@@ -47,6 +47,13 @@ $AppCmd = "$env:windir\system32\inetsrv\appcmd.exe"
 & $AppCmd set config -section:system.webServer/proxy /enabled:"True" /commit:apphost | Out-Null
 Write-Host "   [+] Complementos de IIS configurados exitosamente." -ForegroundColor Green
 
+# 1.5 Configuración de Red PostgreSQL y Firewall de Windows
+Write-Host "`n1.5. Configurando red de PostgreSQL (0.0.0.0/0) y Firewall..." -ForegroundColor Yellow
+$RemoteScript = "$PSScriptRoot\Configure-PostgresRemote.ps1"
+if (Test-Path $RemoteScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File "$RemoteScript" -Elevated
+}
+
 # 2. Compilar Next.js en Modo Standalone
 Write-Host "`n2. Compilando código de la plataforma Next.js... (Puede tardar 2+ minutos)" -ForegroundColor Yellow
 Set-Location $RootDir

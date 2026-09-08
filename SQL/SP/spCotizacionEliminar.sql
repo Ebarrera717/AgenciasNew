@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public.spCotizacionEliminar(
     p_quotation_id INT,
     p_acting_user_id INT,

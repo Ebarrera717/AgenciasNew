@@ -33,7 +33,9 @@ import {
     Activity,
     Stethoscope,
     RefreshCw,
-    Server
+    Server,
+    SlidersHorizontal,
+    ArrowUpDown
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SearchSelect } from '@/components/SearchSelect'
@@ -243,6 +245,7 @@ export default function SettingsPage() {
     const [branches, setBranches] = useState<any[]>([])
     const [implants, setImplants] = useState<any[]>([])
     const [taxes, setTaxes] = useState<any[]>([])
+    const [allTaxes, setAllTaxes] = useState<any[]>([])
     const [sellers, setSellers] = useState<any[]>([])
     const [ticketPrinters, setTicketPrinters] = useState<any[]>([])
     const [prestadoras, setHotels] = useState<any[]>([])
@@ -269,6 +272,38 @@ export default function SettingsPage() {
     const [transactionConsecutives, setTransactionConsecutives] = useState<any[]>([])
     const [masterList, setMasterList] = useState<any[]>([])
     const [dynamicMasterOptions, setDynamicMasterOptions] = useState<any[]>([])
+
+    // Sub-pestaña para la categorización de Parámetros del Sistema (SQL Server, Tarifa Admin, Licencia, General)
+    const [paramSubTab, setParamSubTab] = useState<'sql' | 'tarifa_admin' | 'licencia' | 'general' | 'todos'>('sql')
+
+    const getParamCategory = (item: any): 'sql' | 'tarifa_admin' | 'licencia' | 'general' => {
+        const code = (item?.code || '').toUpperCase();
+        const name = (item?.name || '').toUpperCase();
+
+        if (code.includes('SQL') || name.includes('SQL')) {
+            return 'sql';
+        }
+        if (
+            code.includes('TARIFA_ADMIN') || 
+            name.includes('TARIFA ADMIN') || 
+            code.includes('ADMINISTRATIV') || 
+            name.includes('ADMINISTRATIV')
+        ) {
+            return 'tarifa_admin';
+        }
+        if (
+            code.includes('LICENSE') || 
+            name.includes('LICENCIA') || 
+            code.includes('AGENCY_') || 
+            name.includes('AGENCIA') ||
+            code === 'AGENCY_NAME' || 
+            code === 'AGENCY_NIT' ||
+            name.includes('NIT')
+        ) {
+            return 'licencia';
+        }
+        return 'general';
+    };
 
     // Pagination states
     const [currentPage, setCurrentPage] = useState(1)
@@ -332,6 +367,7 @@ export default function SettingsPage() {
     const [formData, setFormData] = useState<any>({})
     const [searchTerm, setSearchTerm] = useState('')
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+    const [statusSort, setStatusSort] = useState<'all' | 'active-first' | 'inactive-first' | 'only-active' | 'only-inactive'>('all')
 
     // Debounce search term
     useEffect(() => {
@@ -760,7 +796,9 @@ export default function SettingsPage() {
                     fetch('/api/config/taxes').then(res => res.json()).catch(() => [])
                 ]);
                 setTicketTypes(Array.isArray(ttRes) ? ttRes : (ttRes?.data || []));
-                setTaxes(Array.isArray(taxRes) ? taxRes : (taxRes?.data || []));
+                const list = Array.isArray(taxRes) ? taxRes : (taxRes?.data || []);
+                setTaxes(list);
+                setAllTaxes(list);
             } else if (tab === 'combos') {
                 const [prodRes, taxRes, provRes, prestRes] = await Promise.all([
                     fetch('/api/products').then(res => res.json()).catch(() => []),
@@ -769,9 +807,15 @@ export default function SettingsPage() {
                     fetch('/api/config/prestadoras').then(res => res.json()).catch(() => [])
                 ]);
                 setProducts(Array.isArray(prodRes) ? prodRes : (prodRes?.data || []));
-                setTaxes(Array.isArray(taxRes) ? taxRes : (taxRes?.data || []));
+                const list = Array.isArray(taxRes) ? taxRes : (taxRes?.data || []);
+                setTaxes(list);
+                setAllTaxes(list);
                 setProviders(Array.isArray(provRes) ? provRes : []);
                 setHotels(Array.isArray(prestRes) ? prestRes : []);
+            } else if (tab === 'impuestos') {
+                const taxRes = await fetch('/api/config/taxes').then(res => res.json()).catch(() => []);
+                const list = Array.isArray(taxRes) ? taxRes : (taxRes?.data || []);
+                setAllTaxes(list);
             } else if (tab === 'usuarios' || tab === 'resoluciones-documentos' || tab === 'consecutivos-transacciones') {
                 const [b, i, tp] = await Promise.all([
                     fetch('/api/config/branches').then(res => res.json()),
@@ -945,6 +989,89 @@ export default function SettingsPage() {
             </td>
         );
     };
+
+    const isItemActive = (item: any) => {
+        if (!item || typeof item !== 'object') return true;
+        if (item.isActive === false || item.isActive === 0 || item.isActive === 'false') return false;
+        if (item.is_active === false || item.is_active === 0 || item.is_active === 'false') return false;
+        if (item.active === false || item.active === 0 || item.active === 'false') return false;
+        if (item.activo === false || item.activo === 0 || item.activo === 'false') return false;
+        if (item.inactive === true || item.inactive === 1 || item.inactive === 'true') return false;
+        if (item.inactivo === true || item.inactivo === 1 || item.inactivo === 'true') return false;
+        return true;
+    };
+
+    const sortAndFilterMasterItems = <T extends any>(items: T[]): T[] => {
+        if (!Array.isArray(items)) return [];
+        let result = [...items];
+
+        if (statusSort === 'only-active') {
+            result = result.filter(item => isItemActive(item));
+        } else if (statusSort === 'only-inactive') {
+            result = result.filter(item => !isItemActive(item));
+        }
+
+        if (statusSort === 'active-first') {
+            result.sort((a, b) => {
+                const aAct = isItemActive(a) ? 1 : 0;
+                const bAct = isItemActive(b) ? 1 : 0;
+                return bAct - aAct;
+            });
+        } else if (statusSort === 'inactive-first') {
+            result.sort((a, b) => {
+                const aAct = isItemActive(a) ? 1 : 0;
+                const bAct = isItemActive(b) ? 1 : 0;
+                return aAct - bAct;
+            });
+        }
+
+        return result;
+    };
+
+    const cycleStatusSort = () => {
+        setStatusSort(prev => {
+            if (prev === 'all') return 'active-first';
+            if (prev === 'active-first') return 'inactive-first';
+            if (prev === 'inactive-first') return 'only-active';
+            if (prev === 'only-active') return 'only-inactive';
+            return 'all';
+        });
+    };
+
+    const renderEstadoTh = () => (
+        <th
+            onClick={cycleStatusSort}
+            title="Haga clic para ordenar o filtrar por Estado (Activos primero, Inactivos primero, Solo Activos, Solo Inactivos, Todos)"
+            className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest cursor-pointer select-none hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
+        >
+            <div className="flex items-center gap-1.5">
+                <span>Estado</span>
+                {statusSort === 'active-first' && (
+                    <span className="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 rounded-md font-extrabold flex items-center gap-1 normal-case tracking-normal">
+                        🟢 Activos ⬇
+                    </span>
+                )}
+                {statusSort === 'inactive-first' && (
+                    <span className="px-1.5 py-0.5 text-[9px] bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 rounded-md font-extrabold flex items-center gap-1 normal-case tracking-normal">
+                        🔴 Inactivos ⬇
+                    </span>
+                )}
+                {statusSort === 'only-active' && (
+                    <span className="px-1.5 py-0.5 text-[9px] bg-emerald-600 text-white rounded-md font-extrabold flex items-center gap-1 normal-case tracking-normal">
+                        Solo Activos
+                    </span>
+                )}
+                {statusSort === 'only-inactive' && (
+                    <span className="px-1.5 py-0.5 text-[9px] bg-rose-600 text-white rounded-md font-extrabold flex items-center gap-1 normal-case tracking-normal">
+                        Solo Inactivos
+                    </span>
+                )}
+                {statusSort === 'all' && (
+                    <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
+                )}
+            </div>
+        </th>
+    );
 
     const handleOpenModal = (item?: any) => {
         fetchLookupData(activeTab);
@@ -1345,17 +1472,79 @@ export default function SettingsPage() {
 
 
 
-            {/* Barra de Búsqueda */}
-            <div className="mb-8 flex items-center gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
-                    <input
-                        type="text"
-                        placeholder={`Buscar en ${TAB_CONFIG[activeTab]?.plural || activeTab}...`}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full h-14 pl-14 pr-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium text-zinc-900 dark:text-white"
-                    />
+            {/* Barra de Búsqueda y Sub-pestañas de Parámetros */}
+            <div className="mb-8 space-y-4">
+                {activeTab === 'parametros' && (
+                    <div className="flex flex-wrap items-center gap-2 p-1.5 bg-zinc-100 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/50">
+                        {[
+                            { id: 'sql', label: 'SQL Server', icon: Server, color: 'text-blue-500' },
+                            { id: 'tarifa_admin', label: 'Tarifa Administrativa', icon: DollarSign, color: 'text-emerald-500' },
+                            { id: 'licencia', label: 'Licencia', icon: Key, color: 'text-amber-500' },
+                            { id: 'general', label: 'General', icon: Settings, color: 'text-zinc-500' },
+                            { id: 'todos', label: 'Todos los Parámetros', icon: Database, color: 'text-purple-500' },
+                        ].map((subTab) => {
+                            const count = (parameters || []).filter(item => {
+                                if (subTab.id === 'todos') return true;
+                                return getParamCategory(item) === subTab.id;
+                            }).length;
+                            const Icon = subTab.icon;
+                            const isSelected = paramSubTab === subTab.id;
+                            return (
+                                <button
+                                    key={subTab.id}
+                                    type="button"
+                                    onClick={() => setParamSubTab(subTab.id as any)}
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer",
+                                        isSelected
+                                            ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm border border-zinc-200 dark:border-zinc-700"
+                                            : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-800/40"
+                                    )}
+                                >
+                                    <Icon className={cn("w-4 h-4", subTab.color)} />
+                                    <span>{subTab.label}</span>
+                                    <span className={cn(
+                                        "px-2 py-0.5 rounded-full text-[10px] font-extrabold",
+                                        isSelected
+                                            ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                                            : "bg-zinc-200/60 dark:bg-zinc-700/60 text-zinc-500 dark:text-zinc-400"
+                                    )}>
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative flex-1 min-w-[260px]">
+                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                        <input
+                            type="text"
+                            placeholder={`Buscar en ${TAB_CONFIG[activeTab]?.plural || activeTab}...`}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full h-14 pl-14 pr-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium text-zinc-900 dark:text-white"
+                        />
+                    </div>
+
+                    {/* Selector de Orden y Filtro por Estado */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-14 px-4 rounded-2xl shadow-sm">
+                        <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
+                        <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 hidden sm:inline">Estado:</span>
+                        <select
+                            value={statusSort}
+                            onChange={(e) => setStatusSort(e.target.value as any)}
+                            className="bg-transparent text-xs font-bold text-zinc-800 dark:text-zinc-200 outline-none cursor-pointer pr-1"
+                        >
+                            <option value="all" className="dark:bg-zinc-900">Todos los estados</option>
+                            <option value="active-first" className="dark:bg-zinc-900">🟢 Activos primero</option>
+                            <option value="inactive-first" className="dark:bg-zinc-900">🔴 Inactivos primero</option>
+                            <option value="only-active" className="dark:bg-zinc-900">Solo Activos</option>
+                            <option value="only-inactive" className="dark:bg-zinc-900">Solo Inactivos</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -1675,7 +1864,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Usuario</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Rol</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Edición Reportes</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'extraccion-interfaces' ? (
@@ -1685,7 +1874,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código del Campo</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Prefijo / Constante en Archivo</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Delimitador</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'resoluciones-documentos' ? (
@@ -1697,7 +1886,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Rango Numeración</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Consecutivo Actual</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Vencimiento</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'consecutivos-transacciones' ? (
@@ -1709,7 +1898,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Consecutivo Actual</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Sucursal</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Implante</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'impuestos' ? (
@@ -1721,14 +1910,14 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Valor</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Homologación</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Editable</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'vendedores' || activeTab === 'tiqueteadores' ? (
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre del {activeTab === 'vendedores' ? 'Vendedor' : 'Tiqueteador'}</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'prestadoras' ? (
@@ -1738,7 +1927,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Proveedor</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Categoría</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Tipo</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'proveedores' ? (
@@ -1748,7 +1937,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Tipo Proveedor</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Sigla / Aerolínea</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Contacto</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'tipos-proveedores' ? (
@@ -1756,7 +1945,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">¿Es Aerolínea?</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'clientes' ? (
@@ -1765,7 +1954,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Vendedor por Defecto</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Contacto</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'productos' ? (
@@ -1776,7 +1965,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Costo</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Precio Base</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Cargos Asignados</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'monedas' ? (
@@ -1785,7 +1974,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Moneda</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Tasa Conv.</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Decimales</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'logs' ? (
@@ -1799,7 +1988,7 @@ export default function SettingsPage() {
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código Único</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Variable</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'parametros' ? (
@@ -1813,7 +2002,7 @@ export default function SettingsPage() {
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'equivalencias' ? (
@@ -1822,49 +2011,49 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Maestro</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código Maestro</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código Equiv.</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'tarjetas-credito' ? (
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'formas-pago' ? (
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'paises' ? (
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'ciudades' ? (
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'aeropuertos' ? (
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : activeTab === 'tipos-tiquetes' ? (
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     ) : (
@@ -1872,17 +2061,17 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Descripción</th>
                                             {activeTab === 'implants' && <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Sucursal</th>}
-                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Estado</th>
+                                            {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
                                     )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-medium">
-                                {activeTab === 'usuarios' && (users || []).filter(user => 
+                                {activeTab === 'usuarios' && sortAndFilterMasterItems((users || []).filter(user => 
                                     user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     user.email.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(user => (
+                                )).map(user => (
                                     <tr key={user.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all">
                                         <td className="px-8 py-6">
                                             <div className="font-bold text-zinc-900 dark:text-white mb-0.5">{user.name}</div>
@@ -1911,10 +2100,10 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'impuestos' && (taxes || []).filter(tax => 
+                                {activeTab === 'impuestos' && sortAndFilterMasterItems((taxes || []).filter(tax => 
                                     tax?.name?.toLowerCase().includes((searchTerm || '').toLowerCase()) || 
                                     tax?.code?.toLowerCase().includes((searchTerm || '').toLowerCase())
-                                ).map(tax => (
+                                )).map(tax => (
                                     <tr key={tax.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-zinc-600 dark:text-zinc-400 text-sm">
                                             <span className="w-7 h-7 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center font-mono font-bold text-xs">
@@ -1925,7 +2114,7 @@ export default function SettingsPage() {
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">
                                             <div>{tax.name}</div>
                                             {tax.targetTaxId && (() => {
-                                                const targetT = (taxes || []).find((t: any) => Number(t.id) === Number(tax.targetTaxId));
+                                                const targetT = ((allTaxes && allTaxes.length > 0 ? allTaxes : taxes) || []).find((t: any) => Number(t.id) === Number(tax.targetTaxId));
                                                 return targetT ? (
                                                     <span className="inline-block mt-1 px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold rounded-md border border-amber-200/60 dark:border-amber-800/40">
                                                         Sumar en: {targetT.name} {targetT.code ? `(${targetT.code})` : ''}
@@ -1969,11 +2158,11 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'prestadoras' && prestadoras.filter(p => 
+                                {activeTab === 'prestadoras' && sortAndFilterMasterItems((prestadoras || []).filter(p => 
                                     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     p.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     p.provider?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(prestadora => (
+                                )).map(prestadora => (
                                     <tr key={prestadora.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{prestadora.code || '-'}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{prestadora.name}</td>
@@ -1997,12 +2186,12 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'equivalencias' && (equivalences || []).filter(item => 
+                                {activeTab === 'equivalencias' && sortAndFilterMasterItems((equivalences || []).filter(item => 
                                     item.interface_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.master_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.cd_maestro?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.cd_codigo?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(item => (
+                                )).map(item => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.interface_name}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-700 dark:text-zinc-300">{item.master_name}</td>
@@ -2018,12 +2207,12 @@ export default function SettingsPage() {
                                     </tr>
                                 ))}
 
-                                {activeTab === 'extraccion-interfaces' && (interfaceExtractRules || []).filter(item => 
+                                {activeTab === 'extraccion-interfaces' && sortAndFilterMasterItems((interfaceExtractRules || []).filter(item => 
                                     item.fieldName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.fieldCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.prefix?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.Interfaces?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(item => (
+                                )).map(item => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.Interfaces?.name || `ID ${item.interfaceId}`}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-700 dark:text-zinc-300">{item.fieldName}</td>
@@ -2043,10 +2232,10 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'clientes' && (clients || []).filter(item => 
+                                {activeTab === 'clientes' && sortAndFilterMasterItems((clients || []).filter(item => 
                                     (item.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     (item.document || '').toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map((item: any) => (
+                                )).map((item: any) => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.document || item.id || '-'}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-700 dark:text-zinc-300">{item.name || item.document || 'Sin nombre'}</td>
@@ -2073,14 +2262,14 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'proveedores' && (providers || []).filter((item: any) => 
+                                {activeTab === 'proveedores' && sortAndFilterMasterItems((providers || []).filter((item: any) => 
                                     item.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.providerTypeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.sigla?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.airlineCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.contactInfo?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map((item: any) => (
+                                )).map((item: any) => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code || item.document || item.id || '-'}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-700 dark:text-zinc-300">{item.name}</td>
@@ -2114,11 +2303,11 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'productos' && (products || []).filter(item => 
+                                {activeTab === 'productos' && sortAndFilterMasterItems((products || []).filter(item => 
                                     item.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.type?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map((item: any) => (
+                                )).map((item: any) => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code || '-'}</td>
                                         <td className="px-8 py-6">
@@ -2151,30 +2340,48 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'parametros' && (parameters || []).filter(item => 
-                                    item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                    item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                    item.value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(item => (
-                                    <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
-                                        <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code}</td>
-                                        <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.name}</td>
-                                        <td className="px-8 py-6 font-medium text-zinc-600 dark:text-zinc-300">{item.value}</td>
-                                        <td className="px-8 py-6 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button onClick={() => handleOpenModal(item)} className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all"><Edit2 className="w-5 h-5" /></button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"><Trash2 className="w-5 h-5" /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {activeTab === 'combos' && (combos || []).filter(item => 
+                                {activeTab === 'parametros' && (() => {
+                                    const filtered = (parameters || []).filter(item => {
+                                        const matchesCategory = paramSubTab === 'todos' || getParamCategory(item) === paramSubTab;
+                                        const matchesSearch = 
+                                            (item.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                            (item.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            (item.value || '').toString().toLowerCase().includes(searchTerm.toLowerCase());
+                                        return matchesCategory && matchesSearch;
+                                    });
+
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <tr>
+                                                <td colSpan={4} className="px-8 py-12 text-center text-zinc-400 dark:text-zinc-500 font-medium">
+                                                    No se encontraron parámetros en esta categoría.
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+
+                                    return filtered.map(item => (
+                                        <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
+                                            <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code}</td>
+                                            <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.name}</td>
+                                            <td className="px-8 py-6 font-medium text-zinc-600 dark:text-zinc-300 max-w-md truncate">{item.value}</td>
+                                            <td className="px-8 py-6 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button onClick={() => handleOpenModal(item)} className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all"><Edit2 className="w-5 h-5" /></button>
+                                                    <button onClick={() => handleDelete(item.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"><Trash2 className="w-5 h-5" /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ));
+                                })()}
+                                {activeTab === 'combos' && sortAndFilterMasterItems((combos || []).filter(item => 
                                     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.code?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(item => (
+                                )).map(item => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.name}</td>
+                                        {renderMasterStatusTd(item)}
                                         <td className="px-8 py-6 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button onClick={() => handleDuplicateCombo(item)} title="Duplicar Combo" className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all"><Copy className="w-5 h-5" /></button>
@@ -2184,10 +2391,10 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'monedas' && (currencies || []).filter(item => 
+                                {activeTab === 'monedas' && sortAndFilterMasterItems((currencies || []).filter(item => 
                                     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.code?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(item => (
+                                )).map(item => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.name}</td>
@@ -2202,33 +2409,14 @@ export default function SettingsPage() {
                                         </td>
                                     </tr>
                                 ))}
-                                {activeTab === 'equivalencias' && (equivalences || []).filter(item => 
-                                    item.interface_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                    item.master_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                    item.cd_maestro?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                    item.cd_codigo?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map(item => (
-                                    <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
-                                        <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.interface_name}</td>
-                                        <td className="px-8 py-6 font-bold text-zinc-700 dark:text-zinc-300">{item.master_name}</td>
-                                        <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.cd_maestro}</td>
-                                        <td className="px-8 py-6 font-bold text-zinc-700 dark:text-zinc-300">{item.cd_codigo}</td>
-                                        <td className="px-8 py-6 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button onClick={() => handleOpenModal(item)} className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all"><Edit2 className="w-5 h-5" /></button>
-                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"><Trash2 className="w-5 h-5" /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
 
-                                {activeTab === 'resoluciones-documentos' && (documentResolutions || [])
+                                {activeTab === 'resoluciones-documentos' && sortAndFilterMasterItems((documentResolutions || [])
                                 .filter((item: any) => 
                                     item.resolutionNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.branchName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.implantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.prefix?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map((item: any) => (
+                                )).map((item: any) => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-bold text-zinc-900 dark:text-white">{item.branchName || 'Todas'}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-600 dark:text-zinc-300">{item.implantName || 'Todos'}</td>
@@ -2239,13 +2427,7 @@ export default function SettingsPage() {
                                         <td className="px-8 py-6 font-mono text-xs text-zinc-600 dark:text-zinc-400">{item.initialNumber} - {item.finalNumber}</td>
                                         <td className="px-8 py-6 font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">{item.currentNumber}</td>
                                         <td className="px-8 py-6 text-xs text-zinc-500">{item.expirationDate ? new Date(item.expirationDate).toLocaleDateString() : '-'}</td>
-                                        <td className="px-8 py-6">
-                                            {item.isActive ? (
-                                                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">Activa</span>
-                                            ) : (
-                                                <span className="text-xs font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">Inactiva</span>
-                                            )}
-                                        </td>
+                                        {renderMasterStatusTd(item)}
                                         <td className="px-8 py-6 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button onClick={() => handleOpenModal(item)} className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all"><Edit2 className="w-5 h-5" /></button>
@@ -2255,14 +2437,14 @@ export default function SettingsPage() {
                                     </tr>
                                 ))}
 
-                                {activeTab === 'consecutivos-transacciones' && (transactionConsecutives || [])
+                                {activeTab === 'consecutivos-transacciones' && sortAndFilterMasterItems((transactionConsecutives || [])
                                 .filter((item: any) => 
                                     item.transactionType?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.branchName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.implantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.prefix?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map((item: any) => (
+                                )).map((item: any) => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-mono font-bold text-blue-600 dark:text-blue-400">{item.transactionType}</td>
                                         <td className="px-8 py-6 font-bold text-zinc-800 dark:text-zinc-200">{item.description}</td>
@@ -2283,12 +2465,12 @@ export default function SettingsPage() {
                                     </tr>
                                 ))}
 
-                                {((activeTab === 'vendedores' ? sellers : activeTab === 'tiqueteadores' ? ticketPrinters : activeTab === 'sucursales' ? branches : activeTab === 'implants' ? implants : activeTab === 'variables' ? variables : activeTab === 'tarjetas-credito' ? creditCards : activeTab === 'formas-pago' ? payments : activeTab === 'paises' ? countries : activeTab === 'ciudades' ? cities : activeTab === 'aeropuertos' ? airports : activeTab === 'tipos-tiquetes' ? ticketTypes : activeTab === 'estados-cotizacion' ? quotationStates : activeTab === 'tipos-proveedores' ? providerTypes : []) || [])
+                                {sortAndFilterMasterItems(((activeTab === 'vendedores' ? sellers : activeTab === 'tiqueteadores' ? ticketPrinters : activeTab === 'sucursales' ? branches : activeTab === 'implants' ? implants : activeTab === 'variables' ? variables : activeTab === 'tarjetas-credito' ? creditCards : activeTab === 'formas-pago' ? payments : activeTab === 'paises' ? countries : activeTab === 'ciudades' ? cities : activeTab === 'aeropuertos' ? airports : activeTab === 'tipos-tiquetes' ? ticketTypes : activeTab === 'estados-cotizacion' ? quotationStates : activeTab === 'tipos-proveedores' ? providerTypes : []) || [])
                                 .filter((item: any) => 
                                     item.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                     item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                     item.email?.toLowerCase().includes(searchTerm.toLowerCase())
-                                ).map((item: any) => (
+                                )).map((item: any) => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code || '-'}</td>
                                         <td className="px-8 py-6">
@@ -2585,7 +2767,7 @@ export default function SettingsPage() {
                                                  onChange={(e) => setFormData({ ...formData, targetTaxId: e.target.value ? parseInt(e.target.value) : null })}
                                              >
                                                  <option value="">Ninguno (Mantener independiente)</option>
-                                                 {(taxes || []).filter((t: any) => Number(t.id) !== Number(formData.id)).map((t: any) => (
+                                                 {((allTaxes && allTaxes.length > 0 ? allTaxes : taxes) || []).filter((t: any) => Number(t.id) !== Number(formData.id)).map((t: any) => (
                                                      <option key={t.id} value={t.id}>
                                                          {t.name} {t.code ? `(${t.code})` : ''}
                                                      </option>
@@ -3551,7 +3733,7 @@ export default function SettingsPage() {
 
                                                                     {/* Right: Individually applied taxes */}
                                                                     <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
-                                                                        {taxes.map(tax => {
+                                                                        {(allTaxes && allTaxes.length > 0 ? allTaxes : taxes).map(tax => {
                                                                             const appliedTax = (cp.appliedTaxes || []).find((at: any) => at.chargeAndTaxId === tax.id);
                                                                             const checked = !!appliedTax;
                                                                             return (

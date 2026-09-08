@@ -18,7 +18,7 @@ if (fs.existsSync(envPath)) {
     });
 }
 
-const SECRET_KEY = process.env.LICENSE_SECRET || process.env.NEXTAUTH_SECRET || 'Korex_Master_License_Secret_Key_2026_Secure';
+const SECRET_KEY = process.env.LICENSE_SECRET || 'Korex_Master_License_Secret_Key_2026_Secure';
 
 function generarLicencia(cliente, nit, fechaExpiracion) {
     if (!cliente || !nit || !fechaExpiracion) {

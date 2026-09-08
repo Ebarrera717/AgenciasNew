@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spBranchEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public.spBranchEliminar(
     p_id INT,
     p_acting_user_id INT,

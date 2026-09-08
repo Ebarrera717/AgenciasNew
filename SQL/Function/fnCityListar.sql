@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCityListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public."fnCityListar"()
 RETURNS TABLE(id integer, code text, name text, "countriesId" integer, statecode text, iata text, "countryName" text)
 LANGUAGE plpgsql AS $function$

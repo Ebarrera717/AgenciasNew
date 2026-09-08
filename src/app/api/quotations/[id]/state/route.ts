@@ -15,7 +15,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spCotizacionActualizarEstadoManual($1::INT, $2::TEXT, $3::TEXT, $4::INT, $5::TEXT)`,
+            `CALL public."spCotizacionActualizarEstadoManual"($1::INT, $2::TEXT, $3::TEXT, $4::INT, $5::TEXT)`,
             id,
             state,
             description || null,

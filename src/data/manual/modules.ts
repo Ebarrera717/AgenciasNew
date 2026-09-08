@@ -387,7 +387,7 @@ export const MANUAL_MODULES: ManualModule[] = [
         iconName: 'Settings',
         category: 'Configuración Global',
         description: 'Manual de funcionamiento detallado para cada una de las 25 tablas maestras, parámetros, usuarios y módulos del sitio.',
-        overview: 'El módulo de Configuración (/dashboard/settings) administra todas las tablas maestras de la plataforma. A continuación se describe el funcionamiento detallado de cada una de las pestañas maestras activas.',
+        overview: 'El módulo de Configuración (/dashboard/settings) administra todas las tablas maestras de la plataforma. Cuenta con selector dinámico de ordenamiento y filtrado por estado (Activos primero, Inactivos primero, Solo Activos, Solo Inactivos) tanto en los controles principales como haciendo clic directo en el encabezado de la columna "Estado" de las tablas.',
         procedures: [
             {
                 code: 'MAE-01',
@@ -751,14 +751,17 @@ export const MANUAL_MODULES: ManualModule[] = [
                 code: 'MAE-23',
                 masterCode: 'SystemParameter',
                 name: 'Maestro de Parámetros del Sistema',
-                summary: 'Variables de configuración global (SystemParameter).',
-                concept: 'Administra configuraciones globales como IVA por defecto, empresa y licencias.',
+                summary: 'Variables de configuración global organizadas en sub-pestañas categóricas (SQL Server, Tarifa Administrativa, Licencia y General).',
+                concept: 'Administra configuraciones globales agrupadas dinámicamente en sub-pestañas: SQL Server (conexión y exportación automática Zeus ERP), Tarifa Administrativa (rangos y cobros), Licencia (NIT, Razón Social y claves cifradas) y General (tasa IATA, país, etc.).',
                 fields: [
-                    { name: 'Código Parámetro', type: 'Texto', description: 'Identificador del parámetro.' },
-                    { name: 'Valor Parámetro', type: 'Texto', description: 'Valor activo asignado.' }
+                    { name: 'Categorías (Sub-pestañas)', type: 'Navegación', description: 'Permite filtrar parámetros entre SQL Server, Tarifa Administrativa, Licencia, General y Todos.' },
+                    { name: 'Código Parámetro', type: 'Texto', description: 'Identificador técnico único del parámetro.' },
+                    { name: 'Nombre descriptivo', type: 'Texto', description: 'Nombre funcional del parámetro.' },
+                    { name: 'Valor Parámetro', type: 'Texto / JSON', description: 'Valor activo o configuración en formato texto o JSON.' }
                 ],
                 steps: [
-                    { number: 1, title: 'Ajustar Parámetro', description: 'En la pestaña "Parámetros", modifique los valores globales del sistema.' }
+                    { number: 1, title: 'Filtrar por Categoría', description: 'Seleccione la sub-pestaña deseada ("SQL Server", "Tarifa Administrativa", "Licencia" o "General") para ubicar rápidamente la variable a modificar.' },
+                    { number: 2, title: 'Ajustar Parámetro', description: 'Haga clic en el botón de edición para actualizar el valor global correspondiente.' }
                 ]
             },
             {

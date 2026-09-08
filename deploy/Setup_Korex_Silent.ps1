@@ -184,6 +184,13 @@ if (Test-Path $AppCmd) {
     & $AppCmd set config -section:system.webServer/proxy /enabled:"True" /commit:apphost 2>&1 >> $LogFile
 }
 
+# Paso 2.5. CONFIGURAR ACCESO REMOTO POSTGRESQL Y FIREWALL
+Write-Log "Configurando reglas de red y Firewall para PostgreSQL y Servidor Web..."
+$RemoteScript = Join-Path $PSScriptRoot "Configure-PostgresRemote.ps1"
+if (Test-Path $RemoteScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File "$RemoteScript" -Elevated
+}
+
 # Paso 3. CONFIGURAR PUERTOS Y DETENER SERVICIOS REMANENTES
 $SitePort = 3000
 $NextjsPort = 3001
@@ -237,7 +244,7 @@ Write-Log "Configuracion de conexion DB cargada para ejecucion: Host=$PgHost, Po
 # Actualizar el archivo .env con los puertos dinámicos resultantes
 Write-Log "Actualizando archivo .env con puertos finales (IIS=$SitePort, Next.js=$NextjsPort)..."
 $DatabaseUrl = "postgresql://$($PgUser):$($PgPass)@$($PgHost):$($PgPort)/$($PgDb)?schema=public"
-$NewEnvContent = "DATABASE_URL=`"$DatabaseUrl`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
+$NewEnvContent = "DATABASE_URL=`"$DatabaseUrl`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nLICENSE_SECRET=`"Korex_Master_License_Secret_Key_2026_Secure`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
 Set-Content -Path $EnvFile -Value $NewEnvContent -Encoding UTF8
 
 # Paso 5. ACTUALIZAR CONFIGURACIÓN DE PROXY EN web.config

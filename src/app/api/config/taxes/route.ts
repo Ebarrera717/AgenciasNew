@@ -66,8 +66,10 @@ export async function POST(req: NextRequest) {
         const productIdsJson = JSON.stringify(Array.isArray(productIds) ? productIds : []);
         const parsedTargetTaxId = targetTaxId !== undefined && targetTaxId !== null && targetTaxId !== '' ? parseInt(targetTaxId) : null;
 
+        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
+
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spImpuestoCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::TEXT, $5::DECIMAL, $6::BOOLEAN, $7::INT, $8::JSONB, $9::INT, $10::INT, $11::INT, $12::TEXT)`,
+            `CALL public.spImpuestoCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::TEXT, $5::DECIMAL, $6::BOOLEAN, $7::INT, $8::JSONB, $9::INT, $10::BOOLEAN, $11::INT, $12::INT, $13::TEXT)`,
             code || null,
             name,
             type,
@@ -77,6 +79,7 @@ export async function POST(req: NextRequest) {
             numericOrden,
             productIdsJson,
             parsedTargetTaxId,
+            isAct,
             actingUserId,
             0, // p_tax_id
             '' // p_mensaje_resultado

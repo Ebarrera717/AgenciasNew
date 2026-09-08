@@ -112,7 +112,25 @@ Copy-Item ".\deploy\Update_Korex.ps1" -Destination $ReleaseDir -Force
 Copy-Item ".\deploy\db_installer.js" -Destination $ReleaseDir -Force
 Copy-Item ".\deploy\web.config" -Destination $ReleaseDir -Force
 
+# Herramientas Administrativas (Limpieza de Movimientos y Activar Licencia)
+if (Test-Path ".\Limpiar_Movimientos_Produccion.bat") { Copy-Item ".\Limpiar_Movimientos_Produccion.bat" -Destination $ReleaseDir -Force }
+if (Test-Path ".\ActivarLicencia.bat") { Copy-Item ".\ActivarLicencia.bat" -Destination $ReleaseDir -Force }
+
+# Garantizar que GenerarLicencia NO viaje al cliente final por seguridad
+if (Test-Path "$ReleaseDir\GenerarLicencia.bat") { Remove-Item "$ReleaseDir\GenerarLicencia.bat" -Force }
+
+if (!(Test-Path "$ReleaseDir\deploy")) { New-Item -ItemType Directory -Path "$ReleaseDir\deploy" | Out-Null }
+if (Test-Path ".\deploy\clean_movement_tables.js") { Copy-Item ".\deploy\clean_movement_tables.js" -Destination "$ReleaseDir\deploy" -Force }
+
+if (!(Test-Path "$ReleaseDir\scripts")) { New-Item -ItemType Directory -Path "$ReleaseDir\scripts" | Out-Null }
+if (Test-Path ".\scripts\activar-licencia.js") { Copy-Item ".\scripts\activar-licencia.js" -Destination "$ReleaseDir\scripts" -Force }
+
+# Garantizar que generar-licencia.js NO viaje al cliente final
+if (Test-Path "$ReleaseDir\scripts\generar-licencia.js") { Remove-Item "$ReleaseDir\scripts\generar-licencia.js" -Force }
+
 # SQL Master
+if (!(Test-Path "$ReleaseDir\SQL\SP")) { New-Item -ItemType Directory -Path "$ReleaseDir\SQL\SP" -Force | Out-Null }
+if (Test-Path ".\SQL\SP\spLimpiarMovimientosProduccion.sql") { Copy-Item ".\SQL\SP\spLimpiarMovimientosProduccion.sql" -Destination "$ReleaseDir\SQL\SP" -Force }
 if (Test-Path ".\SQL\Actualizador\Actualizador.SQL") { Copy-Item ".\SQL\Actualizador\Actualizador.SQL" -Destination "$ReleaseDir\SQL" -Force }
 if (Test-Path ".\SQL\Actualizador\ActualizadorSERVER.SQL") { Copy-Item ".\SQL\Actualizador\ActualizadorSERVER.SQL" -Destination "$ReleaseDir\SQL" -Force }
 if (Test-Path ".\SQL\Data\Inicial.sql") { Copy-Item ".\SQL\Data\Inicial.sql" -Destination "$ReleaseDir\SQL" -Force }

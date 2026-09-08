@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInterfaceAmadeus'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE spInterfaceAmadeus(
     p_op TEXT,
     p_Booking TEXT,

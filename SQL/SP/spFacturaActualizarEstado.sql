@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spFacturaActualizarEstado'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spFacturaActualizarEstado"(
     IN p_results JSONB
 )

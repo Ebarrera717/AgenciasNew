@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPreCotizacionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 -- =============================================
 -- Procedimiento Almacenado: spPreCotizacionCrear
 -- Descripción: Procedimiento en PostgreSQL para crear Pre-Cotizaciones con consecutivo unificado compartido.

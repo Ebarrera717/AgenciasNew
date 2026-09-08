@@ -1,5 +1,115 @@
 DO $$
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'EquivalenciasInterfaces_Log') THEN
+        CREATE TABLE public."EquivalenciasInterfaces_Log" (
+            "id" integer DEFAULT nextval('"EquivalenciasInterfaces_Log_id_seq"'::regclass) NOT NULL,
+            "Id_Interfaces" integer,
+            "cd_maestro" character varying,
+            "cd_codigo" character varying,
+            "cd_codigoInte" character varying,
+            "cd_operacion" character varying,
+            "ds_xmlpeticion" text,
+            "ds_xmlrespuesta" text,
+            "ds_xmlorg" text,
+            "ds_Logpeticion" text,
+            "fecha_creacion" timestamp without time zone DEFAULT now()
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Attachment') THEN
+        CREATE TABLE public."Attachment" (
+            "id" integer DEFAULT nextval('"Attachment_id_seq"'::regclass) NOT NULL,
+            "quotationId" integer NOT NULL,
+            "fileName" text NOT NULL,
+            "fileType" text NOT NULL,
+            "fileSize" integer NOT NULL,
+            "fileContent" bytea NOT NULL,
+            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ExecutionProcedure') THEN
+        CREATE TABLE public."ExecutionProcedure" (
+            "id" integer DEFAULT nextval('"ExecutionProcedure_id_seq"'::regclass) NOT NULL,
+            "name" character varying NOT NULL,
+            "spName" character varying NOT NULL,
+            "description" text,
+            "parameters" jsonb,
+            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ExecutionPreset') THEN
+        CREATE TABLE public."ExecutionPreset" (
+            "id" integer DEFAULT nextval('"ExecutionPreset_id_seq"'::regclass) NOT NULL,
+            "name" character varying NOT NULL,
+            "procedureId" integer NOT NULL,
+            "description" text,
+            "filterValues" jsonb,
+            "filterConfig" jsonb,
+            "columnConfigs" jsonb,
+            "selectedTotals" jsonb,
+            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'BookingGDSInvoiceAutoLog') THEN
+        CREATE TABLE public."BookingGDSInvoiceAutoLog" (
+            "Id" integer DEFAULT nextval('"BookingGDSInvoiceAutoLog_id_seq"'::regclass) NOT NULL,
+            "branchId" integer,
+            "implanteId" integer,
+            "date" timestamp without time zone,
+            "menssage" text,
+            "bookingCode" character varying,
+            "bookingId" integer,
+            "error" boolean,
+            "file" text,
+            "userId" integer
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'BookingsGDSInvoiceAuto') THEN
+        CREATE TABLE public."BookingsGDSInvoiceAuto" (
+            "id" integer DEFAULT nextval('"BookingsGDSInvoiceAuto_id_seq"'::regclass) NOT NULL,
+            "Branch" character varying,
+            "implant" character varying,
+            "bookingCode" character varying,
+            "bookingId" integer
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'BookingProductFEEGDS') THEN
+        CREATE TABLE public."BookingProductFEEGDS" (
+            "id" integer DEFAULT nextval('"BookingProductFEEGDS_id_seq"'::regclass) NOT NULL,
+            "bookingProductId" integer NOT NULL,
+            "code" text NOT NULL,
+            "name" text NOT NULL,
+            "type" text NOT NULL,
+            "description" text NOT NULL,
+            "billigconcept" text NOT NULL,
+            "servicetype" text NOT NULL,
+            "amount" double precision NOT NULL,
+            "tax" double precision NOT NULL,
+            "other" double precision NOT NULL,
+            "total" double precision NOT NULL
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'BookingsGDS_log') THEN
+        CREATE TABLE public."BookingsGDS_log" (
+            "id" integer DEFAULT nextval('"BookingsGDS_log_id_seq"'::regclass) NOT NULL,
+            "blanch" character varying,
+            "implant" character varying,
+            "message" text,
+            "file" character varying,
+            "codebooking" character varying,
+            "booking" text,
+            "error" integer DEFAULT 0 NOT NULL
+        );
+    END IF;
+
 
     CREATE SEQUENCE IF NOT EXISTS public.seq_quotation_consecutivo START WITH 1;
 
@@ -2168,7 +2278,7 @@ BEGIN
             "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
         );
     ELSE
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationPrintCustomization_quotationId_key') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationPrintCustomization_quotationId_key') AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'QuotationPrintCustomization_quotationId_key') THEN
             ALTER TABLE public."QuotationPrintCustomization" ADD CONSTRAINT "QuotationPrintCustomization_quotationId_key" UNIQUE ("quotationId");
         END IF;
     END IF;
@@ -2619,7 +2729,7 @@ BEGIN
       AND LOWER(TRIM(a.prefix)) = LOWER(TRIM(b.prefix));
 
     -- Restricción de Unicidad por combinación de Interfaz y Prefijo (interfaceId + prefix)
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'InterfaceExtractParam_interfaceId_prefix_key') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterfaceExtractParam_interfaceId_prefix_key') AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'InterfaceExtractParam_interfaceId_prefix_key') THEN
         ALTER TABLE public."InterfaceExtractParam" 
         ADD CONSTRAINT "InterfaceExtractParam_interfaceId_prefix_key" 
         UNIQUE ("interfaceId", "prefix");
@@ -2637,6 +2747,11 @@ BEGIN
             "finalNumber" integer NOT NULL,
             "currentNumber" integer NOT NULL,
             "resolutionDate" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            "prefix" character varying(20),
+            "expirationDate" timestamp without time zone,
+            "isActive" boolean DEFAULT true NOT NULL,
+            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ReportJoins' AND column_name = 'report_id') THEN
         ALTER TABLE public."ReportJoins" ADD COLUMN "report_id" integer NOT NULL;
@@ -2814,7 +2929,7 @@ BEGIN
       AND LOWER(TRIM(a.prefix)) = LOWER(TRIM(b.prefix));
 
     -- Restricción de Unicidad por combinación de Interfaz y Prefijo (interfaceId + prefix)
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'InterfaceExtractParam_interfaceId_prefix_key') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterfaceExtractParam_interfaceId_prefix_key') AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'InterfaceExtractParam_interfaceId_prefix_key') THEN
         ALTER TABLE public."InterfaceExtractParam" 
         ADD CONSTRAINT "InterfaceExtractParam_interfaceId_prefix_key" 
         UNIQUE ("interfaceId", "prefix");
@@ -2916,6 +3031,13 @@ BEGIN
             "implantId" INT REFERENCES public."Implant"(id) ON DELETE SET NULL,
             "fuente" VARCHAR(50),
             "serie" VARCHAR(50),
+            "consecutivo" BIGINT NOT NULL DEFAULT 0,
+            "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX "idx_sysconsecutivo_codigo" ON public."SysConsecutivo"("codigo");
+        CREATE INDEX "idx_sysconsecutivo_branch" ON public."SysConsecutivo"("branchId");
+        CREATE INDEX "idx_sysconsecutivo_implant" ON public."SysConsecutivo"("implantId");
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'User' AND column_name = 'passwordHash') THEN
         ALTER TABLE public."User" ADD COLUMN "passwordHash" text NOT NULL;
@@ -3009,7 +3131,7 @@ BEGIN
       AND LOWER(TRIM(a.prefix)) = LOWER(TRIM(b.prefix));
 
     -- Restricción de Unicidad por combinación de Interfaz y Prefijo (interfaceId + prefix)
-    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'InterfaceExtractParam_interfaceId_prefix_key') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterfaceExtractParam_interfaceId_prefix_key') AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'InterfaceExtractParam_interfaceId_prefix_key') THEN
         ALTER TABLE public."InterfaceExtractParam" 
         ADD CONSTRAINT "InterfaceExtractParam_interfaceId_prefix_key" 
         UNIQUE ("interfaceId", "prefix");

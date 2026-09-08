@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spCotizacionActualizar($1::INT, $2::JSONB, $3::INT, $4::TEXT)`,
+            `CALL public."spCotizacionActualizar"($1::INT, $2::JSONB, $3::INT, $4::TEXT)`,
             id,
             JSON.stringify(body),
             actingUserId,
@@ -124,7 +124,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spCotizacionEliminar($1::INT, $2::INT, $3::TEXT)`,
+            `CALL public."spCotizacionEliminar"($1::INT, $2::INT, $3::TEXT)`,
             id,
             actingUserId,
             '' // p_mensaje_resultado

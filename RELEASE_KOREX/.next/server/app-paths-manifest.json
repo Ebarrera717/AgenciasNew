@@ -16,6 +16,7 @@
   "/api/config/countries/route": "app/api/config/countries/route.js",
   "/api/config/credit-cards/route": "app/api/config/credit-cards/route.js",
   "/api/config/currencies/route": "app/api/config/currencies/route.js",
+  "/api/config/diagnostics/route": "app/api/config/diagnostics/route.js",
   "/api/config/document-resolutions/route": "app/api/config/document-resolutions/route.js",
   "/api/config/equivalences/route": "app/api/config/equivalences/route.js",
   "/api/config/implants/route": "app/api/config/implants/route.js",

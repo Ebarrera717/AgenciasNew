@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
                 console.log(`[EXPORT_API] Actualizando estados en Postgres para: ${idsStr}`);
                 try {
                     await prisma.$executeRawUnsafe(
-                        `CALL public.spCotizacionActualizarEstado($1::JSONB)`,
+                        `CALL public."spCotizacionActualizarEstado"($1::JSONB)`,
                         JSON.stringify(spResult)
                     );
                 } catch (spPgError) {

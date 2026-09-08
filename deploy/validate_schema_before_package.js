@@ -19,6 +19,7 @@ async function validateAndPrepareSchema(customConnStr) {
   }
 
   const client = new Client({ connectionString });
+  client.on('error', err => console.warn('  [WARN] PG Client async error caught:', err.message));
   await client.connect();
 
   const folders = ['SQL/Table', 'SQL/Function', 'SQL/SP', 'SQL/Procedure'];
@@ -29,10 +30,25 @@ async function validateAndPrepareSchema(customConnStr) {
     const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.sql'));
     for (const file of files) {
       // Ignorar scripts pesados o destructivos
-      if (file === 'TABLEINI.sql' || file === 'Inicial.sql') continue;
-
       const filePath = path.join(dirPath, file);
-      const sql = fs.readFileSync(filePath, 'utf8');
+      let sql = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+
+      // Ignorar procedimientos almacenados exclusivos de SQL Server (Zeus ERP) al compilar en PostgreSQL
+      if (/\bdbo\./i.test(sql) || /^\s*GO\b/im.test(sql) || /sys\.objects/i.test(sql) || /SET ANSI_NULLS/i.test(sql)) {
+        continue;
+      }
+
+      // Auto-inyectar bloque DO $$ de limpieza dinámica si no lo tiene para prevenir errores 42883 de sobrecargas obsoletas
+      const spNameMatch = sql.match(/CREATE\s+OR\s+REPLACE\s+(PROCEDURE|FUNCTION)\s+(?:public\.)?("?[a-zA-Z0-9_]+"|sp[a-zA-Z0-9_]+|fn[a-zA-Z0-9_]+)/i);
+      if (spNameMatch && !sql.includes('DO $$')) {
+        const objectType = spNameMatch[1].toUpperCase();
+        const objectName = spNameMatch[2].replace(/"/g, '');
+        const dropBlock = `DO $$\nDECLARE\n    r RECORD;\nBEGIN\n    FOR r IN \n        SELECT oid::regprocedure AS proc_name \n        FROM pg_proc \n        WHERE proname ILIKE '${objectName}'\n    LOOP\n        EXECUTE 'DROP ${objectType} ' || r.proc_name || '${objectType === 'FUNCTION' ? ' CASCADE' : ''}';\n    END LOOP;\nEND $$;\n\n`;
+        sql = dropBlock + sql;
+        fs.writeFileSync(filePath, sql, 'utf8');
+        console.log(`  [AUTO-FIX] Inyectado bloque DO $$ de limpieza dinámica en ${folder}/${file}`);
+      }
+
       try {
         await client.query(sql);
       } catch (err) {
@@ -58,8 +74,8 @@ async function validateAndPrepareSchema(customConnStr) {
       const matches = content.matchAll(/public\."([A-Za-z0-9_]+)"/g);
       for (const m of matches) {
         const tbl = m[1];
-        // Ignorar invocaciones a procedimientos o funciones (sp*, fn*)
-        if (!tbl.startsWith('sp') && !tbl.startsWith('fn') && !tbl.startsWith('sp_') && !tbl.startsWith('fn_')) {
+        // Ignorar invocaciones a procedimientos o funciones (sp*, fn*) y secuencias (*_seq, seq_*)
+        if (!tbl.startsWith('sp') && !tbl.startsWith('fn') && !tbl.startsWith('sp_') && !tbl.startsWith('fn_') && !tbl.endsWith('_seq') && !tbl.startsWith('seq_')) {
           referencedTables.add(tbl);
         }
       }
@@ -94,8 +110,8 @@ async function validateAndPrepareSchema(customConnStr) {
 
         const createBlock = `\n    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${tableName}') THEN\n        CREATE TABLE public."${tableName}" (\n            ${colDefs.join(',\n            ')}\n        );\n    END IF;\n`;
 
-        // Insertar dentro del bloque DO $$ BEGIN ... END $$; de Alter_New_Columns.sql
-        alterSql = alterSql.replace(/BEGIN\s*\n/, `BEGIN\n${createBlock}`);
+        // Insertar dentro del primer bloque DO $$ BEGIN ... END $$; de Alter_New_Columns.sql
+        alterSql = alterSql.replace(/(DO\s*\$\$\s*\r?\n\s*BEGIN)/i, `$1${createBlock}`);
         fixedTablesCount++;
       }
     }
@@ -184,16 +200,15 @@ async function validateAndPrepareSchema(customConnStr) {
   ];
 
   for (const u of uniqueAudits) {
+    const constraintName = `${u.table}_${u.column}_key`;
     const uRes = await client.query(`
-      SELECT tc.constraint_name 
-      FROM information_schema.table_constraints tc
-      JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-      WHERE tc.table_schema = 'public' AND tc.table_name = $1 AND kcu.column_name = $2 AND tc.constraint_type = 'UNIQUE';
-    `, [u.table, u.column]);
+      SELECT 1 FROM pg_class WHERE relname = $1
+      UNION
+      SELECT 1 FROM pg_constraint WHERE conname = $1;
+    `, [constraintName]);
 
     if (uRes.rows.length === 0) {
       console.log(`  [AUTO-FIX] Agregando restricción UNIQUE a public."${u.table}"("${u.column}")...`);
-      const constraintName = `${u.table}_${u.column}_key`;
       await client.query(`
         DO $$ BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = '${constraintName}') AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${constraintName}') THEN
@@ -439,6 +454,92 @@ async function validateAndPrepareSchema(customConnStr) {
     }
   }
   console.log("  [OK] Funciones de consulta validadas con LEFT JOIN obligatorio.");
+
+  // 3.5 AUDITORÍA AUTOMÁTICA DE FIRMAS Y PARÁMETROS EN API ROUTES VS STORED PROCEDURES / FUNCIONES
+  console.log("\n[PASO 3.5/4] Auditando firmas y parámetros en API Routes vs Stored Procedures y Funciones...");
+  
+  function countCallArguments(argsStr) {
+    const trimmed = argsStr.trim();
+    if (!trimmed) return 0;
+    const placeholders = trimmed.match(/\$(\d+)/g);
+    if (placeholders && placeholders.length > 0) {
+      const numbers = placeholders.map(p => parseInt(p.replace('$', '')));
+      return Math.max(...numbers);
+    }
+    const parts = trimmed.split(/,(?=(?:(?:[^"']*["']){2})*[^"']*$)/);
+    const validParts = parts.map(p => p.trim()).filter(p => p.length > 0);
+    return validParts.length;
+  }
+
+  const procRes = await client.query(`
+    SELECT p.proname, pronargs,
+           pg_get_function_identity_arguments(p.oid) as args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public';
+  `);
+
+  const dbProcs = new Map();
+  for (const row of procRes.rows) {
+    dbProcs.set(row.proname.toLowerCase(), {
+      name: row.proname,
+      argCount: parseInt(row.pronargs),
+      args: row.args
+    });
+  }
+
+  const apiDir = path.join(rootDir, 'src', 'app', 'api');
+  function scanApiFiles(dir) {
+    let results = [];
+    if (!fs.existsSync(dir)) return results;
+    const list = fs.readdirSync(dir);
+    list.forEach(file => {
+      const fullPath = path.join(dir, file);
+      const stat = fs.statSync(fullPath);
+      if (stat && stat.isDirectory()) {
+        results = results.concat(scanApiFiles(fullPath));
+      } else if (file.endsWith('.ts') || file.endsWith('.js')) {
+        results.push(fullPath);
+      }
+    });
+    return results;
+  }
+
+  const apiFiles = scanApiFiles(apiDir);
+  let paramMismatchErrors = 0;
+
+  for (const file of apiFiles) {
+    const content = fs.readFileSync(file, 'utf8');
+    const relFile = path.relative(rootDir, file);
+
+    const matches = content.matchAll(/(?:CALL|FROM)\s+(?:public\.)?("?[a-zA-Z0-9_]+"|sp[a-zA-Z0-9_]+|fn[a-zA-Z0-9_]+)\s*\(([\s\S]*?)\)/gi);
+    for (const m of matches) {
+      const rawName = m[1].replace(/"/g, '');
+      const argsStr = m[2];
+      const nameLower = rawName.toLowerCase();
+
+      if (nameLower.startsWith('sp') || nameLower.startsWith('fn')) {
+        const argCount = countCallArguments(argsStr);
+        const dbProc = dbProcs.get(nameLower);
+
+        if (!dbProc) {
+          console.warn(`  [WARN] Invocación en ${relFile} a '${rawName}' que no existe aún en PostgreSQL local.`);
+        } else if (argCount !== dbProc.argCount) {
+          console.error(`  [ERROR CRITICO PARAMETROS] Mismatch en ${relFile}:`);
+          console.error(`     Invocación Next.js: ${rawName} con ${argCount} argumentos`);
+          console.error(`     Definición en DB: ${dbProc.name} tiene ${dbProc.argCount} parámetros (${dbProc.args})`);
+          paramMismatchErrors++;
+        }
+      }
+    }
+  }
+
+  if (paramMismatchErrors > 0) {
+    console.error(`\n[FATAL] Se encontraron ${paramMismatchErrors} error(es) de número/firmas de parámetros entre API Routes y la Base de Datos.`);
+    console.error("  La compilación pre-despliegue se ha ABORTADO para evitar fallas 42883 en producción.\n");
+    process.exit(1);
+  }
+  console.log("  [OK] Auditoría de firmas de parámetros entre API Routes y DB completada con 0 errores.");
 
   // 4. Sincronizar scripts actualizadores
   console.log("\n[PASO 4/4] Sincronizando scripts actualizadores (Actualizador.sql)...");

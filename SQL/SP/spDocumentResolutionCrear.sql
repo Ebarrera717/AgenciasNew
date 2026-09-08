@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spDocumentResolutionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spDocumentResolutionCrear"(
     IN p_branch_id integer,
     IN p_implant_id integer,

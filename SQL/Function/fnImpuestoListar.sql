@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnImpuestoListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.fnImpuestoListar()
 RETURNS SETOF JSONB
 LANGUAGE plpgsql

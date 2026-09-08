@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMonedaListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 DROP FUNCTION IF EXISTS public.fnMonedaListar(INT);
 
 CREATE OR REPLACE FUNCTION public.fnMonedaListar(

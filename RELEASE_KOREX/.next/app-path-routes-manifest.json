@@ -16,6 +16,7 @@
   "/api/config/countries/route": "/api/config/countries",
   "/api/config/credit-cards/route": "/api/config/credit-cards",
   "/api/config/currencies/route": "/api/config/currencies",
+  "/api/config/diagnostics/route": "/api/config/diagnostics",
   "/api/config/document-resolutions/route": "/api/config/document-resolutions",
   "/api/config/equivalences/route": "/api/config/equivalences",
   "/api/config/implants/route": "/api/config/implants",

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Save, Trash2, Plus, ChevronDown, Calendar, Users, Globe, DollarSign, Briefcase, Hotel as HotelIcon, Tag, Tags, Percent, Calculator, ArrowRight, Loader2, FileDown, Paperclip, FileText, Download, X, Printer, CreditCard, Receipt, Plane, AlertCircle } from 'lucide-react'
+import { Save, Trash2, Plus, ChevronDown, Calendar, Users, Globe, DollarSign, Briefcase, Hotel as HotelIcon, Tag, Tags, Percent, Calculator, ArrowRight, Loader2, FileDown, Paperclip, FileText, Download, X, Printer, CreditCard, Receipt, Plane, AlertCircle, Send, CheckCircle2 } from 'lucide-react'
 import { format, differenceInDays } from 'date-fns'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -109,6 +109,40 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
     const consecutivoParam = searchParams.get('consecutivo')
     const quotationNoticeParam = searchParams.get('quotationNotice')
     const [noticeResponse, setNoticeResponse] = useState('')
+    const [sendingNoticeOnly, setSendingNoticeOnly] = useState(false)
+    const [noticeSendSuccess, setNoticeSendSuccess] = useState('')
+
+    const handleSendNoticeOnly = async () => {
+        if (!preQuotationId || !noticeResponse.trim()) return
+        setSendingNoticeOnly(true)
+        setNoticeSendSuccess('')
+        try {
+            let userObj: any = null
+            try {
+                const stored = localStorage.getItem('user')
+                if (stored) userObj = JSON.parse(stored)
+            } catch (e) {}
+
+            const res = await fetch('/api/prequotations', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-Id': userObj?.id?.toString() || '1'
+                },
+                body: JSON.stringify({
+                    preQuotationId: Number(preQuotationId),
+                    noticeResponse: noticeResponse.trim()
+                })
+            })
+            const resData = await res.json()
+            if (!res.ok) throw new Error(resData.message || 'Error al guardar respuesta')
+            setNoticeSendSuccess(resData.message || 'Respuesta / Duda registrada exitosamente en la Pre-Cotización.')
+        } catch (err: any) {
+            alert(err.message || 'Error guardando respuesta')
+        } finally {
+            setSendingNoticeOnly(false)
+        }
+    }
 
     const [data, setData] = useState<any>(null)
     const [originalState, setOriginalState] = useState('Nuevo')
@@ -880,15 +914,35 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                         </div>
                     )}
 
-                    <div className="space-y-1.5 pt-1">
-                        <label className="text-xs font-bold text-amber-300">Respuesta al Aviso para el Registro de Pre-Cotización:</label>
-                        <input
-                            type="text"
-                            value={noticeResponse}
-                            onChange={e => setNoticeResponse(e.target.value)}
-                            placeholder="Escriba su respuesta aclaratoria (ej. 'Cotización armada con tarifa promocional según lo solicitado')..."
-                            className="w-full bg-slate-950 border border-amber-500/50 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500 outline-none"
-                        />
+                    <div className="space-y-2 pt-1">
+                        <label className="text-xs font-bold text-amber-300">Respuesta al Aviso / Registro de Duda (Pre-Cotización):</label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                                type="text"
+                                value={noticeResponse}
+                                onChange={e => {
+                                    setNoticeResponse(e.target.value)
+                                    setNoticeSendSuccess('')
+                                }}
+                                placeholder="Escriba su respuesta aclaratoria o duda (ej. 'No hay cupo en ese hotel, ¿desea cotizar Sol Caribe?')..."
+                                className="flex-1 bg-slate-950 border border-amber-500/50 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500 outline-none"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleSendNoticeOnly}
+                                disabled={sendingNoticeOnly || !noticeResponse.trim()}
+                                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-zinc-950 font-extrabold rounded-xl text-xs shrink-0 flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer active:scale-95"
+                            >
+                                {sendingNoticeOnly ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                <span>Enviar Respuesta / Duda</span>
+                            </button>
+                        </div>
+                        {noticeSendSuccess && (
+                            <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-xs font-bold text-emerald-300 flex items-center gap-2 mt-2">
+                                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                <span>{noticeSendSuccess}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

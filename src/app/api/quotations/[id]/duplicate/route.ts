@@ -18,7 +18,7 @@ export async function POST(
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spCotizacionDuplicar($1::INT, $2::INT, $3::INT, $4::TEXT)`,
+            `CALL public."spCotizacionDuplicar"($1::INT, $2::INT, $3::INT, $4::TEXT)`,
             quotationId,
             actingUserId,
             0, // p_new_quotation_id

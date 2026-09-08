@@ -17,7 +17,8 @@ import {
     Eye,
     Info,
     MessageSquare,
-    Check
+    Check,
+    Send
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { SearchSelect } from '@/components/SearchSelect';
@@ -96,6 +97,49 @@ export default function PreQuotationsPage() {
 
     // Modal de detalle y trazabilidad
     const [selectedDetail, setSelectedDetail] = useState<PreQuotationItem | null>(null);
+    const [modalNoticeResponse, setModalNoticeResponse] = useState('');
+    const [savingModalResponse, setSavingModalResponse] = useState(false);
+    const [modalResponseSuccess, setModalResponseSuccess] = useState('');
+
+    useEffect(() => {
+        if (selectedDetail) {
+            setModalNoticeResponse(selectedDetail.notice_response || '');
+            setModalResponseSuccess('');
+        }
+    }, [selectedDetail]);
+
+    const handleSaveModalResponse = async () => {
+        if (!selectedDetail || !modalNoticeResponse.trim()) return;
+        setSavingModalResponse(true);
+        setModalResponseSuccess('');
+        try {
+            let userObj: any = null;
+            try {
+                const stored = localStorage.getItem('user');
+                if (stored) userObj = JSON.parse(stored);
+            } catch (e) {}
+
+            const res = await fetch('/api/prequotations', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-Id': userObj?.id?.toString() || '1'
+                },
+                body: JSON.stringify({
+                    preQuotationId: selectedDetail.id,
+                    noticeResponse: modalNoticeResponse.trim()
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al guardar respuesta');
+            setModalResponseSuccess(data.message || 'Respuesta / Duda registrada correctamente.');
+            fetchPreQuotations();
+        } catch (err: any) {
+            alert(err.message || 'Error al guardar respuesta');
+        } finally {
+            setSavingModalResponse(false);
+        }
+    };
 
     const fetchPreQuotations = async () => {
         setLoading(true);
@@ -728,12 +772,36 @@ export default function PreQuotationsPage() {
                                 </div>
                             )}
 
-                            {selectedDetail.notice_response && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl space-y-1">
-                                    <div className="font-extrabold text-emerald-700 dark:text-emerald-300">Respuesta al Aviso por el Cotizador:</div>
-                                    <div className="text-zinc-800 dark:text-zinc-200 font-medium leading-relaxed">{selectedDetail.notice_response}</div>
+                            <div className="bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-700/60 space-y-2">
+                                <div className="font-extrabold text-zinc-800 dark:text-zinc-200 text-xs">Respuesta al Aviso / Generación de Duda (Pre-Cotización):</div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={modalNoticeResponse}
+                                        onChange={e => {
+                                            setModalNoticeResponse(e.target.value);
+                                            setModalResponseSuccess('');
+                                        }}
+                                        placeholder="Escriba su respuesta o duda (ej. 'En el hotel solicitado no hay cupo, le cotizamos en Sol Caribe')..."
+                                        className="flex-1 h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 text-xs font-medium text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveModalResponse}
+                                        disabled={savingModalResponse || !modalNoticeResponse.trim()}
+                                        className="px-4 h-10 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-zinc-950 font-extrabold rounded-xl text-xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
+                                    >
+                                        {savingModalResponse ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                        <span>Guardar Respuesta / Duda</span>
+                                    </button>
                                 </div>
-                            )}
+                                {modalResponseSuccess && (
+                                    <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 pt-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>{modalResponseSuccess}</span>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Trazabilidad End-to-End */}
                             <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">

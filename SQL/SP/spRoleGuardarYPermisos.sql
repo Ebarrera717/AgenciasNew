@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spRoleGuardarYPermisos'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 -- =============================================
 -- Procedimiento Almacenado: spRoleGuardarYPermisos
 -- Descripción: Procedimiento en PostgreSQL para crear, actualizar y gestionar los permisos de los roles.

@@ -150,6 +150,13 @@ if (Test-Path $AppCmd) {
     & $AppCmd set config -section:system.webServer/proxy /enabled:"True" /commit:apphost | Out-Null
 }
 
+# 2.5 Habilitar Acceso Remoto PostgreSQL y Firewall de Windows
+Write-Step "Configurando acceso remoto PostgreSQL y reglas de Firewall..."
+$RemoteScript = Join-Path $PSScriptRoot "Configure-PostgresRemote.ps1"
+if (Test-Path $RemoteScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File "$RemoteScript" -Elevated
+}
+
 # 3. Comprobar Conectividad con Postgres
 Write-Step "Verificando conexion TCP con base de datos en $($PgHost):$($PgPort)..."
 $tcpClient = New-Object System.Net.Sockets.TcpClient

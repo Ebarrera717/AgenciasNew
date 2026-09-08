@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        const { licenseKey } = await req.json();
+        const { licenseKey, clientName, nit } = await req.json();
 
         if (!licenseKey) {
             return NextResponse.json({ message: 'La clave de licencia es requerida' }, { status: 400 });
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id');
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1;
 
-        const payload = await applyLicenseKey(licenseKey, actingUserId);
+        const payload = await applyLicenseKey(licenseKey, actingUserId, clientName, nit);
 
         const response = NextResponse.json({
             message: 'Licencia actualizada con éxito',

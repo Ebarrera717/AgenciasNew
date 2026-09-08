@@ -162,6 +162,7 @@ begin
     DbUrl := 'DATABASE_URL="postgresql://' + URLEncode(User) + ':' + URLEncode(Pass) + '@' + Host + ':' + Port + '/' + DbName + '?schema=public"';
     SaveStringToFile(ExpandConstant('{app}\.env'), DbUrl + #13#10, False);
     SaveStringToFile(ExpandConstant('{app}\.env'), 'NEXTAUTH_SECRET="KorexProductionSecretKey2024_Security"' + #13#10, True);
+    SaveStringToFile(ExpandConstant('{app}\.env'), 'LICENSE_SECRET="Korex_Master_License_Secret_Key_2026_Secure"' + #13#10, True);
     SaveStringToFile(ExpandConstant('{app}\.env'), 'NEXTAUTH_URL="http://localhost:3000"' + #13#10, True);
     SaveStringToFile(ExpandConstant('{app}\.env'), 'PORT="3001"' + #13#10, True);
   end;

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spCotizacionCrear($1::JSONB, $2::INT, $3::INT, $4::TEXT)`,
+            `CALL public."spCotizacionCrear"($1::JSONB, $2::INT, $3::INT, $4::TEXT)`,
             JSON.stringify(body),
             actingUserId,
             0, // p_quotation_id

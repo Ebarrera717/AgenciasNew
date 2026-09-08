@@ -50,11 +50,12 @@ Esta guía detalla las reglas obligatorias y el flujo de trabajo paso a paso par
 > ```
 > NUNCA dar por finalizada una modificación SQL ni responder al usuario sin haber corrido previamente este comando para compilar en la BD PostgreSQL local (`Korex_colaereo`).
 
-Este script ejecuta la validación de 4 capas y el despliegue automático:
-1. Compila y despliega los `.sql` en tiempo real en la BD PostgreSQL local.
+Este script ejecuta la validación de 7 capas y el despliegue automático:
+1. Compila y despliega los `.sql` en tiempo real en la BD PostgreSQL local (auto-inyectando bloques `DO $$` de limpieza si faltan).
 2. Inyecta `CREATE TABLE IF NOT EXISTS` para tablas referenciadas en [`Alter_New_Columns.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Table/Alter_New_Columns.sql).
 3. Verifica la regla obligatoria de `LEFT JOIN` en funciones de consulta.
-4. Sincroniza automáticamente los scripts de producción [`SQL/Actualizador/Actualizador.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador/Actualizador.sql) y [`ActualizadorSERVER.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador/ActualizadorSERVER.sql).
+4. **Audita automáticamente el número y firmas de parámetros** entre las API Routes (`src/app/api/`) y `pg_proc` de la BD local (PASO 3.5). Aborta la compilación de inmediato si detecta descalces.
+5. Sincroniza automáticamente los scripts de producción [`SQL/Actualizador/Actualizador.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador/Actualizador.sql) y [`ActualizadorSERVER.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador/ActualizadorSERVER.sql).
 
 > [!CRITICAL]
 > **REGLA DE SINCRONIZACIÓN OBLIGATORIA DE NUEVAS COLUMNAS (PREVENCIÓN DE ERROR 42703 `column does not exist`)**:

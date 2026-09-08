@@ -57,8 +57,9 @@ La ruta detectada automáticamente pre-llena el campo de directorio en el asiste
 - *Razón*: Evita que el actualizador instale los archivos en una carpeta por defecto o secundaria si el cliente ubicó el sitio en otra letra de unidad o subdirectorio (ej. `F:\Korex\Cotizaciones` vs `F:\Korex_Sistema`), salvaguardando que siempre se actualice el código ejecutable en la ruta física real.
 
 ### J. Garantía de Despliegue en Masa Limpio (Limpieza Dinámica de Sobrecargas y Secuencias)
-1. **Limpieza Dinámica de Sobrecargas (`DO $$ ... DROP PROCEDURE/FUNCTION ... $$;`)**: Todo procedimiento o función inyectado en `Actualizador.sql` y en scripts `.sql` incluye un bloque dinámico `DO $$` que consulta `pg_proc` y elimina previamente cualquier firma o versión sobrecargada anterior. De esta manera, al actualizar clientes remotos con bases de datos antiguas que poseían firmas con diferente número o tipo de parámetros, no ocurrirá el error 42883 (`procedure does not exist`).
+1. **Limpieza Dinámica de Sobrecargas (`DO $$ ... DROP PROCEDURE/FUNCTION ... $$;`)**: Todo procedimiento o función inyectado en `Actualizador.sql` y en scripts `.sql` incluye un bloque dinámico `DO $$` (auto-inyectado por `deploy/validate_schema_before_package.js` si falta) que consulta `pg_proc` y elimina previamente cualquier firma o versión sobrecargada anterior. De esta manera, al actualizar clientes remotos con bases de datos antiguas que poseían firmas con diferente número o tipo de parámetros, no ocurrirá el error 42883 (`procedure does not exist`).
 2. **Siembra Automatizada de Secuencias**: `deploy/validate_schema_before_package.js` escanea cualquier llamada a `nextval(...)` en los SPs e inyecta de forma transparente `CREATE SEQUENCE IF NOT EXISTS public.<secuencia> START WITH 1;` en [`SQL/Table/Alter_New_Columns.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Table/Alter_New_Columns.sql).
+3. **Auditoría Pre-Compilación de Firmas de Parámetros (API Routes vs DB)**: El validador auto-escanea todas las invocaciones `CALL public.sp...(...)` y `SELECT ... FROM public.fn...(...)` en `src/app/api/` y las compara con la firma real en `pg_proc` de PostgreSQL local. Si detecta discrepancias en el número de parámetros (previniendo errores 42883 por omitir columnas como `p_is_active`), **la compilación se aborta de inmediato con un error fatal**.
 
 ---
 
@@ -91,14 +92,15 @@ La vista principal de Configuración del Sistema (`src/app/dashboard/settings/pa
 
 ## 3. Validador Automatizado Integrado (`deploy/validate_schema_before_package.js`)
 
-El script de validación automatizada [`deploy/validate_schema_before_package.js`](file:///f:/Proyectos/AgenciasNew/deploy/validate_schema_before_package.js) está integrado directamente en [`deploy/gen_schema_json.js`](file:///f:/Proyectos/AgenciasNew/deploy/gen_schema_json.js) y ejecuta de forma transparente 6 capas de seguridad:
+El script de validación automatizada [`deploy/validate_schema_before_package.js`](file:///f:/Proyectos/AgenciasNew/deploy/validate_schema_before_package.js) está integrado directamente en [`deploy/gen_schema_json.js`](file:///f:/Proyectos/AgenciasNew/deploy/gen_schema_json.js) y ejecuta de forma transparente 7 capas de seguridad:
 
-1. **Despliegue Local**: Compila todos los scripts de `SQL/Function/`, `SQL/SP/` y `SQL/Procedure/` en PostgreSQL local.
+1. **Despliegue Local**: Compila todos los scripts de `SQL/Function/`, `SQL/SP/` y `SQL/Procedure/` en PostgreSQL local auto-inyectando bloques `DO $$` de limpieza dinámica si faltan.
 2. **Auto-Inyección de Tablas**: Detecta tablas referenciadas en SPs e inyecta bloques `CREATE TABLE IF NOT EXISTS` en `Alter_New_Columns.sql` si faltan.
 3. **Inyección de Secuencias**: Verifica que toda columna `id` tenga secuencia por defecto (`DEFAULT nextval(...)`) y auto-corrige si falta.
 4. **Verificación de Restricciones UNIQUE**: Garantiza las llaves de unicidad requeridas para operaciones `UPSERT` / `ON CONFLICT`.
 5. **Verificación de `LEFT JOIN`**: Revisa sintácticamente que no existan `INNER JOIN` en tablas maestras.
-6. **Sincronización Dinámica de Actualizadores**: Sincroniza e inyecta los 125+ scripts SQL en [`Actualizador.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador/Actualizador.sql) y [`Actualizador.SQL`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador.SQL).
+6. **Auditoría de Firmas y Parámetros (PASO 3.5)**: Contrasta todos los llamados a Stored Procedures y Funciones en las rutas Next.js (`/api/`) contra `pg_proc` de la BD local. Cancela la compilación si existe algún descalce en el número de parámetros.
+7. **Sincronización Dinámica de Actualizadores**: Sincroniza e inyecta los 125+ scripts SQL en [`Actualizador.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador/Actualizador.sql) y [`Actualizador.SQL`](file:///f:/Proyectos/AgenciasNew/SQL/Actualizador.SQL).
 
 ---
 

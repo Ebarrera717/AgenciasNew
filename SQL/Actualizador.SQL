@@ -6,13 +6,15 @@
 -- >>> 1. CREACIÓN DE TABLAS E ÍNDICES (TABLEINI) <<<
 
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spSellerCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSellerCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -53,6 +55,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCityListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public."fnCityListar"()
 RETURNS TABLE(id integer, code text, name text, "countriesId" integer, statecode text, iata text, "countryName" text)
 LANGUAGE plpgsql AS $function$
@@ -62,13 +77,15 @@ END; $function$;;
 
 -- Inyectado automáticamente: fnClienteListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnClienteListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnClienteListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -110,13 +127,15 @@ $$;;
 
 -- Inyectado automáticamente: fnComboListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnComboListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnComboListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -181,13 +200,15 @@ $$;;
 
 -- Inyectado automáticamente: fnCotizacion.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnCotizacion' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCotizacion'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -314,13 +335,15 @@ $$;;
 
 -- Inyectado automáticamente: fnCotizacionHistorial.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnCotizacionHistorial' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCotizacionHistorial'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -467,13 +490,15 @@ $$;;
 
 -- Inyectado automáticamente: fnCotizacionListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnCotizacionListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCotizacionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -582,6 +607,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCountryListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public."fnCountryListar"()
 RETURNS TABLE(id integer, code text, name text, dane text, region text, prefix text, "curencyId" integer)
 LANGUAGE plpgsql AS $function$
@@ -598,6 +636,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCreditCardListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -633,6 +684,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCreditCardValidar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -696,6 +760,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnDocumentResolutionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public."fnDocumentResolutionListar"()
 RETURNS TABLE (
     id integer,
@@ -751,6 +828,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnEquivalenceInterface'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public."fnEquivalenceInterface"(
 	p_id_interface integer,
 	p_id_master integer,
@@ -798,13 +888,15 @@ ALTER FUNCTION public."fnEquivalenceInterface"(integer, integer, text) OWNER TO 
 
 -- Inyectado automáticamente: fnImplantListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnImplantListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnImplantListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -820,13 +912,15 @@ $$;;
 
 -- Inyectado automáticamente: fnImpuestoListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnImpuestoListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnImpuestoListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -876,6 +970,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnInterfaceExtractParamValue'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -988,6 +1095,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnInterfacesList'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 DROP FUNCTION IF EXISTS public."fnInterfacesList"();
 
 CREATE OR REPLACE FUNCTION public."fnInterfacesList"()
@@ -1025,6 +1145,42 @@ $BODY$;
 
 ALTER FUNCTION public."fnInterfacesList"() OWNER TO postgres;;
 
+-- Inyectado automáticamente: fnInvoicesListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnInvoicesListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnInvoicesListar()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        jsonb_build_object(
+            'id', i.id,
+            'code', i.code,
+            'createdAt', i."createdAt",
+            'updatedAt', i."updatedAt",
+            'state', i.state,
+            'clientName', COALESCE(c.name, ''),
+            'total', COALESCE(i.total, 0)
+        )
+    FROM public."Invoice" i
+    LEFT JOIN public."Client" c ON c.id = i."clientId"
+    ORDER BY i.id DESC;
+END;
+$$;;
+
 -- Inyectado automáticamente: fnMasterList.sql
 DO $$
 DECLARE r RECORD;
@@ -1034,6 +1190,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMasterList'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1062,13 +1231,15 @@ ALTER FUNCTION public."fnMasterList"() OWNER TO postgres;;
 
 -- Inyectado automáticamente: fnMenu.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnMenu' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMenu'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1086,13 +1257,15 @@ $$;;
 
 -- Inyectado automáticamente: fnMenuAll.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnMenuAll' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMenuAll'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1109,13 +1282,15 @@ $$;;
 
 -- Inyectado automáticamente: fnMonedaListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnMonedaListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMonedaListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1160,6 +1335,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnObtenerSiguienteConsecutivo'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1233,13 +1421,15 @@ $$;;
 
 -- Inyectado automáticamente: fnParameterListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnParameterListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnParameterListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1265,6 +1455,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnPaymentListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public."fnPaymentListar"()
 RETURNS TABLE(id integer, code text, name text, iscash boolean, iscredit boolean, inactive boolean)
 LANGUAGE plpgsql AS $function$
@@ -1281,6 +1484,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnPreCotizacionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1358,13 +1574,8 @@ BEGIN
         COALESCE(q."internalNumber", '')::TEXT AS converted_internal_number,
         p."convertedAt",
         COALESCE(cu.name, '')::TEXT AS converted_user_name,
-        COALESCE((
-            SELECT string_agg(inv."internalNumber", ', ')
-            FROM public."QuotationInvoice" qi
-            JOIN public."Invoice" inv ON qi."invoiceId" = inv.id
-            WHERE qi."quotationId" = p."convertedQuotationId"
-        ), '')::TEXT AS invoice_number,
-        EXTRACT(EPOCH FROM (COALESCE(p."convertedAt", CURRENT_TIMESTAMP) - p."createdAt"))::INT / 60 AS elapsed_minutes
+        ''::TEXT AS invoice_number,
+        (EXTRACT(EPOCH FROM (COALESCE(p."convertedAt", CURRENT_TIMESTAMP) - p."createdAt")) / 60)::INT AS elapsed_minutes
     FROM public."PreQuotation" p
     LEFT JOIN public."Client" c ON p."clientId" = c.id
     LEFT JOIN public."Provider" pr ON p."providerId" = pr.id
@@ -1390,13 +1601,15 @@ $$;;
 
 -- Inyectado automáticamente: fnPrestadoraListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnPrestadoraListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnPrestadoraListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1428,13 +1641,15 @@ $$;;
 
 -- Inyectado automáticamente: fnProductoListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnProductoListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnProductoListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1450,13 +1665,15 @@ $$;;
 
 -- Inyectado automáticamente: fnProveedorListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnProveedorListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnProveedorListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1493,13 +1710,15 @@ $$;;
 
 -- Inyectado automáticamente: fnProviderTypeListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnProviderTypeListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnProviderTypeListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1535,6 +1754,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnQuitarEspeciales'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public."fnQuitarEspeciales"(texto TEXT)
 RETURNS TEXT AS $$
 BEGIN
@@ -1560,6 +1792,20 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnQuotationStateListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+
 CREATE OR REPLACE FUNCTION public."fnQuotationStateListar"()
 RETURNS TABLE(id integer, code text, name text, color text, "createdAt" timestamp)
 LANGUAGE plpgsql AS $function$
@@ -1576,6 +1822,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnReportDinamic'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1736,13 +1995,15 @@ $$;;
 
 -- Inyectado automáticamente: fnReservaBuscarParaFacturar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnReservaBuscarParaFacturar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnReservaBuscarParaFacturar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1920,13 +2181,15 @@ $$;;
 
 -- Inyectado automáticamente: fnResolucionListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnResolucionListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnResolucionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1949,6 +2212,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnRoleListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -1991,6 +2267,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnRptCotizacion'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2293,13 +2582,15 @@ $BODY$;;
 
 -- Inyectado automáticamente: fnSellerListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnSellerListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnSellerListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2315,13 +2606,15 @@ $$;;
 
 -- Inyectado automáticamente: fnSysConsecutivoListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnSysConsecutivoListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnSysConsecutivoListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2366,13 +2659,15 @@ $$;;
 
 -- Inyectado automáticamente: fnTicketPrinterListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnTicketPrinterListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnTicketPrinterListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2398,6 +2693,20 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnTicketTypeListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+
 CREATE OR REPLACE FUNCTION public."fnTicketTypeListar"()
 RETURNS TABLE(id integer, code text, name text, description text, "isActive" boolean)
 LANGUAGE plpgsql AS $function$
@@ -2414,6 +2723,19 @@ BEGIN
             EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnTransactionConsecutiveListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2468,6 +2790,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnUserPermissions'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 -- =============================================
 -- Función: fnUserPermissions
 -- Descripción: Retorna el rol y la matriz de permisos JSON de un usuario desde la base de datos PostgreSQL.
@@ -2497,13 +2832,15 @@ $$;;
 
 -- Inyectado automáticamente: fnUsuarioListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnUsuarioListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnUsuarioListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2550,13 +2887,15 @@ $$;;
 
 -- Inyectado automáticamente: fnVariableListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fnVariableListar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnVariableListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2572,13 +2911,15 @@ $$;;
 
 -- Inyectado automáticamente: fn_obtener_decimales_moneda.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fn_obtener_decimales_moneda' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fn_obtener_decimales_moneda'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2599,13 +2940,15 @@ $$;;
 
 -- Inyectado automáticamente: fn_obtener_historial_estados.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'fn_obtener_historial_estados' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fn_obtener_historial_estados'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -2647,6 +2990,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spAirportActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spAirportActualizar"(IN p_id integer, IN p_code text, IN p_name text, IN p_citiesId integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 DECLARE v_existente integer;
@@ -2668,6 +3024,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spAirportCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -2693,6 +3062,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spAirportEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spAirportEliminar"(IN p_id integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 BEGIN
@@ -2701,13 +3083,15 @@ EXCEPTION WHEN foreign_key_violation THEN p_mensaje_resultado := 'ERROR: En uso.
 
 -- Inyectado automáticamente: spBranchActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spBranchActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spBranchActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -2758,13 +3142,15 @@ $$;;
 
 -- Inyectado automáticamente: spBranchCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spBranchCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spBranchCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -2806,13 +3192,15 @@ $$;;
 
 -- Inyectado automáticamente: spBranchEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spBranchEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spBranchEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -2839,13 +3227,15 @@ $$;;
 
 -- Inyectado automáticamente: spCellCustomizationDelete.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spCellCustomizationDelete' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCellCustomizationDelete'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -2869,13 +3259,15 @@ $$;;
 
 -- Inyectado automáticamente: spCellCustomizationUpsert.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spCellCustomizationUpsert' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCellCustomizationUpsert'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -2915,6 +3307,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCityActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spCityActualizar"(IN p_id integer, IN p_code text, IN p_name text, IN p_countriesId integer, IN p_statecode text, IN p_iata text, IN p_user_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 DECLARE v_existente integer;
@@ -2939,6 +3344,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCityCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spCityCrear"(IN p_code text, IN p_name text, IN p_countriesId integer, IN p_statecode text, IN p_iata text, IN p_user_id integer, INOUT p_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 DECLARE v_existente integer;
@@ -2958,6 +3376,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCityEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -3117,13 +3548,15 @@ LANGUAGE plpgsql;;
 
 -- Inyectado automáticamente: spComboActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spComboActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spComboActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -3196,13 +3629,15 @@ $$;;
 
 -- Inyectado automáticamente: spComboCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spComboCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spComboCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -3276,13 +3711,15 @@ $$;;
 
 -- Inyectado automáticamente: spComboEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spComboEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spComboEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -3304,13 +3741,15 @@ $$;;
 
 -- Inyectado automáticamente: spCotizacionActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spCotizacionActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -3721,13 +4160,15 @@ $$;;
 
 -- Inyectado automáticamente: spCotizacionActualizarEstado.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spCotizacionActualizarEstado' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionActualizarEstado'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -3806,13 +4247,15 @@ $$;;
 
 -- Inyectado automáticamente: spCotizacionActualizarEstadoManual.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spCotizacionActualizarEstadoManual' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionActualizarEstadoManual'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -3880,6 +4323,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -4303,13 +4759,15 @@ LANGUAGE plpgsql;;
 
 -- Inyectado automáticamente: spCotizacionEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spCotizacionEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -6089,6 +6547,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCountryActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spCountryActualizar"(IN p_id integer, IN p_code text, IN p_name text, IN p_dane text, IN p_region text, IN p_prefix text, IN p_curencyId integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 DECLARE v_existente integer;
@@ -6110,6 +6581,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCountryCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -6135,6 +6619,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCountryEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spCountryEliminar"(IN p_id integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 BEGIN
@@ -6150,6 +6647,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCreditCardActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -6217,6 +6727,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCreditCardCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spCreditCardCrear"(
     IN p_code text,
     IN p_name text,
@@ -6279,6 +6802,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCreditCardEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spCreditCardEliminar"(
     IN p_id integer,
     IN p_user_id integer,
@@ -6320,6 +6856,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spDocumentResolutionActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -6404,6 +6953,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spDocumentResolutionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -6511,6 +7073,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spDocumentResolutionEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spDocumentResolutionEliminar"(
     IN p_id integer,
     IN p_user_id integer,
@@ -6543,6 +7118,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spEquivalencesInterfacesConsultar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -6616,6 +7204,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spEquivalencesInterfacesCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spEquivalencesInterfacesCrear"(
     IN p_id_interfaces integer,
     IN p_id_master integer,
@@ -6674,6 +7275,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spEquivalencesInterfacesEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spEquivalencesInterfacesEliminar"(
     IN p_id integer,
     IN p_user_id integer,
@@ -6714,6 +7328,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spExportInvoices'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -7568,13 +8195,15 @@ $$;;
 
 -- Inyectado automáticamente: spExportInvoices.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spExportInvoices' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spExportInvoices'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -8532,13 +9161,15 @@ $$;;
 
 -- Inyectado automáticamente: spExportQuotation.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spExportQuotation' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spExportQuotation'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -9592,6 +10223,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spFacturaActualizarEstado'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -11859,13 +12503,15 @@ GO;
 
 -- Inyectado automáticamente: spImplantActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spImplantActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spImplantActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -11918,13 +12564,15 @@ $$;;
 
 -- Inyectado automáticamente: spImplantEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spImplantEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spImplantEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -11958,6 +12606,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spImportInvoices'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -12518,6 +13179,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spImportQuotation'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spImportQuotation"(
     IN p_text_data TEXT,
     IN p_user_id INT,
@@ -12931,13 +13605,15 @@ $$;;
 
 -- Inyectado automáticamente: spImpuestoActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spImpuestoActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spImpuestoActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name;
     END LOOP;
 END $$;
 
@@ -12981,13 +13657,15 @@ $$;;
 
 -- Inyectado automáticamente: spImpuestoEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spImpuestoEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spImpuestoEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name;
     END LOOP;
 END $$;
 
@@ -13031,13 +13709,15 @@ $$;;
 
 -- Inyectado automáticamente: spInterfaceAmadeusPG.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spInterfaceAmadeus' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInterfaceAmadeus'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -15243,13 +15923,15 @@ $BODY$;;
 
 -- Inyectado automáticamente: spInvoicesActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spInvoicesActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInvoicesActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -15480,13 +16162,15 @@ $$;;
 
 -- Inyectado automáticamente: spInvoicesCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spInvoicesCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInvoicesCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -15944,13 +16628,15 @@ $$;;
 
 -- Inyectado automáticamente: spInvoicesEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spInvoicesEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInvoicesEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -15967,6 +16653,74 @@ BEGIN
 END;
 $$;;
 
+-- Inyectado automáticamente: spLimpiarMovimientosProduccion.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT proname, oidvectortypes(proargtypes) as argtypes
+        FROM pg_proc
+        JOIN pg_namespace ON pg_namespace.oid = pg_proc.pronamespace
+        WHERE pg_namespace.nspname = 'public' AND proname = 'spLimpiarMovimientosProduccion'
+    LOOP
+        EXECUTE 'DROP PROCEDURE IF EXISTS public."spLimpiarMovimientosProduccion"(' || r.argtypes || ') CASCADE;';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spLimpiarMovimientosProduccion"(
+    INOUT p_mensaje_resultado text DEFAULT ''
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_tbl TEXT;
+    v_tables TEXT[] := ARRAY[
+        'Quotation', 'QuotationProduct', 'QuotationProductTax', 'QuotationProductVariable', 
+        'QuotationProductPassenger', 'QuotationProductPayment', 'QuotationCombo', 'QuotationInvoice', 
+        'QuotationStateHistory', 'QuotationPrintCustomization', 'QuotationManualService', 'PreQuotation', 
+        'PreQuotationStateHistory', 'Invoices', 'Invoice', 'InvoicesProduct', 'InvoicesProductTax', 
+        'InvoicesProductVariable', 'InvoicesProductPasenger', 'InvoicesProductPayment', 
+        'InvoicesProductCombo', 'InvoicesProductItinerary', 'BookingGDS', 'BookingsGDS_log', 
+        'BookingProductGDS', 'BookingProductItineraryGDS', 'BookingProductPassangerGDS', 
+        'BookingProductTaxGDS', 'BookingProductVariableGDS', 'BookingProductFEEGDS', 
+        'BookingProductPaymentGDS', 'BookingsGDSInvoiceAuto', 'BookingGDSInvoiceAutoLog', 
+        'BranchGDSInvoiceAuto', 'SystemLog', 'ExecutionPreset', 'ExecutionProcedure', 'Attachment', 
+        'EquivalenciasInterfaces_Log'
+    ];
+BEGIN
+    FOREACH v_tbl IN ARRAY v_tables
+    LOOP
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = v_tbl) THEN
+            EXECUTE 'TRUNCATE TABLE public."' || v_tbl || '" CASCADE;';
+        END IF;
+    END LOOP;
+
+    -- Reinicio de secuencias
+    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'seq_quotation_consecutivo') THEN
+        ALTER SEQUENCE public.seq_quotation_consecutivo RESTART WITH 1;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'Invoices_id_seq') THEN
+        ALTER SEQUENCE public."Invoices_id_seq" RESTART WITH 1;
+    END IF;
+
+    p_mensaje_resultado := 'SUCCESS: Tablas de movimientos vaciadas exitosamente. Parámetros y maestros intactos.';
+EXCEPTION WHEN OTHERS THEN
+    p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;;
+
 -- Inyectado automáticamente: spLogRegistrar.sql
 DO $$
 DECLARE r RECORD;
@@ -15976,6 +16730,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spLogRegistrar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16000,13 +16767,15 @@ $$;;
 
 -- Inyectado automáticamente: spMaestroImportar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spMaestroImportar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spMaestroImportar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16226,13 +16995,15 @@ $$;;
 
 -- Inyectado automáticamente: spMonedaActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spMonedaActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spMonedaActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16276,13 +17047,15 @@ $$;;
 
 -- Inyectado automáticamente: spMonedaEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spMonedaEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spMonedaEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16310,13 +17083,15 @@ $$;;
 
 -- Inyectado automáticamente: spMonedaListar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spMonedaListar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spMonedaListar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16351,13 +17126,15 @@ $$;;
 
 -- Inyectado automáticamente: spParameterActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spParameterActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spParameterActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16392,13 +17169,15 @@ $$;;
 
 -- Inyectado automáticamente: spParameterCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spParameterCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spParameterCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16426,13 +17205,15 @@ $$;;
 
 -- Inyectado automáticamente: spParameterEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spParameterEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spParameterEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16469,6 +17250,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPaymentActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spPaymentActualizar"(IN p_id integer, IN p_code text, IN p_name text, IN p_iscash boolean, IN p_iscredit boolean, IN p_inactive boolean, IN p_user_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 DECLARE v_existente integer;
@@ -16490,6 +17284,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPaymentCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16515,6 +17322,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPaymentEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spPaymentEliminar"(IN p_id integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
 LANGUAGE plpgsql AS $procedure$
 BEGIN
@@ -16533,10 +17353,23 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPreCotizacionConvertir'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 -- =============================================
 -- Procedimiento Almacenado: spPreCotizacionConvertir
 -- Descripción: Procedimiento en PostgreSQL para registrar la conversión de una Pre-Cotización a Cotización,
---              guardar la respuesta al aviso y registrar la trazabilidad.
+--              o registrar únicamente la respuesta/duda sin convertir la pre-cotización.
 -- Base de Datos: PostgreSQL (Korex_colaereo)
 -- =============================================
 CREATE OR REPLACE PROCEDURE public."spPreCotizacionConvertir"(
@@ -16548,26 +17381,53 @@ CREATE OR REPLACE PROCEDURE public."spPreCotizacionConvertir"(
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_is_convert BOOLEAN;
+    v_current_state TEXT;
+    v_acting_user_id INT;
 BEGIN
     IF p_pre_quotation_id IS NULL OR p_pre_quotation_id = 0 THEN
         p_mensaje_resultado := 'ERROR: ID de Pre-Cotización inválido.';
         RETURN;
     END IF;
 
-    UPDATE public."PreQuotation"
-    SET state = 'COTIZADA',
-        "convertedQuotationId" = p_quotation_id,
-        "convertedAt" = CURRENT_TIMESTAMP,
-        "convertedUserId" = p_acting_user_id,
-        "noticeResponse" = COALESCE(p_notice_response, "noticeResponse"),
-        "updatedAt" = CURRENT_TIMESTAMP
-    WHERE id = p_pre_quotation_id;
+    -- Obtener userId válido garantizado para evitar NOT NULL / FK violations
+    SELECT COALESCE(
+        (SELECT id FROM public."User" WHERE id = p_acting_user_id LIMIT 1),
+        (SELECT "userId" FROM public."PreQuotation" WHERE id = p_pre_quotation_id),
+        (SELECT id FROM public."User" ORDER BY id ASC LIMIT 1),
+        1
+    ) INTO v_acting_user_id;
 
-    -- Historial de estado
-    INSERT INTO public."PreQuotationStateHistory" ("preQuotationId", "state", "description", "userId", "createdAt")
-    VALUES (p_pre_quotation_id, 'COTIZADA', 'Pre-cotización convertida exitosamente a cotización (ID: ' || COALESCE(p_quotation_id::TEXT, 'N/A') || ')', p_acting_user_id, CURRENT_TIMESTAMP);
+    v_is_convert := (p_quotation_id IS NOT NULL AND p_quotation_id > 0);
 
-    p_mensaje_resultado := 'SUCCESS: Pre-Cotización convertida a Cotización correctamente.';
+    SELECT state INTO v_current_state FROM public."PreQuotation" WHERE id = p_pre_quotation_id;
+
+    IF v_is_convert THEN
+        UPDATE public."PreQuotation"
+        SET state = 'COTIZADA',
+            "convertedQuotationId" = p_quotation_id,
+            "convertedAt" = CURRENT_TIMESTAMP,
+            "convertedUserId" = v_acting_user_id,
+            "noticeResponse" = COALESCE(p_notice_response, "noticeResponse"),
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = p_pre_quotation_id;
+
+        INSERT INTO public."PreQuotationStateHistory" ("preQuotationId", "state", "description", "userId", "createdAt")
+        VALUES (p_pre_quotation_id, 'COTIZADA', 'Pre-cotización convertida exitosamente a cotización (ID: ' || p_quotation_id::TEXT || ')', v_acting_user_id, CURRENT_TIMESTAMP);
+
+        p_mensaje_resultado := 'SUCCESS: Pre-Cotización convertida a Cotización correctamente.';
+    ELSE
+        UPDATE public."PreQuotation"
+        SET "noticeResponse" = COALESCE(p_notice_response, "noticeResponse"),
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE id = p_pre_quotation_id;
+
+        INSERT INTO public."PreQuotationStateHistory" ("preQuotationId", "state", "description", "userId", "createdAt")
+        VALUES (p_pre_quotation_id, COALESCE(v_current_state, 'POR COTIZAR'), 'Respuesta / Duda registrada en la pre-cotización: ' || COALESCE(p_notice_response, ''), v_acting_user_id, CURRENT_TIMESTAMP);
+
+        p_mensaje_resultado := 'SUCCESS: Respuesta / Duda registrada en la Pre-Cotización correctamente.';
+    END IF;
 END;
 $$;;
 
@@ -16580,6 +17440,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPreCotizacionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16664,13 +17537,15 @@ $$;;
 
 -- Inyectado automáticamente: spPrestadoraActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spPrestadoraActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPrestadoraActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16708,13 +17583,15 @@ $$;;
 
 -- Inyectado automáticamente: spPrestadoraEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spPrestadoraEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPrestadoraEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16736,13 +17613,15 @@ $$;;
 
 -- Inyectado automáticamente: spProductoActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProductoActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProductoActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16785,13 +17664,15 @@ $$;;
 
 -- Inyectado automáticamente: spProductoCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProductoCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProductoCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16823,13 +17704,15 @@ $$;;
 
 -- Inyectado automáticamente: spProductoEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProductoEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProductoEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16873,13 +17756,15 @@ $$;;
 
 -- Inyectado automáticamente: spProveedorActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProveedorActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProveedorActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16919,13 +17804,15 @@ $$;;
 
 -- Inyectado automáticamente: spProveedorCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProveedorCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProveedorCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16958,13 +17845,15 @@ $$;;
 
 -- Inyectado automáticamente: spProveedorEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProveedorEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProveedorEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -16986,13 +17875,15 @@ $$;;
 
 -- Inyectado automáticamente: spProviderTypeActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProviderTypeActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProviderTypeActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17024,13 +17915,15 @@ $$;;
 
 -- Inyectado automáticamente: spProviderTypeCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProviderTypeCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProviderTypeCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17059,13 +17952,15 @@ $$;;
 
 -- Inyectado automáticamente: spProviderTypeEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spProviderTypeEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spProviderTypeEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17097,6 +17992,20 @@ BEGIN
         END;
     END LOOP;
 END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spQuotationStateActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 
 CREATE OR REPLACE PROCEDURE public."spQuotationStateActualizar"(
     p_id INT,
@@ -17133,6 +18042,20 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spQuotationStateCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+
 CREATE OR REPLACE PROCEDURE public."spQuotationStateCrear"(
     p_code TEXT,
     p_name TEXT,
@@ -17166,6 +18089,20 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spQuotationStateEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+
 CREATE OR REPLACE PROCEDURE public."spQuotationStateEliminar"(
     p_id INT,
     p_acting_user_id INT,
@@ -17182,13 +18119,15 @@ END; $$;;
 
 -- Inyectado automáticamente: spResolucionActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spResolucionActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spResolucionActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17241,13 +18180,15 @@ $$;;
 
 -- Inyectado automáticamente: spResolucionCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spResolucionCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spResolucionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17288,13 +18229,15 @@ $$;;
 
 -- Inyectado automáticamente: spResolucionEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spResolucionEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spResolucionEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17328,6 +18271,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spRoleGuardarYPermisos'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17394,13 +18350,15 @@ $$;;
 
 -- Inyectado automáticamente: spSellerActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spSellerActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSellerActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17437,13 +18395,15 @@ $$;;
 
 -- Inyectado automáticamente: spSellerEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spSellerEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSellerEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17470,13 +18430,15 @@ $$;;
 
 -- Inyectado automáticamente: spSysConsecutivoActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spSysConsecutivoActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSysConsecutivoActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17535,13 +18497,15 @@ $$;;
 
 -- Inyectado automáticamente: spSysConsecutivoCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spSysConsecutivoCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSysConsecutivoCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17584,13 +18548,15 @@ $$;;
 
 -- Inyectado automáticamente: spSysConsecutivoEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spSysConsecutivoEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSysConsecutivoEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17623,13 +18589,15 @@ $$;;
 
 -- Inyectado automáticamente: spTicketPrinterActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spTicketPrinterActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTicketPrinterActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17664,13 +18632,15 @@ $$;;
 
 -- Inyectado automáticamente: spTicketPrinterCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spTicketPrinterCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTicketPrinterCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17698,13 +18668,15 @@ $$;;
 
 -- Inyectado automáticamente: spTicketPrinterEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spTicketPrinterEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTicketPrinterEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17740,6 +18712,20 @@ BEGIN
         END;
     END LOOP;
 END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTicketTypeActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 
 CREATE OR REPLACE PROCEDURE public."spTicketTypeActualizar"(
     p_id INT,
@@ -17778,6 +18764,20 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTicketTypeCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+
 CREATE OR REPLACE PROCEDURE public."spTicketTypeCrear"(
     p_code TEXT,
     p_name TEXT,
@@ -17812,6 +18812,20 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTicketTypeEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+
 CREATE OR REPLACE PROCEDURE public."spTicketTypeEliminar"(
     p_id INT,
     p_acting_user_id INT,
@@ -17835,6 +18849,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTransactionConsecutiveActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17897,6 +18924,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTransactionConsecutiveCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -17973,6 +19013,19 @@ BEGIN
     END LOOP;
 END $$;
 
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spTransactionConsecutiveEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE public."spTransactionConsecutiveEliminar"(
     IN p_id integer,
     IN p_user_id integer,
@@ -17998,13 +19051,15 @@ $$;;
 
 -- Inyectado automáticamente: spUsuarioActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spUsuarioActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spUsuarioActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -18056,13 +19111,15 @@ $$;;
 
 -- Inyectado automáticamente: spUsuarioConsultar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spUsuarioConsultar' LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spUsuarioConsultar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -18100,13 +19157,15 @@ $$;;
 
 -- Inyectado automáticamente: spUsuarioCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spUsuarioCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spUsuarioCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -18160,13 +19219,15 @@ $$;;
 
 -- Inyectado automáticamente: spUsuarioEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spUsuarioEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spUsuarioEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -18195,13 +19256,15 @@ $$;;
 
 -- Inyectado automáticamente: spVariableActualizar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spVariableActualizar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spVariableActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -18234,13 +19297,15 @@ $$;;
 
 -- Inyectado automáticamente: spVariableCrear.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spVariableCrear' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spVariableCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -18267,13 +19332,15 @@ $$;;
 
 -- Inyectado automáticamente: spVariableEliminar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spVariableEliminar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spVariableEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -18300,13 +19367,15 @@ $$;;
 
 -- Inyectado automáticamente: spCotizacionDuplicar.sql
 DO $$
-DECLARE r RECORD;
+DECLARE
+    r RECORD;
 BEGIN
-    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spCotizacionDuplicar' LOOP
-        BEGIN
-            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
-        EXCEPTION WHEN OTHERS THEN NULL;
-        END;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionDuplicar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
@@ -18461,6 +19530,19 @@ BEGIN
             EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSiteModuleMasterToggle'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 

@@ -232,6 +232,12 @@
       "namedRegex": "^/api/config/currencies(?:/)?$"
     },
     {
+      "page": "/api/config/diagnostics",
+      "regex": "^/api/config/diagnostics(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/config/diagnostics(?:/)?$"
+    },
+    {
       "page": "/api/config/document-resolutions",
       "regex": "^/api/config/document\\-resolutions(?:/)?$",
       "routeKeys": {},

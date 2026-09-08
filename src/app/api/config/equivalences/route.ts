@@ -22,8 +22,8 @@ export async function POST(req: Request) {
         const { id_interfaces, id_master, cd_maestro, cd_codigo, cd_codigoInte } = body
 
         await prisma.$executeRawUnsafe(
-            `CALL public."spEquivalencesInterfacesCrear"($1, $2, $3, $4, $5, $6, null)`,
-            Number(id_interfaces), Number(id_master), cd_maestro, cd_codigo, cd_codigoInte || '', Number(userId)
+            `CALL public."spEquivalencesInterfacesCrear"($1, $2, $3, $4, $5, $6, $7)`,
+            Number(id_interfaces), Number(id_master), cd_maestro, cd_codigo, cd_codigoInte || '', Number(userId), null
         )
         return NextResponse.json({ success: true })
     } catch (error: any) {
@@ -64,7 +64,7 @@ export async function DELETE(req: Request) {
 
         if (!id) return NextResponse.json({ message: 'ID required' }, { status: 400 })
 
-        await prisma.$executeRawUnsafe(`CALL public."spEquivalencesInterfacesEliminar"($1, $2, null)`, Number(id), Number(userId))
+        await prisma.$executeRawUnsafe(`CALL public."spEquivalencesInterfacesEliminar"($1, $2, $3)`, Number(id), Number(userId), null)
         return NextResponse.json({ success: true })
     } catch (error: any) {
         return NextResponse.json({ message: error.message }, { status: 500 })

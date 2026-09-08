@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fn_obtener_historial_estados'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 -- Crear función para obtener el historial de estados de una cotización
 CREATE OR REPLACE FUNCTION public.fn_obtener_historial_estados(p_quotation_id INT)
 RETURNS TABLE (

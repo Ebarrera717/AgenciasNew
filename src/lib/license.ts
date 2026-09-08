@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 
-const SECRET_KEY = process.env.LICENSE_SECRET || process.env.NEXTAUTH_SECRET || 'Korex_Master_License_Secret_Key_2026_Secure';
+const SECRET_KEY = process.env.LICENSE_SECRET || 'Korex_Master_License_Secret_Key_2026_Secure';
 
 export interface LicensePayload {
     client: string;
@@ -78,6 +78,12 @@ export function verifyLicenseKey(licenseKey: string): LicenseVerificationResult 
  */
 export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
     try {
+        const agencyNameParam = await prisma.systemParameter.findUnique({ where: { code: 'AGENCY_NAME' } });
+        const agencyNitParam = await prisma.systemParameter.findUnique({ where: { code: 'AGENCY_NIT' } });
+
+        const configuredClient = agencyNameParam?.value?.trim() || null;
+        const configuredNit = agencyNitParam?.value?.trim() || null;
+
         const paramKey = await prisma.systemParameter.findUnique({
             where: { code: 'LICENSE_KEY' }
         });
@@ -88,8 +94,8 @@ export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
                 isExpired: true,
                 expirationDate: null,
                 daysRemaining: null,
-                clientName: null,
-                nit: null,
+                clientName: configuredClient,
+                nit: configuredNit,
                 status: 'UNLICENSED'
             };
         }
@@ -101,8 +107,8 @@ export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
                 isExpired: true,
                 expirationDate: null,
                 daysRemaining: null,
-                clientName: null,
-                nit: null,
+                clientName: configuredClient,
+                nit: configuredNit,
                 status: 'UNLICENSED'
             };
         }
@@ -112,8 +118,8 @@ export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
         const now = new Date();
 
         const diffTime = targetExpDate.getTime() - now.getTime();
-        const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const isExpired = daysRemaining < 0;
+        const daysRemaining = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        const isExpired = now.getTime() > targetExpDate.getTime();
 
         let status: 'ACTIVE' | 'WARNING' | 'EXPIRED' | 'UNLICENSED' = 'ACTIVE';
         if (isExpired) {
@@ -127,15 +133,15 @@ export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
             isExpired,
             expirationDate,
             daysRemaining,
-            clientName: client,
-            nit,
+            clientName: configuredClient || client,
+            nit: configuredNit || nit,
             status
         };
     } catch (error) {
         console.error('Error al consultar estado de licencia:', error);
         return {
             isLicensed: false,
-            isExpired: false, // Evitar bloqueo completo ante falla temporal de BD si no es intencional
+            isExpired: false,
             expirationDate: null,
             daysRemaining: null,
             clientName: null,
@@ -148,7 +154,12 @@ export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
 /**
  * Registra o actualiza la clave de licencia en la Base de Datos
  */
-export async function applyLicenseKey(licenseKey: string, actingUserId: number = 1) {
+export async function applyLicenseKey(
+    licenseKey: string, 
+    actingUserId: number = 1,
+    clientNameInput?: string,
+    nitInput?: string
+) {
     const verification = verifyLicenseKey(licenseKey);
     if (!verification.isValid || !verification.payload) {
         throw new Error(verification.error || 'Clave de licencia inválida');
@@ -156,17 +167,9 @@ export async function applyLicenseKey(licenseKey: string, actingUserId: number =
 
     const { client, nit, expirationDate } = verification.payload;
 
-    // Verificar si existe un NIT de agencia registrado para asegurar que la clave pertenece a esta empresa
-    const agencyNitParam = await prisma.systemParameter.findUnique({
-        where: { code: 'AGENCY_NIT' }
-    });
-
-    if (agencyNitParam && agencyNitParam.value) {
-        const configuredNit = agencyNitParam.value.trim();
-        if (configuredNit && configuredNit !== nit.trim()) {
-            throw new Error(`Esta clave de licencia pertenece al NIT ${nit}, pero el sistema está registrado para el NIT ${configuredNit}.`);
-        }
-    }
+    // Registrar / Actualizar Nombre y NIT de la Agencia con la información verificada de la clave de licencia
+    const finalClient = (clientNameInput && clientNameInput.trim()) || client.trim();
+    const finalNit = (nitInput && nitInput.trim()) || nit.trim();
 
     // Actualizar en SystemParameter usando Prisma upsert
     await prisma.systemParameter.upsert({
@@ -184,14 +187,14 @@ export async function applyLicenseKey(licenseKey: string, actingUserId: number =
     // Registrar Nombre y NIT de la Agencia oficialmente en la base de datos
     await prisma.systemParameter.upsert({
         where: { code: 'AGENCY_NAME' },
-        update: { value: client.trim(), name: 'Nombre o Razón Social de la Agencia' },
-        create: { code: 'AGENCY_NAME', name: 'Nombre o Razón Social de la Agencia', value: client.trim() }
+        update: { value: finalClient, name: 'Nombre o Razón Social de la Agencia' },
+        create: { code: 'AGENCY_NAME', name: 'Nombre o Razón Social de la Agencia', value: finalClient }
     });
 
     await prisma.systemParameter.upsert({
         where: { code: 'AGENCY_NIT' },
-        update: { value: nit.trim(), name: 'NIT de la Agencia' },
-        create: { code: 'AGENCY_NIT', name: 'NIT de la Agencia', value: nit.trim() }
+        update: { value: finalNit, name: 'NIT de la Agencia' },
+        create: { code: 'AGENCY_NIT', name: 'NIT de la Agencia', value: finalNit }
     });
 
     // Registrar en SystemLog
@@ -201,8 +204,8 @@ export async function applyLicenseKey(licenseKey: string, actingUserId: number =
             userId: actingUserId,
             action: 'UPDATE',
             module: 'LICENSE',
-            description: `Licencia actualizada para ${client} (NIT ${nit}) activa hasta ${expirationDate}.`,
-            metadata: { client, nit, expirationDate }
+            description: `Licencia actualizada para ${finalClient} (NIT ${finalNit}) activa hasta ${expirationDate}.`,
+            metadata: { client: finalClient, nit: finalNit, expirationDate }
         });
     } catch (e) {
         console.error('Error al registrar log de licencia:', e);

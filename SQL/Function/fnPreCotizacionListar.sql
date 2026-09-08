@@ -1,3 +1,16 @@
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnPreCotizacionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
 -- =============================================
 -- Función: fnPreCotizacionListar
 -- Descripción: Consulta el listado de Pre-Cotizaciones con LEFT JOIN obligatorio,
@@ -72,13 +85,8 @@ BEGIN
         COALESCE(q."internalNumber", '')::TEXT AS converted_internal_number,
         p."convertedAt",
         COALESCE(cu.name, '')::TEXT AS converted_user_name,
-        COALESCE((
-            SELECT string_agg(inv."internalNumber", ', ')
-            FROM public."QuotationInvoice" qi
-            JOIN public."Invoice" inv ON qi."invoiceId" = inv.id
-            WHERE qi."quotationId" = p."convertedQuotationId"
-        ), '')::TEXT AS invoice_number,
-        EXTRACT(EPOCH FROM (COALESCE(p."convertedAt", CURRENT_TIMESTAMP) - p."createdAt"))::INT / 60 AS elapsed_minutes
+        ''::TEXT AS invoice_number,
+        (EXTRACT(EPOCH FROM (COALESCE(p."convertedAt", CURRENT_TIMESTAMP) - p."createdAt")) / 60)::INT AS elapsed_minutes
     FROM public."PreQuotation" p
     LEFT JOIN public."Client" c ON p."clientId" = c.id
     LEFT JOIN public."Provider" pr ON p."providerId" = pr.id

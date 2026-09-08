@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ShieldAlert, KeyRound, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { ShieldAlert, KeyRound, CheckCircle2, AlertCircle, RefreshCw, Building, FileText } from 'lucide-react';
 
 export default function LicenciaExpiradaPage() {
     const [licenseKey, setLicenseKey] = useState('');
+    const [clientName, setClientName] = useState('');
+    const [nit, setNit] = useState('');
     const [loading, setLoading] = useState(false);
     const [checkingStatus, setCheckingStatus] = useState(true);
     const [isUnlicensed, setIsUnlicensed] = useState(false);
@@ -14,6 +16,9 @@ export default function LicenciaExpiradaPage() {
         fetch('/api/config/license')
             .then(res => res.json())
             .then(data => {
+                if (data.clientName) setClientName(data.clientName);
+                if (data.nit) setNit(data.nit);
+
                 if (data.isLicensed && !data.isExpired && (data.status === 'ACTIVE' || data.status === 'WARNING')) {
                     window.location.replace('/dashboard');
                 } else {
@@ -40,7 +45,11 @@ export default function LicenciaExpiradaPage() {
             const res = await fetch('/api/config/license', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ licenseKey: licenseKey.trim() })
+                body: JSON.stringify({
+                    licenseKey: licenseKey.trim(),
+                    clientName: clientName.trim(),
+                    nit: nit.trim()
+                })
             });
 
             const data = await res.json();
@@ -112,6 +121,35 @@ export default function LicenciaExpiradaPage() {
 
                 {/* Formulario de Activación */}
                 <form onSubmit={handleActivate} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                                <Building className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Cliente / Razón Social:</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={clientName}
+                                onChange={(e) => setClientName(e.target.value)}
+                                placeholder="Ej: Agencia de Viajes Korex"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-medium text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                                <FileText className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Cédula o NIT:</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={nit}
+                                onChange={(e) => setNit(e.target.value)}
+                                placeholder="Ej: 900123456-1"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-medium text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                            />
+                        </div>
+                    </div>
+
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-slate-300 flex items-center gap-2">
                             <KeyRound className="w-4 h-4 text-slate-400" />
