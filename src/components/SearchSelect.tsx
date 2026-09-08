@@ -7,7 +7,7 @@ import { Search, X, Check } from 'lucide-react'
 interface SearchSelectProps {
     options: any[];
     value: string;
-    onChange: (val: string) => void;
+    onChange: (val: string, option?: any) => void;
     placeholder?: string;
     disabled?: boolean;
     labelKey?: string;
@@ -253,7 +253,7 @@ export function SearchSelect({
                                                             const valToEmit = valueKey && opt[valueKey] !== undefined && opt[valueKey] !== null
                                                                 ? String(opt[valueKey])
                                                                 : (opt.code && value === String(opt.code) ? String(opt.code) : String(opt.id || opt.code || opt[labelKey] || ''));
-                                                            onChange(valToEmit);
+                                                            onChange(valToEmit, opt);
                                                             setIsOpen(false);
                                                             setSearchTerm('');
                                                         }}

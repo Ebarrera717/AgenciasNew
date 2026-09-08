@@ -16,7 +16,8 @@ CREATE OR REPLACE PROCEDURE public.spVariableActualizar(
     p_code TEXT,
     p_name TEXT,
     p_acting_user_id INT,
-    INOUT p_mensaje_resultado TEXT
+    INOUT p_mensaje_resultado TEXT,
+    p_is_for_all_clients BOOLEAN DEFAULT false
 )
 LANGUAGE plpgsql
 AS $$
@@ -28,7 +29,8 @@ BEGIN
 
     UPDATE public."MasterVariable"
     SET "code" = p_code,
-        "name" = p_name
+        "name" = p_name,
+        "isForAllClients" = COALESCE(p_is_for_all_clients, false)
     WHERE id = p_id;
 
     p_mensaje_resultado := 'SUCCESS: Variable actualizada exitosamente.';

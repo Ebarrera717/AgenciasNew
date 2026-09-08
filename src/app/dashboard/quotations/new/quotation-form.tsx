@@ -1054,12 +1054,26 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                     <SearchSelect
                                         options={data.clients}
                                         value={formData.clientId}
-                                        onChange={(val) => {
-                                            const selectedC = data.clients?.find((c: any) => String(c.id) === String(val));
+                                        onChange={async (val, opt) => {
+                                            let selectedC = opt || data.clients?.find((c: any) => String(c.id) === String(val));
+                                            if ((!selectedC || selectedC.sellerId === undefined) && val) {
+                                                try {
+                                                    const res = await fetch(`/api/clients?id=${encodeURIComponent(val)}`);
+                                                    if (res.ok) {
+                                                        const clientData = await res.json();
+                                                        if (clientData && !clientData.message) {
+                                                            selectedC = clientData;
+                                                        }
+                                                    }
+                                                } catch (err) {
+                                                    console.error("Error fetching client seller:", err);
+                                                }
+                                            }
+                                            const sellerIdToSet = selectedC?.sellerId ? String(selectedC.sellerId) : '';
                                             setFormData(prev => ({
                                                 ...prev,
                                                 clientId: val,
-                                                sellerId: selectedC?.sellerId ? String(selectedC.sellerId) : prev.sellerId
+                                                sellerId: sellerIdToSet || prev.sellerId
                                             }));
                                         }}
                                         placeholder="Seleccionar Cliente"
@@ -1129,14 +1143,19 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-zinc-500">Estado de Cotización</label>
+                                    <label className="text-sm font-semibold text-zinc-500">
+                                        Estado de Cotización {!quotationId && <span className="text-xs text-zinc-400 font-normal">(Bloqueado en Nuevo al crear)</span>}
+                                    </label>
                                     <select
+                                        disabled={!quotationId}
                                         className={cn(
                                             "w-full h-12 rounded-xl px-4 border outline-none font-bold focus:ring-2 transition-all",
-                                            getStateColorClass(formData.state, data.quotationStates)
+                                            getStateColorClass(formData.state, data.quotationStates),
+                                            !quotationId && "opacity-75 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800"
                                         )}
                                         value={formData.state}
                                         onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                        title={!quotationId ? "El estado es Nuevo al crear una cotización" : undefined}
                                     >
                                         {(data.quotationStates || [
                                             { code: 'NUEVO', name: 'Nuevo' },
@@ -1929,60 +1948,85 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                     Variables Adicionales (Maestro)
                                                 </p>
                                                 <div className="flex flex-col gap-2">
-                                                    {(!data.variables || data.variables.length === 0) && (
-                                                        <span className="text-xs text-zinc-400 font-medium">No hay variables adicionales configuradas.</span>
-                                                    )}
+                                                    {(() => {
+                                                        const selectedClient = data.clients?.find((c: any) => String(c.id) === String(formData.clientId));
+                                                        let clientMandatoryIds: any[] = [];
+                                                        if (selectedClient?.mandatoryVariables) {
+                                                            if (Array.isArray(selectedClient.mandatoryVariables)) {
+                                                                clientMandatoryIds = selectedClient.mandatoryVariables;
+                                                            } else if (typeof selectedClient.mandatoryVariables === 'string') {
+                                                                try { clientMandatoryIds = JSON.parse(selectedClient.mandatoryVariables); } catch (e) {}
+                                                            }
+                                                        }
 
-                                                    {data.variables?.map((vMaster: any) => {
-                                                        const assigned = item.variables?.find((v: any) => v.masterVariableId === vMaster.id);
-                                                        const isSelected = !!assigned;
+                                                        const availableVariables = (data.variables || []).filter((vMaster: any) => {
+                                                            if (vMaster.isForAllClients) return true;
+                                                            const isMandatoryForClient = clientMandatoryIds.some(
+                                                                id => String(id) === String(vMaster.id) || String(id) === String(vMaster.code)
+                                                            );
+                                                            if (isMandatoryForClient) return true;
+                                                            const hasValueInItem = item.variables?.some(
+                                                                (v: any) => String(v.masterVariableId) === String(vMaster.id) && v.value
+                                                            );
+                                                            if (hasValueInItem) return true;
+                                                            return false;
+                                                        });
 
-                                                        return (
-                                                            <div key={vMaster.id} className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                                                                <div className="flex items-center gap-2 min-w-[200px]">
-                                                                    <label className={cn(
-                                                                        "flex items-center gap-2 cursor-pointer text-sm font-bold flex-1",
-                                                                        isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-600 dark:text-zinc-400"
-                                                                    )}>
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                                                            checked={isSelected}
-                                                                            onChange={(e) => {
-                                                                                const checked = e.target.checked;
-                                                                                const currentVars = item.variables || [];
-                                                                                if (checked) {
-                                                                                    updateItem(index, 'variables', [...currentVars, { masterVariableId: vMaster.id, value: '' }]);
-                                                                                } else {
-                                                                                    updateItem(index, 'variables', currentVars.filter((v: any) => v.masterVariableId !== vMaster.id));
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                        <span>{vMaster.name}</span>
-                                                                        <span className="opacity-50 text-[10px] ml-auto">({vMaster.code})</span>
-                                                                    </label>
-                                                                </div>
+                                                        if (availableVariables.length === 0) {
+                                                            return <span className="text-xs text-zinc-400 font-medium">No hay variables adicionales aplicables para este cliente.</span>;
+                                                        }
 
-                                                                {isSelected && (
-                                                                    <div className="flex-1 border-l border-zinc-200 dark:border-zinc-700 pl-4 py-1">
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder={`Ingresar valor para ${vMaster.name}`}
-                                                                            className="w-full h-8 bg-white dark:bg-zinc-900 rounded-lg px-3 border border-zinc-200 dark:border-zinc-700 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
-                                                                            value={assigned.value}
-                                                                            onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                const newVars = (item.variables || []).map((v: any) =>
-                                                                                    v.masterVariableId === vMaster.id ? { ...v, value: val } : v
-                                                                                );
-                                                                                updateItem(index, 'variables', newVars);
-                                                                            }}
-                                                                        />
+                                                        return availableVariables.map((vMaster: any) => {
+                                                            const assigned = item.variables?.find((v: any) => String(v.masterVariableId) === String(vMaster.id));
+                                                            const isSelected = !!assigned;
+
+                                                            return (
+                                                                <div key={vMaster.id} className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                                                                    <div className="flex items-center gap-2 min-w-[200px]">
+                                                                        <label className={cn(
+                                                                            "flex items-center gap-2 cursor-pointer text-sm font-bold flex-1",
+                                                                            isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-600 dark:text-zinc-400"
+                                                                        )}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                                                checked={isSelected}
+                                                                                onChange={(e) => {
+                                                                                    const checked = e.target.checked;
+                                                                                    const currentVars = item.variables || [];
+                                                                                    if (checked) {
+                                                                                        updateItem(index, 'variables', [...currentVars, { masterVariableId: vMaster.id, value: '' }]);
+                                                                                    } else {
+                                                                                        updateItem(index, 'variables', currentVars.filter((v: any) => String(v.masterVariableId) !== String(vMaster.id)));
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <span>{vMaster.name}</span>
+                                                                            <span className="opacity-50 text-[10px] ml-auto">({vMaster.code})</span>
+                                                                        </label>
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    })}
+
+                                                                    {isSelected && (
+                                                                        <div className="flex-1 border-l border-zinc-200 dark:border-zinc-700 pl-4 py-1">
+                                                                            <input
+                                                                                type="text"
+                                                                                placeholder={`Ingresar valor para ${vMaster.name}`}
+                                                                                className="w-full h-8 bg-white dark:bg-zinc-900 rounded-lg px-3 border border-zinc-200 dark:border-zinc-700 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                                                                                value={assigned.value}
+                                                                                onChange={(e) => {
+                                                                                    const val = e.target.value;
+                                                                                    const newVars = (item.variables || []).map((v: any) =>
+                                                                                        String(v.masterVariableId) === String(vMaster.id) ? { ...v, value: val } : v
+                                                                                    );
+                                                                                    updateItem(index, 'variables', newVars);
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        });
+                                                    })()}
                                                 </div>
                                             </div>
                                         )}

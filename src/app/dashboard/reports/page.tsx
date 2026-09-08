@@ -71,6 +71,7 @@ export default function ReportsPage() {
     const [runtimeFilterValues, setRuntimeFilterValues] = useState<Record<string, any>>({})
     const [isRuntimeFilterModalOpen, setIsRuntimeFilterModalOpen] = useState(false)
     const [copiedToClipboard, setCopiedToClipboard] = useState(false)
+    const [isScreenReportModalOpen, setIsScreenReportModalOpen] = useState(false)
 
     // Lookup Helper Modal State (Activado por la Lupa en los filtros)
     const [isLookupModalOpen, setIsLookupModalOpen] = useState(false)
@@ -975,6 +976,13 @@ export default function ReportsPage() {
                         </div>
                         <div className="flex items-center gap-3">
                             <button 
+                                onClick={() => setIsScreenReportModalOpen(true)}
+                                className="px-5 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-500/20 text-xs"
+                            >
+                                <Printer className="w-4 h-4" /> 
+                                Ver Reporte en Pantalla
+                            </button>
+                            <button 
                                 onClick={copyToClipboardExcel} 
                                 className="px-5 h-12 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100 rounded-xl font-bold flex items-center gap-2 transition-all border border-blue-200 dark:border-blue-800 text-xs"
                             >
@@ -1605,6 +1613,199 @@ export default function ReportsPage() {
                                     >
                                         Cancelar
                                     </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal de Reporte en Pantalla (Imprimible / Vista Previa Documental) */}
+            <AnimatePresence>
+                {isScreenReportModalOpen && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-8 bg-black/70 backdrop-blur-md overflow-y-auto">
+                        <style>{`
+                            @page {
+                                size: landscape;
+                                margin: 8mm;
+                            }
+                            @media print {
+                                body * { visibility: hidden !important; }
+                                #printable-screen-report, #printable-screen-report * { visibility: visible !important; }
+                                #printable-screen-report {
+                                    position: absolute !important;
+                                    left: 0 !important;
+                                    top: 0 !important;
+                                    width: 100% !important;
+                                    margin: 0 !important;
+                                    padding: 10px !important;
+                                    background: white !important;
+                                    color: black !important;
+                                    box-shadow: none !important;
+                                    border: none !important;
+                                    font-size: 9px !important;
+                                }
+                                #printable-screen-report table {
+                                    width: 100% !important;
+                                    table-layout: auto !important;
+                                    border-collapse: collapse !important;
+                                }
+                                #printable-screen-report th, #printable-screen-report td {
+                                    padding: 4px 6px !important;
+                                    font-size: 9px !important;
+                                    white-space: nowrap !important;
+                                    word-break: keep-all !important;
+                                }
+                                #printable-screen-report tr {
+                                    page-break-inside: avoid !important;
+                                    break-inside: avoid !important;
+                                }
+                                .no-print-area { display: none !important; }
+                            }
+                        `}</style>
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800"
+                        >
+                            {/* Barra superior de control del Modal */}
+                            <div className="no-print-area p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/80 dark:bg-zinc-800/40">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-xl flex items-center justify-center">
+                                        <Printer className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-zinc-900 dark:text-white">Vista Previa del Reporte</h3>
+                                        <p className="text-xs text-zinc-400 font-medium">{activeReport?.name || 'Reporte de Información'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button 
+                                        onClick={() => window.print()}
+                                        className="px-5 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-500/20"
+                                    >
+                                        <Printer className="w-4 h-4" />
+                                        Imprimir / PDF
+                                    </button>
+                                    <button 
+                                        onClick={() => setIsScreenReportModalOpen(false)} 
+                                        className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Documento Imprimible del Reporte en Pantalla */}
+                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-zinc-50/50 dark:bg-zinc-950">
+                                <div id="printable-screen-report" className="bg-white text-zinc-900 p-8 md:p-12 rounded-[2rem] shadow-sm border border-zinc-200 space-y-8">
+                                    {/* Encabezado Corporativo del Reporte */}
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-zinc-200 gap-4">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-2xl font-black tracking-tight text-blue-600">KoreX</span>
+                                                <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">ERP AGENCIAS</span>
+                                            </div>
+                                            <h1 className="text-2xl font-black tracking-tight text-zinc-900 mt-2">{activeReport?.name || 'REPORTE OPERATIVO'}</h1>
+                                            <p className="text-xs font-medium text-zinc-500 mt-0.5">Informe de datos en pantalla exportado directamente del sistema</p>
+                                        </div>
+                                        <div className="text-left md:text-right text-xs font-medium text-zinc-500 space-y-1 bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                                            <div><strong className="text-zinc-700">Fecha de Generación:</strong> {new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                                            <div><strong className="text-zinc-700">Total Registros:</strong> {reportResult.length}</div>
+                                            <div><strong className="text-zinc-700">Origen Tabla:</strong> {activeReport?.base_table || 'Cotizaciones'}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Resumen de Filtros Aplicados */}
+                                    {Object.keys(runtimeFilterValues).length > 0 && (
+                                        <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-100 text-xs space-y-1.5">
+                                            <span className="font-bold text-blue-900 uppercase text-[10px] tracking-wider block">Filtros de Búsqueda Aplicados:</span>
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-zinc-700">
+                                                {Object.entries(runtimeFilterValues).map(([k, v]) => (
+                                                    v ? <div key={k}><strong className="text-zinc-900">{k}:</strong> {String(v)}</div> : null
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Tabla de Registros en Pantalla */}
+                                    {reportResult.length === 0 ? (
+                                        <div className="py-16 text-center text-zinc-400 font-bold">No existen datos registrados para mostrar en este reporte.</div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-xs border-collapse border border-zinc-200">
+                                                <thead>
+                                                    <tr className="bg-zinc-100 text-zinc-800 font-bold uppercase tracking-wider border-b border-zinc-300">
+                                                        <th className="py-2.5 px-2.5 border-r border-zinc-200 text-center w-10 whitespace-nowrap">#</th>
+                                                        {Object.keys(reportResult[0]).map(key => (
+                                                            <th key={key} className="py-2.5 px-3 border-r border-zinc-200 whitespace-nowrap">{key}</th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-zinc-200 text-zinc-800">
+                                                    {reportResult.map((row, idx) => (
+                                                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/70'}>
+                                                            <td className="py-2 px-2.5 border-r border-zinc-200 font-bold text-center text-zinc-500 whitespace-nowrap">{idx + 1}</td>
+                                                            {Object.entries(row).map(([colKey, val], j) => {
+                                                                const keyLower = colKey.toLowerCase();
+                                                                let formattedVal = val === null || val === undefined || val === '' ? '-' : String(val);
+                                                                
+                                                                if (typeof val === 'string' && val.includes('T') && (keyLower.includes('fecha') || keyLower.includes('date') || keyLower.includes('createdat'))) {
+                                                                    const d = new Date(val);
+                                                                    if (!isNaN(d.getTime())) {
+                                                                        const year = d.getFullYear();
+                                                                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                                        const day = String(d.getDate()).padStart(2, '0');
+                                                                        const hours = String(d.getHours()).padStart(2, '0');
+                                                                        const minutes = String(d.getMinutes()).padStart(2, '0');
+                                                                        formattedVal = `${year}-${month}-${day} ${hours}:${minutes}`;
+                                                                    }
+                                                                }
+
+                                                                const isNum = typeof val === 'number' || (!isNaN(Number(val)) && val !== '' && val !== null && !keyLower.includes('nit') && !keyLower.includes('documento') && !keyLower.includes('tel') && !keyLower.includes('código') && !keyLower.includes('codigo') && !keyLower.includes('numero') && !keyLower.includes('número') && !keyLower.includes('id'));
+                                                                const isCurrency = isNum && (keyLower.includes('valor') || keyLower.includes('monto') || keyLower.includes('total') || keyLower.includes('precio') || keyLower.includes('tarifa') || keyLower.includes('costo') || keyLower.includes('utilidad'));
+                                                                
+                                                                if (isCurrency && typeof val !== 'string') {
+                                                                    formattedVal = `$ ${Number(val).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                                                }
+
+                                                                return (
+                                                                    <td key={j} className={`py-2 px-3 border-r border-zinc-200 whitespace-nowrap ${isNum ? 'text-right font-mono' : ''}`}>
+                                                                        {formattedVal}
+                                                                    </td>
+                                                                )
+                                                            })}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                                {/* Fila de Totales Sumarizados al final si existen columnas numéricas */}
+                                                <tfoot>
+                                                    <tr className="bg-zinc-100 font-black text-zinc-900 border-t-2 border-zinc-300">
+                                                        <td className="py-2.5 px-2.5 border-r border-zinc-200 text-center whitespace-nowrap">TOTAL</td>
+                                                        {Object.entries(reportResult[0]).map(([colKey, firstVal], j) => {
+                                                            const isNumCol = (typeof firstVal === 'number' || !isNaN(Number(firstVal))) && (colKey.toLowerCase().includes('valor') || colKey.toLowerCase().includes('monto') || colKey.toLowerCase().includes('total') || colKey.toLowerCase().includes('precio') || colKey.toLowerCase().includes('tarifa') || colKey.toLowerCase().includes('costo') || colKey.toLowerCase().includes('utilidad'));
+                                                            if (isNumCol) {
+                                                                const sum = reportResult.reduce((acc, row) => acc + (Number(row[colKey]) || 0), 0);
+                                                                return (
+                                                                    <td key={j} className="py-2.5 px-3 border-r border-zinc-200 text-right font-mono text-xs text-blue-700 font-extrabold whitespace-nowrap">
+                                                                        $ {sum.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                    </td>
+                                                                )
+                                                            }
+                                                            return <td key={j} className="py-2.5 px-3 border-r border-zinc-200 whitespace-nowrap"></td>;
+                                                        })}
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* Pie del Reporte */}
+                                    <div className="pt-6 border-t border-zinc-200 flex items-center justify-between text-[11px] text-zinc-500 font-medium">
+                                        <div>KoreX ERP Agencias - Sistema de Gestión e Informes Operativos</div>
+                                        <div>Página 1 de 1</div>
+                                    </div>
                                 </div>
                             </div>
                         </motion.div>

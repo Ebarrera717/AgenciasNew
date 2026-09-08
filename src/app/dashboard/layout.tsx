@@ -89,8 +89,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const uCode = (code || '').toUpperCase()
         const uAction = (action || '').toLowerCase()
 
-        if (uCode.includes('PRECOTIZACION') || uAction.includes('prequotations')) return <FilePlus className="w-5 h-5 text-amber-400" />
-        if (uCode.includes('MANUAL') || uAction.includes('manual')) return <BookOpen className="w-5 h-5 text-blue-400" />
+        if (uCode.includes('PRECOTIZACION') || uAction.includes('prequotations')) return <FilePlus className="w-5 h-5" />
+        if (uCode.includes('MANUAL') || uAction.includes('manual')) return <BookOpen className="w-5 h-5" />
         if (uCode.includes('DASHBOARD') || uAction === '/dashboard') return <LayoutDashboard className="w-5 h-5" />
         if (uCode.includes('COTIZACION') || uAction.includes('quotations')) return <FileText className="w-5 h-5" />
         if (uCode.includes('FACTURA') || uAction.includes('invoices')) return <Receipt className="w-5 h-5" />

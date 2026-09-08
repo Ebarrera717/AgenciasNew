@@ -231,7 +231,7 @@ export default function QuotationsListPage() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setIsPrintModalOpen(true)}
-                        className="px-6 h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-2xl flex items-center gap-3 shadow-sm font-bold transition-all hover:bg-zinc-50"
+                        className="px-5 h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl flex items-center gap-2 shadow-sm text-sm font-bold transition-all cursor-pointer active:scale-95"
                     >
                         <Printer className="w-5 h-5" />
                         Imprimir Reporte
@@ -240,7 +240,7 @@ export default function QuotationsListPage() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => router.push('/dashboard/quotations/new')}
-                        className="px-6 h-14 bg-blue-600 text-white rounded-2xl flex items-center gap-3 shadow-xl shadow-blue-500/20 font-bold"
+                        className="px-5 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-2 shadow-md shadow-blue-500/20 text-sm font-bold transition-all cursor-pointer active:scale-95 shrink-0"
                     >
                         <Plus className="w-5 h-5" />
                         Nueva Cotización

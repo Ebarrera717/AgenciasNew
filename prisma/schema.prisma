@@ -51,6 +51,7 @@ model Client {
   mandatoryVariables Json?
   sellerId           Int?
   isActive           Boolean        @default(true)
+  creditDays         Int?           @default(0)
   Seller             Seller?        @relation(fields: [sellerId], references: [id], onUpdate: NoAction)
   preQuotations      PreQuotation[]
   quotations         Quotation[]
@@ -355,6 +356,7 @@ model MasterVariable {
   code             String                     @unique
   name             String
   isActive         Boolean                    @default(true)
+  isForAllClients  Boolean                    @default(false)
   productVariables QuotationProductVariable[]
 }
 
@@ -446,11 +448,11 @@ model CellCustomization {
 }
 
 model Invoices {
-  id                   Int      @id @default(autoincrement())
-  internalNumber       String   @unique @db.VarChar(255)
-  date                 DateTime @default(now()) @db.Timestamp(6)
+  id                   Int       @id @default(autoincrement())
+  internalNumber       String    @unique @db.VarChar(255)
+  date                 DateTime  @default(now()) @db.Timestamp(6)
   clientId             Int
-  currency             String   @db.VarChar(50)
+  currency             String    @db.VarChar(50)
   exchangeRate         Float
   branchId             Int
   implantId            Int?
@@ -461,10 +463,11 @@ model Invoices {
   chargesAndTaxes      Float
   totalAmount          Float
   userId               Int?
-  state                String?  @default("NUEVO") @db.VarChar(25)
-  fuente               String?  @db.VarChar(50)
-  serie                String?  @db.VarChar(50)
-  consecutivo          String?  @db.VarChar(50)
+  state                String?   @default("NUEVO") @db.VarChar(25)
+  fuente               String?   @db.VarChar(50)
+  serie                String?   @db.VarChar(50)
+  consecutivo          String?   @db.VarChar(50)
+  dueDate              DateTime? @db.Timestamp(6)
 }
 
 model InvoicesProduct {
@@ -1191,4 +1194,20 @@ model SysConsecutivo {
   @@index([branchId], map: "idx_sysconsecutivo_branch")
   @@index([codigo], map: "idx_sysconsecutivo_codigo")
   @@index([implantId], map: "idx_sysconsecutivo_implant")
+}
+
+model NotasCreditoNoRef {
+  id             Int       @id @default(autoincrement())
+  fuente         String?   @db.VarChar(10)
+  serie          String?   @db.VarChar(10)
+  consecutivo    String?   @db.VarChar(50)
+  factura_fuente String?   @db.VarChar(10)
+  factura_serie  String?   @db.VarChar(10)
+  factura_numero String?   @db.VarChar(50)
+  fecha          DateTime? @default(now()) @db.Timestamptz(6)
+  createdAt      DateTime? @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([consecutivo], map: "idx_notas_credito_no_ref_consecutivo")
+  @@index([factura_fuente, factura_serie, factura_numero], map: "idx_notas_credito_no_ref_factura")
 }

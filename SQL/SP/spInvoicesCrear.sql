@@ -50,6 +50,10 @@ DECLARE
     v_serie_val TEXT;
     v_consec_val TEXT;
     v_consec_num BIGINT;
+    v_date TIMESTAMP;
+    v_due_date TIMESTAMP;
+    v_credit_days INT;
+    v_client_id INT;
 BEGIN
     -- ----------------------------------------------------
     -- FASE 1: PRE-VALIDACIONES OBLIGATORIAS (Síncrona sin modificar BD)
@@ -286,15 +290,33 @@ BEGIN
         END;
 
         v_fuente_val := COALESCE(NULLIF(p_data->>'fuente', ''), 'FE');
+        v_client_id := NULLIF(p_data->>'clientId', '')::INT;
+
+        IF NULLIF(p_data->>'date', '') IS NOT NULL THEN
+            v_date := (p_data->>'date')::TIMESTAMP;
+        ELSE
+            v_date := CURRENT_TIMESTAMP;
+        END IF;
+
+        IF NULLIF(p_data->>'dueDate', '') IS NOT NULL THEN
+            v_due_date := (p_data->>'dueDate')::TIMESTAMP;
+        ELSE
+            SELECT COALESCE("creditDays", 0) INTO v_credit_days FROM public."Client" WHERE id = v_client_id;
+            IF v_credit_days IS NOT NULL AND v_credit_days > 0 THEN
+                v_due_date := v_date + (v_credit_days || ' days')::INTERVAL;
+            ELSE
+                v_due_date := v_date;
+            END IF;
+        END IF;
 
         -- Inserción de la Factura Cabecera
         INSERT INTO public."Invoices" (
-            "internalNumber", "date", "clientId", "currency", "exchangeRate", 
+            "internalNumber", "date", "dueDate", "clientId", "currency", "exchangeRate", 
             "branchId", "implantId", "sellerId", "ticketPrinterId", 
             "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
             "totalAmount", "userId", "state", "fuente", "serie", "consecutivo"
         ) VALUES (
-            v_internal_number, CURRENT_TIMESTAMP, NULLIF(p_data->>'clientId', '')::INT, p_data->>'currency', COALESCE(NULLIF(p_data->>'exchangeRate', '')::FLOAT, 1.0),
+            v_internal_number, v_date, v_due_date, v_client_id, p_data->>'currency', COALESCE(NULLIF(p_data->>'exchangeRate', '')::FLOAT, 1.0),
             v_branch_id, v_implant_id, NULLIF(p_data->>'sellerId', '')::INT, NULLIF(p_data->>'ticketPrinterId', '')::INT,
             0, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::FLOAT, 0.0), COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0.0),
             COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0.0), p_acting_user_id, 'NUEVO',

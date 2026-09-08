@@ -22,6 +22,59 @@ async function validateAndPrepareSchema(customConnStr) {
   client.on('error', err => console.warn('  [WARN] PG Client async error caught:', err.message));
   await client.connect();
 
+  // 0.5 Escaneo y garantía previa de todas las secuencias (nextval) en SQL y API Routes
+  console.log("\n[PASO 0.5/4] Auditando y sembrando todas las secuencias (nextval) en PostgreSQL local...");
+  const alterColumnsPath = path.join(rootDir, 'SQL', 'Table', 'Alter_New_Columns.sql');
+  let alterContentPre = fs.existsSync(alterColumnsPath) ? fs.readFileSync(alterColumnsPath, 'utf8') : '';
+  const detectedSequences = new Set();
+
+  // Escanear todas las carpetas SQL y API Routes en busca de nextval('...')
+  const searchPathsForSeq = ['SQL/SP', 'SQL/Function', 'SQL/Procedure', 'SQL/Table', 'src/app/api'];
+  for (const relPath of searchPathsForSeq) {
+    const fullPath = path.join(rootDir, relPath);
+    if (!fs.existsSync(fullPath)) continue;
+    const scanFiles = (dir) => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const res = path.resolve(dir, entry.name);
+        if (entry.isDirectory()) {
+          scanFiles(res);
+        } else if (entry.isFile() && (entry.name.endsWith('.sql') || entry.name.endsWith('.ts') || entry.name.endsWith('.js'))) {
+          const content = fs.readFileSync(res, 'utf8');
+          const matches = content.matchAll(/nextval\(['"](?:public\.)?([A-Za-z0-9_]+)['"]\)/gi);
+          for (const m of matches) {
+            detectedSequences.add(m[1]);
+          }
+        }
+      }
+    };
+    scanFiles(fullPath);
+  }
+
+  let injectedPreSeq = 0;
+  for (const seqName of detectedSequences) {
+    // 1. Crear en Postgres local inmediatamente
+    try {
+      await client.query(`CREATE SEQUENCE IF NOT EXISTS public."${seqName}" START WITH 1;`);
+      await client.query(`CREATE SEQUENCE IF NOT EXISTS public.${seqName} START WITH 1;`);
+    } catch (e) {}
+
+    // 2. Garantizar en Alter_New_Columns.sql en nivel superior
+    const topSeqRegex = new RegExp(`CREATE\\s+SEQUENCE\\s+IF\\s+NOT\\s+EXISTS\\s+public\\.${seqName}\\b`, 'i');
+    if (!topSeqRegex.test(alterContentPre)) {
+      console.log(`  [AUTO-FIX] Inyectando siembra superior de secuencia public.${seqName} en Alter_New_Columns.sql...`);
+      alterContentPre = `CREATE SEQUENCE IF NOT EXISTS public.${seqName} START WITH 1;\n` + alterContentPre;
+      injectedPreSeq++;
+    }
+  }
+
+  if (injectedPreSeq > 0) {
+    fs.writeFileSync(alterColumnsPath, alterContentPre, 'utf8');
+    console.log(`  [OK] Se inyectaron ${injectedPreSeq} secuencia(s) al inicio de Alter_New_Columns.sql.`);
+  } else {
+    console.log(`  [OK] Se verificaron ${detectedSequences.size} secuencia(s) autodetectada(s) sin ausencias.`);
+  }
+
   const folders = ['SQL/Table', 'SQL/Function', 'SQL/SP', 'SQL/Procedure'];
   for (const folder of folders) {
     const dirPath = path.join(rootDir, folder);
@@ -157,7 +210,6 @@ async function validateAndPrepareSchema(customConnStr) {
 
   // 2.5.5 Verificación y Siembra Automática de Secuencias Personalizadas (nextval en SPs)
   console.log("\n[PASO 2.5.5/5] Auditando secuencias personalizadas referenciadas en Stored Procedures...");
-  const alterColumnsPath = path.join(__dirname, '..', 'SQL', 'Table', 'Alter_New_Columns.sql');
   let alterSqlContent = fs.readFileSync(alterColumnsPath, 'utf8');
   let customSeqInjected = 0;
 

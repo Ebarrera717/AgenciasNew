@@ -8,6 +8,7 @@ const DEFAULT_INVOICE_CONFIG: Record<string, string> = {
     idFactura: "G4",
     internalNumber: "G5",
     fecha: "G6",
+    fechaVencimiento: "G7",
     clienteNombre: "B8",
     clienteIdentificacion: "G8",
     clienteDireccion: "B9",
@@ -163,7 +164,8 @@ export async function GET(req: Request) {
                 const fieldValues: Record<string, any> = {
                     idFactura: inv.consecutivo || inv.id,
                     internalNumber: inv.internalNumber,
-                    fecha: inv.date ? new Date(inv.date).toLocaleDateString() : '',
+                    fecha: inv.date ? new Date(inv.date).toLocaleDateString('es-CO') : '',
+                    fechaVencimiento: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('es-CO') : (inv.date ? new Date(inv.date).toLocaleDateString('es-CO') : ''),
                     clienteNombre: client?.name || '',
                     clienteIdentificacion: client?.document || '',
                     clienteDireccion: client?.address || '',

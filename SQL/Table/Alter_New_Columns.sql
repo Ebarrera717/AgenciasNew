@@ -854,6 +854,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Client' AND column_name = 'mandatoryVariables') THEN
         ALTER TABLE public."Client" ADD COLUMN "mandatoryVariables" jsonb;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Client' AND column_name = 'creditDays') THEN
+        ALTER TABLE public."Client" ADD COLUMN "creditDays" integer DEFAULT 0;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Implant' AND column_name = 'id') THEN
         ALTER TABLE public."Implant" ADD COLUMN "id" integer NOT NULL;
     END IF;
@@ -1006,6 +1009,12 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'MasterVariable' AND column_name = 'name') THEN
         ALTER TABLE public."MasterVariable" ADD COLUMN "name" text NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'MasterVariable' AND column_name = 'isForAllClients') THEN
+        ALTER TABLE public."MasterVariable" ADD COLUMN "isForAllClients" boolean DEFAULT false NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'MasterVariable' AND column_name = 'isActive') THEN
+        ALTER TABLE public."MasterVariable" ADD COLUMN "isActive" boolean DEFAULT true NOT NULL;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Airports' AND column_name = 'id') THEN
         ALTER TABLE public."Airports" ADD COLUMN "id" integer NOT NULL;
@@ -1827,6 +1836,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'consecutivo') THEN
         ALTER TABLE public."Invoices" ADD COLUMN "consecutivo" character varying(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'dueDate') THEN
+        ALTER TABLE public."Invoices" ADD COLUMN "dueDate" timestamp without time zone;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProduct' AND column_name = 'id') THEN
         ALTER TABLE public."InvoicesProduct" ADD COLUMN "id" integer NOT NULL;

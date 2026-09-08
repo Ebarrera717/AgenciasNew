@@ -323,10 +323,10 @@ export default function PreQuotationsPage() {
 
                 <button
                     onClick={() => { resetForm(); setIsModalOpen(true); }}
-                    className="px-5 h-11 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold rounded-2xl shadow-md transition-all flex items-center gap-2 text-xs cursor-pointer active:scale-95 shrink-0"
+                    className="px-5 h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 text-sm cursor-pointer active:scale-95 shrink-0"
                 >
-                    <Plus className="w-4 h-4" />
-                    <span>+ Nueva Pre-Cotización</span>
+                    <Plus className="w-5 h-5" />
+                    <span>Nueva Pre-Cotización</span>
                 </button>
             </header>
 

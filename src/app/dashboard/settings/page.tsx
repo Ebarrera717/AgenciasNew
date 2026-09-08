@@ -493,6 +493,7 @@ export default function SettingsPage() {
             idCotizacion: 'ID Cotización',
             internalNumber: 'Número Interno',
             fecha: 'Fecha',
+            fechaVencimiento: 'Fecha Vencimiento',
             clienteNombre: 'Cliente Nombre',
             clienteIdentificacion: 'Cliente ID / NIT',
             clienteDireccion: 'Dirección',
@@ -551,6 +552,7 @@ export default function SettingsPage() {
             { key: 'idCotizacion', label: 'ID Cotización' },
             { key: 'internalNumber', label: 'Número Interno' },
             { key: 'fecha', label: 'Fecha' },
+            { key: 'fechaVencimiento', label: 'Fecha Vencimiento' },
             { key: 'clienteNombre', label: 'Cliente Nombre' },
             { key: 'clienteIdentificacion', label: 'Cliente ID / NIT' },
             { key: 'clienteDireccion', label: 'Dirección' },
@@ -1393,19 +1395,18 @@ export default function SettingsPage() {
                             </motion.button>
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploading}
-                                className="px-6 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl flex items-center gap-3 shadow-xl font-bold transition-all disabled:opacity-50"
+                                className="px-5 h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl flex items-center gap-2 text-sm font-bold shadow-sm transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                             >
-                                {uploading ? <Loader2 className="animate-spin w-5 h-5" /> : <Database className="w-5 h-5" />}
+                                {uploading ? <Loader2 className="animate-spin w-5 h-5" /> : <Database className="w-5 h-5 text-blue-600" />}
                                 Carga Masiva
                             </motion.button>
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => handleOpenModal()}
-                                className="px-6 h-14 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 text-white rounded-2xl flex items-center gap-3 shadow-xl font-bold transition-all"
+                                className="px-5 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-2 shadow-md shadow-blue-500/20 text-sm font-bold transition-all cursor-pointer active:scale-95 shrink-0"
                             >
                                 <Plus className="w-5 h-5" />
                                 {TAB_CONFIG[activeTab]?.newLabel || 'Nuevo Registro'}
@@ -1428,7 +1429,7 @@ export default function SettingsPage() {
                     { key: 'clientes' as Tab, label: 'Clientes', icon: <Users className="w-4 h-4" /> },
                     { key: 'combos' as Tab, label: 'Combos', icon: <Database className="w-4 h-4" /> },
                     { key: 'consecutivos-transacciones' as Tab, label: 'Consecutivos', icon: <Database className="w-4 h-4" /> },
-                    { key: 'diagnostico' as Tab, label: 'Diagnóstico y Salud', icon: <Activity className="w-4 h-4 text-emerald-500" />, isSystem: true },
+                    { key: 'diagnostico' as Tab, label: 'Diagnóstico y Salud', icon: <Activity className="w-4 h-4" />, isSystem: true },
                     { key: 'equivalencias' as Tab, label: 'Equivalencias', icon: <Tags className="w-4 h-4" /> },
                     { key: 'estados-cotizacion' as Tab, label: 'Estados Cotiz.', icon: <Tags className="w-4 h-4" /> },
                     { key: 'extraccion-interfaces' as Tab, label: 'Extracción Interfaces', icon: <TerminalSquare className="w-4 h-4" /> },
@@ -1988,6 +1989,7 @@ export default function SettingsPage() {
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código Único</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Variable</th>
+                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Aplica A</th>
                                             {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
@@ -2496,6 +2498,17 @@ export default function SettingsPage() {
                                                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700'
                                                 }`}>
                                                     {item.isAirline ? 'Sí' : 'No'}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {activeTab === 'variables' && (
+                                            <td className="px-8 py-6">
+                                                <span className={`px-3 py-1 text-[10px] font-black rounded-lg uppercase tracking-wider border ${
+                                                    item.isForAllClients 
+                                                        ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' 
+                                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700'
+                                                }`}>
+                                                    {item.isForAllClients ? 'Todos los Clientes' : 'Solo Obligatorias'}
                                                 </span>
                                             </td>
                                         )}
@@ -3215,15 +3228,25 @@ export default function SettingsPage() {
                                                 </div>
                                                 {activeTab === 'clientes' && <Input label="Dirección" value={formData.address || ''} onChange={(v: string) => setFormData({ ...formData, address: v })} placeholder="Opcional" />}
                                                 {activeTab === 'clientes' && (
-                                                    <div className="space-y-2 group">
-                                                        <label className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Vendedor por Defecto</label>
-                                                        <SearchSelect 
-                                                            options={sellers} 
-                                                            value={formData.sellerId} 
-                                                            onChange={(val) => setFormData({ ...formData, sellerId: val })}
-                                                            labelKey="name"
-                                                            secondaryKey="code"
-                                                            placeholder="Seleccionar Vendedor por Defecto (Opcional)"
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-2 group">
+                                                            <label className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Vendedor por Defecto</label>
+                                                            <SearchSelect 
+                                                                options={sellers} 
+                                                                value={formData.sellerId} 
+                                                                onChange={(val) => setFormData({ ...formData, sellerId: val })}
+                                                                labelKey="name"
+                                                                secondaryKey="code"
+                                                                placeholder="Seleccionar Vendedor por Defecto (Opcional)"
+                                                            />
+                                                        </div>
+                                                        <Input 
+                                                            label="Plazo de Crédito (Días)" 
+                                                            type="number"
+                                                            min="0"
+                                                            value={formData.creditDays !== undefined && formData.creditDays !== null ? formData.creditDays : 0} 
+                                                            onChange={(v: string) => setFormData({ ...formData, creditDays: v ? parseInt(v) : 0 })} 
+                                                            placeholder="Ej. 30" 
                                                         />
                                                     </div>
                                                 )}
@@ -3265,7 +3288,12 @@ export default function SettingsPage() {
                                                                                 }}
                                                                             />
                                                                             <div className="flex flex-col">
-                                                                                <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">{v.name}</span>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">{v.name}</span>
+                                                                                    {v.isForAllClients && (
+                                                                                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800">Global (Todos los clientes)</span>
+                                                                                    )}
+                                                                                </div>
                                                                                 <span className="text-[10px] text-zinc-400 font-mono">{v.code}</span>
                                                                             </div>
                                                                         </label>
@@ -3814,6 +3842,18 @@ export default function SettingsPage() {
                                         <>
                                             <Input label="Código Único" value={formData.code || ''} onChange={(v: string) => setFormData({ ...formData, code: v })} required placeholder="Ej. TKT-VUELO" />
                                             <Input label="Nombre de Variable" value={formData.name || ''} onChange={(v: string) => setFormData({ ...formData, name: v })} required placeholder="Ej. Número de Tiquete / Reserva" />
+                                            <label className="flex items-center space-x-3 cursor-pointer p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors mt-2">
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                                                    checked={Boolean(formData.isForAllClients)}
+                                                    onChange={(e) => setFormData({ ...formData, isForAllClients: e.target.checked })}
+                                                />
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-zinc-900 dark:text-white">Aplica para todos los clientes</span>
+                                                    <span className="text-[11px] text-zinc-500">Si se marca, esta variable aparecerá para todos los clientes al cotizar o facturar. Si no, solo aparecerá para los clientes que la tengan obligatoria.</span>
+                                                </div>
+                                            </label>
                                         </>
                                     ) : activeTab === 'parametros' ? (
                                         <>

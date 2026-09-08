@@ -16,13 +16,14 @@ CREATE OR REPLACE PROCEDURE public.spVariableCrear(
     p_name TEXT,
     p_acting_user_id INT,
     INOUT p_variable_id INT,
-    INOUT p_mensaje_resultado TEXT
+    INOUT p_mensaje_resultado TEXT,
+    p_is_for_all_clients BOOLEAN DEFAULT false
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    INSERT INTO public."MasterVariable" ("code", "name")
-    VALUES (p_code, p_name)
+    INSERT INTO public."MasterVariable" ("code", "name", "isForAllClients")
+    VALUES (p_code, p_name, COALESCE(p_is_for_all_clients, false))
     RETURNING id INTO p_variable_id;
 
     p_mensaje_resultado := 'SUCCESS: Variable creada con ID ' || p_variable_id;

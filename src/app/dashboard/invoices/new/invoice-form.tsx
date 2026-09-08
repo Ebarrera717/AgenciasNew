@@ -66,6 +66,8 @@ interface InvoiceFormData {
     fuente?: string;
     serie?: string;
     consecutivo?: string;
+    date?: string;
+    dueDate?: string;
 }
 
 export function computeItinerarySummaries(itineraryList: any[]) {
@@ -131,7 +133,9 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
         state: 'Nuevo',
         fuente: '',
         serie: '',
-        consecutivo: ''
+        consecutivo: '',
+        date: new Date().toISOString().split('T')[0],
+        dueDate: new Date().toISOString().split('T')[0]
     })
     const [saving, setSaving] = useState(false)
     const [isGlobalPaymentOpen, setIsGlobalPaymentOpen] = useState(false)
@@ -930,6 +934,8 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                             fuente: qData.fuente || '',
                             serie: qData.serie || '',
                             consecutivo: qData.consecutivo || '',
+                            date: qData.date ? new Date(qData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                            dueDate: qData.dueDate ? new Date(qData.dueDate).toISOString().split('T')[0] : (qData.date ? new Date(qData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
                             items: (qData.products || []).map((p: any) => {
                                 const safeAppliedTaxes = Array.isArray(p.appliedTaxes) ? p.appliedTaxes : [];
                                 const safeVariables = Array.isArray(p.variables) ? p.variables : [];
@@ -1226,17 +1232,41 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                 <SearchSelect
                                     options={data.clients}
                                     value={formData.clientId}
-                                    onChange={(val) => {
-                                        const selectedC = data.clients?.find((c: any) => String(c.id) === String(val));
+                                    onChange={async (val, opt) => {
+                                        let selectedC = opt || data.clients?.find((c: any) => String(c.id) === String(val));
+                                        if ((!selectedC || selectedC.creditDays === undefined || selectedC.sellerId === undefined) && val) {
+                                            try {
+                                                const res = await fetch(`/api/clients?id=${encodeURIComponent(val)}`);
+                                                if (res.ok) {
+                                                    const clientData = await res.json();
+                                                    if (clientData && !clientData.message) {
+                                                        selectedC = clientData;
+                                                    }
+                                                }
+                                            } catch (err) {
+                                                console.error("Error fetching client details:", err);
+                                            }
+                                        }
+                                        const creditDays = Number(selectedC?.creditDays) || 0;
+                                        const baseDate = formData.date || new Date().toISOString().split('T')[0];
+                                        const d = new Date(baseDate + 'T00:00:00');
+                                        d.setDate(d.getDate() + creditDays);
+                                        const calculatedDueDate = d.toISOString().split('T')[0];
+                                        const sellerIdToSet = selectedC?.sellerId ? String(selectedC.sellerId) : '';
+
                                         setFormData(prev => ({
                                             ...prev,
                                             clientId: val,
-                                            sellerId: selectedC?.sellerId ? String(selectedC.sellerId) : prev.sellerId
+                                            sellerId: sellerIdToSet || prev.sellerId,
+                                            date: baseDate,
+                                            dueDate: calculatedDueDate
                                         }));
                                     }}
                                     disabled={isReadOnly}
                                     placeholder="Seleccionar Cliente"
                                     secondaryKey="document"
+                                    remoteSearchEndpoint="/api/clients"
+                                    minSearchLength={2}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -1247,6 +1277,48 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                     onChange={(val) => setFormData({ ...formData, sellerId: val })}
                                     disabled={isReadOnly}
                                     placeholder="Seleccionar Vendedor"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-zinc-500">Fecha de Realización</label>
+                                <input
+                                    type="date"
+                                    disabled={isReadOnly}
+                                    className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                    value={formData.date || ''}
+                                    onChange={(e) => {
+                                        const newDateStr = e.target.value;
+                                        const selectedC = data.clients?.find((c: any) => String(c.id) === String(formData.clientId));
+                                        const creditDays = Number(selectedC?.creditDays) || 0;
+                                        let calculatedDueDate = newDateStr;
+                                        if (newDateStr) {
+                                            const d = new Date(newDateStr + 'T00:00:00');
+                                            d.setDate(d.getDate() + creditDays);
+                                            calculatedDueDate = d.toISOString().split('T')[0];
+                                        }
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            date: newDateStr,
+                                            dueDate: calculatedDueDate
+                                        }));
+                                    }}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-zinc-500">
+                                    Fecha de Vencimiento
+                                    {(() => {
+                                        const selectedC = data.clients?.find((c: any) => String(c.id) === String(formData.clientId));
+                                        const creditDays = Number(selectedC?.creditDays) || 0;
+                                        return creditDays > 0 ? ` (${creditDays} días plazo)` : '';
+                                    })()}
+                                </label>
+                                <input
+                                    type="date"
+                                    disabled={isReadOnly}
+                                    className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                    value={formData.dueDate || ''}
+                                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -2237,59 +2309,88 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                                     <span>Variables de Sistema Adicionales</span>
                                                 </p>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                    {data.variables.map((vMaster: any) => {
-                                                        const assigned = (item.variables || []).find((v: any) => v.masterVariableId === vMaster.id);
-                                                        const isSelected = !!assigned;
+                                                    {(() => {
+                                                        const selectedClient = data.clients?.find((c: any) => String(c.id) === String(formData.clientId));
+                                                        let clientMandatoryIds: any[] = [];
+                                                        if (selectedClient?.mandatoryVariables) {
+                                                            if (Array.isArray(selectedClient.mandatoryVariables)) {
+                                                                clientMandatoryIds = selectedClient.mandatoryVariables;
+                                                            } else if (typeof selectedClient.mandatoryVariables === 'string') {
+                                                                try { clientMandatoryIds = JSON.parse(selectedClient.mandatoryVariables); } catch (e) {}
+                                                            }
+                                                        }
 
-                                                        return (
-                                                            <div key={vMaster.id} className={cn(
-                                                                "flex flex-col gap-2 p-3 rounded-xl border transition-all",
-                                                                isSelected ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50" : "bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800"
-                                                            )}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <label className={cn(
-                                                                        "flex items-center gap-2 cursor-pointer text-sm font-bold flex-1",
-                                                                        isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-600 dark:text-zinc-400"
-                                                                    )}>
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                                                            checked={isSelected}
-                                                                            onChange={(e) => {
-                                                                                const checked = e.target.checked;
-                                                                                const currentVars = item.variables || [];
-                                                                                if (checked) {
-                                                                                    updateItem(index, 'variables', [...currentVars, { masterVariableId: vMaster.id, value: '' }]);
-                                                                                } else {
-                                                                                    updateItem(index, 'variables', currentVars.filter((v: any) => v.masterVariableId !== vMaster.id));
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                        <span>{vMaster.name}</span>
-                                                                        <span className="opacity-50 text-[10px] ml-auto">({vMaster.code})</span>
-                                                                    </label>
-                                                                </div>
+                                                        const availableVariables = (data.variables || []).filter((vMaster: any) => {
+                                                            if (vMaster.isForAllClients) return true;
+                                                            const isMandatoryForClient = clientMandatoryIds.some(
+                                                                id => String(id) === String(vMaster.id) || String(id) === String(vMaster.code)
+                                                            );
+                                                            if (isMandatoryForClient) return true;
+                                                            const hasValueInItem = item.variables?.some(
+                                                                (v: any) => String(v.masterVariableId) === String(vMaster.id) && v.value
+                                                            );
+                                                            if (hasValueInItem) return true;
+                                                            return false;
+                                                        });
 
-                                                                {isSelected && (
-                                                                    <div className="flex-1 border-l border-zinc-200 dark:border-zinc-700 pl-4 py-1">
-                                                                        <input
-                                                                            type="text"
-                                                                            placeholder={`Ingresar valor para ${vMaster.name}`}
-                                                                            className="w-full h-8 bg-white dark:bg-zinc-900 rounded-lg px-3 border border-zinc-200 dark:border-zinc-700 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
-                                                                            value={assigned.value}
-                                                                            onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                const newVars = (item.variables || []).map((v: any) =>
-                                                                                    v.masterVariableId === vMaster.id ? { ...v, value: val } : v
-                                                                                );
-                                                                                updateItem(index, 'variables', newVars);
-                                                                            }}
-                                                                        />
+                                                        if (availableVariables.length === 0) {
+                                                            return <span className="col-span-2 text-xs text-zinc-400 font-medium">No hay variables adicionales aplicables para este cliente.</span>;
+                                                        }
+
+                                                        return availableVariables.map((vMaster: any) => {
+                                                            const assigned = (item.variables || []).find((v: any) => String(v.masterVariableId) === String(vMaster.id));
+                                                            const isSelected = !!assigned;
+
+                                                            return (
+                                                                <div key={vMaster.id} className={cn(
+                                                                    "flex flex-col gap-2 p-3 rounded-xl border transition-all",
+                                                                    isSelected ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50" : "bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800"
+                                                                )}>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <label className={cn(
+                                                                            "flex items-center gap-2 cursor-pointer text-sm font-bold flex-1",
+                                                                            isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-600 dark:text-zinc-400"
+                                                                        )}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                                                checked={isSelected}
+                                                                                onChange={(e) => {
+                                                                                    const checked = e.target.checked;
+                                                                                    const currentVars = item.variables || [];
+                                                                                    if (checked) {
+                                                                                        updateItem(index, 'variables', [...currentVars, { masterVariableId: vMaster.id, value: '' }]);
+                                                                                    } else {
+                                                                                        updateItem(index, 'variables', currentVars.filter((v: any) => String(v.masterVariableId) !== String(vMaster.id)));
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <span>{vMaster.name}</span>
+                                                                            <span className="opacity-50 text-[10px] ml-auto">({vMaster.code})</span>
+                                                                        </label>
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    })}
+
+                                                                    {isSelected && (
+                                                                        <div className="flex-1 border-l border-zinc-200 dark:border-zinc-700 pl-4 py-1">
+                                                                            <input
+                                                                                type="text"
+                                                                                placeholder={`Ingresar valor para ${vMaster.name}`}
+                                                                                className="w-full h-8 bg-white dark:bg-zinc-900 rounded-lg px-3 border border-zinc-200 dark:border-zinc-700 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                                                                                value={assigned.value}
+                                                                                onChange={(e) => {
+                                                                                    const val = e.target.value;
+                                                                                    const newVars = (item.variables || []).map((v: any) =>
+                                                                                        String(v.masterVariableId) === String(vMaster.id) ? { ...v, value: val } : v
+                                                                                    );
+                                                                                    updateItem(index, 'variables', newVars);
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        });
+                                                    })()}
                                                 </div>
                                             </div>
                                         )}

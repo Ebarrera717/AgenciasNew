@@ -35,13 +35,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
-        const { name, document, contactInfo, address, mandatoryVariables, sellerId, isActive } = body
+        const { name, document, contactInfo, address, mandatoryVariables, sellerId, isActive, creditDays } = body
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
+        const cDays = parseInt(creditDays) || 0;
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spClienteCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::TEXT, $5::JSONB, $6::INT, $7::INT, $8::BOOLEAN, $9::INT, $10::TEXT)`,
+            `CALL public.spClienteCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::TEXT, $5::JSONB, $6::INT, $7::INT, $8::BOOLEAN, $9::INT, $10::INT, $11::TEXT)`,
             name || '',
             document || '',
             contactInfo || null,
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
             actingUserId,
             sellerId ? parseInt(sellerId) : null,
             isAct,
+            cDays,
             0, // p_client_id
             '' // p_mensaje_resultado
         );
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
             throw new Error(message || 'Error creating client');
         }
 
-        const client = { id: dbClientId, name, document, sellerId, isActive: isAct };
+        const client = { id: dbClientId, name, document, sellerId, isActive: isAct, creditDays: cDays };
 
         import('@/lib/logger').then(({ logSystemEvent }) => {
             logSystemEvent({ userId: actingUserId, action: 'CREATE', module: 'CLIENT', description: `Cliente ${client.name} creado (SP).`, metadata: client });
@@ -77,13 +79,14 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         const body = await req.json()
-        const { id, name, document, contactInfo, address, mandatoryVariables, sellerId, isActive } = body
+        const { id, name, document, contactInfo, address, mandatoryVariables, sellerId, isActive, creditDays } = body
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
+        const cDays = parseInt(creditDays) || 0;
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spClienteActualizar($1::INT, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::INT, $8::INT, $9::BOOLEAN, $10::TEXT)`,
+            `CALL public.spClienteActualizar($1::INT, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::INT, $8::INT, $9::BOOLEAN, $10::INT, $11::TEXT)`,
             parseInt(id),
             name || '',
             document || '',
@@ -93,6 +96,7 @@ export async function PUT(req: NextRequest) {
             actingUserId,
             sellerId ? parseInt(sellerId) : null,
             isAct,
+            cDays,
             '' // p_mensaje_resultado
         );
 
@@ -101,7 +105,7 @@ export async function PUT(req: NextRequest) {
             throw new Error(message);
         }
 
-        const client = { id, name, document, isActive: isAct };
+        const client = { id, name, document, isActive: isAct, creditDays: cDays };
 
         import('@/lib/logger').then(({ logSystemEvent }) => {
             logSystemEvent({ userId: actingUserId, action: 'UPDATE', module: 'CLIENT', description: `Cliente ${client.name} actualizado (SP).`, metadata: client });

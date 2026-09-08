@@ -82,6 +82,7 @@ CREATE OR REPLACE PROCEDURE public."spLimpiarMovimientosProduccion"(
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    r RECORD;
     v_tbl TEXT;
     v_tables TEXT[] := ARRAY[
         'Quotation', 'QuotationProduct', 'QuotationProductTax', 'QuotationProductVariable', 
@@ -104,14 +105,23 @@ BEGIN
         END IF;
     END LOOP;
 
-    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'seq_quotation_consecutivo') THEN
-        ALTER SEQUENCE public.seq_quotation_consecutivo RESTART WITH 1;
-    END IF;
-    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'Invoices_id_seq') THEN
-        ALTER SEQUENCE public."Invoices_id_seq" RESTART WITH 1;
+    -- Reinicio dinámico universal de TODAS las secuencias en public (IDs y Consecutivos)
+    FOR r IN 
+        SELECT c.relname 
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'S'
+    LOOP
+        EXECUTE 'ALTER SEQUENCE public."' || r.relname || '" RESTART WITH 1;';
+    END LOOP;
+
+    -- Reiniciar los consecutivos de transacciones a su valor inicial configurado
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'TransactionConsecutive') THEN
+        UPDATE public."TransactionConsecutive"
+        SET "currentNumber" = COALESCE("initialNumber", 1);
     END IF;
 
-    p_mensaje_resultado := 'SUCCESS: Tablas de movimientos vaciadas exitosamente. Parámetros y maestros intactos.';
+    p_mensaje_resultado := 'SUCCESS: Tablas de movimientos vaciadas y consecutivos/secuencias reiniciados exitosamente a 1.';
 EXCEPTION WHEN OTHERS THEN
     p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END;

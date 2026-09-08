@@ -21,6 +21,7 @@ CREATE OR REPLACE PROCEDURE public.spClienteActualizar(
     p_acting_user_id INT,
     p_seller_id INT DEFAULT NULL,
     p_is_active BOOLEAN DEFAULT true,
+    p_credit_days INT DEFAULT 0,
     INOUT p_mensaje_resultado TEXT DEFAULT ''
 )
 AS $BODY$
@@ -37,7 +38,8 @@ BEGIN
         "address" = p_address,
         "mandatoryVariables" = p_mandatory_variables,
         "sellerId" = p_seller_id,
-        "isActive" = COALESCE(p_is_active, true)
+        "isActive" = COALESCE(p_is_active, true),
+        "creditDays" = COALESCE(p_credit_days, 0)
     WHERE id = p_id;
 
     p_mensaje_resultado := 'SUCCESS: Cliente ' || p_id || ' actualizado.';

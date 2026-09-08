@@ -33,6 +33,7 @@ export async function GET() {
                 serie: inv.serie,
                 consecutivo: inv.consecutivo,
                 date: inv.date,
+                dueDate: inv.dueDate,
                 clientName: client?.name || 'Consumidor Final',
                 document: client?.document || '',
                 amount: inv.totalAmount || 0,

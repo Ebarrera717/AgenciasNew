@@ -24,7 +24,8 @@ RETURNS TABLE (
     "sellerId" integer,
     "sellerCode" text,
     "sellerName" text,
-    "isActive" boolean
+    "isActive" boolean,
+    "creditDays" integer
 )
 LANGUAGE plpgsql
 AS $$
@@ -40,7 +41,8 @@ BEGIN
         c."sellerId",
         s.code::text AS "sellerCode",
         s.name::text AS "sellerName",
-        COALESCE(c."isActive", true) AS "isActive"
+        COALESCE(c."isActive", true) AS "isActive",
+        COALESCE(c."creditDays", 0)::integer AS "creditDays"
     FROM public."Client" c
     LEFT JOIN public."Seller" s ON s.id = c."sellerId"
     ORDER BY c.id DESC;

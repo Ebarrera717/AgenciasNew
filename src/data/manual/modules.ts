@@ -364,18 +364,21 @@ export const MANUAL_MODULES: ManualModule[] = [
                 concept: 'Calcula totales de ventas, utilidad, comisiones y niveles de conversión comercial.',
                 fields: [
                     { name: 'Tipo de Reporte', type: 'Selector', description: 'Elija entre Ventas por Vendedor, Producción por Cliente o Rentabilidad.' },
-                    { name: 'Rango de Fechas', type: 'Fechas', description: 'Período de inicio y fin a consultar.' }
+                    { name: 'Rango de Fechas', type: 'Fechas', description: 'Período de inicio y fin a consultar.' },
+                    { name: 'Ver Reporte en Pantalla', type: 'Botón Primario (Azul)', description: 'Abre la vista previa documental en pantalla formateada con totales sumarizados e impresión directa/PDF.' },
+                    { name: 'Copiar a Excel', type: 'Botón Secundario (Azul Claro)', description: 'Copia el resultado en formato TSV directamente al portapapeles para pegar en Excel.' },
+                    { name: 'Descargar Excel (.xlsx)', type: 'Botón Éxito (Verde)', description: 'Exporta el informe estructurado a un libro de cálculo Microsoft Excel.' }
                 ],
                 steps: [
                     {
                         number: 1,
-                        title: 'Seleccionar el Reporte',
-                        description: 'En el menú Reportes, elija el tipo de informe deseado.'
+                        title: 'Seleccionar o Diseñar el Reporte',
+                        description: 'En el centro de reportes (/dashboard/reports), elija una plantilla guardada o cree un reporte personalizado.'
                     },
                     {
                         number: 2,
-                        title: 'Establecer Fechas y Exportar',
-                        description: 'Alique el rango de fechas y presione "Descargar Excel Corporativo".'
+                        title: 'Visualizar e Imprimir en Pantalla',
+                        description: 'Tras aplicar los filtros, presione "Ver Reporte en Pantalla" para abrir la vista previa formal en documento imprimible con encabezado corporativo y totales sumarizados al pie de las columnas de valor.'
                     }
                 ]
             }
@@ -445,10 +448,11 @@ export const MANUAL_MODULES: ManualModule[] = [
                 fields: [
                     { name: 'Nombre / Razón Social', type: 'Texto', description: 'Nombre completo o razón social del cliente.' },
                     { name: 'Documento / NIT', type: 'Texto Único', description: 'Cédula o NIT único para facturación.' },
-                    { name: 'Información de Contacto', type: 'Texto / Email', description: 'Teléfonos, dirección y correo electrónico de notificación.' }
+                    { name: 'Información de Contacto', type: 'Texto / Email', description: 'Teléfonos, dirección y correo electrónico de notificación.' },
+                    { name: 'Plazo (Días)', type: 'Numérico', description: 'Días de plazo de crédito concedidos al cliente para el cálculo automático de la fecha de vencimiento en las facturas.' }
                 ],
                 steps: [
-                    { number: 1, title: 'Registrar Cliente', description: 'En la pestaña "Clientes", presione "+ Nuevo Cliente" e ingrese el documento y contacto.' }
+                    { number: 1, title: 'Registrar Cliente', description: 'En la pestaña "Clientes", presione "+ Nuevo Cliente" e ingrese documento, plazo de crédito en días y datos de contacto.' }
                 ]
             },
             {

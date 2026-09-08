@@ -20,14 +20,14 @@ BEGIN
     SELECT 
         jsonb_build_object(
             'id', i.id,
-            'code', i.code,
-            'createdAt', i."createdAt",
-            'updatedAt', i."updatedAt",
+            'internalNumber', i."internalNumber",
+            'date', i.date,
+            'dueDate', i."dueDate",
             'state', i.state,
             'clientName', COALESCE(c.name, ''),
-            'total', COALESCE(i.total, 0)
+            'totalAmount', COALESCE(i."totalAmount", 0)
         )
-    FROM public."Invoice" i
+    FROM public."Invoices" i
     LEFT JOIN public."Client" c ON c.id = i."clientId"
     ORDER BY i.id DESC;
 END;

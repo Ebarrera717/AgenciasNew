@@ -12,7 +12,8 @@ import {
     Edit,
     Eye,
     Trash2,
-    Printer
+    Printer,
+    Plus
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -130,17 +131,17 @@ export default function InvoicesHistoryPage() {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleExport}
-                        className="px-6 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-xl shadow-emerald-500/20 font-bold transition-all flex items-center gap-3 shrink-0"
+                        className="px-5 h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl shadow-sm text-sm font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer active:scale-95"
                     >
-                        <Download className="w-5 h-5" /> Exportar
+                        <Download className="w-5 h-5 text-emerald-600" /> Exportar
                     </motion.button>
                     <Link href="/dashboard/invoices/new">
                         <motion.button
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            className="px-8 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl shadow-blue-500/20 font-bold transition-all flex items-center gap-3 shrink-0"
+                            className="px-5 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/20 text-sm font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer active:scale-95"
                         >
-                            Nueva Factura <ArrowRight className="w-5 h-5" />
+                            <Plus className="w-5 h-5" /> Nueva Factura
                         </motion.button>
                     </Link>
                 </div>
@@ -200,12 +201,19 @@ export default function InvoicesHistoryPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm font-medium">
-                                                <Calendar className="w-4 h-4 opacity-50" />
-                                                {q.date ? format(new Date(q.date), 'dd/MM/yyyy') : format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy')}
-                                            </div>
-                                        </td>
+                                         <td className="px-8 py-6">
+                                             <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm font-medium">
+                                                 <Calendar className="w-4 h-4 opacity-50" />
+                                                 <div>
+                                                     <div>{q.date ? format(new Date(q.date), 'dd/MM/yyyy') : '-'}</div>
+                                                     {q.dueDate && (
+                                                         <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                                                             Venc: {format(new Date(q.dueDate), 'dd/MM/yyyy')}
+                                                         </div>
+                                                     )}
+                                                 </div>
+                                             </div>
+                                         </td>
                                         <td className="px-8 py-6">
                                             <div className="font-semibold text-zinc-800 dark:text-zinc-200">{q.clientName}</div>
                                             <div className="text-xs text-zinc-500">{q.branchName ? `Sucursal: ${q.branchName}` : ''}</div>

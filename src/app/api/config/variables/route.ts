@@ -18,14 +18,16 @@ export async function POST(req: NextRequest) {
         const body = await req.json()
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+        const isForAll = body.isForAllClients !== undefined ? Boolean(body.isForAllClients) : false
         
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spVariableCrear($1::TEXT, $2::TEXT, $3::INT, $4::INT, $5::TEXT)`,
+            `CALL public.spVariableCrear($1::TEXT, $2::TEXT, $3::INT, $4::INT, $5::TEXT, $6::BOOLEAN)`,
             body.code,
             body.name,
             actingUserId,
             0, // p_variable_id
-            '' // p_mensaje_resultado
+            '', // p_mensaje_resultado
+            isForAll
         );
 
         const dbId = results[0]?.p_variable_id;
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
             throw new Error(message || 'Error creating variable');
         }
 
-        const variable = { id: dbId, ...body };
+        const variable = { id: dbId, ...body, isForAllClients: isForAll };
 
         import('@/lib/logger').then(({ logSystemEvent }) => {
             logSystemEvent({ userId: actingUserId, action: 'CREATE', module: 'MASTER_DATA', description: `Variable ${variable.name} creada (SP).`, metadata: variable });
@@ -53,14 +55,16 @@ export async function PUT(req: NextRequest) {
         const body = await req.json()
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+        const isForAll = body.isForAllClients !== undefined ? Boolean(body.isForAllClients) : false
         
         const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spVariableActualizar($1::INT, $2::TEXT, $3::TEXT, $4::INT, $5::TEXT)`,
+            `CALL public.spVariableActualizar($1::INT, $2::TEXT, $3::TEXT, $4::INT, $5::TEXT, $6::BOOLEAN)`,
             parseInt(body.id),
             body.code,
             body.name,
             actingUserId,
-            '' // p_mensaje_resultado
+            '', // p_mensaje_resultado
+            isForAll
         );
 
         const message = results[0]?.p_mensaje_resultado || '';
@@ -73,7 +77,11 @@ export async function PUT(req: NextRequest) {
             await prisma.$executeRawUnsafe(`UPDATE public."MasterVariable" SET "isActive" = $1 WHERE id = $2`, isAct, parseInt(body.id));
         }
 
-        const variable = { ...body };
+        if (body.isForAllClients !== undefined) {
+            await prisma.$executeRawUnsafe(`UPDATE public."MasterVariable" SET "isForAllClients" = $1 WHERE id = $2`, Boolean(body.isForAllClients), parseInt(body.id));
+        }
+
+        const variable = { ...body, isForAllClients: isForAll };
 
         import('@/lib/logger').then(({ logSystemEvent }) => {
             logSystemEvent({ userId: actingUserId, action: 'UPDATE', module: 'MASTER_DATA', description: `Variable ${variable.name} actualizada (SP).`, metadata: variable });
