@@ -77,7 +77,6 @@ Copy-Item ".\deploy\web.config" -Destination "$StandalonePath\web.config" -Force
 Write-Host "`n4. Instalando y arrancando servicio interno Windows (AgenciasNew_NextJS)..." -ForegroundColor Yellow
 if (Get-Service -Name "AgenciasNew_NextJS" -ErrorAction SilentlyContinue) {
     Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue 
-    sc.exe delete "AgenciasNew_NextJS" | Out-Null
     Start-Sleep -Seconds 2
 }
 node .\deploy\install-service.js | Out-Null

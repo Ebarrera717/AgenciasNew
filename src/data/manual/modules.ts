@@ -861,5 +861,76 @@ export const MANUAL_MODULES: ManualModule[] = [
                 ]
             }
         ]
+    },
+    {
+        id: 'sqlserver-deployment',
+        title: 'Despliegue e Instalación SQL Server',
+        iconName: 'Database',
+        category: 'Infraestructura y Despliegue',
+        description: 'Manual de procedimiento para la instalación, restauración de base de datos en blanco (.BAK), migración desde PostgreSQL y actualización en SQL Server.',
+        overview: 'Este módulo guía el despliegue del sistema con Microsoft SQL Server. Cumple la regla estricta de que el instalador de la aplicación NUNCA ejecuta CREATE DATABASE ni requiere permisos de creación de base de datos. Entrega 6 componentes independientes incluyendo la base en blanco estructurada (.BAK) para clientes nuevos y las herramientas independientes de migración y auditoría de integridad.',
+        procedures: [
+            {
+                code: 'SQL-01',
+                name: 'Despliegue Inicial para Clientes Nuevos (Restauración .BAK)',
+                summary: 'Restauración del backup en blanco Korex_SQLServer_Inicial_1.0.bak y validación con el instalador de la aplicación.',
+                concept: 'El cliente o infraestructura restaura la base de datos estructurada en blanco en SQL Server y asigna un usuario con rol db_owner. Posteriormente ejecuta el instalador Korex_SQLServer_Setup.exe indicando los datos de conexión.',
+                fields: [
+                    { name: 'Archivo Backup (.BAK)', type: 'Archivo de Sistema', description: 'Korex_SQLServer_Inicial_1.0.bak con la estructura T-SQL completa y semillas sin datos de clientes.' },
+                    { name: 'Servidor / Host', type: 'IP / Nombre Red', description: 'Nombre o IP del servidor SQL Server (ej. 192.168.1.50 o 127.0.0.1).' },
+                    { name: 'Instancia', type: 'Texto', description: 'Nombre de la instancia de SQL Server (si aplica).' },
+                    { name: 'Puerto', type: 'Numérico', description: 'Puerto de comunicación TCP/IP (por defecto 1433).' },
+                    { name: 'Base de Datos', type: 'Texto', description: 'Nombre de la base de datos restaurada (ej. Korex_colaereo).' },
+                    { name: 'Usuario / Clave', type: 'Credenciales SQL', description: 'Usuario de SQL Server con rol db_owner sobre la base de datos.' }
+                ],
+                businessRules: [
+                    'El instalador NO ejecuta CREATE DATABASE ni requiere permisos administrativos de creación de base de datos.',
+                    'La base de datos debe ser restaurada y configurada previamente en SQL Server antes de ejecutar el instalador.'
+                ],
+                steps: [
+                    { number: 1, title: 'Copiar y Restaurar Backup .BAK', description: 'Copie Korex_SQLServer_Inicial_1.0.bak al servidor de SQL Server y restaure la base desde SSMS (RESTORE DATABASE).' },
+                    { number: 2, title: 'Crear Usuario y Permisos', description: 'Cree el usuario korex_user en SQL Server con autenticación mixta y asígnele el rol db_owner en la base restaurada.' },
+                    { number: 3, title: 'Ejecutar Instalador de la Aplicación', description: 'Ejecute Korex_SQLServer_Setup.exe, ingrese las credenciales de conexión y complete la validación del servicio.' }
+                ]
+            },
+            {
+                code: 'SQL-02',
+                name: 'Migración y Auditoría de Datos Operativos (PostgreSQL -> SQL Server)',
+                summary: 'Traslado independiente de información operacional desde PostgreSQL a SQL Server y auditoría de integridad.',
+                concept: 'Herramienta de migración para clientes existentes que opera de forma secuencial conservando la concordancia de IDs con IDENTITY_INSERT ON y verificando 0 discrepancias de datos.',
+                fields: [
+                    { name: 'Ejecutable de Migración', type: 'Script Node.js / Batch', description: 'Ejecutar_Migracion_SQLServer.bat o node deploy/migrate_pg_to_sqlserver.js.' },
+                    { name: 'Auditor de Integridad', type: 'Script Auditor', description: 'node deploy/validate_migration.js' }
+                ],
+                businessRules: [
+                    'El migrador activa automáticamente IDENTITY_INSERT ON para preservar exactamente los mismos IDs de cotizaciones, facturas, clientes y usuarios.',
+                    'El auditor de integridad compara tabla por tabla los conteos y sumatorias emitiendo un reporte de MATCH PERFECTO.'
+                ],
+                steps: [
+                    { number: 1, title: 'Restaurar Base en Blanco', description: 'Restaure el backup Korex_SQLServer_Inicial_1.0.bak en el servidor de destino SQL Server.' },
+                    { number: 2, title: 'Ejecutar Migrador con 1 Clic', description: 'Ejecute el script Ejecutar_Migracion_SQLServer.bat en el servidor para trasladar la información operacional y correr el auditor de integridad.' },
+                    { number: 3, title: 'Configurar Aplicación', description: 'Ejecute el instalador o actualizador de la aplicación apuntando a la base de datos SQL Server recién migrada.' }
+                ]
+            },
+            {
+                code: 'SQL-03',
+                name: 'Actualización Idempotente para Clientes en Producción (ActualizadorSERVER.sql)',
+                summary: 'Aplicación segura de actualizaciones de esquema, tablas, semillas y procedimientos sin borrar datos de clientes.',
+                concept: 'Permite actualizar clientes existentes que ya corren sobre SQL Server hacia nuevas versiones de la plataforma mediante un script T-SQL 100% idempotente (ActualizadorSERVER.sql).',
+                fields: [
+                    { name: 'Script Actualizador T-SQL', type: 'Archivo SQL', description: 'ActualizadorSERVER.sql con alteraciones DDL seguras e inyección de nuevos SPs.' },
+                    { name: 'Ejecutor de Actualizaciones', type: 'Script / Ejecutable', description: 'GenerarActualizadorSqlServer.bat o node deploy/update_db_sqlserver.js.' }
+                ],
+                businessRules: [
+                    'El actualizador T-SQL verifica la existencia de cada columna, tabla o parámetro (IF NOT EXISTS) antes de crearlo.',
+                    'Los procedimientos almacenados se reemplazan limpiamente sin alterar ni eliminar registros contables ni datos operativos.'
+                ],
+                steps: [
+                    { number: 1, title: 'Generar Paquete Actualizador', description: 'Ejecute GenerarActualizadorSqlServer.bat para compilar el script ActualizadorSERVER.sql y verificar la suite.' },
+                    { number: 2, title: 'Ejecutar Actualización en Producción', description: 'Corra node deploy/update_db_sqlserver.js o el ejecutable entregado indicando las credenciales de la base SQL Server en producción.' }
+                ]
+            }
+        ]
     }
 ];
+

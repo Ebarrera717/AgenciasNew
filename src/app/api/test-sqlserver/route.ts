@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSQLServerConnection } from '@/lib/sqlserver';
+import { getSQLServerConnection, isSQLServerMode, parseSQLServerUrl } from '@/lib/sqlserver';
 import prisma from '@/lib/prisma';
 
 const SQL_PARAM_CODES = [
@@ -13,18 +13,32 @@ const SQL_PARAM_CODES = [
 export async function GET() {
   const start = Date.now();
 
-  // 1. Leer parámetros actuales desde SystemParameter
-  const params = await prisma.systemParameter.findMany({
-    where: { code: { in: SQL_PARAM_CODES } },
-    select: { code: true, name: true, value: true },
-    orderBy: { code: 'asc' },
-  });
-
-  // Ocultar la clave
-  const paramsSafe = params.map(p => ({
-    ...p,
-    value: p.code === 'ClaveSQLServer' ? (p.value ? '***' : '(vacío)') : p.value || '(vacío)',
-  }));
+  let paramsSafe: any[] = [];
+  if (isSQLServerMode()) {
+    const connStr = process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL || '';
+    const parsed = parseSQLServerUrl(connStr);
+    paramsSafe = [
+      { code: 'ServidorSQLServer', name: 'Servidor', value: parsed.servidor },
+      { code: 'UsuarioSQLServer', name: 'Usuario', value: parsed.usuario },
+      { code: 'ClaveSQLServer', name: 'Clave', value: '***' },
+      { code: 'BaseSQLServer', name: 'Base de Datos', value: parsed.base_datos },
+      { code: 'PuertoSQLServer', name: 'Puerto', value: parsed.puerto || '1433 (Defecto)' },
+    ];
+  } else {
+    try {
+      const params = await prisma.systemParameter.findMany({
+        where: { code: { in: SQL_PARAM_CODES } },
+        select: { code: true, name: true, value: true },
+        orderBy: { code: 'asc' },
+      });
+      paramsSafe = params.map(p => ({
+        ...p,
+        value: p.code === 'ClaveSQLServer' ? (p.value ? '***' : '(vacío)') : p.value || '(vacío)',
+      }));
+    } catch (e: any) {
+      paramsSafe = [];
+    }
+  }
 
   // 2. Probar conexión
   try {

@@ -1,6 +1,7 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 import { getCellCustomizationConfig, syncCellCustomization } from '@/lib/cell-customization'
 import { generateHtmlTemplate } from '@/lib/excel-to-html'
 import { logSystemEvent } from '@/lib/logger'
@@ -9,6 +10,33 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query(`
+                    SELECT i.[id], i.[code], i.[name], i.[branchId], i.[resolutionId], i.[isActive],
+                           CASE WHEN i.[isActive] = 1 THEN 0 ELSE 1 END AS [inactive],
+                           b.[id] AS b_id, b.[code] AS b_code, b.[name] AS b_name
+                    FROM dbo.[Implant] i
+                    LEFT JOIN dbo.[Branch] b ON i.[branchId] = b.[id]
+                    ORDER BY i.[id] DESC
+                `);
+                await pool.close();
+                const implantsWithData = res.recordset.map((i: any) => ({
+                    ...i,
+                    logo: null,
+                    hasTemplate: false,
+                    hasInvoiceTemplate: false,
+                    branch: i.b_id ? { id: i.b_id, code: i.b_code, name: i.b_name } : null
+                }));
+                return NextResponse.json(paginateArray(req, implantsWithData, (i: any) => [i.code, i.name]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const implants = await prisma.$queryRawUnsafe<any[]>(
             `SELECT i.*, 
                     json_build_object('id', b.id, 'code', b.code, 'name', b.name) as branch
@@ -45,6 +73,35 @@ export async function POST(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         
+        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
+        const branchId = body.branchId ? parseInt(body.branchId) : null;
+        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', body.code || '')
+                    .input('name', body.name || '')
+                    .input('branchId', branchId)
+                    .input('resolutionId', resolutionId)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        INSERT INTO dbo.[Implant] ([code], [name], [branchId], [resolutionId], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @branchId, @resolutionId, @isActive)
+                    `);
+                await pool.close();
+                const dbId = res.recordset[0]?.id;
+                const implant = { id: dbId, ...body };
+                return NextResponse.json(implant);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         let logoBuffer = null;
         if (body.logo) {
             const base64Data = body.logo.replace(/^data:image\/\w+;base64,/, "");
@@ -80,10 +137,6 @@ export async function POST(req: NextRequest) {
                 console.error("Error generating invoice HTML template during implant creation:", htmlErr);
             }
         }
-
-        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
-        const branchId = body.branchId ? parseInt(body.branchId) : null;
-        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spImplantCrear($1::TEXT, $2::TEXT, $3::BYTEA, $4::BYTEA, $5::JSONB, $6::TEXT, $7::INT, $8::INT, $9::BYTEA, $10::JSONB, $11::TEXT, $12::BOOLEAN, $13::INT, $14::INT, $15::TEXT)`,
@@ -131,6 +184,35 @@ export async function PUT(req: NextRequest) {
         const body = await req.json()
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+        const dbId = parseInt(body.id);
+        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
+        const branchId = body.branchId ? parseInt(body.branchId) : null;
+        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', dbId)
+                    .input('code', body.code || '')
+                    .input('name', body.name || '')
+                    .input('branchId', branchId)
+                    .input('resolutionId', resolutionId)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        UPDATE dbo.[Implant]
+                        SET [code] = @code, [name] = @name, [branchId] = @branchId, [resolutionId] = @resolutionId, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const implant = { ...body };
+                return NextResponse.json(implant);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         
         let logoBuffer = null;
         if (body.logo) {
@@ -150,7 +232,6 @@ export async function PUT(req: NextRequest) {
             invoiceTemplateBuffer = Buffer.from(cleanBase64, 'base64');
         }
 
-        const dbId = parseInt(body.id);
         let finalLogoBuffer = logoBuffer;
         let finalTemplateBuffer = templateBuffer;
         let finalInvoiceTemplateBuffer = invoiceTemplateBuffer;
@@ -194,10 +275,6 @@ export async function PUT(req: NextRequest) {
                 console.error("Error generating/updating invoice HTML template during implant update:", htmlErr);
             }
         }
-
-        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
-        const branchId = body.branchId ? parseInt(body.branchId) : null;
-        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spImplantActualizar($1::INT, $2::TEXT, $3::TEXT, $4::BYTEA, $5::BYTEA, $6::JSONB, $7::TEXT, $8::INT, $9::INT, $10::BYTEA, $11::JSONB, $12::TEXT, $13::BOOLEAN, $14::INT, $15::TEXT)`,
@@ -245,6 +322,21 @@ export async function DELETE(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         if (!id) return NextResponse.json({ message: 'ID is required' }, { status: 400 })
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query(`DELETE FROM dbo.[Implant] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ message: 'Implant deleted successfully' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spImplantEliminar($1::INT, $2::INT, $3::TEXT)`,

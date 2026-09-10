@@ -1,11 +1,25 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().execute('dbo.spSellerListar');
+                await pool.close();
+                return NextResponse.json(paginateArray(req, res.recordset || [], (s: any) => [s.code, s.name]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const sellers = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnSellerListar()`)
         return NextResponse.json(paginateArray(req, sellers, s => [s.code, s.name]))
     } catch (error) {
@@ -19,7 +33,30 @@ export async function POST(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
-        
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', body.code || null)
+                    .input('name', body.name || '')
+                    .input('email', body.email || null)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        INSERT INTO dbo.[Seller] ([code], [name], [email], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @email, @isActive)
+                    `);
+                await pool.close();
+                const seller = { id: res.recordset[0]?.id, ...body };
+                return NextResponse.json(seller);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spSellerCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::BOOLEAN, $5::INT, $6::INT, $7::TEXT)`,
             body.code || null,
@@ -57,7 +94,31 @@ export async function PUT(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
-        
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(body.id))
+                    .input('code', body.code || null)
+                    .input('name', body.name || '')
+                    .input('email', body.email || null)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        UPDATE dbo.[Seller]
+                        SET [code] = @code, [name] = @name, [email] = @email, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const seller = { ...body };
+                return NextResponse.json(seller);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spSellerActualizar($1::INT, $2::TEXT, $3::TEXT, $4::TEXT, $5::BOOLEAN, $6::INT, $7::TEXT)`,
             parseInt(body.id),
@@ -94,6 +155,21 @@ export async function DELETE(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         if (!id) return NextResponse.json({ message: 'ID is required' }, { status: 400 })
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query('DELETE FROM dbo.[Seller] WHERE [id] = @id');
+                await pool.close();
+                return NextResponse.json({ message: 'Seller deleted successfully' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spSellerEliminar($1::INT, $2::INT, $3::TEXT)`,

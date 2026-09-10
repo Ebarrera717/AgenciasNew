@@ -1,6 +1,7 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,24 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url)
         const includeInactive = searchParams.get('includeInactive') === 'true'
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().execute('dbo.spProviderListar');
+                await pool.close();
+                let providers: any[] = (res.recordset as any[]) || [];
+                if (!includeInactive) {
+                    providers = providers.filter((p: any) => p.isActive !== false && p.isActive !== 0);
+                }
+                return NextResponse.json(paginateArray(req, providers, (p: any) => [p.code, p.name, p.sigla, p.airlineCode]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const results: any[] = await prisma.$queryRawUnsafe(
             `SELECT * FROM public.fnProveedorListar()`
         );
@@ -28,6 +47,32 @@ export async function POST(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', code || null)
+                    .input('name', name || '')
+                    .input('contactInfo', contactInfo || null)
+                    .input('providerTypeId', providerTypeId ? parseInt(providerTypeId) : null)
+                    .input('airlineCode', airlineCode || null)
+                    .input('sigla', sigla || null)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        INSERT INTO dbo.[Provider] ([code], [name], [contactInfo], [providerTypeId], [airlineCode], [sigla], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @contactInfo, @providerTypeId, @airlineCode, @sigla, @isActive)
+                    `);
+                await pool.close();
+                const provider = { id: res.recordset[0]?.id, name };
+                return NextResponse.json({ message: 'Proveedor creado', provider });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spProveedorCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::JSONB, $5::INT, $6::TEXT, $7::TEXT, $8::BOOLEAN, $9::INT, $10::INT, $11::TEXT)`,
@@ -72,6 +117,33 @@ export async function PUT(req: NextRequest) {
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
 
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .input('code', code || null)
+                    .input('name', name || '')
+                    .input('contactInfo', contactInfo || null)
+                    .input('providerTypeId', providerTypeId ? parseInt(providerTypeId) : null)
+                    .input('airlineCode', airlineCode || null)
+                    .input('sigla', sigla || null)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        UPDATE dbo.[Provider]
+                        SET [code] = @code, [name] = @name, [contactInfo] = @contactInfo, [providerTypeId] = @providerTypeId, [airlineCode] = @airlineCode, [sigla] = @sigla, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const provider = { id, name };
+                return NextResponse.json({ message: 'Proveedor actualizado', provider });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spProveedorActualizar($1::INT, $2::TEXT, $3::TEXT, $4::TEXT, $5::JSONB, $6::INT, $7::TEXT, $8::TEXT, $9::BOOLEAN, $10::INT, $11::TEXT)`,
             parseInt(id),
@@ -112,6 +184,21 @@ export async function DELETE(req: NextRequest) {
         if (!id) return NextResponse.json({ message: 'ID is required' }, { status: 400 })
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query('DELETE FROM dbo.[Provider] WHERE [id] = @id');
+                await pool.close();
+                return NextResponse.json({ message: 'Proveedor eliminado exitosamente' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spProveedorEliminar($1::INT, $2::INT, $3::TEXT)`,

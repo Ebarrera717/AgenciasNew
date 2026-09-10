@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MANUAL_MODULES } from '@/data/manual/modules';
 import prisma from '@/lib/prisma';
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,34 +11,45 @@ export async function GET(req: NextRequest) {
         const query = searchParams.get('q')?.toLowerCase().trim();
         const role = searchParams.get('role')?.toUpperCase().trim() || req.headers.get('x-user-role')?.toUpperCase().trim() || '';
 
-        // 1. Obtener menú activo y lista de maestros desde la base de datos PostgreSQL
         let activeMenuItems: any[] = [];
         let activeMasters: any[] = [];
 
-        try {
-            activeMenuItems = await prisma.$queryRawUnsafe(`SELECT * FROM public.fnMenu()`);
-        } catch (dbErr) {
-            console.error('Error llamando fnMenu():', dbErr);
-            activeMenuItems = await prisma.menu.findMany({ where: { activo: true } });
-        }
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const mRes = await pool.request().query('SELECT [code], [name], [action], [activo] FROM dbo.[Menu] WHERE [activo] = 1');
+                const maRes = await pool.request().query('SELECT [code], [name], [inactivo] FROM dbo.[Master] WHERE [inactivo] = 0');
+                await pool.close();
+                activeMenuItems = mRes.recordset;
+                activeMasters = maRes.recordset;
+            } catch (sqle) {
+                if (pool) await pool.close();
+            }
+        } else {
+            try {
+                activeMenuItems = await prisma.$queryRawUnsafe(`SELECT * FROM public.fnMenu()`);
+            } catch (dbErr) {
+                console.error('Error llamando fnMenu():', dbErr);
+                activeMenuItems = await prisma.menu.findMany({ where: { activo: true } });
+            }
 
-        try {
-            const masterList: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM public."fnMasterList"()`);
-            activeMasters = masterList.filter((m: any) => !m.inactivo);
-        } catch (mErr) {
-            console.error('Error llamando fnMasterList():', mErr);
+            try {
+                const masterList: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM public."fnMasterList"()`);
+                activeMasters = masterList.filter((m: any) => !m.inactivo);
+            } catch (mErr) {
+                console.error('Error llamando fnMasterList():', mErr);
+            }
         }
 
         const isSuperAdmin = role.includes('SUPERADMIN');
 
-        // Mapeo entre ID del módulo del manual y opciones de menú activas
         const isModuleActive = (moduleId: string): boolean => {
             if (moduleId === 'licensing') {
-                // Licenciamiento es EXCLUSIVO para SUPERADMINISTRADOR
                 return isSuperAdmin;
             }
 
-            if (activeMenuItems.length === 0) return true; // Fallback
+            if (activeMenuItems.length === 0) return true;
 
             switch (moduleId) {
                 case 'quotations':
@@ -55,11 +67,9 @@ export async function GET(req: NextRequest) {
             }
         };
 
-        // 2. Filtrar módulos activos y procedimientos maestros vigentes
         let availableModules = MANUAL_MODULES
             .filter(module => isModuleActive(module.id))
             .map(module => {
-                // Si es el módulo de configuración/maestros, filtrar los procedimientos según las pestañas maestras activas
                 if (module.id === 'config' && activeMasters.length > 0) {
                     const activeProcedures = module.procedures.filter(proc => {
                         if (!proc.masterCode) return true;
@@ -70,7 +80,6 @@ export async function GET(req: NextRequest) {
                 return module;
             });
 
-        // 3. Filtrar por término de búsqueda en tiempo real si existe query
         if (query) {
             availableModules = availableModules.map(module => {
                 const matchedProcedures = module.procedures.filter(proc => {

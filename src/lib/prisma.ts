@@ -2,11 +2,46 @@ import { PrismaClient } from '@prisma/client'
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 
-const prismaClientSingleton = () => {
-    console.log('--- Instantiating NEW PrismaClient (v15) ---')
-    const connectionString = process.env.DATABASE_URL || "postgresql://postgres:111985@localhost:5432/agencias_new?schema=public"
+const getActiveDbUrl = () => {
+    const provider = (process.env.DATABASE_PROVIDER || '').toLowerCase().trim();
+    if (provider === 'sqlserver') {
+        return (process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL || '').trim();
+    }
+    return (process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL || '').trim();
+};
 
-    const pool = new Pool({ connectionString })
+const isSqlUrl = (url: string) => {
+    const provider = (process.env.DATABASE_PROVIDER || '').toLowerCase().trim();
+    if (provider === 'postgresql') return false;
+    if (provider === 'sqlserver') return true;
+    return url.startsWith('sqlserver://') || url.startsWith('mssql://');
+};
+
+const prismaClientSingleton = () => {
+    console.log('--- Instantiating NEW PrismaClient ---')
+    const connectionString = getActiveDbUrl()
+
+    if (isSqlUrl(connectionString)) {
+        console.log('--- Modo Directo SQL Server detectado: Retornando Proxy para Prisma ---')
+        const proxyObj = new Proxy({} as any, {
+            get(target, prop) {
+                if (prop === 'then' || prop === 'catch' || prop === 'finally') return undefined;
+                return new Proxy(() => {}, {
+                    get(t, p) {
+                        return () => Promise.reject(new Error(`[PRISMA_SQLSERVER_PROXY] Prisma no debe ser invocado en modo SQL Server direct. La consulta '${String(prop)}.${String(p)}' debe ser ejecutada mediante getSQLServerConnection().`));
+                    },
+                    apply() {
+                        return Promise.reject(new Error(`[PRISMA_SQLSERVER_PROXY] Prisma no debe ser invocado en modo SQL Server direct. La consulta '${String(prop)}' debe ser ejecutada mediante getSQLServerConnection().`));
+                    }
+                });
+            }
+        }) as PrismaClient
+        ;(proxyObj as any).__isProxy = true
+        return proxyObj
+    }
+
+    const pgUrl = connectionString || "postgresql://postgres:zzeusagencias@192.168.80.26:5432/Korex_colaereo?schema=public"
+    const pool = new Pool({ connectionString: pgUrl })
     const adapter = new PrismaPg(pool)
 
     const prisma = new PrismaClient({
@@ -18,20 +53,10 @@ const prismaClientSingleton = () => {
             { emit: 'stdout', level: 'warn' }
         ]
     })
- 
-    // Escuchar eventos de consultas e imprimirlos en la consola
+
     ;(prisma as any).$on('query', (e: any) => {
         console.log(`[PRISMA_SQL] Consulta: ${e.query} | Params: ${e.params} | Duración: ${e.duration}ms`);
     })
-    
-    // Debug: check if fields exists
-    try {
-        const dmmf = (prisma as any)._baseDmmf || (prisma as any)._dmmf
-        if (dmmf) {
-            const model = dmmf.datamodel.models.find((m: any) => m.name === 'ComboProduct')
-            console.log('--- ComboProduct Fields in PrismaClient ---', model?.fields.map((f: any) => f.name))
-        }
-    } catch (e) {}
 
     return prisma
 }
@@ -39,6 +64,24 @@ const prismaClientSingleton = () => {
 type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>
 
 const globalForPrisma = globalThis as unknown as { prisma_prestadora_v1: PrismaClient | undefined }
+
+const isCurrentSqlMode = (() => {
+    return isSqlUrl(getActiveDbUrl());
+})();
+
+const isProxyInstance = (obj: any): boolean => {
+    if (!obj) return false;
+    if (obj.__isProxy === true) return true;
+    if (typeof obj._clientVersion !== 'string') return true;
+    return false;
+};
+
+const cachedPrisma = globalForPrisma.prisma_prestadora_v1;
+
+if (cachedPrisma && isProxyInstance(cachedPrisma) !== isCurrentSqlMode) {
+    console.log('[PRISMA_SINGLETON] Modo de base de datos cambió o proxy obsoleto en memoria. Re-creando PrismaClient...');
+    globalForPrisma.prisma_prestadora_v1 = undefined;
+}
 
 const prisma = globalForPrisma.prisma_prestadora_v1 ?? prismaClientSingleton()
 

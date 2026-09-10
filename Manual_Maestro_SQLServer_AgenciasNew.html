@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Maestro y Documento de Arquitectura Unificado - SQL Server (AgenciasNew)</title>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-dark: #1e3a8a;
+            --bg-light: #f8fafc;
+            --text-dark: #0f172a;
+            --border-color: #e2e8f0;
+            --accent-green: #166534;
+            --accent-green-bg: #f0fdf4;
+            --accent-amber: #92400e;
+            --accent-amber-bg: #fffbeb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background-color: var(--bg-light);
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 50px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid var(--border-color);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 12px;
+            margin-top: 0;
+        }
+
+        h2 {
+            color: var(--primary-dark);
+            font-size: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 35px;
+        }
+
+        h3 {
+            color: #334155;
+            font-size: 1.2rem;
+            margin-top: 25px;
+        }
+
+        .alert-box {
+            background-color: #eff6ff;
+            border-left: 5px solid var(--primary);
+            padding: 18px 24px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .alert-box strong {
+            color: var(--primary-dark);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 12px 16px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 700;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        pre, code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background-color: #0f172a;
+            color: #38bdf8;
+            border-radius: 8px;
+        }
+
+        pre {
+            padding: 20px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        p code, li code {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background-color: var(--accent-green-bg);
+            color: var(--accent-green);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            border: 1px solid #bbf7d0;
+        }
+
+        .download-bar {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .download-bar button {
+            background: white;
+            color: var(--primary);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .download-bar button:hover {
+            background: #f8fafc;
+        }
+
+        @media print {
+            .download-bar { display: none; }
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; border: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="download-bar">
+        <div>
+            <strong>Documento Oficial de Despliegue AgenciasNew</strong> - Microsoft SQL Server
+        </div>
+        <button onclick="window.print()">🖨️ Imprimir / Guardar en PDF</button>
+    </div>
+
+    <h1>Manual Maestro y Documento de Arquitectura Unificado</h1>
+    <p><em>Despliegue, Migración y Operación con Microsoft SQL Server — AgenciasNew</em></p>
+
+    <div class="alert-box">
+        <strong>REGLA FUNDAMENTAL DE DESPLIEGUE:</strong><br>
+        El instalador de la aplicación <strong>NUNCA ejecuta <code>CREATE DATABASE</code></strong> ni requiere permisos de creación de base de datos. La infraestructura o cliente es responsable de crear o restaurar la base de datos manualmente antes de configurar la aplicación.
+    </div>
+
+    <h2>1. Reglas Fundamentales de Arquitectura y Principios de Despliegue</h2>
+    <h3>1.1 Regla Primordial de Lógica en Base de Datos (Database-First)</h3>
+    <p>Todo cálculo, proceso de negocio, liquidación de comisiones, consulta de listado, validación o mutación de datos en AgenciasNew <strong>DEBE realizarse obligatoriamente a través de Procedimientos Almacenados (SPs), Funciones SQL y Tablas de Base de Datos</strong>.</p>
+
+    <h3>1.2 Prohibición Absoluta de <code>CREATE DATABASE</code> en Instaladores</h3>
+    <ul>
+        <li>El instalador de SQL Server NUNCA debe ejecutar <code>CREATE DATABASE</code> ni requerir permisos administrativos para crear bases de datos.</li>
+        <li>La infraestructura/cliente es la única responsable de crear o restaurar la base de datos manualmente.</li>
+    </ul>
+
+    <h2>2. Los 6 Entregables Oficiales del Proyecto</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Entregable</th>
+                <th>Nombre del Componente / Archivo</th>
+                <th>Descripción y Función</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>01</strong></td>
+                <td>Instalador PostgreSQL</td>
+                <td>Instalador local PostgreSQL intacto sin cambios funcionales.</td>
+            </tr>
+            <tr>
+                <td><strong>02</strong></td>
+                <td>Instalador SQL Server (<code>setup_db_sqlserver.js</code>)</td>
+                <td>Instala la aplicación y valida la conexión a la base existente (Sin CREATE DATABASE).</td>
+            </tr>
+            <tr>
+                <td><strong>03</strong></td>
+                <td>Base SQL Server Inicial (<code>deploy/BaseLimpia/Korex_SQLServer_Inicial_1.0.bak</code>)</td>
+                <td>Backup estructurado en blanco con semillas maestras, libre de datos de clientes.</td>
+            </tr>
+            <tr>
+                <td><strong>04</strong></td>
+                <td>Scripts T-SQL (<code>SQL/SqlServer/</code>)</td>
+                <td>Definiciones DDL de tablas, semillas y procedimientos almacenados T-SQL.</td>
+            </tr>
+            <tr>
+                <td><strong>05</strong></td>
+                <td>Proceso de Migración (<code>migrate_pg_to_sqlserver.js</code>)</td>
+                <td>Herramienta independiente PostgreSQL ➔ SQL Server con <code>IDENTITY_INSERT ON</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>06</strong></td>
+                <td>Proceso de Validación (<code>validate_migration.js</code>)</td>
+                <td>Auditor post-migración que compara recuentos y saldos 1 a 1.</td>
+            </tr>
+            <tr>
+                <td><strong>Suite</strong></td>
+                <td>Actualizador (<code>ActualizadorSERVER.sql</code> & <code>update_db_sqlserver.js</code>)</td>
+                <td>Actualizador 100% idempotente para bases en producción.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>3. Generación del Backup Inicial en Blanco (<code>Korex_SQLServer_Inicial_1.0.bak</code>)</h2>
+    <p>Para generar el backup <code>.BAK</code> inicial ejecute desde la consola o con 1 clic:</p>
+    <pre>GenerarBaseInicialBakSqlServer.bat</pre>
+
+    <h2>4. Manual Paso a Paso para Clientes Nuevos (Escenario A)</h2>
+    <ol>
+        <li><strong>Copiar el Backup:</strong> Colocar <code>Korex_SQLServer_Inicial_1.0.bak</code> en la carpeta de backups del servidor.</li>
+        <li><strong>Restaurar en SSMS:</strong> Ejecutar el script T-SQL:
+<pre>RESTORE DATABASE [Korex_colaereo]
+FROM DISK = N'C:\Backup\Korex_SQLServer_Inicial_1.0.bak'
+WITH FILE = 1,
+MOVE N'Korex_SQLServer_Inicial_Temp' TO N'C:\SQLData\Korex_colaereo.mdf',
+MOVE N'Korex_SQLServer_Inicial_Temp_log' TO N'C:\SQLData\Korex_colaereo_log.ldf',
+NOUNLOAD, STATS = 5;
+GO</pre>
+        </li>
+        <li><strong>Crear Usuario SQL:</strong> Asignar rol <code>db_owner</code> a <code>korex_user</code>.</li>
+        <li><strong>Ejecutar Instalador:</strong> Iniciar <code>Korex_SQLServer_Setup.exe</code> e ingresar credenciales.</li>
+    </ol>
+
+    <h2>5. Manual Paso a Paso para Clientes Existentes (Migración desde PostgreSQL)</h2>
+    <p>Para migrar con 1 solo clic ejecute desde la raíz del proyecto:</p>
+    <pre>Ejecutar_Migracion_SQLServer.bat</pre>
+    <p>Este script transfiere automáticamente los datos desde PostgreSQL a SQL Server manteniendo la coincidencia de IDs y corre el auditor de integridad.</p>
+
+    <h2>6. Actualización de Clientes en Producción</h2>
+    <pre>GenerarActualizadorSqlServer.bat
+node deploy/update_db_sqlserver.js</pre>
+
+    <h2>7. Matriz de Auditoría y Validación Completa</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Capa</th>
+                <th>Componente Auditado</th>
+                <th>Estado</th>
+                <th>Detalle</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1. PostgreSQL Local</td>
+                <td>Conectividad & Tablas</td>
+                <td><span class="badge-success">✅ OK</span></td>
+                <td>82 tablas activas</td>
+            </tr>
+            <tr>
+                <td>3. Scripts T-SQL (04)</td>
+                <td>01_Tables.sql / 03_Functions_And_SPs.sql</td>
+                <td><span class="badge-success">✅ OK</span></td>
+                <td>20 tablas DDL y 4 SPs traducidos a T-SQL</td>
+            </tr>
+            <tr>
+                <td>4. Entregables Despliegue</td>
+                <td>02 - setup_db_sqlserver.js</td>
+                <td><span class="badge-success">✅ OK</span></td>
+                <td>Garantizado NO CREATE DATABASE</td>
+            </tr>
+            <tr>
+                <td>4. Entregables Despliegue</td>
+                <td>03 - gen_sqlserver_initial_bak.js</td>
+                <td><span class="badge-success">✅ OK</span></td>
+                <td>Generador del backup Korex_SQLServer_Inicial_1.0.bak</td>
+            </tr>
+            <tr>
+                <td>4. Entregables Despliegue</td>
+                <td>05 - migrate_pg_to_sqlserver.js</td>
+                <td><span class="badge-success">✅ OK</span></td>
+                <td>Migrador PostgreSQL -> SQL Server (IDENTITY_INSERT)</td>
+            </tr>
+            <tr>
+                <td>4. Entregables Despliegue</td>
+                <td>06 - validate_migration.js</td>
+                <td><span class="badge-success">✅ OK</span></td>
+                <td>Auditor post-migración (0 discrepancias)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

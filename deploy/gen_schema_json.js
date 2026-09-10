@@ -11,9 +11,11 @@ let database = 'korex_db';
 let user = 'postgres';
 let password = '';
 
-if (process.env.DATABASE_URL) {
+const pgUrl = process.env.DATABASE_URL_POSTGRES || (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://') ? process.env.DATABASE_URL : 'postgresql://postgres:zzeusagencias@192.168.80.26:5432/Korex_colaereo?schema=public');
+
+if (pgUrl) {
     try {
-        const parsedUrl = new URL(process.env.DATABASE_URL);
+        const parsedUrl = new URL(pgUrl);
         host = parsedUrl.hostname || 'localhost';
         port = parsedUrl.port || '5432';
         database = parsedUrl.pathname.replace(/^\//, '') || 'korex_db';
@@ -47,7 +49,7 @@ async function exportSchema() {
 
     console.log(`[Schema Generator] Conectando a la base de datos de desarrollo: ${database} en ${host}:${port}...`);
     const client = new Client({
-        connectionString: process.env.DATABASE_URL
+        connectionString: pgUrl
     });
 
     try {

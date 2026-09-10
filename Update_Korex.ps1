@@ -208,24 +208,11 @@ if ($DbUrl) {
 }
 
 # Paso 5. Re-registrar e Iniciar el Servicio Windows (Total Update)
-Write-Log "Re-registrando servicio de Windows para aplicar la nueva versión de la aplicación..."
-if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
-    Write-Log "Deteniendo y borrando registro de servicio Korex_NextJS..."
-    Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-    sc.exe delete "Korex_NextJS" | Out-Null
-    Start-Sleep -Seconds 2
-}
-if (Get-Service -Name "AgenciasNew_NextJS" -ErrorAction SilentlyContinue) {
-    Write-Log "Borrando registro de servicio antiguo AgenciasNew_NextJS..."
-    Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
-    sc.exe delete "AgenciasNew_NextJS" | Out-Null
-    Start-Sleep -Seconds 1
-}
-
-if (Test-Path "$TargetDir\daemon") {
-    Write-Log "Removiendo cache del daemon antiguo..."
-    Remove-Item "$TargetDir\daemon" -Recurse -Force -ErrorAction SilentlyContinue
-}
+Write-Log "Deteniendo servicio de Windows para aplicar la nueva versión de la aplicación..."
+Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
 
 if (Test-Path ".\install-service.js") {
     Write-Log "Ejecutando install-service.js con la nueva versión..."

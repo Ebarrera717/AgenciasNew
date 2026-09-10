@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().execute('dbo.spMenuListar');
+                await pool.close();
+                return NextResponse.json(res.recordset || []);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         // Query using fnMenu() function
         const menuItems: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM public.fnMenu()`)
         return NextResponse.json(menuItems)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver';
 import { normalizeRolePermissions, isSuperAdminRole } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,39 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const requesterRole = searchParams.get('userRole')?.toUpperCase().trim() || req.headers.get('x-user-role')?.toUpperCase().trim() || '';
         const isRequesterSuperAdmin = isSuperAdminRole(requesterRole);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query(`
+                    SELECT r.[id], r.[name], r.[description], r.[permissions],
+                           (SELECT COUNT(*) FROM dbo.[User] u WHERE u.[roleId] = r.[id]) AS user_count
+                    FROM dbo.[Role] r
+                    ORDER BY r.[id] ASC
+                `);
+                await pool.close();
+                let formatted = res.recordset.map((role: any) => {
+                    const roleName = String(role.name);
+                    const isSuper = isSuperAdminRole(roleName);
+                    return {
+                        id: Number(role.id),
+                        name: roleName,
+                        description: String(role.description || ''),
+                        permissions: normalizeRolePermissions(role.permissions, roleName),
+                        userCount: Number(role.user_count || 0),
+                        isSuperAdmin: isSuper
+                    };
+                });
+                if (!isRequesterSuperAdmin) {
+                    formatted = formatted.filter(r => !r.isSuperAdmin);
+                }
+                return NextResponse.json(formatted);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         // Ejecución a través de la Función SQL de PostgreSQL fnRoleListar()
         const roles: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM public."fnRoleListar"()`);
@@ -33,7 +67,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json(formatted);
     } catch (error: any) {
-        console.error('Error invocando fnRoleListar():', error);
+        console.error('Error consultando roles:', error);
         return NextResponse.json({ message: 'Error consultando roles en la base de datos' }, { status: 500 });
     }
 }
@@ -49,6 +83,28 @@ export async function POST(req: NextRequest) {
         const roleName = String(name).trim();
         const normPermissions = normalizeRolePermissions(permissions, roleName);
 
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const permStr = JSON.stringify(normPermissions);
+                const res = await pool.request()
+                    .input('name', roleName)
+                    .input('description', description ? String(description).trim() : '')
+                    .input('permissions', permStr)
+                    .query(`
+                        INSERT INTO dbo.[Role] ([name], [description], [permissions])
+                        OUTPUT INSERTED.id
+                        VALUES (@name, @description, @permissions)
+                    `);
+                await pool.close();
+                return NextResponse.json({ message: 'Rol guardado exitosamente', id: res.recordset[0]?.id });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         // Ejecución a través del Procedimiento Almacenado public.spRoleGuardarYPermisos
         const result: any[] = await prisma.$queryRawUnsafe(
             `CALL public."spRoleGuardarYPermisos"($1, $2, $3, $4::jsonb, NULL, NULL)`,
@@ -60,7 +116,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ message: 'Rol guardado exitosamente en la base de datos', result });
     } catch (error: any) {
-        console.error('Error invocando spRoleGuardarYPermisos:', error);
+        console.error('Error guardando rol:', error);
         return NextResponse.json({ message: error.message || 'Error al guardar el rol en BD' }, { status: 500 });
     }
 }
@@ -76,6 +132,29 @@ export async function PUT(req: NextRequest) {
         const roleName = String(name || '').trim();
         const normPermissions = normalizeRolePermissions(permissions, roleName);
 
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const permStr = JSON.stringify(normPermissions);
+                await pool.request()
+                    .input('id', Number(id))
+                    .input('name', roleName)
+                    .input('description', description ? String(description).trim() : '')
+                    .input('permissions', permStr)
+                    .query(`
+                        UPDATE dbo.[Role]
+                        SET [name] = @name, [description] = @description, [permissions] = @permissions
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                return NextResponse.json({ message: 'Rol actualizado con éxito' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         // Ejecución a través del Procedimiento Almacenado public.spRoleGuardarYPermisos
         const result: any[] = await prisma.$queryRawUnsafe(
             `CALL public."spRoleGuardarYPermisos"($1, $2, $3, $4::jsonb, NULL, NULL)`,
@@ -87,7 +166,7 @@ export async function PUT(req: NextRequest) {
 
         return NextResponse.json({ message: 'Rol actualizado con éxito en la base de datos', result });
     } catch (error: any) {
-        console.error('Error invocando spRoleGuardarYPermisos:', error);
+        console.error('Error actualizando rol:', error);
         return NextResponse.json({ message: error.message || 'Error al actualizar el rol en BD' }, { status: 500 });
     }
 }
@@ -102,6 +181,35 @@ export async function DELETE(req: NextRequest) {
         }
 
         const roleId = Number(id);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const roleCheck = await pool.request()
+                    .input('id', roleId)
+                    .query(`SELECT [name] FROM dbo.[Role] WHERE [id] = @id`);
+                if (roleCheck.recordset[0] && isSuperAdminRole(roleCheck.recordset[0].name)) {
+                    await pool.close();
+                    return NextResponse.json({ message: 'El rol SUPERADMINISTRADOR no puede ser eliminado.' }, { status: 400 });
+                }
+                const userCheck = await pool.request()
+                    .input('id', roleId)
+                    .query(`SELECT COUNT(*) as count FROM dbo.[User] WHERE [roleId] = @id`);
+                if (userCheck.recordset[0]?.count > 0) {
+                    await pool.close();
+                    return NextResponse.json({ message: `No se puede eliminar el rol porque tiene ${userCheck.recordset[0].count} usuario(s) asignado(s).` }, { status: 400 });
+                }
+                await pool.request()
+                    .input('id', roleId)
+                    .query(`DELETE FROM dbo.[Role] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ message: 'Rol eliminado con éxito' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const roleCheck: any[] = await prisma.$queryRawUnsafe(
             `SELECT name FROM public."Role" WHERE id = $1`,

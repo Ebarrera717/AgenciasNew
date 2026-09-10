@@ -44,6 +44,7 @@ import RoleManagerTab from '@/components/RoleManagerTab'
 import LicenseStatusCard from '@/components/LicenseStatusCard'
 import { AdministrativeFeeTab } from '@/components/AdministrativeFeeTab'
 import ErrorDiagnosticModal, { DiagnosticErrorData } from '@/components/ErrorDiagnosticModal'
+import { isSuperAdminRole } from '@/lib/permissions'
 
 type Tab = 'parametros' | 'roles' | 'usuarios' | 'sucursales' | 'implants' | 'impuestos' | 'vendedores' | 'tiqueteadores' | 'prestadoras' | 'clientes' | 'proveedores' | 'tipos-proveedores' | 'productos' | 'variables' | 'combos' | 'logs' | 'monedas' | 'equivalencias' | 'extraccion-interfaces' | 'tarjetas-credito' | 'formas-pago' | 'paises' | 'ciudades' | 'aeropuertos' | 'tipos-tiquetes' | 'estados-cotizacion' | 'formatos-cotizacion' | 'modulos-sitio' | 'resoluciones-documentos' | 'consecutivos-transacciones' | 'tarifa-administrativa' | 'diagnostico';
 
@@ -130,6 +131,19 @@ export default function SettingsPage() {
     const [uploading, setUploading] = useState(false)
     const fileInputRef = React.useRef<HTMLInputElement>(null)
 
+    const [currentUserRole, setCurrentUserRole] = useState<string>('')
+    const isSuperAdmin = isSuperAdminRole(currentUserRole)
+
+    useEffect(() => {
+        try {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                const parsed = JSON.parse(storedUser);
+                setCurrentUserRole(parsed.role || parsed.roleName || '');
+            }
+        } catch (e) {}
+    }, [])
+
     // Site Modules & Masters State
     const [siteModules, setSiteModules] = useState<any[]>([])
     const [siteMasters, setSiteMasters] = useState<any[]>([])
@@ -138,7 +152,20 @@ export default function SettingsPage() {
     const fetchSiteModulesAndMasters = async () => {
         setLoadingSiteModules(true)
         try {
-            const res = await fetch('/api/config/site-modules')
+            let roleStr = currentUserRole;
+            if (!roleStr && typeof window !== 'undefined') {
+                try {
+                    const storedUser = localStorage.getItem('user');
+                    if (storedUser) {
+                        const parsed = JSON.parse(storedUser);
+                        roleStr = parsed.role || parsed.roleName || '';
+                    }
+                } catch (e) {}
+            }
+
+            const res = await fetch(`/api/config/site-modules?userRole=${encodeURIComponent(roleStr)}`, {
+                headers: { 'X-User-Role': roleStr }
+            })
             if (res.ok) {
                 const data = await res.json()
                 setSiteModules(data.modules || [])
@@ -153,9 +180,22 @@ export default function SettingsPage() {
 
     const handleToggleSiteItem = async (type: 'MENU' | 'MASTER', id: number, currentActive: boolean) => {
         try {
-            const res = await fetch('/api/config/site-modules', {
+            let roleStr = currentUserRole;
+            if (!roleStr && typeof window !== 'undefined') {
+                try {
+                    const storedUser = localStorage.getItem('user');
+                    if (storedUser) {
+                        const parsedObj = JSON.parse(storedUser);
+                        roleStr = parsedObj.role || parsedObj.roleName || '';
+                    }
+                } catch (e) {}
+            }
+            const res = await fetch(`/api/config/site-modules?userRole=${encodeURIComponent(roleStr)}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-User-Role': roleStr
+                },
                 body: JSON.stringify({ type, id, active: !currentActive })
             })
             if (res.ok) {
@@ -171,9 +211,22 @@ export default function SettingsPage() {
 
     const handleResetAllSiteItems = async () => {
         try {
-            const res = await fetch('/api/config/site-modules', {
+            let roleStr = currentUserRole;
+            if (!roleStr && typeof window !== 'undefined') {
+                try {
+                    const storedUser = localStorage.getItem('user');
+                    if (storedUser) {
+                        const parsedObj = JSON.parse(storedUser);
+                        roleStr = parsedObj.role || parsedObj.roleName || '';
+                    }
+                } catch (e) {}
+            }
+            const res = await fetch(`/api/config/site-modules?userRole=${encodeURIComponent(roleStr)}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-User-Role': roleStr
+                },
                 body: JSON.stringify({ action: 'RESET_ALL' })
             })
             if (res.ok) {
@@ -235,7 +288,7 @@ export default function SettingsPage() {
 
     useEffect(() => {
         fetchSiteModulesAndMasters()
-    }, [])
+    }, [activeTab, currentUserRole])
 
 
 
@@ -1456,7 +1509,7 @@ export default function SettingsPage() {
                     { key: 'variables' as Tab, label: 'Variables Adic.', icon: <Tags className="w-4 h-4" /> },
                     { key: 'vendedores' as Tab, label: 'Vendedores', icon: <UserCheck className="w-4 h-4" /> }
                 ]
-                .filter(tab => tab.isSystem || isMasterTabEnabled(tab.key))
+                .filter(tab => (tab.key === 'modulos-sitio' ? isSuperAdmin : (tab.isSystem || isMasterTabEnabled(tab.key))))
                 .map((tab) => (
                     <TabButton
                         key={tab.key}
@@ -1728,6 +1781,15 @@ export default function SettingsPage() {
                         <RoleManagerTab />
                     </div>
                 ) : activeTab === 'modulos-sitio' ? (
+                    !isSuperAdmin ? (
+                        <div className="p-8 text-center space-y-4">
+                            <ShieldCheck className="w-16 h-16 text-rose-500 mx-auto" />
+                            <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100">Acceso Restringido</h3>
+                            <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-md mx-auto">
+                                Esta sección es exclusiva para usuarios con el perfil <strong className="text-blue-600">SUPERADMINISTRADOR</strong>.
+                            </p>
+                        </div>
+                    ) : (
                     <div className="p-8 space-y-8">
                         <div>
                             <div className="flex items-center justify-between mb-2">
@@ -1840,6 +1902,7 @@ export default function SettingsPage() {
                             )}
                         </div>
                     </div>
+                    )
                 ) : activeTab === 'formatos-cotizacion' ? (
 
                     <div className="p-8">

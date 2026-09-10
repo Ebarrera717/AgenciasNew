@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/executions/presets?procedureId=X
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url)
@@ -11,6 +11,33 @@ export async function GET(req: NextRequest) {
 
         if (!procedureId) {
             return NextResponse.json({ message: 'El parámetro "procedureId" es requerido.' }, { status: 400 })
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('procedureId', Number(procedureId))
+                    .query(`
+                        SELECT [id], [procedureId], [name], [description], [filterValues], [filterConfig], [columnConfigs], [selectedTotals]
+                        FROM dbo.[ExecutionPreset]
+                        WHERE [procedureId] = @procedureId
+                        ORDER BY [name] ASC
+                    `);
+                await pool.close();
+                const presets = res.recordset.map((p: any) => ({
+                    ...p,
+                    filterValues: typeof p.filterValues === 'string' ? JSON.parse(p.filterValues) : p.filterValues,
+                    filterConfig: typeof p.filterConfig === 'string' ? JSON.parse(p.filterConfig) : p.filterConfig,
+                    columnConfigs: typeof p.columnConfigs === 'string' ? JSON.parse(p.columnConfigs) : p.columnConfigs,
+                    selectedTotals: typeof p.selectedTotals === 'string' ? JSON.parse(p.selectedTotals) : p.selectedTotals
+                }));
+                return NextResponse.json(presets);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         const presets = await prisma.executionPreset.findMany({
@@ -25,7 +52,6 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/executions/presets
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
@@ -33,6 +59,54 @@ export async function POST(req: NextRequest) {
 
         if (!name || !procedureId) {
             return NextResponse.json({ message: 'El nombre y el ID del procedimiento son obligatorios.' }, { status: 400 })
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const fVal = JSON.stringify(filterValues || {});
+                const fCfg = JSON.stringify(filterConfig || {});
+                const cCfg = JSON.stringify(columnConfigs || []);
+                const sTot = JSON.stringify(selectedTotals || []);
+                if (id) {
+                    await pool.request()
+                        .input('id', Number(id))
+                        .input('name', name)
+                        .input('description', description || null)
+                        .input('filterValues', fVal)
+                        .input('filterConfig', fCfg)
+                        .input('columnConfigs', cCfg)
+                        .input('selectedTotals', sTot)
+                        .query(`
+                            UPDATE dbo.[ExecutionPreset]
+                            SET [name] = @name, [description] = @description, [filterValues] = @filterValues,
+                                [filterConfig] = @filterConfig, [columnConfigs] = @columnConfigs, [selectedTotals] = @selectedTotals
+                            WHERE [id] = @id
+                        `);
+                    await pool.close();
+                    return NextResponse.json({ id: Number(id), name, procedureId: Number(procedureId), description, filterValues: filterValues || {}, filterConfig: filterConfig || {}, columnConfigs: columnConfigs || [], selectedTotals: selectedTotals || [] });
+                } else {
+                    const res = await pool.request()
+                        .input('procedureId', Number(procedureId))
+                        .input('name', name)
+                        .input('description', description || null)
+                        .input('filterValues', fVal)
+                        .input('filterConfig', fCfg)
+                        .input('columnConfigs', cCfg)
+                        .input('selectedTotals', sTot)
+                        .query(`
+                            INSERT INTO dbo.[ExecutionPreset] ([procedureId], [name], [description], [filterValues], [filterConfig], [columnConfigs], [selectedTotals])
+                            OUTPUT INSERTED.id
+                            VALUES (@procedureId, @name, @description, @filterValues, @filterConfig, @columnConfigs, @selectedTotals)
+                        `);
+                    await pool.close();
+                    return NextResponse.json({ id: res.recordset[0]?.id, name, procedureId: Number(procedureId), description, filterValues: filterValues || {}, filterConfig: filterConfig || {}, columnConfigs: columnConfigs || [], selectedTotals: selectedTotals || [] });
+                }
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         if (id) {
@@ -68,7 +142,6 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// DELETE /api/executions/presets?id=X
 export async function DELETE(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url)
@@ -76,6 +149,21 @@ export async function DELETE(req: NextRequest) {
 
         if (!id) {
             return NextResponse.json({ message: 'El ID de la plantilla es requerido.' }, { status: 400 })
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', Number(id))
+                    .query(`DELETE FROM dbo.[ExecutionPreset] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ success: true, message: 'Plantilla eliminada con éxito.' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         await prisma.executionPreset.delete({

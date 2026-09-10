@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 import { logSystemEvent } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,23 @@ function serializeConsecutivo(row: any) {
 
 export async function GET() {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query(`
+                    SELECT [id], [codigo], [nombre], [branchId], [implantId], [fuente], [serie], [consecutivo]
+                    FROM dbo.[SysConsecutivo]
+                    ORDER BY [id] DESC
+                `);
+                await pool.close();
+                const sanitized = res.recordset.map(serializeConsecutivo);
+                return NextResponse.json(sanitized);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         const rows = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnSysConsecutivoListar()`)
         const sanitized = rows.map(serializeConsecutivo)
         return NextResponse.json(sanitized)
@@ -30,6 +48,34 @@ export async function POST(req: NextRequest) {
 
         const branchId = body.branchId ? parseInt(body.branchId) : null
         const implantId = body.implantId ? parseInt(body.implantId) : null
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('codigo', body.codigo || '')
+                    .input('nombre', body.nombre || '')
+                    .input('branchId', branchId)
+                    .input('implantId', implantId)
+                    .input('fuente', body.fuente || null)
+                    .input('serie', body.serie || null)
+                    .input('consecutivo', body.consecutivo ? parseInt(body.consecutivo) : 0)
+                    .query(`
+                        INSERT INTO dbo.[SysConsecutivo] ([codigo], [nombre], [branchId], [implantId], [fuente], [serie], [consecutivo])
+                        OUTPUT INSERTED.id
+                        VALUES (@codigo, @nombre, @branchId, @implantId, @fuente, @serie, @consecutivo)
+                    `);
+                await pool.close();
+                const dbId = res.recordset[0]?.id;
+                const sysConsecutivo = { id: dbId, ...body };
+                return NextResponse.json(serializeConsecutivo(sysConsecutivo));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const consecutivoVal = body.consecutivo ? BigInt(body.consecutivo) : BigInt(0)
 
         const results: any[] = await prisma.$queryRawUnsafe(
@@ -72,6 +118,34 @@ export async function PUT(req: NextRequest) {
         const id = parseInt(body.id)
         const branchId = body.branchId ? parseInt(body.branchId) : null
         const implantId = body.implantId ? parseInt(body.implantId) : null
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', id)
+                    .input('codigo', body.codigo || '')
+                    .input('nombre', body.nombre || '')
+                    .input('branchId', branchId)
+                    .input('implantId', implantId)
+                    .input('fuente', body.fuente || null)
+                    .input('serie', body.serie || null)
+                    .input('consecutivo', body.consecutivo ? parseInt(body.consecutivo) : 0)
+                    .query(`
+                        UPDATE dbo.[SysConsecutivo]
+                        SET [codigo] = @codigo, [nombre] = @nombre, [branchId] = @branchId, [implantId] = @implantId,
+                            [fuente] = @fuente, [serie] = @serie, [consecutivo] = @consecutivo
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                return NextResponse.json(serializeConsecutivo(body));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const consecutivoVal = body.consecutivo ? BigInt(body.consecutivo) : BigInt(0)
 
         const results: any[] = await prisma.$queryRawUnsafe(
@@ -112,6 +186,21 @@ export async function DELETE(req: NextRequest) {
 
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query(`DELETE FROM dbo.[SysConsecutivo] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ success: true, message: 'Consecutivo eliminado' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spSysConsecutivoEliminar($1::INT, $2::INT, $3::TEXT)`,

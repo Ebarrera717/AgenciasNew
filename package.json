@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:apply": "node deploy/apply_local_db.js"
+    "db:apply": "node deploy/apply_local_db.js",
+    "test:full": "node scripts/validate_full_suite.js",
+    "test:multidb": "node scripts/test_multidb_runner.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

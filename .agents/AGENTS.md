@@ -7,6 +7,8 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 ## 1. Reglas de Base de Datos y SQL
 
 - **REGLA METODOLÓGICA DE CREACIÓN Y DISEÑO DE SKILLS**: Toda nueva Skill o actualización de Skill **DEBE redactarse como un principio de arquitectura universal, patrón abstracto de solución o regla de diseño reutilizable**, evitando limitar las instrucciones a casos de prueba puntuales o valores del momento. Debe abstraer la causa raíz técnica y ofrecer una directriz general que resuelva automáticamente esa categoría de problema en cualquier desarrollo futuro de la plataforma.
+- **REGLA DE ORO DE DESARROLLO MULTIBASE (PostgreSQL + SQL Server)**: *"PostgreSQL y SQL Server son plataformas oficialmente soportadas. Todo cambio futuro debe diseñarse, implementarse y validarse para ambas desde el inicio. Ningún desarrollo se considera terminado si solo funciona en uno de los dos motores."* Se deben seguir estrictamente todas las directivas y el checklist obligatorio del Skill [`desarrollo-multibase`](file:///f:/Proyectos/AgenciasNew/.agents/skills/desarrollo-multibase/SKILL.md).
+- **REGLA OBLIGATORIA DE TESTING AUTOMATIZADO MULTIBASE**: *"Todo cambio o requerimiento debe contar con su prueba automatizada ejecutable y ser validado en PostgreSQL y SQL Server con 100% de coincidencia funcional."* Se deben ejecutar y cumplir las 11 capas de verificación del Skill [`automated-multidb-testing`](file:///f:/Proyectos/AgenciasNew/.agents/skills/automated-multidb-testing/SKILL.md) (`node scripts/validate_full_suite.js`).
 - **REGLA PRIMORDIAL DE ARQUITECTURA (Lógica en Base de Datos)**: Todo desarrollo, cálculo, proceso de negocio, liquidación, consulta de listado, validación o mutación de datos en AgenciasNew **DEBE realizarse obligatoria y prioritariamente a través de Procedimientos Almacenados (SPs), Funciones SQL y Tablas de Base de Datos** (PostgreSQL local `Korex_colaereo` y SQL Server producción).
   - **Excepción Única**: Únicamente cuando sea técnicamente imposible realizar el procesamiento dentro de la base de datos (por ejemplo: renderizado estético de interfaz React, manipulación directa del DOM o manejo de cookies HTTP de sesión en Edge Runtime), se permitirá implementar dicha lógica en el sitio web / frontend (Next.js).
 
@@ -101,5 +103,28 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 
 - **Estandarización Obligatoria de Botones y Componentes**: Todo nuevo botón de creación (`+ Nuevo ...`), botón secundario, modal, icono de menú lateral o tarjeta de maestro **DEBE cumplir estrictamente los patrones de estilo y tokens Tailwind definidos en el Skill [`ui-design-harmony`](file:///f:/Proyectos/AgenciasNew/.agents/skills/ui-design-harmony/SKILL.md)**.
 - **Prohibición de Estilos Inconsistentes**: Queda estrictamente prohibido usar colores arbitrarios o dispares (ej. botones de creación negros, naranjas o verdes sin justificación de token) o tamaños desiguales (`h-14`, `h-11`, `text-xs`) entre módulos. Los botones de creación principal siempre serán de azul primario (`bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 px-5 text-sm font-bold shadow-md shadow-blue-500/20`).
+
+---
+
+## 9. Regla de Arquitectura de Instalación y Despliegue SQL Server (Base Inicial .BAK vs Migración)
+
+- **Prohibición Absoluta de `CREATE DATABASE` en Instaladores**: El instalador de SQL Server **NO DEBE ejecutar `CREATE DATABASE`** ni depender de que el usuario ejecutor posea permisos administrativos para crear bases de datos. La infraestructura/cliente es la única responsable de crear/restaurar la base de datos y entregar las credenciales de conexión (`Servidor`, `Instancia`, `Puerto`, `Base de Datos`, `Usuario`, `Clave`). El instalador únicamente valida la conexión y los permisos en la base existente.
+- **Entrega de Base SQL Server Inicial en Blanco (`.BAK`)**: Debe existir un proceso independiente mediante el cual el equipo de desarrollo genere un archivo de backup en blanco (`Korex_SQLServer_Inicial_X.X.bak`) preparado para nuevas instalaciones de clientes. Este backup debe contener:
+  - Estructura completa de tablas, PKs, FKs, índices, constraints, vistas, SPs, funciones, triggers y consecutivos.
+  - Catálogos maestros obligatorios y parámetros básicos requeridos por la aplicación.
+  - **Sin información operativa del cliente**.
+- **Generación Automatizada del Backup Inicial**: El proyecto debe contar con un procedimiento documentado/script que cree una base de datos temporal, aplique la estructura T-SQL completa, inyecte las semillas iniciales, valide la integridad y exporte el archivo `.BAK` emparejado con la versión exacta de la aplicación (`Korex_SQLServer_Inicial_1.0.bak`).
+- **Separación Estricta entre Base Inicial y Migración**:
+  - **Cliente Nuevo**: Restaura la base inicial `.BAK` en blanco y configura la conexión de la aplicación.
+  - **Cliente Existente (PostgreSQL)**: Ejecuta el proceso de migración independiente `PostgreSQL -> SQL Server` para trasladar sus datos operativos y luego configura la aplicación.
+- **Auditoría Automatizada Obligatoria de Entregables (`scripts/validate_full_suite.js`)**: Todo cambio en T-SQL, actualizadores o instaladores de SQL Server DEBE ser verificado ejecutando `node scripts/validate_full_suite.js` en 11 capas de seguridad (Skill [`updater-verification`](file:///f:/Proyectos/AgenciasNew/.agents/skills/updater-verification/SKILL.md)), garantizando 22 SPs T-SQL, 3 Funciones Escalares, 20 Tablas DDL y exportación limpia en `deploy/BaseLimpia/Korex_SQLServer_Inicial_1.0.bak`.
+- **6 Componentes de Entregables del Proyecto**:
+  1. `01 - Instalador PostgreSQL`: Se mantiene sin modificaciones funcionales.
+  2. `02 - Instalador SQL Server`: Instala/configura la aplicación y valida la conexión; NO crea la base de datos.
+  3. `03 - Base SQL Server inicial`: Archivo `.BAK` estructurado en blanco sin datos operativos.
+  4. `04 - Scripts SQL Server`: Scripts T-SQL que permiten reconstruir la estructura y generar nuevas versiones del `.BAK`.
+  5. `05 - Proceso de migración`: Herramienta independiente para trasladar datos desde PostgreSQL hacia SQL Server.
+  6. `06 - Proceso de validación`: Validador de integridad para comparar y verificar la información migrada.
+
 
 

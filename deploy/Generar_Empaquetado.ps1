@@ -15,6 +15,16 @@ if ($SkipBuild) {
     Write-Host "`n[1/5] OMITIENDO COMPILACION NEXT.JS (Modo Rapido - Solo base de datos/scripts)..." -ForegroundColor Yellow
 } else {
     Write-Host "`n[1/5] Compilando el proyecto Next.js en Modo Standalone..." -ForegroundColor Yellow
+    
+    # Liberar servicios y procesos remanentes para evitar bloqueo EBUSY de archivos .log en .next/standalone
+    Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+    Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$RootDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+    if (Test-Path "$RootDir\.next\standalone\daemon") {
+        Remove-Item "$RootDir\.next\standalone\daemon" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     npm.cmd run build
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR EN COMPILACION" -ForegroundColor Red

@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { isSQLServerMode } from '@/lib/sqlserver';
 
 /**
  * Registra un evento de auditoría en el sistema usando Prisma.
@@ -12,7 +13,12 @@ export async function registerLog(
 ) {
     try {
         console.log(`[AuditLog_DEBUG] Intentando registrar: ${module} - ${action}: ${description}`);
-        
+
+        if (isSQLServerMode()) {
+            console.log(`[AuditLog_SQLSERVER] ${module} - ${action}: ${description}`);
+            return;
+        }
+
         const logEntry = await prisma.systemLog.create({
             data: {
                 userId: userId && userId !== 0 ? Number(userId) : null,

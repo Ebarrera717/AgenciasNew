@@ -262,16 +262,10 @@ if ($pgConnected) {
 Write-Step "Registrando servicio de segundo plano (Korex_NextJS)..."
 Set-Location $TargetDir
 
-# Eliminar servicio anterior si existe
-if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
-    Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-    sc.exe delete "Korex_NextJS" | Out-Null
-    Start-Sleep -Seconds 2
-}
-
-if (Test-Path "$TargetDir\daemon") {
-    Remove-Item "$TargetDir\daemon" -Recurse -Force -ErrorAction SilentlyContinue
-}
+# Detener servicio anterior si existe
+Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
 
 if (Test-Path ".\install-service.js") {
     node .\install-service.js | Out-Null

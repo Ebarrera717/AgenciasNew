@@ -275,22 +275,11 @@ if ($pgReady) {
 }
 
 # Paso 7. REGISTRAR E INICIAR SERVICIO WINDOWS
-Write-Log "Registrando servicio de Node.js en Windows..."
-if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
-    Write-Log "Removiendo servicio Korex_NextJS anterior..."
-    sc.exe delete "Korex_NextJS" | Out-Null
-    Start-Sleep -Seconds 1
-}
-if (Get-Service -Name "AgenciasNew_NextJS" -ErrorAction SilentlyContinue) {
-    Write-Log "Removiendo servicio AgenciasNew_NextJS anterior..."
-    Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
-    sc.exe delete "AgenciasNew_NextJS" | Out-Null
-    Start-Sleep -Seconds 1
-}
-
-if (Test-Path "$TargetDir\daemon") {
-    Remove-Item "$TargetDir\daemon" -Recurse -Force -ErrorAction SilentlyContinue
-}
+Write-Log "Deteniendo servicio de Node.js en Windows si ya existe..."
+Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
 
 if (Test-Path ".\install-service.js") {
     node .\install-service.js >> $LogFile 2>&1

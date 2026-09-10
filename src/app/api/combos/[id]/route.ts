@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export async function PUT(req: NextRequest, context: any) {
     try {
@@ -8,8 +9,6 @@ export async function PUT(req: NextRequest, context: any) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
 
-        // En Next.js 15, `params` puede ser una promesa, pero para evitar cualquier problema
-        // extraemos el ID directamente de la URL o del body.
         const urlId = req.nextUrl.pathname.split('/').pop();
         let fallbackId = urlId;
         
@@ -22,6 +21,32 @@ export async function PUT(req: NextRequest, context: any) {
         
         if (isNaN(comboId)) {
             return NextResponse.json({ message: `ID de combo no válido (Body: ${body.id}, URL: ${urlId})` }, { status: 400 });
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const isAct = body.isActive !== undefined ? (body.isActive ? 1 : 0) : (body.inactive ? 0 : 1);
+                await pool.request()
+                    .input('id', comboId)
+                    .input('code', code || '')
+                    .input('name', name || '')
+                    .input('cupos', parseInt(cupos?.toString() || '0'))
+                    .input('currencyId', currencyId ? parseInt(currencyId) : null)
+                    .input('isActive', isAct)
+                    .query(`
+                        UPDATE dbo.[Combo]
+                        SET [code] = @code, [name] = @name, [cupos] = @cupos, [currencyId] = @currencyId, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const combo = { id: comboId, name };
+                return NextResponse.json({ message: 'Combo actualizado', combo });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         const results: any[] = await prisma.$queryRawUnsafe(
@@ -85,6 +110,21 @@ export async function DELETE(req: NextRequest, context: any) {
 
         if (isNaN(comboId)) {
             return NextResponse.json({ message: `ID de combo no válido (URL: ${urlId})` }, { status: 400 });
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', comboId)
+                    .query(`DELETE FROM dbo.[Combo] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ message: 'Combo eliminado' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         const results: any[] = await prisma.$queryRawUnsafe(

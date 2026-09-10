@@ -1,11 +1,29 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query(`
+                    SELECT [id], [code], [name], [type], [valueType], [value], [isEditable], [orden], [productIds], [targetTaxId], [isActive],
+                           CASE WHEN [isActive] = 1 THEN 0 ELSE 1 END AS [inactive]
+                    FROM dbo.[ChargeAndTax]
+                    ORDER BY [id] DESC
+                `);
+                await pool.close();
+                return NextResponse.json(paginateArray(req, res.recordset as any[], (t: any) => [t?.code, t?.name, t?.type]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         const results = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnImpuestoListar()`)
         const taxes = (results || []).map(row => row.fnimpuestolistar || Object.values(row)[0]).filter(Boolean);
         return NextResponse.json(paginateArray(req, taxes, t => [t?.code, t?.name, t?.type, t?.gdsEquivalences]))
@@ -65,8 +83,37 @@ export async function POST(req: NextRequest) {
         const numericOrden = orden !== undefined && orden !== null && orden !== '' && !isNaN(parseInt(orden)) ? parseInt(orden) : 0;
         const productIdsJson = JSON.stringify(Array.isArray(productIds) ? productIds : []);
         const parsedTargetTaxId = targetTaxId !== undefined && targetTaxId !== null && targetTaxId !== '' ? parseInt(targetTaxId) : null;
-
         const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', code || null)
+                    .input('name', name || '')
+                    .input('type', type || '')
+                    .input('valueType', valueType || 'NONE')
+                    .input('value', numericVal)
+                    .input('isEditable', isEditable !== undefined ? (isEditable ? 1 : 0) : 1)
+                    .input('orden', numericOrden)
+                    .input('productIds', productIdsJson)
+                    .input('targetTaxId', parsedTargetTaxId)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        INSERT INTO dbo.[ChargeAndTax] ([code], [name], [type], [valueType], [value], [isEditable], [orden], [productIds], [targetTaxId], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @type, @valueType, @value, @isEditable, @orden, @productIds, @targetTaxId, @isActive)
+                    `);
+                await pool.close();
+                const dbId = res.recordset[0]?.id;
+                const tax = { id: dbId, ...body };
+                return NextResponse.json(tax);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spImpuestoCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::TEXT, $5::DECIMAL, $6::BOOLEAN, $7::INT, $8::JSONB, $9::INT, $10::BOOLEAN, $11::INT, $12::INT, $13::TEXT)`,
@@ -120,8 +167,38 @@ export async function PUT(req: NextRequest) {
         const numericOrden = orden !== undefined && orden !== null && orden !== '' && !isNaN(parseInt(orden)) ? parseInt(orden) : 0;
         const productIdsJson = JSON.stringify(Array.isArray(productIds) ? productIds : []);
         const parsedTargetTaxId = targetTaxId !== undefined && targetTaxId !== null && targetTaxId !== '' ? parseInt(targetTaxId) : null;
-
         const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .input('code', code || null)
+                    .input('name', name || '')
+                    .input('type', type || '')
+                    .input('valueType', valueType || 'NONE')
+                    .input('value', numericVal)
+                    .input('isEditable', isEditable !== undefined ? (isEditable ? 1 : 0) : 1)
+                    .input('orden', numericOrden)
+                    .input('productIds', productIdsJson)
+                    .input('targetTaxId', parsedTargetTaxId)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        UPDATE dbo.[ChargeAndTax]
+                        SET [code] = @code, [name] = @name, [type] = @type, [valueType] = @valueType, [value] = @value,
+                            [isEditable] = @isEditable, [orden] = @orden, [productIds] = @productIds, [targetTaxId] = @targetTaxId, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const tax = { ...body };
+                return NextResponse.json(tax);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spImpuestoActualizar($1::INT, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::DECIMAL, $7::BOOLEAN, $8::INT, $9::JSONB, $10::INT, $11::BOOLEAN, $12::INT, $13::TEXT)`,
@@ -169,6 +246,21 @@ export async function DELETE(req: NextRequest) {
         if (!id) return NextResponse.json({ message: 'ID is required' }, { status: 400 })
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query(`DELETE FROM dbo.[ChargeAndTax] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ message: 'Cargo eliminado exitosamente' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spImpuestoEliminar($1::INT, $2::INT, $3::TEXT)`,

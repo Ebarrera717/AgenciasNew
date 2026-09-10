@@ -5,10 +5,16 @@ echo   GENERANDO ENSAMBLADO Y PROGRAMA DE ACTUALIZACION (LITE)
 echo ========================================================
 echo.
 
-echo Paso 0: Generando descriptor de esquema de base de datos...
+echo Paso 0: Generando descriptor de esquema y auditando la suite completa (PG + SQL)...
 node "%~dp0deploy\gen_schema_json.js"
 if %errorlevel% neq 0 (
     echo Error generando el descriptor del esquema de la base de datos.
+    pause
+    exit /b %errorlevel%
+)
+node "%~dp0scripts\validate_full_system.js"
+if %errorlevel% neq 0 (
+    echo ERROR: Fallo la validacion de maestros y funcionalidades. Actualizador cancelado.
     pause
     exit /b %errorlevel%
 )

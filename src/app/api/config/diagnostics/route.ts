@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getSQLServerConnection } from '@/lib/sqlserver';
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver';
 import { getStoredLicenseStatus } from '@/lib/license';
 import { registerErrorLog } from '@/lib/logger';
 
@@ -13,19 +13,37 @@ export async function GET(req: NextRequest) {
         recentErrors: []
     };
 
-    // 1. Probar PostgreSQL Local
-    try {
-        const pgCheck: any = await prisma.$queryRawUnsafe('SELECT version() as version');
-        diagnosticsResult.postgres = {
-            status: 'OK',
-            message: 'Conectado exitosamente a PostgreSQL (Korex_colaereo)',
-            version: pgCheck[0]?.version || 'PostgreSQL'
-        };
-    } catch (err: any) {
-        diagnosticsResult.postgres = {
-            status: 'ERROR',
-            message: `Error al conectar a PostgreSQL local: ${err.message}`
-        };
+    // 1. Probar Base de Datos Principal
+    if (isSQLServerMode()) {
+        try {
+            const pool = await getSQLServerConnection();
+            const res = await pool.request().query('SELECT @@VERSION as version');
+            diagnosticsResult.postgres = {
+                status: 'OK',
+                message: 'Conectado exitosamente a SQL Server Direct Mode',
+                version: res.recordset[0]?.version || 'SQL Server'
+            };
+            await pool.close();
+        } catch (err: any) {
+            diagnosticsResult.postgres = {
+                status: 'ERROR',
+                message: `Error al conectar a SQL Server: ${err.message}`
+            };
+        }
+    } else {
+        try {
+            const pgCheck: any = await prisma.$queryRawUnsafe('SELECT version() as version');
+            diagnosticsResult.postgres = {
+                status: 'OK',
+                message: 'Conectado exitosamente a PostgreSQL (Korex_colaereo)',
+                version: pgCheck[0]?.version || 'PostgreSQL'
+            };
+        } catch (err: any) {
+            diagnosticsResult.postgres = {
+                status: 'ERROR',
+                message: `Error al conectar a PostgreSQL local: ${err.message}`
+            };
+        }
     }
 
     // 2. Probar SQL Server ERP Zeus
@@ -63,30 +81,32 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. Consultar últimos errores del sistema
-    try {
-        const errors = await prisma.systemLog.findMany({
-            where: {
-                OR: [
-                    { action: 'ERROR' },
-                    { description: { contains: 'ERROR', mode: 'insensitive' } }
-                ]
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 20,
-            include: { user: true }
-        });
+    if (!isSQLServerMode()) {
+        try {
+            const errors = await prisma.systemLog.findMany({
+                where: {
+                    OR: [
+                        { action: 'ERROR' },
+                        { description: { contains: 'ERROR', mode: 'insensitive' } }
+                    ]
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+                include: { user: true }
+            });
 
-        diagnosticsResult.recentErrors = errors.map((e: any) => ({
-            id: e.id,
-            createdAt: e.createdAt,
-            module: e.module,
-            action: e.action,
-            description: e.description,
-            userName: e.user?.name || 'Sistema / Automático',
-            metadata: e.metadata
-        }));
-    } catch (err: any) {
-        console.error('Error al consultar logs de diagnóstico:', err);
+            diagnosticsResult.recentErrors = errors.map((e: any) => ({
+                id: e.id,
+                createdAt: e.createdAt,
+                module: e.module,
+                action: e.action,
+                description: e.description,
+                userName: e.user?.name || 'Sistema / Automático',
+                metadata: e.metadata
+            }));
+        } catch (err: any) {
+            console.error('Error al consultar logs de diagnóstico:', err);
+        }
     }
 
     return NextResponse.json(diagnosticsResult);

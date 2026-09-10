@@ -9,7 +9,14 @@ Este Skill define el protocolo de control de calidad y validación automatizada 
 
 ---
 
-## 1. Reglas de Validación de Base de Datos (PostgreSQL)
+## 1. Reglas de Validación de Base de Datos (PostgreSQL + SQL Server)
+
+### REGLA OBLIGATORIA PRE-EMPAQUETADO MULTIBASE:
+Todos los archivos batch de empaquetado e instalación ([GenerarActualizador.bat](file:///f:/Proyectos/AgenciasNew/GenerarActualizador.bat), [GenerarSetup.bat](file:///f:/Proyectos/AgenciasNew/GenerarSetup.bat), [GenerarActualizadorSqlServer.bat](file:///f:/Proyectos/AgenciasNew/GenerarActualizadorSqlServer.bat) y [GenerarSetupSqlServer.bat](file:///f:/Proyectos/AgenciasNew/GenerarSetupSqlServer.bat)) **DEBEN invocar obligatoriamente en su PASO 0 la auditoría completa de maestros y funcionalidades**:
+```cmd
+node "%~dp0scripts\validate_full_system.js"
+```
+Si el resultado no es 100% PASS en PostgreSQL y SQL Server, la generación del ejecutable **debe cancelarse de inmediato**.
 
 ### A. Integridad de Tablas Nuevas y Extensiones
 Cualquier tabla creada o referenciada en SPs (ejemplo: `QuotationManualService`, `QuotationFormat`, `QuotationPrintCustomization`, `QuotationCombo`) **debe contar con un bloque `CREATE TABLE IF NOT EXISTS`** dentro de [`SQL/Table/Alter_New_Columns.sql`](file:///f:/Proyectos/AgenciasNew/SQL/Table/Alter_New_Columns.sql).
@@ -104,18 +111,40 @@ El script de validación automatizada [`deploy/validate_schema_before_package.js
 
 ---
 
-## 4. Secuencia de Empaquetado para Producción
+## 5. Protocolo de Integridad de Backup y Entregables SQL Server (`Korex_SQLServer_Inicial_1.0.bak`)
 
-Para generar un paquete limpio de producción, ejecutar en orden:
+Para garantizar que el archivo de backup inicial en blanco (`Korex_SQLServer_Inicial_1.0.bak`) generado en `deploy/BaseLimpia/` quede **100% operativo y listo para uso inmediato al restaurarse en cualquier servidor SQL Server**, se deben cumplir sin excepción las siguientes 4 reglas de validación:
 
-```bash
-# Paso 1: Ejecutar la validación automatizada y generación del descriptor de esquemas
-node deploy/gen_schema_json.js
+### A. Procesamiento por Separación de Lotes `GO` (`mssql` Driver Compatibility)
+Cualquier ejecutor Node.js que procese archivos T-SQL (`gen_sqlserver_initial_bak.js`, `sync_sqlserver_updater.js`) **DEBE utilizar la función divisora por bloques `GO` (`/^\s*GO\s*$/im`)**:
+```javascript
+async function executeBatchWithGo(pool, sqlScript) {
+    const batches = sqlScript
+        .split(/^\s*GO\s*$/im)
+        .map(b => b.trim())
+        .filter(b => b.length > 0);
 
-# Paso 2: Generar el build standalone de producción de Next.js
-powershell.exe -ExecutionPolicy Bypass -File deploy/Generar_Empaquetado.ps1
-
-# Paso 3: Compilar los ejecutables de Inno Setup
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" deploy/Korex_Update.iss
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" deploy/Korex.iss
+    for (const batch of batches) {
+        await pool.request().batch(batch);
+    }
+}
 ```
+- *Razón*: Evita fallos de sintaxis T-SQL (`Incorrect syntax near 'GO'`) al enviar múltiples Stored Procedures o Funciones en un solo llamado al driver `mssql`.
+
+### B. Auditoría de Unicidad Case-Insensitive en Columnas DDL (`01_Tables.sql`)
+Cada tabla declarada en `SQL/SqlServer/01_Tables.sql` debe ser auditada para evitar columnas duplicadas con distinta capitalización (ejemplo: `[logo]` y `[Logo]` en `Implant`).
+- *Razón*: SQL Server es case-insensitive por defecto en identificadores y aborta la creación de tablas con el error 2705 si se declara una columna más de una vez.
+
+### C. Inclusión Completa de la Programación T-SQL (3 Funciones + 22 Stored Procedures)
+El archivo compilador `SQL/SqlServer/03_Functions_And_SPs.sql` **DEBE incluir obligatoriamente**:
+1. **3 Funciones Escalares**: `fnQuitarEspeciales`, `fnObtenerSiguienteConsecutivo`, `fnInterfaceExtractParamValue`.
+2. **22 Procedimientos Almacenados T-SQL**: Todos los SPs de consulta de maestros (`spMonedaListar`, `spClienteListar`, `spBranchListar`, `spUserListar`, etc.) y los procesadores centrales de integración ERP Zeus (`spCotizacionesCrear` y `spFacturacionesCrear`).
+- *Razón*: Garantiza que al restaurar el backup `.bak` en SSMS (SQL Server Management Studio), la carpeta `Programación` (Procedimientos almacenados y Funciones de valor escalar) quede 100% poblada y funcional sin requerir compilaciones manuales posteriores.
+
+### D. Verificación Automatizada de la Suite Completa (`scripts/validate_full_suite.js`)
+Antes de finalizar cualquier desarrollo o entregar paquetes, se DEBE ejecutar:
+```bash
+node scripts/validate_full_suite.js
+```
+Validando que las 11 capas (PostgreSQL local, Json Schema, T-SQL Scripts y Suites de Despliegue SQL Server) respondan con **`✅ OK`**.
+

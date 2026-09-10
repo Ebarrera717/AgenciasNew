@@ -1,6 +1,7 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,21 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
         const param = id ? parseInt(id) : null
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const reqPool = pool.request();
+                reqPool.input('p_currency_id', param);
+                const res = await reqPool.execute('dbo.spMonedaListar');
+                await pool.close();
+                return NextResponse.json(paginateArray(req, res.recordset || [], (c: any) => [c.code, c.name]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `SELECT * FROM public.fnMonedaListar($1::INT)`,
@@ -33,6 +49,35 @@ export async function POST(req: NextRequest) {
 
         if (!code || !name || exchangeRate === undefined) {
             return NextResponse.json({ message: 'Código, nombre y tasa de cambio son requeridos' }, { status: 400 })
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', code.toUpperCase())
+                    .input('name', name)
+                    .input('exchangeRate', parseFloat(exchangeRate))
+                    .input('decimals', decimals !== undefined ? parseInt(decimals) : 2)
+                    .query(`
+                        INSERT INTO dbo.[Currency] ([code], [name], [exchangeRate], [decimals], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @exchangeRate, @decimals, 1)
+                    `);
+                await pool.close();
+                const currency = { 
+                    id: res.recordset[0]?.id, 
+                    code: code.toUpperCase(), 
+                    name, 
+                    exchangeRate: parseFloat(exchangeRate),
+                    decimals: decimals !== undefined ? parseInt(decimals) : 2
+                };
+                return NextResponse.json({ message: 'Moneda creada', currency });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         const results: any[] = await prisma.$queryRawUnsafe(
@@ -82,6 +127,36 @@ export async function PUT(req: NextRequest) {
 
         if (!id || !code || !name || exchangeRate === undefined) {
             return NextResponse.json({ message: 'ID, código, nombre y tasa de cambio son requeridos' }, { status: 400 })
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .input('code', code.toUpperCase())
+                    .input('name', name)
+                    .input('exchangeRate', parseFloat(exchangeRate))
+                    .input('decimals', decimals !== undefined ? parseInt(decimals) : 2)
+                    .query(`
+                        UPDATE dbo.[Currency]
+                        SET [code] = @code, [name] = @name, [exchangeRate] = @exchangeRate, [decimals] = @decimals
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const currency = { 
+                    id: parseInt(id), 
+                    code: code.toUpperCase(), 
+                    name, 
+                    exchangeRate: parseFloat(exchangeRate),
+                    decimals: decimals !== undefined ? parseInt(decimals) : 2
+                };
+                return NextResponse.json({ message: 'Moneda actualizada', currency });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         const results: any[] = await prisma.$queryRawUnsafe(
@@ -134,6 +209,21 @@ export async function DELETE(req: NextRequest) {
 
         if (!id) {
             return NextResponse.json({ message: 'ID es requerido' }, { status: 400 })
+        }
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query('DELETE FROM dbo.[Currency] WHERE [id] = @id');
+                await pool.close();
+                return NextResponse.json({ message: 'Moneda eliminada exitosamente' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
         }
 
         const results: any[] = await prisma.$queryRawUnsafe(

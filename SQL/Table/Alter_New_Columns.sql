@@ -3261,9 +3261,9 @@ INSERT INTO public."Master" (code, name, "inactivo") VALUES ('Equivalences', 'eq
 
 INSERT INTO public."Master" (code, name, "inactivo") VALUES ('Diagnostics', 'diagnostico', false) ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('LICENSE_KEY', 'Clave de Licencia del Sistema', 'KOR1.eyJjIjoiS09SRVggQUdFTkNJQSBQUlVFQkEiLCJuIjoiNzk4OTg0NTYiLCJlIjoiMjAyNi0wOS0xOCIsImkiOiIyMDI2LTA4LTE4In0.9ff9b9c70c96a3be611adf0c8866f8cf0340bc5311586f66e1afde9be49a9421') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('LICENSE_KEY', 'Clave de Licencia del Sistema', '') ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('LICENSE_EXPIRATION_DATE', 'Fecha de Expiración de Licencia', '2026-09-18') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('LICENSE_EXPIRATION_DATE', 'Fecha de Expiración de Licencia', '') ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PuertoSQLServer', 'Puerto SQL Server', '') ON CONFLICT (code) DO NOTHING;
 
@@ -3337,3 +3337,29 @@ INSERT INTO public."Menu" (code, name, action, activo) VALUES ('MAESTROS', 'Maes
 INSERT INTO public."Menu" (code, name, action, activo) VALUES ('REPORTES', 'Reportes', '/dashboard/reports', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
 
 INSERT INTO public."Menu" (code, name, action, activo) VALUES ('EJECUCIONES', 'Ejecuciones', '/dashboard/executions', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
+
+-- Siembra obligatoria de Rol SUPERADMINISTRADOR y asignación a ebarrera@zagencias.com
+DO $$
+DECLARE
+    v_super_role_id INT;
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Role') THEN
+        IF NOT EXISTS (SELECT 1 FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%') THEN
+            INSERT INTO public."Role" (name, description, permissions, "isActive")
+            VALUES ('SUPERADMINISTRADOR', 'Super Administrador con control total del sistema y gestión de módulos del sitio', '{"all": true, "superadmin": true}'::json, true);
+        END IF;
+
+        SELECT id INTO v_super_role_id FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%' LIMIT 1;
+
+        IF v_super_role_id IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'User') THEN
+            UPDATE public."User"
+            SET "roleId" = v_super_role_id
+            WHERE email = 'ebarrera@zagencias.com';
+        END IF;
+    END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Payment_code_key" ON public."Payment"(code);
+INSERT INTO public."Payment" (code, name, "isActive") VALUES ('CONTADO', 'Contado', true) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Payment" (code, name, "isActive") VALUES ('CREDITO', 'Crédito', true) ON CONFLICT (code) DO NOTHING;
+SELECT setval('public."Payment_id_seq"', COALESCE((SELECT MAX(id) FROM public."Payment"), 1));

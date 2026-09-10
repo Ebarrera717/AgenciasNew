@@ -1,11 +1,24 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().execute('dbo.spProductListar');
+                await pool.close();
+                return NextResponse.json(paginateArray(req, res.recordset || [], (p: any) => [p.code, p.type, p.description]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         const results = await prisma.product.findMany({
             orderBy: { id: 'desc' }
         });
@@ -22,6 +35,33 @@ export async function POST(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', code || null)
+                    .input('type', type || '')
+                    .input('description', description || '')
+                    .input('basePrice', parseFloat(basePrice?.toString() || '0'))
+                    .input('cost', parseFloat(cost?.toString() || '0'))
+                    .input('billingConcept', billingConcept || null)
+                    .input('serviceType', serviceType || null)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        INSERT INTO dbo.[Product] ([code], [type], [description], [basePrice], [cost], [billingConcept], [serviceType], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @type, @description, @basePrice, @cost, @billingConcept, @serviceType, @isActive)
+                    `);
+                await pool.close();
+                const product = { id: res.recordset[0]?.id, code, type, description, basePrice, cost, isActive: isAct };
+                return NextResponse.json({ message: 'Producto creado', product });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const product = await prisma.product.create({
             data: {
@@ -60,6 +100,34 @@ export async function PUT(req: NextRequest) {
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
 
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .input('code', code || null)
+                    .input('type', type || '')
+                    .input('description', description || '')
+                    .input('basePrice', parseFloat(basePrice?.toString() || '0'))
+                    .input('cost', parseFloat(cost?.toString() || '0'))
+                    .input('billingConcept', billingConcept || null)
+                    .input('serviceType', serviceType || null)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        UPDATE dbo.[Product]
+                        SET [code] = @code, [type] = @type, [description] = @description, [basePrice] = @basePrice, [cost] = @cost, [billingConcept] = @billingConcept, [serviceType] = @serviceType, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const product = { id, code, type, description, basePrice, cost, isActive: isAct };
+                return NextResponse.json({ message: 'Producto actualizado', product });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const product = await prisma.product.update({
             where: { id: parseInt(id) },
             data: {
@@ -97,6 +165,21 @@ export async function DELETE(req: NextRequest) {
         if (!id) return NextResponse.json({ message: 'Missing ID' }, { status: 400 })
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query('DELETE FROM dbo.[Product] WHERE [id] = @id');
+                await pool.close();
+                return NextResponse.json({ message: 'Producto eliminado' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         await prisma.product.delete({
             where: { id: parseInt(id) }

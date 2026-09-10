@@ -12,7 +12,10 @@ async function validateAndPrepareSchema(customConnStr) {
 
   // 1. Desplegar todos los archivos SQL locales a la BD PostgreSQL local
   console.log("\n[PASO 1/4] Desplegando funciones y SPs a PostgreSQL local...");
-  const connectionString = customConnStr || process.env.DATABASE_URL;
+  let connectionString = customConnStr || process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL;
+  if (connectionString && (connectionString.startsWith('sqlserver://') || connectionString.startsWith('mssql://'))) {
+    connectionString = process.env.DATABASE_URL_POSTGRES || 'postgresql://postgres:zzeusagencias@192.168.80.26:5432/Korex_colaereo?schema=public';
+  }
   if (!connectionString) {
     console.error("  [ERROR] DATABASE_URL no está configurada en .env");
     process.exit(1);

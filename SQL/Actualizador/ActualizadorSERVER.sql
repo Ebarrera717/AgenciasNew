@@ -1,1139 +1,2260 @@
--- ==========================================================
--- ARCHIVO ACTUALIZADOR COMPLETO: SPS (SQL SERVER)
--- Generado Automáticamente
--- ==========================================================
+-- ============================================================================
+-- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
+-- Generado Automáticamente por deploy/sync_sqlserver_updater.js
+-- Fecha de Generación: 2026-09-10T21:48:52.003Z
+-- Motor: Microsoft SQL Server 2016+ (T-SQL)
+-- ============================================================================
 
--- >>> PROCEDIMIENTOS ALMACENADOS (SQL SERVER) <<<
-
--- Archivo: spCargosImpAsignadosIntegradoConsultarConceptoFac.sql
-IF OBJECT_ID('dbo.spCargosImpAsignadosIntegradoConsultarConceptoFac', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCargosImpAsignadosIntegradoConsultarConceptoFac;
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 GO
-CREATE PROCEDURE [dbo].[spCargosImpAsignadosIntegradoConsultarConceptoFac] 
-	-- Parametros del procedimiento
-	@id_usuario INT,
-	@id_ConceptFac INT,
-	@bu VARCHAR(25) = '',
-	@Id_Cliente Varchar(25) = NULL 
 
- 
+-- --------------------------------------------------------------------------
+-- SECCIÓN 1: ALTERACIÓN Y CREACIÓN IDEMPOTENTE DE TABLAS (DDL)
+-- --------------------------------------------------------------------------
+-- ============================================================================
+-- AGENCIASNEW - ESTRUCTURA COMPLETA DE TABLAS EN MICROSOFT SQL SERVER
+-- Archivo: SQL/SqlServer/01_Tables.sql
+-- Motor: Microsoft SQL Server 2016+ (T-SQL)
+-- ============================================================================
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+
+-- 1. Role
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Role' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Role] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Role PRIMARY KEY,
+        [name] NVARCHAR(100) NOT NULL CONSTRAINT UQ_Role_Name UNIQUE,
+        [description] NVARCHAR(MAX) NULL,
+        [permissions] NVARCHAR(MAX) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Role_IsActive DEFAULT 1
+    );
+END;
+
+-- 2. TicketPrinter
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketPrinter' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TicketPrinter] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TicketPrinter PRIMARY KEY,
+        [code] NVARCHAR(50) NULL CONSTRAINT UQ_TicketPrinter_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [email] NVARCHAR(150) NULL,
+        [isActive] BIT NULL CONSTRAINT DF_TicketPrinter_IsActive DEFAULT 1
+    );
+END;
+
+-- 3. Branch
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Branch' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Branch] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Branch PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Branch_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [logo] VARBINARY(MAX) NULL,
+        [template] VARBINARY(MAX) NULL,
+        [templateConfig] NVARCHAR(MAX) NULL,
+        [htmlTemplate] NVARCHAR(MAX) NULL,
+        [resolutionId] INT NULL,
+        [invoiceTemplate] VARBINARY(MAX) NULL,
+        [invoiceTemplateConfig] NVARCHAR(MAX) NULL,
+        [invoiceHtmlTemplate] NVARCHAR(MAX) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Branch_IsActive DEFAULT 1
+    );
+END;
+
+-- 4. Implant
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Implant' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Implant] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Implant PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Implant_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [branchId] INT NULL CONSTRAINT FK_Implant_Branch REFERENCES dbo.[Branch]([id]),
+        [logo] VARBINARY(MAX) NULL,
+        [template] VARBINARY(MAX) NULL,
+        [templateConfig] NVARCHAR(MAX) NULL,
+        [htmlTemplate] NVARCHAR(MAX) NULL,
+        [resolutionId] INT NULL,
+        [invoiceTemplate] VARBINARY(MAX) NULL,
+        [invoiceTemplateConfig] NVARCHAR(MAX) NULL,
+        [invoiceHtmlTemplate] NVARCHAR(MAX) NULL,
+        [isActive] BIT NULL CONSTRAINT DF_Implant_IsActive DEFAULT 1
+    );
+END;
+
+-- 5. User
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'User' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[User] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_User PRIMARY KEY,
+        [name] NVARCHAR(150) NOT NULL,
+        [email] NVARCHAR(150) NOT NULL CONSTRAINT UQ_User_Email UNIQUE,
+        [passwordHash] NVARCHAR(255) NOT NULL,
+        [resetPasswordToken] NVARCHAR(255) NULL,
+        [resetPasswordExpires] DATETIME2 NULL,
+        [roleId] INT NOT NULL CONSTRAINT FK_User_Role REFERENCES dbo.[Role]([id]),
+        [branchId] INT NULL CONSTRAINT FK_User_Branch REFERENCES dbo.[Branch]([id]),
+        [implantId] INT NULL CONSTRAINT FK_User_Implant REFERENCES dbo.[Implant]([id]),
+        [ticketPrinterId] INT NULL CONSTRAINT FK_User_TicketPrinter REFERENCES dbo.[TicketPrinter]([id]),
+        [canEditReports] BIT NULL CONSTRAINT DF_User_CanEditReports DEFAULT 0,
+        [isActive] BIT NOT NULL CONSTRAINT DF_User_IsActive DEFAULT 1
+    );
+
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'UQ_User_ResetToken' AND object_id = OBJECT_ID('dbo.[User]'))
+    BEGIN
+        CREATE UNIQUE NONCLUSTERED INDEX UQ_User_ResetToken ON dbo.[User]([resetPasswordToken]) WHERE [resetPasswordToken] IS NOT NULL;
+    END;
+END;
+
+-- 6. Seller
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Seller' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Seller] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Seller PRIMARY KEY,
+        [code] NVARCHAR(50) NULL CONSTRAINT UQ_Seller_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [email] NVARCHAR(150) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Seller_IsActive DEFAULT 1
+    );
+END;
+
+-- 7. Client
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Client' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Client] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Client PRIMARY KEY,
+        [name] NVARCHAR(150) NOT NULL,
+        [document] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Client_Document UNIQUE,
+        [contactInfo] NVARCHAR(MAX) NULL,
+        [address] NVARCHAR(255) NULL,
+        [mandatoryVariables] NVARCHAR(MAX) NULL,
+        [sellerId] INT NULL CONSTRAINT FK_Client_Seller REFERENCES dbo.[Seller]([id]),
+        [isActive] BIT NOT NULL CONSTRAINT DF_Client_IsActive DEFAULT 1,
+        [creditDays] INT NULL CONSTRAINT DF_Client_CreditDays DEFAULT 0
+    );
+END;
+
+-- 8. ProviderType
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ProviderType' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ProviderType] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProviderType PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_ProviderType_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [isAirline] BIT NOT NULL CONSTRAINT DF_ProviderType_IsAirline DEFAULT 0,
+        [active] BIT NOT NULL CONSTRAINT DF_ProviderType_Active DEFAULT 1,
+        [isActive] BIT NOT NULL CONSTRAINT DF_ProviderType_IsActive DEFAULT 1,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_ProviderType_CreatedAt DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NULL CONSTRAINT DF_ProviderType_UpdatedAt DEFAULT GETDATE()
+    );
+END;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProviderType') AND name = 'isActive')
+BEGIN
+    ALTER TABLE dbo.[ProviderType] ADD [isActive] BIT NOT NULL CONSTRAINT DF_ProviderType_IsActive DEFAULT 1;
+END;
+
+-- 9. Provider
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Provider' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Provider] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Provider PRIMARY KEY,
+        [code] NVARCHAR(50) NULL CONSTRAINT UQ_Provider_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [contactInfo] NVARCHAR(MAX) NULL,
+        [commissionConfig] NVARCHAR(MAX) NULL,
+        [providerTypeId] INT NULL CONSTRAINT FK_Provider_ProviderType REFERENCES dbo.[ProviderType]([id]),
+        [airlineCode] NVARCHAR(10) NULL,
+        [sigla] NVARCHAR(10) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Provider_IsActive DEFAULT 1
+    );
+END;
+
+-- 10. Prestadora
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Prestadora' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Prestadora] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Prestadora PRIMARY KEY,
+        [name] NVARCHAR(150) NOT NULL,
+        [location] NVARCHAR(150) NULL,
+        [category] NVARCHAR(100) NULL,
+        [providerId] INT NULL CONSTRAINT FK_Prestadora_Provider REFERENCES dbo.[Provider]([id]),
+        [code] NVARCHAR(50) NULL CONSTRAINT UQ_Prestadora_Code UNIQUE,
+        [type] NVARCHAR(50) NULL,
+        [initials] NVARCHAR(50) NULL,
+        [nogds] NVARCHAR(50) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Prestadora_IsActive DEFAULT 1
+    );
+END;
+
+-- 11. TicketType
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TicketType' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TicketType] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TicketType PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_TicketType_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [isActive] BIT NULL CONSTRAINT DF_TicketType_IsActive DEFAULT 1
+    );
+END;
+
+-- 12. Product
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Product' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Product] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Product PRIMARY KEY,
+        [type] NVARCHAR(50) NOT NULL,
+        [description] NVARCHAR(MAX) NOT NULL,
+        [basePrice] FLOAT NOT NULL,
+        [cost] FLOAT NULL CONSTRAINT DF_Product_Cost DEFAULT 0,
+        [billingConcept] NVARCHAR(100) NULL,
+        [serviceType] NVARCHAR(100) NULL,
+        [code] NVARCHAR(50) NULL CONSTRAINT UQ_Product_Code UNIQUE,
+        [airlineItinerary] NVARCHAR(MAX) NULL,
+        [classItinerary] NVARCHAR(MAX) NULL,
+        [flightItinerary] NVARCHAR(MAX) NULL,
+        [ticketTypeId] INT NULL CONSTRAINT FK_Product_TicketType REFERENCES dbo.[TicketType]([id]),
+        [mandatoryFields] NVARCHAR(MAX) NULL,
+        [taxIds] NVARCHAR(MAX) NULL CONSTRAINT DF_Product_TaxIds DEFAULT '[]',
+        [isActive] BIT NOT NULL CONSTRAINT DF_Product_IsActive DEFAULT 1
+    );
+END;
+
+-- 13. Quotation
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Quotation' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Quotation] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Quotation PRIMARY KEY,
+        [internalNumber] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Quotation_InternalNumber UNIQUE,
+        [date] DATETIME2 NOT NULL CONSTRAINT DF_Quotation_Date DEFAULT GETDATE(),
+        [clientId] INT NOT NULL CONSTRAINT FK_Quotation_Client REFERENCES dbo.[Client]([id]),
+        [currency] NVARCHAR(10) NOT NULL,
+        [exchangeRate] FLOAT NOT NULL,
+        [branchId] INT NOT NULL CONSTRAINT FK_Quotation_Branch REFERENCES dbo.[Branch]([id]),
+        [implantId] INT NULL CONSTRAINT FK_Quotation_Implant REFERENCES dbo.[Implant]([id]),
+        [sellerId] INT NULL CONSTRAINT FK_Quotation_Seller REFERENCES dbo.[Seller]([id]),
+        [ticketPrinterId] INT NULL CONSTRAINT FK_Quotation_TicketPrinter REFERENCES dbo.[TicketPrinter]([id]),
+        [baseCommissionable] FLOAT NOT NULL,
+        [commissionPercentage] FLOAT NOT NULL,
+        [chargesAndTaxes] FLOAT NOT NULL,
+        [totalAmount] FLOAT NOT NULL,
+        [userId] INT NULL CONSTRAINT FK_Quotation_User REFERENCES dbo.[User]([id]),
+        [state] NVARCHAR(25) NULL CONSTRAINT DF_Quotation_State DEFAULT N'Nuevo',
+        [stateDescription] NVARCHAR(MAX) NULL,
+        [stateUpdatedAt] DATETIME2 NULL,
+        [costoTotal] FLOAT NULL CONSTRAINT DF_Quotation_CostoTotal DEFAULT 0,
+        [valorBase] FLOAT NULL CONSTRAINT DF_Quotation_ValorBase DEFAULT 0,
+        [utilidad] FLOAT NULL CONSTRAINT DF_Quotation_Utilidad DEFAULT 0,
+        [comisionTotalPercentage] FLOAT NULL CONSTRAINT DF_Quotation_ComisionTotalPct DEFAULT 0,
+        [comisionFreelancePercentage] FLOAT NULL CONSTRAINT DF_Quotation_ComisionFreelancePct DEFAULT 0,
+        [comisionFreelanceValue] FLOAT NULL CONSTRAINT DF_Quotation_ComisionFreelanceVal DEFAULT 0,
+        [comisionPropiaPercentage] FLOAT NULL CONSTRAINT DF_Quotation_ComisionPropiaPct DEFAULT 0,
+        [comisionPropiaValue] FLOAT NULL CONSTRAINT DF_Quotation_ComisionPropiaVal DEFAULT 0,
+        [comisionUtilidadPercentage] FLOAT NULL CONSTRAINT DF_Quotation_ComisionUtilidadPct DEFAULT 0,
+        [destination] NVARCHAR(255) NULL,
+        [startDate] DATETIME2 NULL,
+        [endDate] DATETIME2 NULL,
+        [passenger] NVARCHAR(255) NULL,
+        [paxAdults] INT NULL,
+        [paxChildren] INT NULL,
+        [reservationCode] NVARCHAR(255) NULL,
+        [copyFieldsToProducts] BIT NULL CONSTRAINT DF_Quotation_CopyFields DEFAULT 1,
+        [manualDescription] NVARCHAR(MAX) NULL
+    );
+END;
+
+-- 14. Currency
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Currency' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Currency] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Currency PRIMARY KEY,
+        [code] NVARCHAR(10) NOT NULL CONSTRAINT UQ_Currency_Code UNIQUE,
+        [name] NVARCHAR(100) NOT NULL,
+        [exchangeRate] FLOAT NOT NULL CONSTRAINT DF_Currency_ExchangeRate DEFAULT 1.0,
+        [decimals] INT NOT NULL CONSTRAINT DF_Currency_Decimals DEFAULT 2,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Currency_IsActive DEFAULT 1
+    );
+END;
+
+-- 15. SystemParameter
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SystemParameter' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[SystemParameter] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemParameter PRIMARY KEY,
+        [code] NVARCHAR(100) NOT NULL CONSTRAINT UQ_SystemParameter_Code UNIQUE,
+        [name] NVARCHAR(255) NOT NULL,
+        [value] NVARCHAR(MAX) NOT NULL
+    );
+END;
+
+-- 16. Menu
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Menu' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Menu] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Menu PRIMARY KEY,
+        [code] NVARCHAR(100) NOT NULL CONSTRAINT UQ_Menu_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [parent] INT NULL,
+        [action] NVARCHAR(255) NOT NULL,
+        [activo] BIT NULL CONSTRAINT DF_Menu_Activo DEFAULT 1
+    );
+END;
+
+-- 17. Master
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Master' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Master] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Master PRIMARY KEY,
+        [code] NVARCHAR(100) NOT NULL CONSTRAINT UQ_Master_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [inactivo] BIT NOT NULL CONSTRAINT DF_Master_Inactivo DEFAULT 0
+    );
+END;
+
+-- 18. ChargeAndTax
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChargeAndTax' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ChargeAndTax] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ChargeAndTax PRIMARY KEY,
+        [name] NVARCHAR(150) NOT NULL,
+        [type] NVARCHAR(50) NOT NULL,
+        [valueType] NVARCHAR(50) NOT NULL,
+        [value] FLOAT NOT NULL,
+        [isEditable] BIT NOT NULL CONSTRAINT DF_ChargeAndTax_IsEditable DEFAULT 1,
+        [code] NVARCHAR(50) NULL CONSTRAINT UQ_ChargeAndTax_Code UNIQUE,
+        [orden] INT NULL CONSTRAINT DF_ChargeAndTax_Orden DEFAULT 0,
+        [productIds] NVARCHAR(MAX) NULL CONSTRAINT DF_ChargeAndTax_ProductIds DEFAULT '[]',
+        [targetTaxId] INT NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_ChargeAndTax_IsActive DEFAULT 1
+    );
+END;
+
+-- 19. QuotationProduct
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationProduct' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationProduct] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationProduct PRIMARY KEY,
+        [quotationId] INT NOT NULL CONSTRAINT FK_QuotationProduct_Quotation REFERENCES dbo.[Quotation]([id]) ON DELETE CASCADE,
+        [productId] INT NOT NULL CONSTRAINT FK_QuotationProduct_Product REFERENCES dbo.[Product]([id]),
+        [quantity] INT NOT NULL,
+        [price] FLOAT NOT NULL,
+        [cost] FLOAT NULL CONSTRAINT DF_QuotationProduct_Cost DEFAULT 0,
+        [providerId] INT NULL CONSTRAINT FK_QuotationProduct_Provider REFERENCES dbo.[Provider]([id]),
+        [prestadoraId] INT NULL CONSTRAINT FK_QuotationProduct_Prestadora REFERENCES dbo.[Prestadora]([id]),
+        [checkInDate] DATETIME2 NULL,
+        [checkOutDate] DATETIME2 NULL,
+        [nights] INT NULL,
+        [paxAdults] INT NULL,
+        [paxChildren] INT NULL,
+        [serviceType] NVARCHAR(100) NULL,
+        [destination] NVARCHAR(255) NULL,
+        [reservationCode] NVARCHAR(100) NULL,
+        [sellerCommission] FLOAT NULL,
+        [ticketPrinterCommission] FLOAT NULL,
+        [comboId] INT NULL,
+        [mainTaxId] INT NULL,
+        [inNationality] INT NULL CONSTRAINT DF_QuotationProduct_InNationality DEFAULT 1,
+        [service] NVARCHAR(MAX) NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [servicios] NVARCHAR(MAX) NULL,
+        [descripcion] NVARCHAR(MAX) NULL,
+        [passenger] NVARCHAR(255) NULL
+    );
+END;
+
+-- 20. Invoices
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Invoices' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Invoices] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Invoices PRIMARY KEY,
+        [internalNumber] NVARCHAR(100) NOT NULL CONSTRAINT UQ_Invoices_InternalNumber UNIQUE,
+        [date] DATETIME2 NOT NULL CONSTRAINT DF_Invoices_Date DEFAULT GETDATE(),
+        [clientId] INT NOT NULL,
+        [currency] NVARCHAR(10) NOT NULL,
+        [exchangeRate] FLOAT NOT NULL,
+        [branchId] INT NOT NULL,
+        [implantId] INT NULL,
+        [sellerId] INT NULL,
+        [ticketPrinterId] INT NULL,
+        [baseCommissionable] FLOAT NOT NULL,
+        [commissionPercentage] FLOAT NOT NULL,
+        [chargesAndTaxes] FLOAT NOT NULL,
+        [totalAmount] FLOAT NOT NULL,
+        [userId] INT NULL,
+        [state] NVARCHAR(25) NULL CONSTRAINT DF_Invoices_State DEFAULT N'NUEVO',
+        [fuente] NVARCHAR(50) NULL,
+        [serie] NVARCHAR(50) NULL,
+        [consecutivo] NVARCHAR(50) NULL,
+        [dueDate] DATETIME2 NULL
+    );
+END;
+
+-- 21. Countries
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Countries' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Countries] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Countries PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Countries_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [dane] NVARCHAR(50) NULL,
+        [region] NVARCHAR(100) NULL,
+        [prefix] NVARCHAR(20) NULL,
+        [currencyId] INT NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Countries_IsActive DEFAULT 1
+    );
+END;
+
+-- 22. Cities
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Cities' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Cities] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Cities PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Cities_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [countriesId] INT NULL CONSTRAINT FK_Cities_Countries REFERENCES dbo.[Countries]([id]),
+        [statecode] NVARCHAR(50) NULL,
+        [iata] NVARCHAR(20) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Cities_IsActive DEFAULT 1
+    );
+END;
+
+-- 23. Airports
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Airports' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Airports] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Airports PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Airports_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [citiesId] INT NULL CONSTRAINT FK_Airports_Cities REFERENCES dbo.[Cities]([id]),
+        [isActive] BIT NOT NULL CONSTRAINT DF_Airports_IsActive DEFAULT 1
+    );
+END;
+
+-- 24. CreditCard
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CreditCard' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CreditCard] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CreditCard PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_CreditCard_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [type] NVARCHAR(50) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_CreditCard_IsActive DEFAULT 1
+    );
+END;
+
+-- 25. MasterVariable
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'MasterVariable' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[MasterVariable] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_MasterVariable PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_MasterVariable_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [isForAllClients] BIT NOT NULL CONSTRAINT DF_MasterVariable_IsForAll DEFAULT 0,
+        [isActive] BIT NOT NULL CONSTRAINT DF_MasterVariable_IsActive DEFAULT 1
+    );
+END;
+
+-- 26. Resolution
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Resolution' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Resolution] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Resolution PRIMARY KEY,
+        [code] NVARCHAR(50) NULL,
+        [resolutionNumber] NVARCHAR(100) NOT NULL,
+        [resolutionDate] DATETIME2 NULL,
+        [prefix] NVARCHAR(20) NULL,
+        [fromNumber] INT NULL,
+        [toNumber] INT NULL,
+        [currentNumber] INT NULL,
+        [validFrom] DATETIME2 NULL,
+        [validTo] DATETIME2 NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Resolution_IsActive DEFAULT 1
+    );
+END;
+
+-- 27. DocumentResolution
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DocumentResolution' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[DocumentResolution] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_DocumentResolution PRIMARY KEY,
+        [documentType] NVARCHAR(50) NOT NULL,
+        [resolutionNumber] NVARCHAR(100) NOT NULL,
+        [prefix] NVARCHAR(20) NULL,
+        [fromNumber] INT NULL,
+        [toNumber] INT NULL,
+        [currentNumber] INT NULL,
+        [validFrom] DATETIME2 NULL,
+        [validTo] DATETIME2 NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_DocumentResolution_IsActive DEFAULT 1
+    );
+END;
+
+-- 28. SysConsecutivo
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SysConsecutivo' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[SysConsecutivo] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SysConsecutivo PRIMARY KEY,
+        [codigo] NVARCHAR(50) NOT NULL,
+        [nombre] NVARCHAR(150) NULL,
+        [branchId] INT NULL,
+        [implantId] INT NULL,
+        [fuente] NVARCHAR(50) NULL,
+        [serie] NVARCHAR(50) NULL,
+        [consecutivo] INT NOT NULL CONSTRAINT DF_SysConsecutivo_Num DEFAULT 1,
+        [isActive] BIT NOT NULL CONSTRAINT DF_SysConsecutivo_IsActive DEFAULT 1
+    );
+END;
+
+-- 29. TransactionConsecutive
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TransactionConsecutive' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TransactionConsecutive] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TransactionConsecutive PRIMARY KEY,
+        [transactionType] NVARCHAR(50) NOT NULL,
+        [description] NVARCHAR(150) NULL,
+        [prefix] NVARCHAR(20) NULL,
+        [initialNumber] INT NOT NULL CONSTRAINT DF_TxCons_Init DEFAULT 1,
+        [currentNumber] INT NOT NULL CONSTRAINT DF_TxCons_Curr DEFAULT 1,
+        [branchId] INT NULL,
+        [implantId] INT NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_TransactionConsecutive_IsActive DEFAULT 1
+    );
+END;
+
+-- 30. Equivalence
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Equivalence' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Equivalence] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Equivalence PRIMARY KEY,
+        [category] NVARCHAR(50) NOT NULL,
+        [sourceCode] NVARCHAR(50) NOT NULL,
+        [targetCode] NVARCHAR(50) NOT NULL,
+        [description] NVARCHAR(150) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Equivalence_IsActive DEFAULT 1
+    );
+END;
+
+-- 31. ExecutionProcedure
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ExecutionProcedure' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ExecutionProcedure] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ExecutionProcedure PRIMARY KEY,
+        [name] NVARCHAR(150) NOT NULL,
+        [spName] NVARCHAR(150) NOT NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [parameters] NVARCHAR(MAX) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_ExecutionProcedure_IsActive DEFAULT 1
+    );
+END;
+
+-- 32. ExecutionPreset
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ExecutionPreset' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ExecutionPreset] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ExecutionPreset PRIMARY KEY,
+        [procedureId] INT NOT NULL CONSTRAINT FK_ExecutionPreset_Procedure REFERENCES dbo.[ExecutionProcedure]([id]),
+        [name] NVARCHAR(150) NOT NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [filterValues] NVARCHAR(MAX) NULL,
+        [filterConfig] NVARCHAR(MAX) NULL,
+        [columnConfigs] NVARCHAR(MAX) NULL,
+        [selectedTotals] NVARCHAR(MAX) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_ExecutionPreset_IsActive DEFAULT 1
+    );
+END;
+
+-- 33. Payment
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Payment' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Payment] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Payment PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Payment_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_Payment_IsActive DEFAULT 1
+    );
+END;
+
+PRINT 'Tablas de la base de datos SQL Server estructuradas exitosamente.';
+
+
+GO
+
+-- --------------------------------------------------------------------------
+-- SECCIÓN 2: INYECCIÓN Y PRESERVACIÓN DE SEMILLAS Y PARÁMETROS
+-- --------------------------------------------------------------------------
+-- ============================================================================
+-- AGENCIASNEW - SEMILLAS MAESTRAS E INICIALES PARA BASE EN BLANCO (SQL SERVER)
+-- Archivo: SQL/SqlServer/02_Seeds.sql
+-- Motor: Microsoft SQL Server 2016+ (T-SQL)
+-- ============================================================================
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+
+-- 1. Roles Iniciales
+IF NOT EXISTS (SELECT 1 FROM dbo.[Role] WHERE [name] = N'SUPERADMINISTRADOR' OR UPPER([name]) LIKE '%SUPERADMIN%')
+BEGIN
+    INSERT INTO dbo.[Role] ([name], [description], [permissions], [isActive])
+    VALUES (N'SUPERADMINISTRADOR', N'Super Administrador de la plataforma con privilegios de gestión de módulos del sitio y asignación de superadministradores', N'{"all": true, "superadmin": true}', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Role] WHERE [name] = N'Administrador')
+BEGIN
+    INSERT INTO dbo.[Role] ([name], [description], [permissions], [isActive])
+    VALUES (N'Administrador', N'Rol administrador de la plataforma', N'{"all": true}', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Role] WHERE [name] = N'Agente')
+BEGIN
+    INSERT INTO dbo.[Role] ([name], [description], [permissions], [isActive])
+    VALUES (N'Agente', N'Rol de agente de ventas y cotizaciones', N'{"quotations": true}', 1);
+END;
+
+-- 2. Parámetros del Sistema Requeridos
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'ServidorSQLServer')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ServidorSQLServer', N'Host de SQL Server', N'127.0.0.1');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'BaseSQLServer')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'BaseSQLServer', N'Base de Datos SQL Server', N'Korex_colaereo');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'UsuarioSQLServer')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'UsuarioSQLServer', N'Usuario SQL Server', N'sa');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'ClaveSQLServer')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ClaveSQLServer', N'Contraseña SQL Server', N'zzeusagencias');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'PuertoSQLServer')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'PuertoSQLServer', N'Puerto SQL Server', N'1433');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'EnviarCotizacionesAutoSQLserver')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarCotizacionesAutoSQLserver', N'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', N'1');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'EnviarFacturacionAutoSQLserver')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarFacturacionAutoSQLserver', N'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', N'1');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'ModoFacturacionAuto')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ModoFacturacionAuto', N'Modo de Facturación Automática (Zeus/Local)', N'FALSE');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'AGENCY_NAME')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'AGENCY_NAME', N'Nombre o Razón Social de la Agencia', N'');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'AGENCY_NIT')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'AGENCY_NIT', N'NIT de la Agencia', N'');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'TASA_CAMBIO_IATA')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'TASA_CAMBIO_IATA', N'Tasa de Cambio IATA', N'4200.00');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'TARIFA_ADMIN_OW')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'TARIFA_ADMIN_OW', N'Tarifa Administrativa Nacional One Way', N'29100');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'TARIFA_ADMIN_RT')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'TARIFA_ADMIN_RT', N'Tarifa Administrativa Nacional Roundtrip', N'52800');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'PRODUCTO_TARIFA_ADMINISTRATIVA')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'PRODUCTO_TARIFA_ADMINISTRATIVA', N'Producto por Defecto para Tarifa Administrativa', N'77');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'TARIFA_ADMIN_INT_RANGES')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'TARIFA_ADMIN_INT_RANGES', N'Rangos Tarifa Administrativa Internacional (JSON)', N'[{"min":0,"max":354,"feeUsd":15,"label":"Menores o iguales a USD 354"},{"min":354.01,"max":590,"feeUsd":28,"label":"Mayores de USD 354 hasta USD 590"},{"min":590.01,"max":944,"feeUsd":46,"label":"Mayores de USD 590 hasta USD 944"},{"min":944.01,"max":999999,"feeUsd":95,"label":"Mayores de USD 944"}]');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'PRODUCTO_RESERVA_GDS')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'PRODUCTO_RESERVA_GDS', N'Producto por Defecto para Reservas GDS', N'TAN');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'LICENSE_KEY')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'LICENSE_KEY', N'Clave de Licencia del Sistema', N'');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'LICENSE_EXPIRATION_DATE')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'LICENSE_EXPIRATION_DATE', N'Fecha de Expiración de Licencia', N'');
+END;
+
+
+-- 3. Módulos de Menú de Navegación
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'quotations')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'quotations', N'Cotizaciones', N'/dashboard/quotations', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'invoices')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'invoices', N'Facturación', N'/dashboard/invoices', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'prequotations')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'prequotations', N'Pre-Cotizaciones', N'/dashboard/prequotations', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'executions')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'executions', N'Ejecuciones', N'/dashboard/executions', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'reports')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'reports', N'Reportes', N'/dashboard/reports', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'settings')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'settings', N'Configuración', N'/dashboard/settings', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'manual')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'manual', N'Manual Operativo', N'/dashboard/manual', 1);
+END;
+
+
+-- 4. Tablas Maestras del Sitio (Master)
+DECLARE @masters TABLE (code NVARCHAR(100), name NVARCHAR(255));
+INSERT INTO @masters (code, name) VALUES
+(N'Equivalences', N'equivalencias'),
+(N'Diagnostics', N'diagnostico'),
+(N'SystemParameter', N'parametros'),
+(N'User', N'usuarios'),
+(N'Branch', N'sucursales'),
+(N'Implant', N'implantes'),
+(N'ChargeAndTax', N'impuestos'),
+(N'Seller', N'vendedores'),
+(N'TicketPrinter', N'tiqueteadores'),
+(N'Prestadora', N'prestadoras'),
+(N'Client', N'clientes'),
+(N'Provider', N'proveedores'),
+(N'ProviderType', N'tipos-proveedores'),
+(N'Product', N'productos'),
+(N'MasterVariable', N'variables'),
+(N'Combo', N'combos'),
+(N'SystemLog', N'logs'),
+(N'Currency', N'monedas'),
+(N'InterfaceExtractParam', N'extraccion-interfaces'),
+(N'DocumentResolution', N'resoluciones-documentos'),
+(N'TransactionConsecutive', N'consecutivos-transacciones'),
+(N'CreditCard', N'tarjetas-credito'),
+(N'Payment', N'formas-pago'),
+(N'Countries', N'paises'),
+(N'Cities', N'ciudades'),
+(N'Airports', N'aeropuertos'),
+(N'TicketType', N'tipos-tiquetes'),
+(N'QuotationState', N'estados-cotizacion'),
+(N'QuotationFormat', N'formatos-cotizacion');
+
+INSERT INTO dbo.[Master] ([code], [name], [inactivo])
+SELECT m.code, m.name, 0
+FROM @masters m
+WHERE NOT EXISTS (SELECT 1 FROM dbo.[Master] target WHERE target.code = m.code);
+
+
+-- 5. Monedas por Defecto
+IF NOT EXISTS (SELECT 1 FROM dbo.[Currency] WHERE [code] = N'COP')
+BEGIN
+    INSERT INTO dbo.[Currency] ([code], [name], [exchangeRate], [decimals], [isActive])
+    VALUES (N'COP', N'Peso Colombiano', 1.0, 0, 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[Currency] WHERE [code] = N'USD')
+BEGIN
+    INSERT INTO dbo.[Currency] ([code], [name], [exchangeRate], [decimals], [isActive])
+    VALUES (N'USD', N'Dólar Estadounidense', 4200.0, 2, 1);
+END;
+
+
+-- 6. Usuarios Iniciales de Administración
+DECLARE @SuperAdminRoleId INT;
+SELECT TOP 1 @SuperAdminRoleId = [id] FROM dbo.[Role] WHERE UPPER([name]) LIKE '%SUPERADMIN%';
+IF @SuperAdminRoleId IS NULL
+    SET @SuperAdminRoleId = 1;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE [email] = N'ebarrera@zagencias.com')
+BEGIN
+    INSERT INTO dbo.[User] ([name], [email], [passwordHash], [roleId], [isActive])
+    VALUES (N'Eduardo Barrera', N'ebarrera@zagencias.com', N'$2b$10$e1v0/9V8ZPVqejcqarQfq.hDLlKuva.M/mNsSUxOTefeyuUTqoaW2', @SuperAdminRoleId, 1);
+END
+ELSE
+BEGIN
+    UPDATE dbo.[User] SET [roleId] = @SuperAdminRoleId WHERE [email] = N'ebarrera@zagencias.com';
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE [email] = N'rubiel1985@msn.com')
+BEGIN
+    INSERT INTO dbo.[User] ([name], [email], [passwordHash], [roleId], [isActive])
+    VALUES (N'Rubiel', N'rubiel1985@msn.com', N'$2b$10$e1v0/9V8ZPVqejcqarQfq.hDLlKuva.M/mNsSUxOTefeyuUTqoaW2', 1, 1);
+END;
+
+PRINT 'Semillas iniciales inyectadas exitosamente.';
+
+-- ============================================================================
+-- 7. MAESTROS GLOBALES (Países, Ciudades, Aeropuertos, Formas de Pago)
+-- ============================================================================
+
+-- 7.1 Países (194 registros)
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CO', N'Colombia', N'169', N'LA', N'57', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'US') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'US', N'Estados Unidos', N'249', N'NA', N'1', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ES') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ES', N'España', N'245', N'EUR', N'34', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'DZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'DZ', N'Algeria', N'059', N'AFR', N'213', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'DK') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'DK', N'Denmark', N'232', N'EUR', N'45', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CI', N'Cote d Ivoire', N'193', N'AFR', N'225', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SA', N'Saudi Arabia', N'053', N'MEA', N'966', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NG', N'Nigeria', N'528', N'AFR', N'234', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AU', N'Australia', N'069', N'PAC', N'61', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GB') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GB', N'United Kingdom', N'628', N'EUR', N'44', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MX') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MX', N'Mexico', N'493', N'LA', N'52', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GH') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GH', N'Ghana', N'289', N'AFR', N'233', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TR', N'Turkey', N'827', N'ASI', N'90', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ET') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ET', N'Ethiopia', N'253', N'AFR', N'251', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'YE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'YE', N'Yemen', N'880', N'MEA', N'967', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AR', N'Argentina', N'063', N'LA', N'54', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'RU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'RU', N'Russian Federation', N'670', N'EUR', N'7', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NO', N'Norway', N'538', N'EUR', N'47', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'IS') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'IS', N'Iceland', N'379', N'EUR', N'354', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MA', N'Morocco', N'474', N'AFR', N'212', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'DE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'DE', N'Germany', N'023', N'EUR', N'49', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'FR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'FR', N'France', N'275', N'EUR', N'33', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SE', N'Sweden', N'764', N'EUR', N'46', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'IN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'IN', N'India', N'361', N'ASI', N'91', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ID') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ID', N'Indonesia', N'365', N'ASI', N'62', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'IT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'IT', N'Italy', N'386', N'EUR', N'39', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CK') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CK', N'Cook Islands', N'183', N'PAC', N'682', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BR', N'Brazil', N'105', N'LA', N'55', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NZ', N'New Zealand', N'548', N'PAC', N'64', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KZ', N'Kazakstan', N'406', N'ASI', N'7', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ZA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ZA', N'South Africa', N'756', N'AFR', N'27', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SY', N'Syrian Arab Republic', N'744', N'MEA', N'963', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AD') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AD', N'Andorra', N'037', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'EG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'EG', N'Egypt', N'240', N'MEA', N'20', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'JO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'JO', N'Jordan', N'403', N'MEA', N'962', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NL') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NL', N'Netherlands', N'573', N'EUR', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CL') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CL', N'Chile', N'211', N'LA', N'56', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BE', N'Belgium', N'087', N'EUR', N'32', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AG', N'Antigua and Barbuda', N'043', N'CAR', N'1268', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MY', N'Malaysia', N'455', N'ASI', N'60', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MZ', N'Mozambique', N'505', N'AFR', N'258', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'WS') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'WS', N'Samoa', N'687', N'PAC', N'685', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PE', N'Peru', N'589', N'LA', N'51', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'JP') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'JP', N'Japan', N'399', N'ASI', N'81', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ER') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ER', N'Eritrea', N'243', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PY', N'Paraguay', N'586', N'LA', N'595', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BS') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BS', N'Bahamas', N'077', N'CAR', N'1242', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GR', N'Greece', N'301', N'EUR', N'30', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AW', N'Aruba', N'027', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AE', N'United Arab Emirates', N'244', N'MEA', N'971', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PF') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PF', N'French Polynesia', N'599', N'PAC', N'689', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CU', N'Cuba', N'199', N'CAR', N'53', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AI', N'Anguilla', N'041', N'CAR', N'1264', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PH') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PH', N'Philippines', N'267', N'ASI', N'63', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BH') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BH', N'Bahrain', N'080', N'ASI', N'973', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AZ', N'Azerbaijan', N'074', N'ASI', N'994', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BW', N'Botswana', N'101', N'AFR', N'267', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'RO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'RO', N'Romania', N'670', N'EUR', N'40', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BM', N'Bermuda', N'090', N'CAR', N'1441', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'YU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'YU', N'Yugoslavia', N'885', N'EUR', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LB') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LB', N'Lebanon', N'431', N'MEA', N'961', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'FJ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'FJ', N'Fiji', N'870', N'PAC', N'679', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CF') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CF', N'Central African Republic', N'640', N'AFR', N'236', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BB') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BB', N'Barbados', N'083', N'CAR', N'1246', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'IQ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'IQ', N'Iraq', N'369', N'MEA', N'964', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CN', N'China', N'215', N'ASI', N'86', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MH') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MH', N'Marshall Islands', N'472', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GM', N'Gambia', N'285', N'AFR', N'220', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BI', N'Burundi', N'115', N'AFR', N'257', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TH') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TH', N'Thailand', N'776', N'ASI', N'66', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ML') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ML', N'Mali', N'464', N'AFR', N'223', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'VE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'VE', N'Venezuela', N'850', N'LA', N'58', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MW', N'Malawi', N'458', N'AFR', N'265', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AN', N'Netherlands Antilles', N'047', N'CAR', N'31', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CH') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CH', N'Switzerland', N'767', N'EUR', N'41', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CZ', N'Czech Republic', N'644', N'EUR', N'420', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'DO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'DO', N'Dominican Republic', N'647', N'CAR', N'1089', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SK') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SK', N'Slovakia', N'246', N'EUR', N'421', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'HU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'HU', N'Hungary', N'355', N'EUR', N'36', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ZW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ZW', N'Zimbabwe', N'665', N'AFR', N'263', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CV') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CV', N'Cape Verde', N'127', N'AFR', N'238', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BN', N'Brunei Darussalam', N'108', N'ASI', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BZ', N'Belize', N'088', N'LA', N'501', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CG', N'Congo', N'177', N'AFR', N'242', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BO', N'Bolivia', N'097', N'LA', N'591', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'HT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'HT', N'Haiti', N'341', N'CAR', N'509', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GF') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GF', N'French Guiana', N'325', N'LA', N'594', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PT', N'Portugal', N'607', N'EUR', N'351', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GP') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GP', N'Guadeloupe', N'309', N'CAR', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'IE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'IE', N'Ireland', N'375', N'EUR', N'353', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BD') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BD', N'Bangladesh', N'081', N'ASI', N'880', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PA', N'Panama', N'580', N'LA', N'507', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KR', N'Korea, Republic Of', N'190', N'ASI', N'82', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GN', N'Guinea', N'329', N'AFR', N'224', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LK') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LK', N'Sri Lanka', N'750', N'ASI', N'94', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BJ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BJ', N'Benin', N'229', N'AFR', N'229', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'EC') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'EC', N'Ecuador', N'239', N'LA', N'593', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CA', N'Canada', N'149', N'NA', N'1', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KY', N'Cayman Islands', N'137', N'CAR', N'1345', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'UY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'UY', N'Uruguay', N'845', N'LA', N'598', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TZ', N'Tanzania, United Republic Of', N'780', N'AFR', N'255', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'HR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'HR', N'Croatia', N'198', N'EUR', N'385', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'DM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'DM', N'Dominica', N'235', N'CAR', N'1767', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TN', N'Tunisia', N'820', N'AFR', N'216', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SN', N'Senegal', N'728', N'AFR', N'221', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CM', N'Cameroon', N'145', N'AFR', N'237', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'VN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'VN', N'Vietnam', N'855', N'ASI', N'84', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'QA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'QA', N'Qatar', N'618', N'MEA', N'974', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'UG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'UG', N'Uganda', N'833', N'AFR', N'256', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CY', N'Cyprus', N'221', N'EUR', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'VG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'VG', N'Virgin Islands, British', N'863', N'CAR', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NA', N'Namibia', N'507', N'AFR', N'264', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'IL') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'IL', N'Israel', N'383', N'MEA', N'972', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CD') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CD', N'Congo, The Democratic Republic Of', N'NULL', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MQ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MQ', N'Martinique', N'477', N'CAR', N'33', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SL') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SL', N'Sierra Leone', N'735', N'AFR', N'232', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GT', N'Guatemala', N'317', N'CAR', N'502', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PL') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PL', N'Poland', N'603', N'EUR', N'48', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TC') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TC', N'Turks and Caicos Islands', N'823', N'CAR', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NC') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NC', N'New Caledonia', N'542', N'PAC', N'687', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GI', N'Gibraltar', N'293', N'EUR', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PG', N'Papua New Guinea', N'545', N'PAC', N'675', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GL') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GL', N'Greenland', N'305', N'NA', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AT', N'Austria', N'072', N'EUR', N'43', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GU', N'Guam', N'313', N'PAC', N'671', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MT', N'Malta', N'467', N'EUR', N'356', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KM', N'Comoros', N'173', N'AFR', N'269', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TW', N'Taiwan, Province of China', N'218', N'ASI', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PK') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PK', N'Pakistan', N'576', N'ASI', N'92', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'FI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'FI', N'Finland', N'271', N'EUR', N'358', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SB') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SB', N'Solomon Islands', N'677', N'PAC', N'677', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'HK') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'HK', N'Hong Kong', N'351', N'ASI', N'852', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'UA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'UA', N'Ukraine', N'830', N'EUR', N'380', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NU', N'Niue', N'531', N'PAC', N'683', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'DJ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'DJ', N'Djibouti', N'NULL', N'AFR', N'253', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'RW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'RW', N'Rwanda', N'675', N'AFR', N'250', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'JM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'JM', N'Jamaica', N'391', N'CAR', N'1876', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SD') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SD', N'Sudan', N'759', N'AFR', N'249', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NP') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NP', N'Nepal', N'517', N'ASI', N'977', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LT', N'Lithuania', N'443', N'EUR', N'9876', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KW', N'Kuwait', N'413', N'MEA', N'965', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AO', N'Angola', N'040', N'AFR', N'244', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GA', N'Gabon', N'281', N'AFR', N'241', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TG', N'Togo', N'800', N'AFR', N'228', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'CR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'CR', N'Costa Rica', N'196', N'LA', N'506', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SI', N'Slovenia', N'247', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ZM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ZM', N'Zambia', N'890', N'AFR', N'260', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LU', N'Luxembourg', N'445', N'EUR', N'352', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KE', N'Kenya', N'410', N'AFR', N'254', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MC') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MC', N'Monaco', N'498', N'EUR', N'377', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'OM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'OM', N'Oman', N'556', N'MEA', N'968', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MO', N'Macau', N'447', N'ASI', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NI', N'Nicaragua', N'521', N'LA', N'505', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MV') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MV', N'Maldives', N'461', N'ASI', N'960', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LR', N'Liberia', N'434', N'AFR', N'231', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KI') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KI', N'Kiribati', N'411', N'PAC', N'686', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MU', N'Mauritius', N'485', N'AFR', N'230', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BY', N'Belarus', N'091', N'EUR', N'375', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LS') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LS', N'Lesotho', N'426', N'AFR', N'266', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SZ', N'Swaziland', N'773', N'AFR', N'268', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MR', N'Mauritania', N'488', N'AFR', N'222', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TD') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TD', N'Chad', N'203', N'AFR', N'235', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KN', N'Saint Kitts and Nevis', N'695', N'CAR', N'1869', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'NE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'NE', N'Niger', N'525', N'AFR', N'227', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BF') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BF', N'Burkina Faso', N'031', N'AFR', N'226', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GW', N'Guinea-Bissau', N'334', N'AFR', N'245', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SR', N'Suriname', N'770', N'LA', N'597', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'KH') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'KH', N'Cambodia', N'141', N'ASI', N'855', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TT') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TT', N'Trinidad and Tobago', N'815', N'CAR', N'1868', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AS') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AS', N'American Samoa', N'690', N'PAC', N'1684', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MM') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MM', N'Myanmar', N'093', N'ASI', N'95', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LV') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LV', N'Latvia', N'429', N'EUR', N'371', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MP') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MP', N'Northern Mariana Islands', N'NULL', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'PW') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'PW', N'Palau', N'578', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'HN') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'HN', N'Honduras', N'345', N'LA', N'504', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'RE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'RE', N'Reunion', N'660', N'AFR', N'33', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SV') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SV', N'El Salvador', N'242', N'LA', N'503', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SC') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SC', N'Seychelles', N'731', N'AFR', N'248', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'SG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'SG', N'Singapore', N'741', N'ASI', N'65', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BA', N'Bosnia and Herzegovina', N'029', N'EUR', N'387', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MK') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MK', N'Macedonia, The Former Yugoslav Republic of', N'448', N'NULL', N'NULL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'BG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'BG', N'Bulgaria', N'111', N'EUR', N'359', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'UZ') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'UZ', N'Uzbekistan', N'847', N'ASI', N'998', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'GE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'GE', N'Georgia', N'287', N'ASI', N'995', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'TO') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'TO', N'Tonga', N'810', N'PAC', N'676', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'IR') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'IR', N'Iran, Islamic Republic Of', N'372', N'MEA', N'98', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'AL') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'AL', N'Albania', N'017', N'EUR', N'355', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'EE') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'EE', N'Estonia', N'251', N'EUR', N'372', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'MG') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'MG', N'Madagascar', N'450', N'AFR', N'261', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LY') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LY', N'Libyan Arab Jamahiriya', N'438', N'AFR', N'218', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'VC') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'VC', N'Saint Vincent and The Grenadines', N'705', N'CAR', N'1784', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'VU') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'VU', N'Vanuatu', N'551', N'PAC', N'678', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'LA') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'LA', N'Lao People s Democratic Republic', N'420', N'ASI', N'856', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Countries] WHERE [code] = N'ST') INSERT INTO dbo.[Countries] ([code], [name], [dane], [region], [prefix], [isActive]) VALUES (N'ST', N'STONIA', N'251', N'AFR', N'239', 1);
+
+-- 7.2 Ciudades (297 registros)
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BOG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BOG', N'Bogotá', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CO'), N'CUN', N'BOG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MDE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MDE', N'Medellín', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CO'), N'ANT', N'MDE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MIA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MIA', N'Miami', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'FL', N'MIA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MAD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MAD', N'Madrid', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'MAD', N'MAD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HOU') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HOU', N'Houston', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'HOU', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ANC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ANC', N'Anchorage', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'ANC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LIM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LIM', N'Lima', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'LIM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DEN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DEN', N'Denver', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'DEN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ATL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ATL', N'Atlanta', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'ATL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CMH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CMH', N'Columbus', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'CMH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BOL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BOL', N'Hartford', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'BOL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SEA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SEA', N'Seattle', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'SEA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CLE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CLE', N'Cleveland', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'CLE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BNA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BNA', N'Nashville', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'BNA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BOS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BOS', N'Boston', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'BOS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BUF') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BUF', N'Buffalo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'BUF', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BWI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BWI', N'Baltimore', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'BWI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CHI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CHI', N'Chicago', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'CHI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CHS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CHS', N'Charleston', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'CHS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DFW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DFW', N'Dallas', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'DFW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DAY') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DAY', N'Dayton', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'DAY', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DUB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DUB', N'Dublin', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'DUB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DTT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DTT', N'Detroit', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'DTT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'EWR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'EWR', N'Newark', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'EWR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GEO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GEO', N'Georgetown', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'GEO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GLA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GLA', N'Glasgow', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'GLA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HNL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HNL', N'Honolulu', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'HNL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LAX') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LAX', N'Los Angeles', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'LAX', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SFO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SFO', N'San Francisco', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'SFO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NYC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NYC', N'New York', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'NYC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LAS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LAS', N'Las Vegas', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'LAS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LGB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LGB', N'Long Beach', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'LGB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ORL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ORL', N'Orlando', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'ORL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MEM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MEM', N'Memphis', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'MEM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MKE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MKE', N'Milwaukee', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'MKE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MSP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MSP', N'Minneapolis', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'MSP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MSY') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MSY', N'New Orleans', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'MSY', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SAN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SAN', N'San Diego', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'SAN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NOR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NOR', N'Norfolk', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'NOR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PDX') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PDX', N'Portland', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'PDX', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PHX') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PHX', N'Phoenix', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'PHX', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'RDU') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'RDU', N'Raleigh', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'RDU', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'RIC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'RIC', N'Richmond', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'RIC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ROC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ROC', N'Rochester', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'ROC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SAI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SAI', N'San Antonio', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'SAI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SAV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SAV', N'Savannah', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'SAV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SLC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SLC', N'Salt Lake City', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'SLC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TPA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TPA', N'Tampa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'TPA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TUS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TUS', N'Tucson', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'TUS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YYJ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YYJ', N'Victoria', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'YYJ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'VAP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'VAP', N'Valparaiso', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'US'), N'', N'VAP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ABJ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ABJ', N'Abidjan', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CI'), N'null', N'ABJ', 0);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DHA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DHA', N'Dhahran', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SA'), N'', N'DHA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'RUH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'RUH', N'Riyadh', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SA'), N'', N'RUH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'JED') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'JED', N'Jeddah', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SA'), N'', N'JED', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KAN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KAN', N'Kano', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NG'), N'', N'KAN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LOS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LOS', N'Lagos', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NG'), N'', N'LOS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SYD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SYD', N'Sydney', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AU'), N'', N'SYD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MEL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MEL', N'Melbourne', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AU'), N'', N'MEL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ROM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ROM', N'Roma', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AU'), N'', N'ROM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PER') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PER', N'Perth', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AU'), N'', N'PER', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CNS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CNS', N'Cairns', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AU'), N'', N'CNS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HBA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HBA', N'Hobart', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AU'), N'', N'HBA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BHD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BHD', N'Belfast', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GB'), N'', N'BHD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MME') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MME', N'Teesside', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GB'), N'', N'MME', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LBA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LBA', N'Leeds', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GB'), N'', N'LBA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LPB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LPB', N'La Paz', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'LPB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MID') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MID', N'Merida', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'MID', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MZT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MZT', N'Mazatlan', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'MZT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MTY') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MTY', N'Monterrey', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'MTY', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PVR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PVR', N'Puerto Vallarta', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'PVR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'VER') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'VER', N'Veracruz', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'VER', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TAM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TAM', N'Tampico', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'TAM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GYM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GYM', N'Guaymas', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'GYM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GDL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GDL', N'Guadalajara', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'GDL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CUN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CUN', N'Cancun', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'CUN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CZM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CZM', N'Cozumel', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MX'), N'', N'CZM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ACC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ACC', N'Accra', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GH'), N'', N'ACC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ALC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ALC', N'Alicante', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'ALC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AGP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AGP', N'Malaga', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'AGP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BCN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BCN', N'Barcelona', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'BCN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BIO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BIO', N'Bilbao', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'BIO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GND') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GND', N'Granada', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'GND', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'IBZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'IBZ', N'Ibiza', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'IBZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SVQ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SVQ', N'Sevilla', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'SVQ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'VGO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'VGO', N'Vigo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'VGO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'VIX') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'VIX', N'Vitoria', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'VIX', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'VLC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'VLC', N'Valencia', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'VLC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ZAZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ZAZ', N'Zaragoza', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'ZAZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SDR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SDR', N'Santander', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'SDR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PNA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PNA', N'Pamplona', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'PNA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MJV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MJV', N'Murcia', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'MJV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MAH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MAH', N'Menorca', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ES'), N'', N'MAH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AYT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AYT', N'Antalya', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TR'), N'', N'AYT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ANK') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ANK', N'Ankara', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TR'), N'', N'ANK', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ADD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ADD', N'Addis Ababa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ET'), N'', N'ADD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ADE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ADE', N'Aden', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'YE'), N'', N'ADE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BAQ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BAQ', N'Barranquilla', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CO'), N'ATL', N'BAQ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CTG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CTG', N'Cartagena', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CO'), N'BOL', N'CTG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CLO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CLO', N'Cali', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CO'), N'VAL', N'CLO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'000001') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'000001', N'chigorodo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CO'), N'', N'000001', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BHI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BHI', N'Bahia Blanca', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AR'), N'', N'BHI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BUE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BUE', N'Buenos Aires', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AR'), N'', N'BUE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SLZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SLZ', N'San Luis', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AR'), N'', N'SLZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KRS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KRS', N'Kristiansand', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NO'), N'', N'KRS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SVG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SVG', N'Stavanger', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NO'), N'', N'SVG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BGO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BGO', N'Bergen', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NO'), N'', N'BGO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'OSL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'OSL', N'Oslo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NO'), N'', N'OSL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CAS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CAS', N'Casablanca', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MA'), N'', N'CAS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'RAK') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'RAK', N'Marrakech', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MA'), N'', N'RAK', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'RBA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'RBA', N'Rabat', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MA'), N'', N'RBA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'STR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'STR', N'Stuttgart', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'DE'), N'', N'STR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LEJ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LEJ', N'Leipzig', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'DE'), N'', N'LEJ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MUC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MUC', N'Munich', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'DE'), N'', N'MUC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DUS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DUS', N'Dusseldorf', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'DE'), N'', N'DUS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FRA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FRA', N'Frankfurt', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'DE'), N'', N'FRA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PAR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PAR', N'Paris', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FR'), N'', N'PAR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BOD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BOD', N'Bordeaux', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FR'), N'', N'BOD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LYS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LYS', N'Lyon', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FR'), N'', N'LYS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LHV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LHV', N'Le Havre', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FR'), N'', N'LHV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LIL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LIL', N'Lille', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FR'), N'', N'LIL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MMA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MMA', N'Malmo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SE'), N'', N'MMA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DEL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DEL', N'Delhi', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IN'), N'', N'DEL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MAA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MAA', N'Madras', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IN'), N'', N'MAA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DPS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DPS', N'Denpasar', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ID'), N'', N'DPS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'JKT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'JKT', N'Jakarta', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ID'), N'', N'JKT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BRI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BRI', N'Bari', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IT'), N'', N'BRI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MIL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MIL', N'Milan', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IT'), N'', N'MIL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PMO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PMO', N'Palermo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IT'), N'', N'PMO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'POA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'POA', N'Porto Alegre', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'POA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'REC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'REC', N'Recife', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'REC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SSA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SSA', N'Salvador', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'SSA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'JPA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'JPA', N'Joao Pessoa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'JPA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MCZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MCZ', N'Maceio', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'MCZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NAT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NAT', N'Natal', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'NAT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BSB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BSB', N'Brasilia', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'BSB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BZC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BZC', N'Buzios', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'BZC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BEL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BEL', N'Belem', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'BEL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AJU') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AJU', N'Aracaju', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'AJU', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BHZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BHZ', N'Belo Horizonte', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'BHZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CWB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CWB', N'Curitiba', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'CWB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CGB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CGB', N'Cuiaba', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'CGB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'IOS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'IOS', N'Ilheus', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'IOS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GYN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GYN', N'Goiania', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'GYN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FOR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FOR', N'Fortaleza', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'FOR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'RIO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'RIO', N'Rio De Janeiro', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BR'), N'', N'RIO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CHC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CHC', N'Christchurch', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NZ'), N'', N'CHC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AKL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AKL', N'Auckland', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NZ'), N'', N'AKL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'WLG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'WLG', N'Wellington', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NZ'), N'', N'WLG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PRY') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PRY', N'Pretoria', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ZA'), N'', N'PRY', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PEZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PEZ', N'Port Elizabeth', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ZA'), N'', N'PEZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DUR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DUR', N'Durban', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ZA'), N'', N'DUR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CTW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CTW', N'Cape Town', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ZA'), N'', N'CTW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ALP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ALP', N'Aleppo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SY'), N'', N'ALP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CAI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CAI', N'Cairo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'EG'), N'', N'CAI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AMM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AMM', N'Amman', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'JO'), N'', N'AMM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AMS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AMS', N'Amsterdam', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NL'), N'', N'AMS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ANF') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ANF', N'Antofagasta', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CL'), N'', N'ANF', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ARI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ARI', N'Arica', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CL'), N'', N'ARI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'IQQ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'IQQ', N'Iquique', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CL'), N'', N'IQQ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PMC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PMC', N'Puerto Montt', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CL'), N'', N'PMC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PUQ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PUQ', N'Punta Arenas', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CL'), N'', N'PUQ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ZCO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ZCO', N'Temuco', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CL'), N'', N'ZCO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LSC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LSC', N'La Serena', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CL'), N'', N'LSC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ANR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ANR', N'Antwerp', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BE'), N'', N'ANR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KUL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KUL', N'Kuala Lumpur', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MY'), N'', N'KUL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PEN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PEN', N'Penang', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MY'), N'', N'PEN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MPM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MPM', N'Maputo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MZ'), N'', N'MPM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'APW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'APW', N'Apia', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'WS'), N'', N'APW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AQP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AQP', N'Arequipa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'PE'), N'', N'AQP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'OSA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'OSA', N'Osaka', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'JP'), N'', N'OSA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FUK') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FUK', N'Fukuoka', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'JP'), N'', N'FUK', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NGO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NGO', N'Nagoya', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'JP'), N'', N'NGO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'OKA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'OKA', N'Okinawa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'JP'), N'', N'OKA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ASM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ASM', N'Asmara', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ER'), N'', N'ASM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ASU') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ASU', N'Asuncion', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'PY'), N'', N'ASU', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FPO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FPO', N'Freeport', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BS'), N'', N'FPO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NAS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NAS', N'Nassau', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BS'), N'', N'NAS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AUA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AUA', N'Aruba', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AW'), N'', N'AUA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AUH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AUH', N'Abu Dhabi', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AE'), N'', N'AUH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DXB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DXB', N'Dubai', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AE'), N'', N'DXB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SHJ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SHJ', N'Sharjah', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AE'), N'', N'SHJ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PPT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PPT', N'Papeete', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'PF'), N'', N'PPT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'VRA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'VRA', N'Varadero', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CU'), N'', N'VRA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ZLO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ZLO', N'Manzanillo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CU'), N'', N'ZLO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HOG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HOG', N'Holguin', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CU'), N'', N'HOG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'AVI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'AVI', N'Ciego De Avila', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CU'), N'', N'AVI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MNL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MNL', N'Manila', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'PH'), N'', N'MNL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BAH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BAH', N'Bahrain', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BH'), N'', N'BAH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GBE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GBE', N'Gaborone', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BW'), N'', N'GBE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TSR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TSR', N'Timisoara', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'RO'), N'', N'TSR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BDA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BDA', N'Bermuda', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BM'), N'', N'BDA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BEY') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BEY', N'Beirut', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'LB'), N'', N'BEY', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NAN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NAN', N'Nadi', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FJ'), N'', N'NAN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SUV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SUV', N'Suva', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FJ'), N'', N'SUV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BGF') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BGF', N'Bangui', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CF'), N'', N'BGF', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BGI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BGI', N'Barbados', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BB'), N'', N'BGI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BGW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BGW', N'Baghdad', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IQ'), N'', N'BGW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BSR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BSR', N'Basra', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IQ'), N'', N'BSR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CAN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CAN', N'Guangzhou', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CN'), N'', N'CAN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BJS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BJS', N'Beijing', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CN'), N'', N'BJS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DLC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DLC', N'Dalian', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CN'), N'', N'DLC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SHA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SHA', N'Shanghai', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CN'), N'', N'SHA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BJL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BJL', N'Banjul', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GM'), N'', N'BJL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BJM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BJM', N'Bujumbura', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BI'), N'', N'BJM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BKK') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BKK', N'Bangkok', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TH'), N'', N'BKK', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HKT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HKT', N'Phuket', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TH'), N'', N'HKT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BKO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BKO', N'Bamako', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ML'), N'', N'BKO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CCS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CCS', N'Caracas', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'VE'), N'', N'CCS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PMV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PMV', N'Porlamar', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'VE'), N'', N'PMV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MAR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MAR', N'Maracaibo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'VE'), N'', N'MAR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LLW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LLW', N'Lilongwe', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MW'), N'', N'LLW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BLZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BLZ', N'Blantyre', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MW'), N'', N'BLZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BON') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BON', N'Bonaire', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AN'), N'', N'BON', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MLH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MLH', N'Mulhouse', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CH'), N'', N'MLH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ZRH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ZRH', N'Zurich', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CH'), N'', N'ZRH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SDQ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SDQ', N'Santo Domingo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'DO'), N'', N'SDQ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BTS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BTS', N'Bratislava', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SK'), N'', N'BTS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BUD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BUD', N'Budapest', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'HU'), N'', N'BUD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BUQ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BUQ', N'Bulawayo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ZW'), N'', N'BUQ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HRE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HRE', N'Harare', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ZW'), N'', N'HRE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'BZV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'BZV', N'Brazzaville', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CG'), N'', N'BZV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CBB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CBB', N'Cochabamba', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BO'), N'', N'CBB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PAP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PAP', N'Port Au Prince', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'HT'), N'', N'PAP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CAY') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CAY', N'Cayenne', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GF'), N'', N'CAY', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FAO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FAO', N'Faro', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'PT'), N'', N'FAO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SNN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SNN', N'Shannon', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IE'), N'', N'SNN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DAC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DAC', N'Dhaka', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BD'), N'', N'DAC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CKY') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CKY', N'Conakry', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GN'), N'', N'CKY', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CMB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CMB', N'Colombo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'LK'), N'', N'CMB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'COO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'COO', N'Cotonou', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BJ'), N'', N'COO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GYE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GYE', N'Guayaquil', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'EC'), N'', N'GYE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'UIO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'UIO', N'Quito', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'EC'), N'', N'UIO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YTO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YTO', N'Toronto', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'YTO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YEG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YEG', N'Edmonton', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'YEG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YUL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YUL', N'Montreal', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'YUL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YOW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YOW', N'Ottawa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'YOW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YYC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YYC', N'Calgary', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'YYC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YQG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YQG', N'Windsor', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'YQG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YWG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YWG', N'Winnipeg', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'YWG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'VAN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'VAN', N'Vancouver', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CA'), N'', N'VAN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CYR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CYR', N'Colonia', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'UY'), N'', N'CYR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PDP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PDP', N'Punta Del Este', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'UY'), N'', N'PDP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MVD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MVD', N'Montevideo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'UY'), N'', N'MVD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DAR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DAR', N'Dar Es Salaam', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TZ'), N'', N'DAR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ZAG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ZAG', N'Zagreb', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'HR'), N'', N'ZAG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DKR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DKR', N'Dakar', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SN'), N'', N'DKR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DLA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DLA', N'Douala', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CM'), N'', N'DLA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'YAO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'YAO', N'Yaounde', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CM'), N'', N'YAO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'DOH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'DOH', N'Doha', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'QA'), N'', N'DOH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LCA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LCA', N'Larnaca', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CY'), N'', N'LCA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PFO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PFO', N'Paphos', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CY'), N'', N'PFO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'WDH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'WDH', N'Windhoek', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NA'), N'', N'WDH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TLV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TLV', N'Tel Aviv', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IL'), N'', N'TLV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'JRS') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'JRS', N'Jerusalem', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IL'), N'', N'JRS', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FBM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FBM', N'Lubumbashi', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CD'), N'', N'FBM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FIH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FIH', N'Kinshasa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CD'), N'', N'FIH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'FNA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'FNA', N'Freetown', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SL'), N'', N'FNA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GIB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GIB', N'Gibraltar', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GI'), N'', N'GIB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'GRZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'GRZ', N'Graz', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AT'), N'', N'GRZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KLU') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KLU', N'Klagenfurt', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AT'), N'', N'KLU', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LNZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LNZ', N'Linz', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AT'), N'', N'LNZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MLA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MLA', N'Malta', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MT'), N'', N'MLA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KHH') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KHH', N'Kaohsiung', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TW'), N'', N'KHH', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TPE') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TPE', N'Taipei', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TW'), N'', N'TPE', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KHI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KHI', N'Karachi', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'PK'), N'', N'KHI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'ISB') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'ISB', N'Islamabad', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'PK'), N'', N'ISB', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HEL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HEL', N'Helsinki', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'FI'), N'', N'HEL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'HKG') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'HKG', N'Hong Kong', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'HK'), N'', N'HKG', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'IEV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'IEV', N'Kiev', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'UA'), N'', N'IEV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KGL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KGL', N'Kigali', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'RW'), N'', N'KGL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KIN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KIN', N'Kingston', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'JM'), N'', N'KIN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MBJ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MBJ', N'Montego Bay', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'JM'), N'', N'MBJ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KRT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KRT', N'Khartoum', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SD'), N'', N'KRT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'KWI') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'KWI', N'Kuwait', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'KW'), N'', N'KWI', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LAD') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LAD', N'Luanda', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AO'), N'', N'LAD', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LBV') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LBV', N'Libreville', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'GA'), N'', N'LBV', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LFW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LFW', N'Lome', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'TG'), N'', N'LFW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'CTF') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'CTF', N'CARTAGO', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'CR'), N'', N'CTF', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LJU') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LJU', N'Ljubljana', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SI'), N'', N'LJU', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'LUN') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'LUN', N'Lusaka', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'ZM'), N'', N'LUN', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NBO') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NBO', N'Nairobi', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'KE'), N'', N'NBO', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MCT') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MCT', N'Muscat', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'OM'), N'', N'MCT', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MGA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MGA', N'Managua', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NI'), N'', N'MGA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'MLW') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'MLW', N'Monrovia', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'LR'), N'', N'MLW', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NKC') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NKC', N'Nouakchott', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'MR'), N'', N'NKC', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'NIM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'NIM', N'Niamey', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'NE'), N'', N'NIM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PBM') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PBM', N'Paramaribo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SR'), N'', N'PBM', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SAP') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SAP', N'San Pedro Sula', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'HN'), N'', N'SAP', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TGU') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TGU', N'Tegucigalpa', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'HN'), N'', N'TGU', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SAL') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SAL', N'San Salvador', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SV'), N'', N'SAL', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SEZ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SEZ', N'Mahe Island', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'SC'), N'', N'SEZ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SJJ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SJJ', N'Sarajevo', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BA'), N'', N'SJJ', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'SOF') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'SOF', N'Sofia', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'BG'), N'', N'SOF', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'THR') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'THR', N'Teheran', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'IR'), N'', N'THR', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'TIA') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'TIA', N'Tirana', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'AL'), N'', N'TIA', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Cities] WHERE [code] = N'PUJ') INSERT INTO dbo.[Cities] ([code], [name], [countriesId], [statecode], [iata], [isActive]) VALUES (N'PUJ', N'PUNTA CANA', (SELECT TOP 1 [id] FROM dbo.[Countries] WHERE [code] = N'DO'), NULL, N'PUJ', 1);
+
+-- 7.3 Aeropuertos (433 registros)
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BOG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BOG', N'Aeropuerto Internacional El Dorado', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BOG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MDE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MDE', N'Aeropuerto Internacional Jose Maria Cordova', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MDE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MIA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MIA', N'Miami International Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MIA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MAD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MAD', N'Adolfo Suarez Madrid-Barajas', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MAD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AAP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AAP', N'Andrau Airpark', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ABJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ABJ', N'Felix Houphouet Boigny Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ABJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ACC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ACC', N'Kotoka Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ACC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ADD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ADD', N'Bole Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ADD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ADE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ADE', N'Yemen Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ADE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AEP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AEP', N'Jorge Newbery', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BUE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AGB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AGB', N'Mehlhausen', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MUC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AGP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AGP', N'Malaga Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AGP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AJU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AJU', N'Santa Maria Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AJU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AKL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AKL', N'Auckland Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AKL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ALC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ALC', N'Alicante Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ALC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ALP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ALP', N'Nejrab Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ALP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AMM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AMM', N'Queen Alia Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AMM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AMS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AMS', N'Schiphol Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AMS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ANC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ANC', N'Anchorage Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ANC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ANF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ANF', N'Cerro Moreno Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ANF'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ANK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ANK', N'Etimesgut Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ANK'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ANR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ANR', N'Deurne Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ANR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AOH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AOH', N'Allen County Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LIM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'APA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'APA', N'Centennial Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DEN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'APW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'APW', N'Apia Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'APW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AQP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AQP', N'Rodriguez Ballon Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AQP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ARI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ARI', N'Chacalluta Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ARI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ASM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ASM', N'Asmara Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ASM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ASU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ASU', N'Salvio Pettirosse Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ASU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ATL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ATL', N'Hartsfield Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ATL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AUA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AUA', N'Reina Beatrix Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AUA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AUH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AUH', N'Dhabi Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AUH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AUO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AUO', N'Auburn Opelika', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AVI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AVI', N'Maximo Gomez Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AVI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'AYT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'AYT', N'Antalya Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'AYT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BAH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BAH', N'Muharraq Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BAH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BCN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BCN', N'Barcelona Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BCN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BDA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BDA', N'Bermuda International', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BDA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BDL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BDL', N'Bradley Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BOL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BEL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BEL', N'Val De Cans Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BEL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BER') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BER', N'Berlin Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VER'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BEY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BEY', N'Beirut Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BEY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BFI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BFI', N'Seattle Boeing Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SEA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BFS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BFS', N'Belfast Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BHD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BGF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BGF', N'Bangui Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BGF'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BGI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BGI', N'Grantley Adams Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BGI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BGO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BGO', N'Flesland Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BGO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BGW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BGW', N'Al Muthana Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BGW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BHD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BHD', N'Belfast City Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BHD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BHI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BHI', N'Commandante Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BHI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BIO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BIO', N'Sondica Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BIO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BJL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BJL', N'Yundum Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BJL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BJM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BJM', N'Bujumbura Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BJM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BJS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BJS', N'Beijing', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BJS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BKK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BKK', N'Bangkok Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BKK'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BKL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BKL', N'Burke Lakefront Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CLE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BKO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BKO', N'Senou Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BKO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BLA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BLA', N'Gen J A Anzoategui Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BCN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BLZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BLZ', N'Chileka Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BLZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BNA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BNA', N'Nashville Metro Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BNA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BOD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BOD', N'Merignac Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BOD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BON') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BON', N'Flamingo Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BON'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BOS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BOS', N'Logan Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BOS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BRI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BRI', N'Bari Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BRI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BSB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BSB', N'Brasilia Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BSB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BSR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BSR', N'Basra Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BSR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BTS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BTS', N'Ivanka Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BTS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BUD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BUD', N'Ferihegy Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BUD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BUE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BUE', N'Buenos Aires Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BUE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BUF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BUF', N'Greater Buffalo Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BUF'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BUQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BUQ', N'Bulawayo Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BUQ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BWI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BWI', N'Baltimore Washington Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BWI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BZC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BZC', N'Buzios Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BZC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BZV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BZV', N'Maya Maya Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BZV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CAI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CAI', N'Cairo Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CAI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CAN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CAN', N'Baiyun Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CAS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CAS', N'Anfa Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CAY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CAY', N'Rochambeau Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CAY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CBB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CBB', N'J Wilsterman Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CBB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CCS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CCS', N'Simon Bolivar Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CCS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CDG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CDG', N'Charles De Gaulle Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CGB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CGB', N'Marechal Rondon Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CGB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CGF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CGF', N'Cuyahoga County Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CLE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CGK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CGK', N'Soekarno Hatta Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'JKT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CGX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CGX', N'Meigs Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CHC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CHC', N'Christchurch Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CHI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CHI', N'Chicago Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CHS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CHS', N'Charleston Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CKY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CKY', N'Conakry Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CKY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CLE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CLE', N'Hopkins Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CLE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CLU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CLU', N'Columbus Municipal Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CMB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CMB', N'Katunayake Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CMH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CMH', N'Port Columbus Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CMN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CMN', N'Mohamed V Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CNF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CNF', N'Tancredo Neves Intl Arpt.', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BHZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CNS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CNS', N'Cairns Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CNS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'COO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'COO', N'Cotonou Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'COO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CPT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CPT', N'Cape Town International', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CTW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CRW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CRW', N'Yeager Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CSG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CSG', N'Columbus Metro Ft Benning Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CUN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CUN', N'Cancun Aeropuerto Internacional', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CUN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CUS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CUS', N'Columbus Municipal', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CWB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CWB', N'Afonso Pena Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CWB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CXH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CXH', N'Coal Harbor Sea Plane Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CYR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CYR', N'Colonia Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CYR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CZM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CZM', N'Aeropuerto Intl De Cozumel', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CZM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DAC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DAC', N'Zia Intl Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DAC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DAL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DAL', N'Love Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DFW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DAR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DAR', N'Es Salaam Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DAY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DAY', N'Dayton International Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DAY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DBN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DBN', N'Dublin Municipal Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DUB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DEL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DEL', N'Delhi Indira Gandhi Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DEL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DEN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DEN', N'Denver Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DEN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DET') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DET', N'Detroit City Apt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DTT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DFW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DFW', N'Dallas Ft Worth Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DFW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DHA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DHA', N'Dhahran Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DHA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DKR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DKR', N'Yoff Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DKR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DLA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DLA', N'Douala Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DLA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DLC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DLC', N'Dalian Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DLC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DOH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DOH', N'Doha Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DOH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DPS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DPS', N'Ngurah Rai Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DPS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DTW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DTW', N'Detroit Metro Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DTT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DUB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DUB', N'Dublin Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DUB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DUR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DUR', N'Durban International', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DUR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DUS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DUS', N'Dusseldorf Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DUS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DWH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DWH', N'David Wayne Hooks Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DXB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DXB', N'Dubai Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DXB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'EAP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'EAP', N'Mulhouse/Basel Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MLH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'EFD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'EFD', N'Ellington Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ERS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ERS', N'Eros Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'WDH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ESB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ESB', N'Esenboga Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ANK'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'EWR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'EWR', N'Newark Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'EWR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'EZE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'EZE', N'Ministro Pistarini', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BUE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FAO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FAO', N'Faro Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FAO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FBM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FBM', N'Luano', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FBM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FBU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FBU', N'Fornebu Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'OSL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FIH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FIH', N'Kinshasa Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FIH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FNA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FNA', N'Lungi Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FNA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FOR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FOR', N'Pinto Martines Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FOR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FPO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FPO', N'Freeport Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FPO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FRA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FRA', N'Frankfurt Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FRA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FTY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FTY', N'Fulton Cty Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ATL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'FUK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'FUK', N'Itazuke Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FUK'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GBE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GBE', N'Gaborone Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GBE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GDL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GDL', N'Miguel Hidalgo Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GDL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GED') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GED', N'Sussex County Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GEO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GEN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GEN', N'Gardermoen Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'OSL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GEO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GEO', N'Timehri Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GEO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GGW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GGW', N'International Glasgow', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GLA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GIB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GIB', N'North Front Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GIB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GIG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GIG', N'Rio Internacional', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RIO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GLA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GLA', N'Glasgow Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GLA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GRX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GRX', N'Granada Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GND'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GRZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GRZ', N'Thalerhof Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GRZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GTR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GTR', N'Golden Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GYE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GYE', N'Simon Bolivar Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GYE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GYM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GYM', N'Gen Jose M Yanez Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GYM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'GYN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'GYN', N'Santa Genoveva', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GYN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HBA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HBA', N'Hobart Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HBA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HEL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HEL', N'Helsinki Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HEL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HFD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HFD', N'Brainard Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BOL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HKG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HKG', N'Hong Kong Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HKG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HKT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HKT', N'Phuket Intl Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HKT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HMA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HMA', N'Malmo City Hvc Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MMA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HNL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HNL', N'Honolulu Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HNL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HOG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HOG', N'Frank Pias Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HOU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HOU', N'Houston Hobby Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'HRE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'HRE', N'Harare Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HRE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'IAH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'IAH', N'Houston Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'IBZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'IBZ', N'Ibiza Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'IBZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'IEV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'IEV', N'Zhulhany Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'IEV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'IOS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'IOS', N'Eduardo Gomes Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'IOS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'IQQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'IQQ', N'Cavancha Chucumata Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'IQQ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ISB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ISB', N'Islamabad Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ISB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ITM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ITM', N'Itami Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'OSA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'IWS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'IWS', N'West Houston', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JAJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JAJ', N'Perimeter Hlpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ATL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JAO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JAO', N'Beaver Ruin Helpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ATL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JBP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JBP', N'Commerce Business Plaza Heliport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JCC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JCC', N'China Basin Hlpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SFO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JDP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JDP', N'Issy Les Moulineaux Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JED') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JED', N'Jeddah Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'JED'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JFK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JFK', N'John F Kennedy Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NYC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JKT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JKT', N'Kemayoran Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'JKT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JPA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JPA', N'Castro Pinto Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'JPA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JRE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JRE', N'East 60th St Hlpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NYC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JRS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JRS', N'Atarot Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'JRS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'JTO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'JTO', N'Thousand Oaks Hlpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KAN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KAN', N'Aminu Kano Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KBP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KBP', N'Borispol Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'IEV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KGL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KGL', N'Kayibanda Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KGL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KHH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KHH', N'Kaohsiung Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KHH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KHI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KHI', N'Karachi Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KHI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KIN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KIN', N'Norman Manly Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KIN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KIX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KIX', N'Kansai International Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'OSA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KLU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KLU', N'Klagenfurt Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KLU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KRS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KRS', N'Kjevik Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KRS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KRT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KRT', N'Civil Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KRT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KTP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KTP', N'Tinson Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KIN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KUL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KUL', N'Subang Kuala Lumpur Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KUL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'KWI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'KWI', N'Kuwait Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KWI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LAD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LAD', N'Four De Fevereiro Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LAP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LAP', N'Aeropuerto Gen Marquez De Leon', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LPB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LAS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LAS', N'McCarran Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LAX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LAX', N'Los Angeles Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LBA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LBA', N'Leeds Bradford Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LBA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LBG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LBG', N'Le Bourget Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LBH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LBH', N'Palm Beach Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SYD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LBV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LBV', N'Libreville Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LBV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LCA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LCA', N'Larnaca Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LCA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LEH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LEH', N'Octeville Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LHV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LEJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LEJ', N'Schkeuditz Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LEJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LFW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LFW', N'Lome Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LFW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LGA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LGA', N'La Guardia', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NYC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LGB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LGB', N'Long Beach Municipal', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LGB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LIL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LIL', N'Lesquin Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LIL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LIM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LIM', N'Nlima Intl Jorge Chavez', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LIM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LIN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LIN', N'Linate Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MIL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LJU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LJU', N'Brnik Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LJU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LKE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LKE', N'Lake Union Seaplane Base', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SEA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LLW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LLW', N'Lilongwe Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LLW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LNZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LNZ', N'Hoersching Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LNZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LOS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LOS', N'Murtala Muhammed Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LOS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LPB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LPB', N'El Alto Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LPB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LSC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LSC', N'La Florida', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LSC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LUN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LUN', N'Lusaka Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LUN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LUQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LUQ', N'San Luis Cty Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SLZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LVS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LVS', N'Las Vegas Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'LYS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'LYS', N'Satolas Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LYS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MAA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MAA', N'Meenambarkkam Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MAA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MAH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MAH', N'Aerop De Menorca', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MAH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MAR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MAR', N'La Chinita Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MBJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MBJ', N'Sangster Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MBJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MCO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MCO', N'Orlando Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ORL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MCT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MCT', N'Seeb Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MCT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MCZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MCZ', N'Palmeres Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MCZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MDW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MDW', N'Midway', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MEB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MEB', N'Essendon Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MEL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MEL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MEL', N'Tullamarine Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MEL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MEM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MEM', N'Memphis Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MEM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MGA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MGA', N'Augusto C Sandino', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MGA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MID') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MID', N'Merida Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MID'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MIL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MIL', N'Milan Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MIL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MJV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MJV', N'San Javier Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MJV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MKE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MKE', N'General Mitchell Fld', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MKE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MLA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MLA', N'Luqa Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MLA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MLB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MLB', N'Melbourne Regional', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MEL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MLH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MLH', N'Euroairport French', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MLH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MLW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MLW', N'Sprigg Payne Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MLW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MMA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MMA', N'Malmo Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MMA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MME') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MME', N'Teesside Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MME'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MMX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MMX', N'Sturup Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MMA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MNL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MNL', N'Ninoy Aquino Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MNL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MPM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MPM', N'Maputo Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MPM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MRD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MRD', N'Alberto Carnevalli Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MID'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MSP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MSP', N'Minneapolis St Paul Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MSP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MSY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MSY', N'Moisant Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MSY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MTC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MTC', N'Selfridge Air Natl Guard', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DTT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MTY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MTY', N'Escobedo Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MTY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MUC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MUC', N'Franz Josef Strauss Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MUC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MVD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MVD', N'Carrasco Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MVD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MXP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MXP', N'Malpensa Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MIL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MYF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MYF', N'Montogomery Fld', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MZO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MZO', N'Sierra Maestra Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ZLO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'MZT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'MZT', N'Buelina Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MZT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NAN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NAN', N'Nadi Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NAS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NAS', N'Nassau Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NAT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NAT', N'Augusto Severo Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NAT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NBO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NBO', N'Jomo Kenyatta Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NBO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NEW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NEW', N'New Lakefront Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MSY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NGO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NGO', N'Komaki Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NGO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NIM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NIM', N'Niamey Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NIM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NKC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NKC', N'Nouakchott Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NKC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NQA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NQA', N'Memphis Naval Air Station', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MEM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NSI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NSI', N'Nsimalen Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YAO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'NYC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'NYC', N'New York City Area Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NYC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'OFK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'OFK', N'Karl Stefan Fld', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NOR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'OKA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'OKA', N'Naha Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'OKA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'OLU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'OLU', N'Columbus Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'OPF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'OPF', N'Opa Locka Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MIA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ORD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ORD', N'OHare Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ORL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ORL', N'Herndon Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ORL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ORY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ORY', N'Orly Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'OSA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'OSA', N'Osaka', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'OSA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'OSL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'OSL', N'Oslo Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'OSL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'OSU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'OSU', N'Ohio State Univ Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PAP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PAP', N'Mais Gate Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PAR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PAR', N'Paris Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PBM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PBM', N'Zanderij Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PBM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PDK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PDK', N'Dekalb Peachtree', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ATL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PDP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PDP', N'Cap Curbelo Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PDP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PDX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PDX', N'Portland Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PDX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PEK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PEK', N'Beijing Capital Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BJS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PEN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PEN', N'Penang Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PEN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PER') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PER', N'Perth Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PER'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PFO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PFO', N'Paphos Intl Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PFO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PHT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PHT', N'Henry County Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PHX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PHX', N'Sky Harbor Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PHX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PID') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PID', N'Paradise Island Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PIK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PIK', N'Prestwick Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'GLA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PLZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PLZ', N'Port Elizabeth Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PEZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PMC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PMC', N'Tepual Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PMC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PMO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PMO', N'Punta Raisi Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PMO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PMV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PMV', N'Delcaribe Gen S Marino Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PMV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PNA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PNA', N'Pamplona Noain Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PNA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'POA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'POA', N'Porto Alegre Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'POA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PPT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PPT', N'Intl Tahiti Faaa', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PPT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PRX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PRX', N'Paris Cox Field Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PAR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PRY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PRY', N'Wonderboom Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PRY'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PSK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PSK', N'New River Valley Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DUB'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PTJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PTJ', N'Portland Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PDX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PUQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PUQ', N'Presidente Ibanez Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PUQ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PVR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PVR', N'Ordaz Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PVR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PWK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PWK', N'Pal Waukee Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CHI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'PWM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'PWM', N'Portland Intl Jetport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'PDX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QBA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QBA', N'San Francisco Bay Area Airpts', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SFO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QDF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QDF', N'Dallas Area Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DFW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QGV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QGV', N'Neu Isenburg Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'FRA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QHO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QHO', N'Houston Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'HOU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QKN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QKN', N'Kingston Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KIN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QLA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QLA', N'Los Angeles Area Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QMI') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QMI', N'Miami Area Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MIA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QRV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QRV', N'Arras Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LIL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'QSE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'QSE', N'Seattle Area Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SEA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RAC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RAC', N'Horlick Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MKE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RAK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RAK', N'Menara Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RAK'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RBA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RBA', N'Sale Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RBA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RDU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RDU', N'Raleigh Durham Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RDU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'REC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'REC', N'Recife Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'REC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RIC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RIC', N'Byrd Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RIC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RIO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RIO', N'Rio De Janeiro Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RIO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RMA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RMA', N'Roma Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ROM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ROB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ROB', N'Roberts Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MLW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ROC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ROC', N'Monroe Cty Arpt New York', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ROC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RSE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RSE', N'Au Rose Bay Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SYD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RST') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RST', N'Rochester Municipal', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ROC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'RUH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'RUH', N'King Khaled Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RUH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SAL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SAL', N'El Salvador Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SAN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SAN', N'Lindbergh Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SAP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SAP', N'La Mesa Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SAT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SAT', N'San Antonio Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SAV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SAV', N'Travis Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SDA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SDA', N'Saddam Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BGW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SDM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SDM', N'Brown Fld Municipal', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SDQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SDQ', N'Las Americas Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SDQ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SDR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SDR', N'Santander Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SDR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SDU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SDU', N'Santos Dumont Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'RIO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SDV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SDV', N'Dov Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TLV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SEA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SEA', N'Seattle Tacoma Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SEA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SEZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SEZ', N'Seychelles Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SEZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SFO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SFO', N'San Francisco Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SFO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SHA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SHA', N'Shanghai Intl Hongqiao', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SHA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SHJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SHJ', N'Sharjah Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SHJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SJJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SJJ', N'Butmir Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SJJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SLC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SLC', N'Salt Lake City Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SLC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SMO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SMO', N'Santa Monica Municipal Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SNN') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SNN', N'Shannon Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SNN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SOF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SOF', N'Sofia Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SOF'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SSA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SSA', N'Dois De Julho Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SSA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'STD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'STD', N'Mayor Humberto Vivas Guerrero Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SDQ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'STR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'STR', N'Eghterdingen Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'STR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SUV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SUV', N'Nausori Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SUV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SVG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SVG', N'Sola Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SVG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SVQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SVQ', N'San Pablo Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SVQ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SVZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SVZ', N'San Antonio Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SAI'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SXF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SXF', N'Schoenefeld Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VER'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'SYD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'SYD', N'Sydney Kingsford Smith Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SYD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TAM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TAM', N'General F Javier Mina', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TAM'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TGU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TGU', N'Toncontin Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TGU'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'THF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'THF', N'Tempelhof Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VER'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'THR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'THR', N'Mehrabad Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'THR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TIA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TIA', N'Rinas Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TIA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TLV') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TLV', N'Ben Gurion Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TLV'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TMB') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TMB', N'Tamiami Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MIA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TPA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TPA', N'Tampa Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TPA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TPE') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TPE', N'Chiang Kai Shek Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TPE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TPF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TPF', N'Peter O Knight Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TPA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TSR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TSR', N'Timisoara Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TSR'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TSS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TSS', N'East 34th St Hlpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NYC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TUS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TUS', N'Tucson Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'TUS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'TXL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'TXL', N'Tegel Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VER'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'UBS') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'UBS', N'Lowndes Cty Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CMH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'UIO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'UIO', N'Mariscal Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'UIO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'UIZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'UIZ', N'Berz Macomb Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DTT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VCT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VCT', N'Victoria Regional Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YYJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VER') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VER', N'Las Bajadas General Heriberto Jara', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VER'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VGO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VGO', N'Vigo Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VGO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VGT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VGT', N'Las Vegas North Air Terminal', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VIT') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VIT', N'Vitoria Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VIX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VIX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VIX', N'Eurico Sales Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VIX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VLC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VLC', N'Valencia Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VLC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VNY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VNY', N'Los Angeles Van Nuys Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'LAX'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VPZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VPZ', N'Porter County', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VAP'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'VRA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'VRA', N'Juan Gualberto Gomez Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VRA'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'WDH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'WDH', N'Windhoek Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'WDH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'WIL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'WIL', N'Wilson Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NBO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'WLG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'WLG', N'Wellington Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'WLG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'WZY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'WZY', N'Seaplane Base Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'NAS'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YAO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YAO', N'Yaounde Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YAO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YBZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YBZ', N'Downtown Hlpt Toronto', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YTO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YEA') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YEA', N'Edmonton Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YEG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YED') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YED', N'Namao Field', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YEG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YEG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YEG', N'Edmonton Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YEG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YGK') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YGK', N'Norman Rodgers Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'KIN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YHU') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YHU', N'St Hubert Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YUL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YIP') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YIP', N'Willow Run Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'DTT'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YKZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YKZ', N'Buttonville Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YTO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YMQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YMQ', N'Montreal Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YUL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YMX') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YMX', N'Mirabel Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YUL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YMY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YMY', N'Victoria Stol', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YUL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YOW') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YOW', N'Ottawa Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YOW'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YQF') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YQF', N'Red Deer Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YYC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YQG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YQG', N'Windsor Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YQG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YQY') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YQY', N'Sydney Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'SYD'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YTO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YTO', N'Toronto Area Airports', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YTO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YTZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YTZ', N'Toronto City Centre Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YTO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YUL') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YUL', N'Dorval Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YUL'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YVR') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YVR', N'Vancouver Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'VAN'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YWG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YWG', N'Winnipeg Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YWG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YWH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YWH', N'Inner Harbor Sea Plane Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YYJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YXD') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YXD', N'Edmonton Municipal Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YEG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YYC') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YYC', N'Calgary Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YYC'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YYJ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YYJ', N'Victoria Intl Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YYJ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'YYZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'YYZ', N'Lester B Pearson Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'YTO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ZAG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ZAG', N'Zagreb Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ZAG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ZAZ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ZAZ', N'Zaragoza Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ZAZ'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ZCO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ZCO', N'Manquehue Arpt', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ZCO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ZLO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ZLO', N'Aeropuerto Intl', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ZLO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'ZRH') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'ZRH', N'Zurich Airport', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'ZRH'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CTG') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CTG', N'Aeropuerto Internacional Rafael Nunez', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CTG'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'CLO') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'CLO', N'Alfonso Bonilla Arag¢n', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'CLO'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'DIM') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'DIM', N'Aeropuerto Olaya Herrera', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'MDE'), 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BAQ') INSERT INTO dbo.[Airports] ([code], [name], [citiesId], [isActive]) VALUES (N'BAQ', N'AEROPUERTO ERNESTO CORTIZO', (SELECT TOP 1 [id] FROM dbo.[Cities] WHERE [code] = N'BAQ'), 1);
+
+-- 7.4 Formas de Pago (2 registros)
+IF NOT EXISTS (SELECT 1 FROM dbo.[Payment] WHERE [code] = N'EFE') INSERT INTO dbo.[Payment] ([code], [name], [isActive]) VALUES (N'EFE', N'Efectivo', 1);
+IF NOT EXISTS (SELECT 1 FROM dbo.[Payment] WHERE [code] = N'TC') INSERT INTO dbo.[Payment] ([code], [name], [isActive]) VALUES (N'TC', N'Tarjeta De Credito', 1);
+
+
+GO
+
+-- --------------------------------------------------------------------------
+-- SECCIÓN 3: COMPILACIÓN Y ACTUALIZACIÓN DE PROCEDIMIENTOS Y FUNCIONES
+-- --------------------------------------------------------------------------
+-- ============================================================================
+-- AGENCIASNEW - PROCEDIMIENTOS ALMACENADOS Y FUNCIONES EN SQL SERVER (T-SQL)
+-- Archivo: SQL/SqlServer/03_Functions_And_SPs.sql
+-- Motor: Microsoft SQL Server 2016+ (T-SQL)
+-- ============================================================================
+
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
+-- ============================================================================
+-- SECCIÓN 1: FUNCIONES ESCALARES Y DE TABLA (T-SQL)
+-- ============================================================================
+
+-- 1.1. fnQuitarEspeciales
+IF OBJECT_ID('dbo.fnQuitarEspeciales', 'FN') IS NOT NULL
+    DROP FUNCTION dbo.fnQuitarEspeciales;
+GO
+
+CREATE FUNCTION dbo.fnQuitarEspeciales
+(
+    @p_texto NVARCHAR(MAX)
+)
+RETURNS NVARCHAR(MAX)
 AS
 BEGIN
-	-- SET NOCOUNT ON: Previene que conjuntos de resultados extras interfieran con 
-	-- expresiones SELECT
-	SET NOCOUNT ON;
-
-    -- Declaracion e inicializacion de variables
-  	DECLARE @bl_permit			 BIT 	, -- Permiso de ejecucion del proceso
-  			@bl_as 	   			 BIT	, -- Auditar exito
-	 		@bl_af 			     BIT	, -- Auditar fallido	 		
-			@procmsg	VARCHAR(8000)	, -- Mensaje devuelto por procedimientos llamados desde este procedimiento
-			@procret 	BIT 			, -- Valor de retorno de los procedimientos llamados desde este procedimiento
-			@idproce	int		    	, -- Codigo de proceso
-	 		@retry 		BIT			    , -- 1=Reintentar ; 0=Abortar  
-	 		@retrycont	INT			    , -- Contador de reintentos
-	 		@maxretries INT			    , -- Maximo numero de reintentos
-	 		@timeout	NVARCHAR(4000)  , -- Tiempo de espera maximo por bloqueo de registros
-	 		@stmt 		NVARCHAR(4000)  , -- Cadena de instrucciones T-SQL
-			@msg	    VARCHAR(8000)   , -- Mensaje retornado por el sistema
-			@retval		TINYINT 		; -- Valor de retorno de este procedimiento: 0:Exito ; 1:Error(Bloque Catch)
-	
-	SELECT 	@retry				 = 1 		   ,
-			@retrycont			 = 0		   ,
-			@retval				 = 0;
-  	
-  	-- Manejo de tiempo de espera y de reintentos por bloqueo de tablas/registros  
-   	SELECT @maxretries = convert(INT,Valor) FROM dbo.Parametros WHERE Id = 60 ;
-	SELECT @timeout    = convert(NVARCHAR(4000),Valor) FROM dbo.Parametros WHERE Id = 50 ;		
-	SET @stmt = N'SET LOCK_TIMEOUT '+ltrim(rtrim(@timeout))
-	EXEC sp_executesql @stmt,N''
-		
-	WHILE ( (@retry = 1) AND (@retrycont <= @maxretries) )
-	BEGIN
-		SET @retry = 0;
-    
-    	-- Bloque TRY
-    	BEGIN TRY 
-    	   	
-			--Instrucciones del procedimiento-----------------------------------------
-			DECLARE @id_TiposConceptoFacturacion INT
-			SELECT @id_TiposConceptoFacturacion = ConceptoFacturacion.id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE ConceptoFacturacion.id = @id_ConceptFac
-
-			IF ISNULL(@bu,'')=''
-			BEGIN
-				SELECT @bu = CASE WHEN ISNULL(I.cd_bu,'')<>'' THEN I.cd_bu ELSE ISNULL(S.cd_bu,'') END 
-				From dbo.Usuario U
-				Left Join [dbo].[Sucursales] S On U.id_sucursal = S.id
-				Left Join [dbo].[Implantes] I On U.id_implante = I.id
-				WHERE U.id=@id_usuario
-			END
-
-			--TODO: Manejo de cargos e impuestos por BU
-			DECLARE @Permite_BU AS CHAR(2), @am_valor MONEY				
-			SELECT @Permite_BU = rtrim(valor) FROM Parametros  WHERE id = 163
-			SELECT @am_valor = am_valor FROM dbo.ConfiguracionClientesConceptos WHERE id_cliente = @Id_Cliente AND id_ConceptoFacturacion=@id_ConceptFac AND bl_inactivo=0
-			SET @am_valor = ISNULL(@am_valor,0)
-			IF @Permite_BU = 'S'
-			BEGIN
-				SELECT DISTINCT Codigo
-				 	,Concepto
-				 	,Porcentaje
-				 	,Editable
-				 	,Calcular
-				 	,Contado
-				 	,Credito
-				 	,Valor
-				 	,id_carg
-				 	,id_imp
-				 	,Tipo
-				 	,Nombre
-				 	,Cuenta
-				 	,Contabilizar
-				 	,NULL AS 'Respuesta'
-				 	,noshow 
-				 	,id_cargo_dep
-				 	,id_imp_dep	   
- 				 	,C_Orden
-				 	,I_Orden
-					,bl_iva
-					,bl_iva2
-				 FROM (
-				 		SELECT 	 CD.cd_codigo 				AS 'Codigo'
-							 	,cd.ds_nombre   			AS 'Concepto'
-							 	,convert(NUMERIC(8,4),0)	AS 'Porcentaje'
-							 	,'S'						AS 'Editable'
-							 	,'N/A'						AS 'Calcular'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 THEN CC.am_valor ELSE CD.am_valdef END AS 'Contado' --rgelis 2020/09/30 req.141927
-							 	,convert(money,0)			AS 'Credito'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 THEN CC.am_valor ELSE CD.am_valdef END AS 'Valor' --rgelis 2020/09/30 req.141927
-								,CD.id 						AS 'id_carg'
-								,0							AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,cd.ds_nombre 				AS 'Nombre'   
-								,replicate(' ',16)			AS 'Cuenta'
-								,convert(BIT,0)				AS 'Contabilizar'
-								,cd.bl_noshow 				AS 'noshow'
-								,0 							AS 'id_cargo_dep'
-								,0 							AS 'id_imp_dep'																
-								,in_Orden 					AS 'C_Orden'
-								,0		 					AS 'I_Orden'
-								,0		 					AS 'bl_iva'
-								,0		 					AS 'bl_iva2'
-						FROM dbo.CargosAsignados_ConceptoFac C 
-							INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-							LEFT JOIN dbo.ConfiguracionClientesConceptos CC ON CC.id_conceptofacturacion=C.id_ConceptoFac AND CC.Id_Cliente = @Id_Cliente AND CC.bl_inactivo=0
-						WHERE C.id_ConceptoFac = @id_ConceptFac
-						AND CD.id NOT IN (	--Excluimos cargos que ya estan en descuentos de clientes.
-											SELECT cd.Id
-											FROM dbo.Configuracion_remisiones C 
-												INNER JOIN dbo.Clientes_Descuentos CDSC ON CDSC.Id_Configuracion_remisiones = C.Id --And CDSC.id_ConceptoFacturacion IS NOT NULL
-												INNER JOIN dbo.CargosDesc CD ON CD.id = CDSC.id_CargosDesc
-											WHERE C.Id_Cliente = @Id_Cliente AND  (CDSC.id_ConceptoFacturacion = @id_ConceptFac OR CDSC.id_ConceptoFacturacion IS NULL)	
-											)
-						AND NOT EXISTS (
-											SELECT cd.id
-											FROM dbo.CLIENTES cl
-												INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-												INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-												INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-												INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-											WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-										)
-
-						UNION ALL
-						
-						SELECT 
-								 IR.cd_codigo 										AS 'Codigo'
-							 	,IR.ds_alias	   									AS 'Concepto'
-							 	,ISNULL(convert(NUMERIC(8,4),IBU.am_porcentaje),0)	AS 'Porcentaje'
-							 	,'Editable' = CASE IR.bl_editar 
-												WHEN 0 THEN 'N'
-												WHEN 1 THEN 'S'
-									  		  END   
-							 	,'Calcular'											AS 'Calcular'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 AND IR.id_cargo_dep=1 AND IR.am_porcentaje>0 THEN convert(money,CC.am_valor*(IR.am_porcentaje/100)) ELSE convert(money,0) END AS 'Contado'
-							 	,convert(money,0)									AS 'Credito'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 AND IR.id_cargo_dep=1 AND IR.am_porcentaje>0 THEN convert(money,CC.am_valor*(IR.am_porcentaje/100)) ELSE convert(money,0) END AS 'Valor'
-								,C.id_CargosDesc					   				AS 'id_carg'
-								,I.id_ImpRet										AS 'id_imp'
-								,'Tipo'= CASE IR.cd_tipo 
-											WHEN 0 THEN 'I'
-											WHEN 1 THEN 'R'
-										 END     
-								,IR.ds_nombre 						   				AS 'Nombre'   
-								,IR.cd_cuenta										AS 'Cuenta'
-								,bl_contabilizar									AS 'Contabilizar'
-								,convert(BIT,0)										AS 'noshow'
-								,isnull(IR.id_cargo_dep,0)                          AS 'id_cargo_dep'
-								,isnull(IR.id_imp_dep,0)							AS 'id_imp_dep'
-								,C.in_orden											AS 'C_Orden'
-								,i.in_Orden		 	   								AS 'I_Orden'
-								,bl_iva
-								,bl_iva2
-						FROM dbo.CargosAsignados_ConceptoFac C 
-							INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-							LEFT JOIN dbo.ConfiguracionClientesConceptos CC ON CC.id_conceptofacturacion=C.id_ConceptoFac AND CC.Id_Cliente = @Id_Cliente AND CC.bl_inactivo=0
-							LEFT JOIN dbo.ImpAsignados_ConceptoFac I ON (C.id = I.id_CargosAsignados_ConceptoFac)
-							LEFT JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-							LEFT JOIN dbo.Impuestos_bu IBU ON (IBU.id_impuesto = IR.id AND ibu.cd_bu = @bu )
-						WHERE C.id_ConceptoFac = @id_ConceptFac
-						AND NOT EXISTS (
-												SELECT IR.id
-												FROM dbo.CLIENTES cl
-													INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-													INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-													INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-													INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-													INNER JOIN dbo.ImpAsignados_Configuracion_ImpCategoriaFiscal I ON (I.id_CargosAsignados_Configuracion_ImpCategoriaFiscal = C.id )
-													INNER JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-													INNER JOIN dbo.Impuestos_bu IBU ON (IBU.id_impuesto = IR.id AND ibu.cd_bu = @bu )
-												WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-												)
-
-						UNION ALL 
-						--Cargos por categoria fiscal del cliente
-				 		SELECT 	 CD.cd_codigo 				AS 'Codigo'
-							 	,cd.ds_nombre   			AS 'Concepto'
-							 	,convert(NUMERIC(8,4),0)	AS 'Porcentaje'
-							 	,'S'						AS 'Editable'
-							 	,'N/A'						AS 'Calcular'
-							 	,CD.am_valdef    			AS 'Contado'
-							 	,convert(money,0)			AS 'Credito'
-							 	,CD.am_valdef				AS 'Valor'
-								,CD.id 						AS 'id_carg'
-								,0							AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,cd.ds_nombre 				AS 'Nombre'   
-								,replicate(' ',16)			AS 'Cuenta'
-								,convert(BIT,0)				AS 'Contabilizar'
-								,cd.bl_noshow 				AS 'noshow'
-								,0 							AS 'id_cargo_dep'
-								,0 							AS 'id_imp_dep'																
-								,in_Orden 					AS 'C_Orden'
-								,0		 					AS 'I_Orden'		
-								,0		 					AS 'bl_iva'
-								,0		 					AS 'bl_iva2'																						
-						FROM dbo.CLIENTES cl
-							INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-							INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-							INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-							INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-						WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-						--AND CD.id NOT IN (
-						--					SELECT CD.id
-						--					FROM dbo.CargosAsignados_ConceptoFac C 
-						--						INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-						--					WHERE C.id_ConceptoFac = @id_ConceptFac
-						--				)	
-
-						UNION ALL 
-						--Impuestos por categoria fiscal del cliente
-						SELECT 
-								 IR.cd_codigo 										AS 'Codigo'
-							 	,IR.ds_alias	   									AS 'Concepto'
-							 	,ISNULL(convert(NUMERIC(8,4),IBU.am_porcentaje),0)	AS 'Porcentaje'
-							 	,'Editable' = CASE IR.bl_editar 
-												WHEN 0 THEN 'N'
-												WHEN 1 THEN 'S'
-									  		  END   
-							 	,'Calcular'											AS 'Calcular'
-							 	,convert(money,0)									AS 'Contado'
-							 	,convert(money,0)									AS 'Credito'
-							 	,convert(money,0)									AS 'Valor'
-								,C.id_CargosDesc					   				AS 'id_carg'
-								,I.id_ImpRet										AS 'id_imp'
-								,'Tipo'= CASE IR.cd_tipo 
-											WHEN 0 THEN 'I'
-											WHEN 1 THEN 'R'
-										 END     
-								,IR.ds_nombre 						   				AS 'Nombre'   
-								,IR.cd_cuenta										AS 'Cuenta'
-								,bl_contabilizar									AS 'Contabilizar'
-								,convert(BIT,0)										AS 'noshow'
-								,isnull(IR.id_cargo_dep,0)                          AS 'id_cargo_dep'
-								,isnull(IR.id_imp_dep,0)							AS 'id_imp_dep'
-								,C.in_orden											AS 'C_Orden'
-								,i.in_Orden		 	   								AS 'I_Orden'
-								,bl_iva
-								,bl_iva2
-						FROM dbo.CLIENTES cl
-							INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-							INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-							INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-							INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-							INNER JOIN dbo.ImpAsignados_Configuracion_ImpCategoriaFiscal I ON (I.id_CargosAsignados_Configuracion_ImpCategoriaFiscal = C.id )
-							INNER JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-							INNER JOIN dbo.Impuestos_bu IBU ON (IBU.id_impuesto = IR.id AND ibu.cd_bu = @bu )
-						WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-						--AND ibu.id_impuesto NOT IN (
-						--							SELECT ibu.id_impuesto
-						--							FROM dbo.CargosAsignados_ConceptoFac C 
-						--								INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-						--								LEFT JOIN dbo.ImpAsignados_ConceptoFac I ON (C.id = I.id_CargosAsignados_ConceptoFac)
-						--								LEFT JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-						--								LEFT JOIN dbo.Impuestos_bu IBU ON (IBU.id_impuesto = IR.id AND ibu.cd_bu = @bu )
-						--							WHERE C.id_ConceptoFac = @id_ConceptFac
-						--							)
-										
-						UNION ALL
-						--Descuentos de Clientes
-				 		SELECT 	 CD.cd_codigo 							AS 'Codigo'
-							 	,cd.ds_nombre   						AS 'Concepto'
-							 	,convert(NUMERIC(8,4),CDSC.am_porcentaje)	AS 'Porcentaje'
-							 	,'S'									AS 'Editable'
-							 	,CASE 
-							 		WHEN CDSC.am_porcentaje > 0 THEN 'Calcular'								
-							 		ELSE 'N/A' END 
-							 		AS 'Calcular'
-							 	,CDSC.am_valor    						AS 'Contado'
-							 	,convert(money,0)						AS 'Credito'
-							 	,CDSC.am_valor							AS 'Valor'
-								,CD.id 									AS 'id_carg'
-								,0										AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,cd.ds_nombre 							AS 'Nombre'   
-								,replicate(' ',16)						AS 'Cuenta'
-								,convert(BIT,0)							AS 'Contabilizar'
-								,cd.bl_noshow 							AS 'noshow'
-								,isnull(cd.id_cargo_dep,0) 				AS 'id_cargo_dep'
-								,0 										AS 'id_imp_dep'
-								,999	 								AS 'C_Orden'
-								,0		 								AS 'I_Orden'
-								,0		 								AS 'bl_iva'
-								,0		 								AS 'bl_iva2'
-						FROM dbo.Configuracion_remisiones C 
-							INNER JOIN dbo.Clientes_Descuentos CDSC ON CDSC.Id_Configuracion_remisiones = C.Id --And CDSC.id_ConceptoFacturacion IS NOT NULL
-							INNER JOIN dbo.CargosDesc CD ON CD.id = CDSC.id_CargosDesc
-						WHERE C.Id_Cliente = @Id_Cliente AND  (CDSC.id_ConceptoFacturacion = @id_ConceptFac OR CDSC.id_ConceptoFacturacion IS NULL)
-
-						/*UNION ALL
-						-- Asignacion de por tipo de concepto facturacion
-						SELECT  CD.cd_codigo 				AS 'Codigo'
-							 	,CD.ds_nombre   			AS 'Concepto'
-							 	,convert(NUMERIC(8,4),0)	AS 'Porcentaje'
-							 	,'S'						AS 'Editable'
-							 	,'N/A'						AS 'Calcular'
-							 	,CD.am_valdef    			AS 'Contado'
-							 	,convert(money,0)			AS 'Credito'
-							 	,CD.am_valdef				AS 'Valor'
-								,CD.id 						AS 'id_carg'
-								,0							AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,CD.ds_nombre 				AS 'Nombre'   
-								,replicate(' ',16)			AS 'Cuenta'
-								,convert(BIT,0)				AS 'Contabilizar'
-								,cd.bl_noshow 				AS 'noshow'
-								,0 							AS 'id_cargo_dep'
-								,0 							AS 'id_imp_dep'																
-								,C.in_Orden 				AS 'C_Orden'
-								,0		 					AS 'I_Orden'		
-								,0		 					AS 'bl_iva'
-								,0		 					AS 'bl_iva2'
-						FROM dbo.ConceptoFacturacion CF
-						INNER JOIN dbo.CargosAsignados C ON C.id_TiposConceptFac = CF.id_TiposConceptoFacturacion
-						INNER JOIN dbo.CargosDesc CD ON CD.id = C.id_CargosDesc
-						WHERE CF.id = @id_ConceptFac AND CF.bl_contorlarCargImp=0	
-						
-						UNION ALL
-						
-						SELECT IR.cd_codigo 										AS 'Codigo'
-							 	,IR.ds_alias	   									AS 'Concepto'
-							 	,ISNULL(convert(NUMERIC(8,4),IR.am_porcentaje),0)	AS 'Porcentaje'
-							 	,'Editable' = CASE IR.bl_editar 
-												WHEN 0 THEN 'N'
-												WHEN 1 THEN 'S'
-									  		  END   
-							 	,'Calcular'											AS 'Calcular'
-							 	,convert(money,0)									AS 'Contado'
-							 	,convert(money,0)									AS 'Credito'
-							 	,convert(money,0)									AS 'Valor'
-								,C.id_CargosDesc					   				AS 'id_carg'
-								,I.id_ImpRet										AS 'id_imp'
-								,'Tipo'= CASE IR.cd_tipo 
-											WHEN 0 THEN 'I'
-											WHEN 1 THEN 'R'
-										 END     
-								,IR.ds_nombre 						   				AS 'Nombre'   
-								,IR.cd_cuenta										AS 'Cuenta'
-								,IR.bl_contabilizar									AS 'Contabilizar'
-								,convert(BIT,0)										AS 'noshow'
-								,isnull(IR.id_cargo_dep,0)                          AS 'id_cargo_dep'
-								,isnull(IR.id_imp_dep,0)							AS 'id_imp_dep'
-								,C.in_orden											AS 'C_Orden'
-								,i.in_Orden		 	   								AS 'I_Orden'
-								,bl_iva
-								,bl_iva2
-						FROM dbo.ConceptoFacturacion CF
-						INNER JOIN dbo.CargosAsignados C ON C.id_TiposConceptFac = CF.id_TiposConceptoFacturacion
-						INNER JOIN dbo.CargosDesc CD ON CD.id = C.id_CargosDesc
-						INNER JOIN  dbo.ImpAsignados I ON I.id_CargosAsignados = C.id
-						INNER JOIN dbo.ImpRet IR ON IR.id = I.id_ImpRet
-						WHERE CF.id = @id_ConceptFac AND CF.bl_contorlarCargImp=0 
-						*/							
-
-				 	) AS temptbl
-				 WHERE Codigo IS NOT NULL 
-				 ORDER BY C_Orden, I_Orden ,Id_carg,Id_imp
-			END 
-			ELSE
-			BEGIN
-				SELECT 	DISTINCT Codigo
-				 	,Concepto
-				 	,Porcentaje
-				 	,Editable
-				 	,Calcular
-				 	,Contado
-				 	,Credito
-				 	,Valor
-				 	,id_carg
-				 	,id_imp
-				 	,Tipo
-				 	,Nombre
-				 	,Cuenta
-				 	,Contabilizar
-				 	,NULL AS 'Respuesta'
-				 	,noshow 
-				 	,id_cargo_dep
-				 	,id_imp_dep	   
- 				 	,C_Orden
-				 	,I_Orden
-					,bl_iva
-					,bl_iva2
-				 FROM (
-				 		SELECT 	 CD.cd_codigo 				AS 'Codigo'
-							 	,cd.ds_nombre   			AS 'Concepto'
-							 	,convert(NUMERIC(8,4),am_porcentaje)	AS 'Porcentaje'
-							 	,'S'						AS 'Editable'
-							 	,CASE 
-							 		WHEN am_porcentaje > 0 THEN 'Calcular'								
-							 		ELSE 'N/A' END 
-							 		AS 'Calcular'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 THEN CC.am_valor ELSE CD.am_valdef END AS 'Contado'
-							 	,convert(money,0)			AS 'Credito'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 THEN CC.am_valor ELSE CD.am_valdef END AS 'Valor'
-								,CD.id 						AS 'id_carg'
-								,0							AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,cd.ds_nombre 				AS 'Nombre'   
-								,replicate(' ',16)			AS 'Cuenta'
-								,convert(BIT,0)				AS 'Contabilizar'
-								,cd.bl_noshow 				AS 'noshow'
-								,isnull(cd.id_cargo_dep,0) 	AS 'id_cargo_dep'
-								,0 							AS 'id_imp_dep'																
-								,in_Orden 					AS 'C_Orden'
-								,0		 					AS 'I_Orden'
-								,0		 					AS 'bl_iva'
-								,0		 					AS 'bl_iva2'
-							FROM dbo.CargosAsignados_ConceptoFac C 
-								INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-								LEFT JOIN dbo.ConfiguracionClientesConceptos CC ON CC.id_conceptofacturacion=C.id_ConceptoFac AND CC.Id_Cliente = @Id_Cliente AND CC.bl_inactivo=0
-							WHERE C.id_ConceptoFac = @id_ConceptFac
-							AND CD.id NOT IN (	--Excluimos cargos que ya estan en descuentos de clientes.
-												SELECT cd.Id
-												FROM dbo.Configuracion_remisiones C 
-													INNER JOIN dbo.Clientes_Descuentos CDSC ON CDSC.Id_Configuracion_remisiones = C.Id --And CDSC.id_ConceptoFacturacion IS NOT NULL
-													INNER JOIN dbo.CargosDesc CD ON CD.id = CDSC.id_CargosDesc
-												WHERE C.Id_Cliente = @Id_Cliente AND  (CDSC.id_ConceptoFacturacion = @id_ConceptFac OR CDSC.id_ConceptoFacturacion IS NULL)
-											  )
-						AND NOT EXISTS (
-										SELECT cd.id
-										FROM dbo.CLIENTES cl
-											INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-											INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-											INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-											INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-										WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-										)
-
-						UNION ALL
-						
-						SELECT 
-								 IR.cd_codigo 							AS 'Codigo'
-							 	,IR.ds_alias	   						AS 'Concepto'
-							 	,convert(NUMERIC(8,4),IR.am_porcentaje)	AS 'Porcentaje'
-							 	,'Editable' = CASE IR.bl_editar 
-												WHEN 0 THEN 'N'
-												WHEN 1 THEN 'S'
-									  		  END   
-							 	,'Calcular'								AS 'Calcular'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 AND IR.id_cargo_dep=1 AND IR.am_porcentaje>0 THEN convert(money,CC.am_valor*(IR.am_porcentaje/100)) ELSE convert(money,0) END AS 'Contado'
-							 	,convert(money,0)						AS 'Credito'
-							 	,CASE WHEN ISNULL(CC.am_valor,0)<>0 AND CD.id=1 AND IR.id_cargo_dep=1 AND IR.am_porcentaje>0 THEN convert(money,CC.am_valor*(IR.am_porcentaje/100)) ELSE convert(money,0) END AS 'Valor'
-								,C.id_CargosDesc						AS 'id_carg'
-								,I.id_ImpRet							AS 'id_imp'
-								,'Tipo'= CASE IR.cd_tipo 
-											WHEN 0 THEN 'I'
-											WHEN 1 THEN 'R'
-										 END     
-								,IR.ds_nombre 							AS 'Nombre'   
-								,IR.cd_cuenta							AS 'Cuenta'
-								,bl_contabilizar						AS 'Contabilizar'
-								,convert(BIT,0)							AS 'noshow'
-								,isnull(IR.id_cargo_dep,0) /*  isnull(c.id_CargosDesc,0) */                    AS 'id_cargo_dep' --rgelis 2017/02/11 se cambia por error en superdestinos
-								,isnull(IR.id_imp_dep,0)							AS 'id_imp_dep'
-								,C.in_orden											AS 'C_Orden'
-								,i.in_Orden		 	   								AS 'I_Orden'
-								,bl_iva
-								,bl_iva2
-							FROM dbo.CargosAsignados_ConceptoFac C 
-								INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-								LEFT JOIN dbo.ConfiguracionClientesConceptos CC ON CC.id_conceptofacturacion=C.id_ConceptoFac AND CC.Id_Cliente = @Id_Cliente AND CC.bl_inactivo=0
-								LEFT JOIN dbo.ImpAsignados_ConceptoFac I ON (C.id = I.id_CargosAsignados_ConceptoFac)
-								LEFT JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-							WHERE C.id_ConceptoFac = @id_ConceptFac
-							AND NOT EXISTS(
-											SELECT IR.id
-											FROM dbo.CLIENTES cl
-												INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-												INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-												INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-												INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-												INNER JOIN dbo.ImpAsignados_Configuracion_ImpCategoriaFiscal I ON (I.id_CargosAsignados_Configuracion_ImpCategoriaFiscal = C.id )
-												INNER JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-											WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-										   )
-
-						UNION ALL 
-						--Cargos por categoria fiscal del cliente
-				 		SELECT 	 CD.cd_codigo 				AS 'Codigo'
-							 	,cd.ds_nombre   			AS 'Concepto'
-							 	,convert(NUMERIC(8,4),0)	AS 'Porcentaje'
-							 	,'S'						AS 'Editable'
-							 	,'N/A'						AS 'Calcular'
-							 	,CD.am_valdef    			AS 'Contado'
-							 	,convert(money,0)			AS 'Credito'
-							 	,CD.am_valdef				AS 'Valor'
-								,CD.id 						AS 'id_carg'
-								,0							AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,cd.ds_nombre 				AS 'Nombre'   
-								,replicate(' ',16)			AS 'Cuenta'
-								,convert(BIT,0)				AS 'Contabilizar'
-								,cd.bl_noshow 				AS 'noshow'
-								,0 							AS 'id_cargo_dep'
-								,0 							AS 'id_imp_dep'																
-								,in_Orden 					AS 'C_Orden'
-								,0		 					AS 'I_Orden'			
-								,0		 					AS 'bl_iva'
-								,0		 					AS 'bl_iva2'																					
-						FROM dbo.CLIENTES cl
-							INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-							INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-							INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-							INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-						WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-						--AND CD.id NOT IN (
-						--					SELECT Cd.id
-						--					FROM dbo.CargosAsignados_ConceptoFac C 
-						--						INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-						--					WHERE C.id_ConceptoFac = @id_ConceptFac										
-						--					)						
-
-						UNION ALL 
-						--Impuestos por categoria fiscal del cliente
-						SELECT 
-								 IR.cd_codigo 										AS 'Codigo'
-							 	,IR.ds_alias	   									AS 'Concepto'
-							 	,convert(NUMERIC(8,4),IR.am_porcentaje)	AS 'Porcentaje'
-							 	,'Editable' = CASE IR.bl_editar 
-												WHEN 0 THEN 'N'
-												WHEN 1 THEN 'S'
-									  		  END   
-							 	,'Calcular'											AS 'Calcular'
-							 	,convert(money,0)									AS 'Contado'
-							 	,convert(money,0)									AS 'Credito'
-							 	,convert(money,0)									AS 'Valor'
-								,C.id_CargosDesc					   				AS 'id_carg'
-								,I.id_ImpRet										AS 'id_imp'
-								,'Tipo'= CASE IR.cd_tipo 
-											WHEN 0 THEN 'I'
-											WHEN 1 THEN 'R'
-										 END     
-								,IR.ds_nombre 						   				AS 'Nombre'   
-								,IR.cd_cuenta										AS 'Cuenta'
-								,bl_contabilizar									AS 'Contabilizar'
-								,convert(BIT,0)										AS 'noshow'
-								,isnull(IR.id_cargo_dep,0)                          AS 'id_cargo_dep'
-								,isnull(IR.id_imp_dep,0)							AS 'id_imp_dep'
-								,C.in_orden											AS 'C_Orden'
-								,i.in_Orden		 	   								AS 'I_Orden'
-								,bl_iva
-								,bl_iva2
-						FROM dbo.CLIENTES cl
-							INNER JOIN dbo.TERCEROS t ON t.IDTERCERO = cl.IDTERCERO
-							INNER JOIN dbo.Configuracion_ImpCategoriaFiscal CC ON CC.TipoEmpresa = t.TIPOEMPRESA
-							INNER JOIN dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal C ON C.id_Configuracion_ImpCategoriaFiscal =  CC.id
-							INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-							INNER JOIN dbo.ImpAsignados_Configuracion_ImpCategoriaFiscal I ON (I.id_CargosAsignados_Configuracion_ImpCategoriaFiscal = C.id )
-							INNER JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-						WHERE cl.IDCLIENTE = @Id_Cliente AND CC.id_TiposConceptFac = @id_TiposConceptoFacturacion
-						--AND IR.id NOT IN (
-						--					SELECT IR.id 
-						--					FROM dbo.CargosAsignados_ConceptoFac C 
-						--						INNER JOIN dbo.CargosDesc CD ON (C.id_CargosDesc = CD.id)
-						--						LEFT JOIN dbo.ImpAsignados_ConceptoFac I ON (C.id = I.id_CargosAsignados_ConceptoFac)
-						--						LEFT JOIN dbo.ImpRet IR ON (I.id_ImpRet = IR.id)
-						--					WHERE C.id_ConceptoFac = @id_ConceptFac					
-						--				)						
-
-						UNION ALL
-						-- descuentos configurados a cliente
-				 		SELECT 	 CD.cd_codigo 							AS 'Codigo'
-							 	,cd.ds_nombre   						AS 'Concepto'
-							 	,convert(NUMERIC(8,4),CDSC.am_porcentaje)	AS 'Porcentaje'
-							 	,'S'									AS 'Editable'
-							 	,CASE 
-							 		WHEN CDSC.am_porcentaje > 0 THEN 'Calcular'								
-							 		ELSE 'N/A' END 
-							 		AS 'Calcular'
-							 	,CDSC.am_valor    						AS 'Contado'
-							 	,convert(money,0)						AS 'Credito'
-							 	,CDSC.am_valor							AS 'Valor'
-								,CD.id 									AS 'id_carg'
-								,0										AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,cd.ds_nombre 							AS 'Nombre'   
-								,replicate(' ',16)						AS 'Cuenta'
-								,convert(BIT,0)							AS 'Contabilizar'
-								,cd.bl_noshow 							AS 'noshow'
-								,isnull(cd.id_cargo_dep,0) 				AS 'id_cargo_dep'
-								,0 										AS 'id_imp_dep'
-								,999	 								AS 'C_Orden'
-								,0		 								AS 'I_Orden'
-								,0		 					AS 'bl_iva'
-								,0		 					AS 'bl_iva2'
-							FROM dbo.Configuracion_remisiones C 
-								INNER JOIN dbo.Clientes_Descuentos CDSC ON CDSC.Id_Configuracion_remisiones = C.Id --And CDSC.id_ConceptoFacturacion IS NOT NULL
-								INNER JOIN dbo.CargosDesc CD ON CD.id = CDSC.id_CargosDesc
-							WHERE C.Id_Cliente = @Id_Cliente AND (CDSC.id_ConceptoFacturacion = @id_ConceptFac OR CDSC.id_ConceptoFacturacion IS NULL)
-							
-						/*UNION ALL
-						-- Asignacion de por tipo de concepto facturacion
-						SELECT  CD.cd_codigo 				AS 'Codigo'
-							 	,CD.ds_nombre   			AS 'Concepto'
-							 	,convert(NUMERIC(8,4),0)	AS 'Porcentaje'
-							 	,'S'						AS 'Editable'
-							 	,'N/A'						AS 'Calcular'
-							 	,CD.am_valdef    			AS 'Contado'
-							 	,convert(money,0)			AS 'Credito'
-							 	,CD.am_valdef				AS 'Valor'
-								,CD.id 						AS 'id_carg'
-								,0							AS 'id_imp'
-								,'Tipo'= CASE CD.cd_signo 
-											WHEN '+' THEN 'C'
-											WHEN '-' THEN 'D'
-										 END 				 
-								,CD.ds_nombre 				AS 'Nombre'   
-								,replicate(' ',16)			AS 'Cuenta'
-								,convert(BIT,0)				AS 'Contabilizar'
-								,cd.bl_noshow 				AS 'noshow'
-								,0 							AS 'id_cargo_dep'
-								,0 							AS 'id_imp_dep'																
-								,C.in_Orden 				AS 'C_Orden'
-								,0		 					AS 'I_Orden'		
-								,0		 					AS 'bl_iva'
-								,0		 					AS 'bl_iva2'
-						FROM dbo.ConceptoFacturacion CF
-						INNER JOIN dbo.CargosAsignados C ON C.id_TiposConceptFac = CF.id_TiposConceptoFacturacion
-						INNER JOIN dbo.CargosDesc CD ON CD.id = C.id_CargosDesc
-						WHERE CF.id = @id_ConceptFac AND CF.bl_contorlarCargImp=0	
-						
-						UNION ALL
-						
-						SELECT IR.cd_codigo 										AS 'Codigo'
-							 	,IR.ds_alias	   									AS 'Concepto'
-							 	,ISNULL(convert(NUMERIC(8,4),IR.am_porcentaje),0)	AS 'Porcentaje'
-							 	,'Editable' = CASE IR.bl_editar 
-												WHEN 0 THEN 'N'
-												WHEN 1 THEN 'S'
-									  		  END   
-							 	,'Calcular'											AS 'Calcular'
-							 	,convert(money,0)									AS 'Contado'
-							 	,convert(money,0)									AS 'Credito'
-							 	,convert(money,0)									AS 'Valor'
-								,C.id_CargosDesc					   				AS 'id_carg'
-								,I.id_ImpRet										AS 'id_imp'
-								,'Tipo'= CASE IR.cd_tipo 
-											WHEN 0 THEN 'I'
-											WHEN 1 THEN 'R'
-										 END     
-								,IR.ds_nombre 						   				AS 'Nombre'   
-								,IR.cd_cuenta										AS 'Cuenta'
-								,IR.bl_contabilizar									AS 'Contabilizar'
-								,convert(BIT,0)										AS 'noshow'
-								,isnull(IR.id_cargo_dep,0)                          AS 'id_cargo_dep'
-								,isnull(IR.id_imp_dep,0)							AS 'id_imp_dep'
-								,C.in_orden											AS 'C_Orden'
-								,i.in_Orden		 	   								AS 'I_Orden'
-								,bl_iva
-								,bl_iva2
-						FROM dbo.ConceptoFacturacion CF
-						INNER JOIN dbo.CargosAsignados C ON C.id_TiposConceptFac = CF.id_TiposConceptoFacturacion
-						INNER JOIN dbo.CargosDesc CD ON CD.id = C.id_CargosDesc
-						INNER JOIN dbo.ImpAsignados I ON I.id_CargosAsignados = C.id
-						INNER JOIN dbo.ImpRet IR ON IR.id = I.id_ImpRet
-						WHERE CF.id = @id_ConceptFac AND CF.bl_contorlarCargImp=0 
-						*/
-				 	) AS temptbl
-				 WHERE Codigo IS NOT NULL 
-				 ORDER BY C_Orden, I_Orden ,Id_carg,Id_imp
-			END 
-			 
-			--------------------------------------------------------------------------
-						
-			RETURN @retval 
-	    END TRY 
-    
-    	-- Bloque CATCH (Manejo de excepciones)
-    	BEGIN CATCH 
- 		
- 			-- Tiempo de espera alcanzado --
-		    IF ERROR_NUMBER() = 1222
-		    BEGIN
-      			SET @msg =  'No se pudo ejecutar el proceso. Tiempo de espera agotado.';
-      			SET @retval = 1
-	   	        RAISERROR (@msg,16,125);
-	   	        RETURN @retval;
-		    END
-		    
-		    -- Registro bloqueado / Conflicto de actualizacion
-		    ELSE IF ERROR_NUMBER() IN (1205, 3960)
-    		BEGIN  	        
-		       	SET @retry     = 1              ;
-		       	SET @retrycont = @retrycont + 1 ; 
-	    	 END
-	    	 ELSE
-		     BEGIN
-		     	-- Error no manejado --
-
-
-					SET @retval = 1;
-  	 				SET @msg =	'Ha ocurrido un error. Información para soporte tecnico:'			+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							    'Numero: ' + isnull(CAST(ERROR_NUMBER()   AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Mensaje: ' + isnull(ERROR_MESSAGE(),'') 					   		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							 	'Severidad: ' + isnull(CAST(ERROR_SEVERITY() AS VARCHAR(10)),'') 	+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							 	'Estado: ' + isnull(CAST(ERROR_STATE()    AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Procedimiento: ' + isnull(ERROR_PROCEDURE(),'')					+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Linea: ' + isnull(CAST(ERROR_LINE() 	   AS VARCHAR(10)),''); 							
-		
-					RAISERROR (@msg,16,126);
-					--Se debe auditar proceso fallido
-					/*IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar	@id_proceso = @idproce   ,
-											 			 			@id_usuario = @id_usuario ,
-											 			 			@cd_status  = 0           , 
-											 			 			@admsg      = @msg	  ;*/				
-					RETURN @retval;
-		     END
-		END CATCH     
-	END 
-	
-	IF (@retrycont>@maxretries) 
-	BEGIN 
-		SET @retval = 1
-		SET @msg = 'No se pudo finalizar el proceso. Maximo numero de reintentos alcanzado.'
-		--Se debe auditar proceso fallido
-		/*IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-											 			 @id_usuario = @id_usuario ,
-											 			 @cd_status  = 0           , 
-											 			 @admsg      = @msg	   ;*/												 	   					   
-  		RAISERROR (@msg,16,127);
-  		RETURN @retval;
-  	END   	
-    
-    RETURN @retval;
-END
-
-
--- Archivo: spConfiguracionVariablesObtenerValores.sql
-﻿-- Eliminar si existe
-If Exists ( Select Name From sys.objects Where object_id = OBJECT_ID( N'[dbo].[spConfiguracionVariablesObtenerValores]' ) And OBJECTPROPERTY( object_id , N'IsProcedure' ) = 1 )
-	DROP PROCEDURE dbo.spConfiguracionVariablesObtenerValores
+    IF @p_texto IS NULL RETURN NULL;
+    DECLARE @res NVARCHAR(MAX) = @p_texto;
+    SET @res = REPLACE(@res, N'á', N'a');
+    SET @res = REPLACE(@res, N'é', N'e');
+    SET @res = REPLACE(@res, N'í', N'i');
+    SET @res = REPLACE(@res, N'ó', N'o');
+    SET @res = REPLACE(@res, N'ú', N'u');
+    SET @res = REPLACE(@res, N'Á', N'A');
+    SET @res = REPLACE(@res, N'É', N'E');
+    SET @res = REPLACE(@res, N'Í', N'I');
+    SET @res = REPLACE(@res, N'Ó', N'O');
+    SET @res = REPLACE(@res, N'Ú', N'U');
+    SET @res = REPLACE(@res, N'ñ', N'n');
+    SET @res = REPLACE(@res, N'Ñ', N'N');
+    RETURN @res;
+END;
 GO
 
-CREATE PROCEDURE [dbo].[spConfiguracionVariablesObtenerValores] 
-	-- Parametros del procedimiento
-	@id_usuario 	INT,
-	@id_Reservas	VARCHAR(8000)=NULL,
-	@cd_Reservas    Varchar(25)=NULL,
-	@id_ReservaGDS_Detalles INT=NULL, --rgelis 2018/10/26 req.62804
-	@id_ReservaGDS_Servicios INT=NULL --rgelis 2018/10/26 req.62804
-	
+-- 1.2. fnObtenerSiguienteConsecutivo
+IF OBJECT_ID('dbo.fnObtenerSiguienteConsecutivo', 'FN') IS NOT NULL
+    DROP FUNCTION dbo.fnObtenerSiguienteConsecutivo;
+GO
 
-WITH Encryption	
+CREATE FUNCTION dbo.fnObtenerSiguienteConsecutivo
+(
+    @p_tipo NVARCHAR(50)
+)
+RETURNS NVARCHAR(50)
 AS
 BEGIN
-	-- SET NOCOUNT ON: Previene que conjuntos de resultados extras interfieran con 
-	-- expresiones SELECT
-	SET NOCOUNT ON;
-
-    -- Declaracion e inicializacion de variables
-  	DECLARE @bl_permit			 BIT 	, -- Permiso de ejecucion del proceso
-  			@bl_as 	   			 BIT	, -- Auditar exito
-	 		@bl_af 			     BIT	, -- Auditar fallido	 		
-			@procmsg	VARCHAR(8000)	, -- Mensaje devuelto por procedimientos llamados desde este procedimiento
-			@procret 	BIT 			, -- Valor de retorno de los procedimientos llamados desde este procedimiento
-			@idproce	int		    	, -- Codigo de proceso
-	 		@retry 		BIT			    , -- 1=Reintentar ; 0=Abortar  
-	 		@retrycont	INT			    , -- Contador de reintentos
-	 		@maxretries INT			    , -- Maximo numero de reintentos
-	 		@timeout	NVARCHAR(4000)  , -- Tiempo de espera maximo por bloqueo de registros
-	 		@stmt 		NVARCHAR(4000)  , -- Cadena de instrucciones T-SQL
-			@msg	    VARCHAR(8000)   , -- Mensaje retornado por el sistema
-			@retval		TINYINT 		, -- Valor de retorno de este procedimiento: 0:Exito ; 1:Error(Bloque Catch)
-			@Id_DQB_Conciliacion INT	;
-
-	SELECT 	@idproce 			 = 210,
-			@retry				 = 1,
-			@retrycont			 = 0,
-			@retval				 = 0;
-  	
-  	-- Manejo de tiempo de espera y de reintentos por bloqueo de tablas/registros  
-   	SELECT @maxretries = convert(INT,Valor) FROM dbo.Parametros WHERE Id = 60 ;
-	SELECT @timeout    = convert(NVARCHAR(4000),Valor) FROM dbo.Parametros WHERE Id = 50 ;		
-	SET @stmt = N'SET LOCK_TIMEOUT '+ltrim(rtrim(@timeout))
-	EXEC sp_executesql @stmt,N''
-	
-	
-	WHILE ( (@retry = 1) AND (@retrycont <= @maxretries) )
-	BEGIN
-		SET @retry = 0;
-    
-    	-- Bloque TRY
-    	BEGIN TRY 
-    	    		
-    		--Obteniendo informacion de seguridad y auditoria--
-			EXEC dbo.spzaProcesoUsuario_Consultar @id_usuario   = @id_usuario       ,
-												  @id_proceso   = @idproce 		    , 
-												  @bl_permit    = @bl_permit OUTPUT , 
-												  @bl_auditsuc  = @bl_as 	 OUTPUT , 
-												  @bl_auditfail = @bl_af 	 OUTPUT ;
-			IF (@bl_permit = 0)
-			BEGIN 
-				SELECT 'No posee permisos suficientes para ejecutar esta acción.' AS 'Respuesta'
-				RETURN @retval;
-			END 
-			
-			--Instrucciones del procedimiento-----------------------------------------
-
-
-			DECLARE 
-				@GDS 				VARCHAR(MAX)
-				, @NumVariables 	INT 
-				, @Iden_GDS			INT 
-				, @Contador			INT 
-				, @Fila 			VARCHAR(MAX)
-				--Informacion de las variables
-				, @id_Reserva       INT
-				, @Iden_Variable    NUMERIC (18)
-				, @ds_Linea         VARCHAR (20)
-				, @ds_campo         VARCHAR (20)
-				, @in_tipo_longitud INT
-				, @in_posinicial    INT
-				, @in_longitud      INT
-				, @ValorObtenido	 VARCHAR(MAX)
-				, @PNR				VARCHAR(12)	
-				, @IDEN_Maestro		INT --rgelis 2018/10/26 req.62804
-				, @NumVariablesFomuladas INT
-				, @Formula			VARCHAR(MAX)
-				, @FormulaAux		VARCHAR(MAX)
-
-			 
-			DECLARE @Tabla TABLE(id_Reserva INT,GDS VARCHAR(MAX),Iden_GDS INT) --rgelis 2017/03/16 req.48076
-			DECLARE @TVariablesFormula AS TABLE(id INT IDENTITY,Iden_variable NUMERIC(18),cd_variable VARCHAR(max))
-			IF ISNULL(@cd_Reservas,'') <> ''
-			BEGIN
-				INSERT INTO @Tabla(id_Reserva,GDS,Iden_GDS) --rgelis 2017/03/16 req.48076
-				SELECT r.id AS id_Reserva, r.reserva AS  GDS , r.iden_gds  
-				FROM dbo.ReservasGDS r WHERE r.cd_codigo = @cd_Reservas
-				  
-				--SET @PNR = @cd_Reservas --rgelis 2017/03/16 req.48076
-			END
-			ELSE
-			BEGIN 
-				INSERT INTO @Tabla(id_Reserva,GDS,Iden_GDS) --rgelis 2017/03/16 req.48076
-				SELECT r.id AS id_Reserva, r.reserva AS  GDS , r.iden_gds
-				FROM dbo.ReservasGDS r
-				INNER JOIN dbo.fnSplitMejorado(@id_Reservas,',',0,1) AS s ON CONVERT(INT,s.Codigo) = r.id
-			
-				--SELECT @PNR = cd_codigo --rgelis 2017/03/16 req.48076
-				--FROM dbo.ReservasGDS
-				--WHERE Id IN (SELECT id_Reserva FROM @Tabla)	
-			END  
-
-			DECLARE @TVariables TABLE 
-							(
-							Id               INT IDENTITY NOT NULL,
-							Id_Reserva		 INT NOT NULL, --rgelis 2017/03/16 req.48076
-							IDEN_Maestro	 NUMERIC (18) NOT NULL,	--rgelis 2017/03/16 req.48076
-							Iden_Variable    NUMERIC (18) NOT NULL,
-							ds_Linea         VARCHAR (20),
-							ds_campo         VARCHAR (20) NOT NULL,
-							in_tipo_longitud INT NOT NULL,
-							in_posinicial    INT NOT NULL,
-							in_longitud      INT NOT NULL,
-							ValorObtenido	 VARCHAR(MAX),
-							Formula			 VARCHAR(MAX)
-							)
-				
-			--Obtenemos la informacion de la reserva
-			--SELECT  --rgelis 2017/03/16 req.48076
-			--	@GDS = Reserva 
-			--	,@Iden_GDS = iden_gds
-			--FROM dbo.ReservasGDS 
-			--WHERE cd_codigo=@PNR
-
-			IF @id_ReservaGDS_Detalles = 0 --rgelis 2018/10/26 req.62804
-				SET @id_ReservaGDS_Detalles =  NULL
-			
-			IF @id_ReservaGDS_Servicios = 0
-				SET @id_ReservaGDS_Servicios =  NULL --rgelis 2018/10/26 req.62804
-
-			IF @id_ReservaGDS_Detalles IS NULL AND @id_ReservaGDS_Servicios IS NULL --rgelis 2018/10/26 req.62804
-			BEGIN 
-				--Insetamos la reserva por filas en una tabla temporal
-				Declare @TableReserva AS TABLE(id INT IDENTITY,Fila VARCHAR(max),id_reserva INT) --inicio rgelis 2017/03/16 req.48076
-				INSERT INTO @TableReserva(Fila,id_reserva) 
-				SELECT REPLACE(REPLACE(f.Codigo,CHAR(10),''),CHAR(13),'')  AS Fila,r.id_Reserva 
-				FROM @Tabla r
-				OUTER APPLY dbo.fnSplitMejorado(r.GDS,CHAR(13)+CHAR(10),0,0) AS f --rgelis 2017/05/10 req.....
-				ORDER BY r.id_Reserva,f.id  --fin rgelis 2017/03/16 req.48076
-
-				
-				--UPDATE @TableReserva
-				--SET FILA = REPLACE(REPLACE(filA,CHAR(10),''),CHAR(13),'')
-
-				--Obtenemos la informacion de las variables parametrizadas para el GDS de la reserva
-				INSERT INTO @TVariables (Id_Reserva,IDEN_Maestro,Iden_Variable,ds_Linea,ds_campo,in_tipo_longitud,in_posinicial,in_longitud,Formula) --inicio rgelis 2017/03/16 req.48076
-				SELECT r.id_Reserva,c.IDEN_Maestro,c.Iden_Variable,c.ds_Linea,c.ds_campo,c.in_tipo_longitud,c.in_posinicial,c.in_longitud,v.FormulaDefault AS 'Formula' 
-				FROM @Tabla r 
-				INNER JOIN dbo.ConfiguracionVariables c ON (r.Iden_GDS = c.Iden_GDS OR c.Iden_GDS = 0)
-				INNER JOIN dbo.VariableDefinicion v ON v.IDEN = c.Iden_Variable
-				GROUP BY r.id_Reserva,c.IDEN_Maestro,c.Iden_Variable,c.ds_Linea,c.ds_campo,c.in_tipo_longitud,c.in_posinicial,c.in_longitud,v.FormulaDefault --fin rgelis 2017/03/16 req.48076  
-
-				SET @NumVariables = @@ROWCOUNT
-				/*declare @comodin char(1)*/ --Solo FROSCH
-				--select * from @TVariables
-				--Inicializamos variables
-				SET @Contador = 1
-				--Ciclo para obtener la informacion de las varibles
-				WHILE @Contador <= @NumVariables
-				BEGIN 
-	
-					SELECT 
-						@ds_Linea = RTRIM(ds_Linea)  --rgelis 2020/01/07 ticket.110744
-						, @ds_campo = RTRIM(ds_campo) --rgelis 2020/01/07 ticket.110744
-						, @in_tipo_longitud = in_tipo_longitud
-						, @in_posinicial = in_posinicial
-						, @in_longitud = in_longitud
-						, @Id_Reserva = Id_Reserva --rgelis 2017/03/16 req.48076
-					FROM @TVariables WHERE Id = @Contador
-					/*SET @Comodin = Case When right(@ds_campo,1) NOT IN ('*','-','/') THEN space(1) Else '' END*/ --Solo FROSCH
-					/*SELECT @Fila = Fila FROM @TableReserva WHERE Fila LIKE (@ds_Linea+'%') AND Fila LIKE ('%'+@ds_campo+@comodin+'%') AND id_reserva = @Id_Reserva --fin rgelis 2017/03/16 req.48076*/--Solo FROSCH
-					SELECT @Fila = Fila FROM @TableReserva WHERE Fila LIKE (@ds_Linea+'%') AND Fila LIKE ('%'+@ds_campo+'%') AND id_reserva = @Id_Reserva --fin rgelis 2017/03/16 req.48076
-					SELECT @ValorObtenido = substring(@Fila,charindex(@ds_campo,@Fila,0)+len(@ds_campo),len(@Fila))
-				
-					--Debug
-					--SELECT 
-					--	@ds_Linea AS '@ds_Linea', @ds_campo AS '@ds_campo', @in_tipo_longitud AS '@in_tipo_longitud', @in_posinicial AS '@in_posinicial', @in_longitud AS '@in_longitud'
-					--	, @Fila AS '@Fila', @ValorObtenido AS '@ValorObtenido'
-
-					--Si es longitud fija,obtenemos la informacion segun la configuracion de la variables
-					IF @in_tipo_longitud = 0
-					BEGIN
-						SET @ValorObtenido = substring(@ValorObtenido,@in_posinicial,@in_longitud)
-					END 
-	
-					UPDATE @TVariables
-					SET ValorObtenido = @ValorObtenido
-					WHERE Id = @Contador	
-		
-					SET @Contador = @Contador + 1
-					SELECT @Fila = ''
-				END 
-			END
-			ELSE IF @id_ReservaGDS_Detalles IS NOT NULL 
-			BEGIN
-				SELECT @IDEN_Maestro = IDEN FROM dbo.VariableDefinicionMaestro WHERE Codigo = 'Tiquetes' 
-				INSERT INTO @TVariables (Id_Reserva,IDEN_Maestro,Iden_Variable,ds_Linea,ds_campo,in_tipo_longitud,in_posinicial,in_longitud,ValorObtenido,Formula) 
-				SELECT r.id_Reserva, @IDEN_Maestro AS 'IDEN_Maestro', VD.IDEN AS 'Iden_Variable', '' AS 'ds_Linea', r.ds_nombre AS ds_campo, 0 AS 'in_tipo_longitud', 0 AS 'in_posinicial', 0 AS 'in_longitud', r.ds_valor AS 'ValorObtenido', VD.FormulaDefault AS 'Formula'
-				FROM dbo.ReservaGDS_VariableAdicional r
-				INNER JOIN @Tabla t ON t.id_Reserva = r.id_reserva 
-				INNER JOIN VariableDefinicion VD ON VD.Nombre = r.ds_nombre
-				WHERE r.id_ReservaGDS_Detalles = @id_ReservaGDS_Detalles
-					AND VD.IDEN_TipoVariable = 2
-			END
-			ELSE IF @id_ReservaGDS_Servicios IS NOT NULL 
-			BEGIN
-				SELECT @IDEN_Maestro = IDEN FROM dbo.VariableDefinicionMaestro WHERE Codigo = 'FacturacionServicios' 
-				INSERT INTO @TVariables (Id_Reserva,IDEN_Maestro,Iden_Variable,ds_Linea,ds_campo,in_tipo_longitud,in_posinicial,in_longitud,ValorObtenido,Formula) 
-				SELECT r.id_Reserva, @IDEN_Maestro AS 'IDEN_Maestro', VD.IDEN AS 'Iden_Variable', '' AS 'ds_Linea', r.ds_nombre AS ds_campo, 0 AS 'in_tipo_longitud', 0 AS 'in_posinicial', 0 AS 'in_longitud', r.ds_valor AS 'ValorObtenido',VD.FormulaDefault AS 'Formula'
-				FROM dbo.ReservaGDS_VariableAdicional r
-				INNER JOIN @Tabla t ON t.id_Reserva = r.id_reserva 
-				INNER JOIN VariableDefinicion VD ON VD.Nombre = r.ds_nombre
-				WHERE r.id_ReservaGDS_Servicios = @id_ReservaGDS_Servicios
-					AND VD.IDEN_TipoVariable = 2
-				
-			END
-
-			SELECT @NumVariables = Count(*) FROM @TVariables 
-			SELECT @NumVariablesFomuladas = Count(*) FROM @TVariables WHERE ISNULL(Formula,'')<>'' 
-			SET @Contador = 1
-			--Ciclo para obtener la informacion de las varibles formuladas
-			IF (ISNULL(@NumVariablesFomuladas,0)>0)
-			BEGIN
-				WHILE @Contador <= @NumVariables
-				BEGIN
-					SELECT 
-						@ds_Linea = RTRIM(ds_Linea)  
-						, @ds_campo = RTRIM(ds_campo) 
-						, @in_tipo_longitud = in_tipo_longitud
-						, @in_posinicial = in_posinicial
-						, @in_longitud = in_longitud
-						, @Id_Reserva = Id_Reserva 
-						, @Formula = RTRIM(Formula)
-					FROM @TVariables WHERE Id = @Contador AND ISNULL(Formula,'')<>''
-
-					IF ISNULL(@Formula,'')<>''
-					BEGIN
-						SET @FormulaAux= REPLACE(REPLACE(REPLACE(REPLACE(@Formula,'Z!VAR_',''),'!',''),'&',','),'+',',')
-					
-						DELETE FROM @TVariablesFormula
-					
-						INSERT INTO @TVariablesFormula(Iden_Variable,cd_variable)
-						SELECT Iden_Variable=IDEN ,cd_variable=Codigo 
-						FROM dbo.fnSplitMejorado(@FormulaAux,',',0,1) ve
-						INNER JOIN dbo.VariableDefinicion v ON v.Nombre = ve.Codigo AND v.TipoVariable='Documento'
-					
-						SET @ValorObtenido=@Formula
-						SELECT @ValorObtenido=REPLACE(REPLACE(REPLACE(@ValorObtenido,'Z!VAR_'+cd_variable+'!',ValorObtenido),'&',''),'+','') 
-						FROM @TVariables v
-						INNER JOIN @TVariablesFormula vf ON vf.Iden_variable = v.Iden_Variable  
-					
-						UPDATE @TVariables
-						SET ValorObtenido = @ValorObtenido
-						WHERE Id = @Contador AND ISNULL(Formula,'')<>''
-					END
-				END
-			END
-
-			SELECT DISTINCT
-				TV.Iden_Variable
-	  			,VD.Nombre
-	  			,TV.ValorObtenido
-				,TV.Id_Reserva --inicio rgelis 2017/03/16 req.48076
-				,TV.IDEN_Maestro 
-				,VDM.Codigo AS cd_Maestro --fin rgelis 2017/03/16 req.48076 
-			FROM @TVariables TV
-			INNER JOIN VariableDefinicion VD ON VD.Iden = TV.Iden_Variable
-			INNER JOIN VariableDefinicionMaestro VDM ON VDM.IDEN = TV.IDEN_Maestro --rgelis 2017/03/16 req.48076     
-			--WHERE ISNULL(ValorObtenido,'') <> '' --rgelis 2017/03/15 req..... correcion para que traiga todas las variables configuradas
-			
-			IF (@@ROWCOUNT<1)
-				SET @msg = 'Consulta Fallida';
-							
-			--------------------------------------------------------------------------
-			--Determinando si se debe auditar el proceso exitoso
-			IF (@bl_as = 1) 
-			BEGIN 										
-				EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-												 @id_usuario = @id_usuario ,
-												 @cd_status  = 1           , 												 
-												 @admsg      = NULL        ,
-							 					 @msgparams  = @msg;
-			END 			 						 		 	
-			--SELECT ltrim(rtrim(@msg)) AS 'Respuesta';			
-			RETURN @retval;
-	    END TRY 
-    
-    	-- Bloque CATCH (Manejo de excepciones)
-    	BEGIN CATCH 
- 			
- 			-- Tiempo de espera alcanzado --
-			IF ERROR_NUMBER() = 1222
-			BEGIN
-      			SET @msg =  'No se pudo ejecutar el proceso. Tiempo de espera agotado.';
-      			SET @retval = 1
-	   			RAISERROR (@msg,16,125);
-	   	       	--Se debe auditar proceso fallido
-				IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce ,
-													 			 @id_usuario = @id_usuario ,
-													 			 @cd_status  = 0           , 
-													 			 @admsg      = @msg	   ;				
-	   	        RETURN @retval;
-			END 
-		   -- Registro bloqueado / Conflicto de actualizacion
-			ELSE IF ERROR_NUMBER() IN (1205, 3960)
-			BEGIN	   	        
-		       	SET @retry     = 1              ;
-		       	SET @retrycont = @retrycont + 1 ; 
-
-	    	END
-	    	ELSE
-		    BEGIN
-				-- Error no manejado --
-				--IF (XACT_STATE() <> 0)
-	   	        BEGIN 				
-					SET @retval = 1;
-  	 				SET @msg =	'Ha ocurrido un error. Información para soporte tecnico:'			+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							    'Numero: ' + isnull(CAST(ERROR_NUMBER()   AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Mensaje: ' + isnull(ERROR_MESSAGE(),'') 					   		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							 	'Severidad: ' + isnull(CAST(ERROR_SEVERITY() AS VARCHAR(10)),'') 	+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							 	'Estado: ' + isnull(CAST(ERROR_STATE()    AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Procedimiento: ' + isnull(ERROR_PROCEDURE(),'')					+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Linea: ' + isnull(CAST(ERROR_LINE() 	   AS VARCHAR(10)),''); 							
-		
-					RAISERROR (@msg,16,126);
-					--Se debe auditar proceso fallido
-					IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar	@id_proceso = @idproce   ,
-											 			 			@id_usuario = @id_usuario ,
-											 			 			@cd_status  = 0           , 
-											 			 			@admsg      = @msg	  ;				
-					RETURN @retval;
-	   	        END 
-		     END
-		END CATCH     
-	END 
-	
-	IF (@retrycont>@maxretries) 
-	BEGIN 
-		SET @retval = 1
-		SET @msg = 'No se pudo finalizar el proceso. Maximo numero de reintentos alcanzado.'
-		--Se debe auditar proceso fallido
-		IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-											 			 @id_usuario = @id_usuario ,
-											 			 @cd_status  = 0           , 
-											 			 @admsg      = @msg	   ;												 	   					   
-  		RAISERROR (@msg,16,127);
-  		RETURN @retval;
-  	END   	
-    
-    RETURN @retval;
-END
+    DECLARE @siguiente INT = 1;
+    IF UPPER(@p_tipo) = N'COTIZACION'
+    BEGIN
+        SELECT @siguiente = ISNULL(MAX(id), 0) + 1 FROM dbo.[Quotation];
+        RETURN N'COT-' + RIGHT('000000' + CAST(@siguiente AS NVARCHAR(10)), 6);
+    END;
+    IF UPPER(@p_tipo) = N'FACTURA'
+    BEGIN
+        SELECT @siguiente = ISNULL(MAX(id), 0) + 1 FROM dbo.[Invoices];
+        RETURN N'FAC-' + RIGHT('000000' + CAST(@siguiente AS NVARCHAR(10)), 6);
+    END;
+    RETURN CAST(@siguiente AS NVARCHAR(50));
+END;
 GO
 
+-- 1.3. fnInterfaceExtractParamValue
+IF OBJECT_ID('dbo.fnInterfaceExtractParamValue', 'FN') IS NOT NULL
+    DROP FUNCTION dbo.fnInterfaceExtractParamValue;
+GO
 
--- Archivo: spCotizacionesCrear.sql
+CREATE FUNCTION dbo.fnInterfaceExtractParamValue
+(
+    @p_paramsXml NVARCHAR(MAX),
+    @p_paramCode NVARCHAR(100)
+)
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+    IF @p_paramsXml IS NULL OR @p_paramCode IS NULL RETURN NULL;
+    RETURN NULL;
+END;
+GO
+
+-- ============================================================================
+-- SECCIÓN 2: PROCEDIMIENTOS ALMACENADOS DE MAESTROS Y CATALOGOS (T-SQL)
+-- ============================================================================
+
+-- 2.1. spMonedaListar
+IF OBJECT_ID('dbo.spMonedaListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spMonedaListar;
+GO
+
+CREATE PROCEDURE dbo.spMonedaListar
+    @p_currency_id INT = NULL,
+    @p_id INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @id INT = COALESCE(@p_currency_id, @p_id);
+    SELECT
+        c.[id],
+        c.[code],
+        c.[name],
+        c.[exchangeRate],
+        c.[decimals],
+        ISNULL(c.[isActive], 1) AS [isActive],
+        CASE WHEN ISNULL(c.[isActive], 1) = 1 THEN 0 ELSE 1 END AS [inactive]
+    FROM dbo.[Currency] c
+    WHERE (@id IS NULL OR c.[id] = @id)
+    ORDER BY c.[code] ASC;
+END;
+GO
+
+-- 2.2. spMonedaCrear
+IF OBJECT_ID('dbo.spMonedaCrear', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spMonedaCrear;
+GO
+
+CREATE PROCEDURE dbo.spMonedaCrear
+    @p_code NVARCHAR(10),
+    @p_name NVARCHAR(100),
+    @p_exchange_rate FLOAT = 1.0,
+    @p_decimals INT = 2,
+    @p_acting_user_id INT = NULL,
+    @p_currency_id INT OUTPUT,
+    @p_mensaje_resultado NVARCHAR(255) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF EXISTS (SELECT 1 FROM dbo.[Currency] WHERE [code] = @p_code)
+        BEGIN
+            SET @p_currency_id = 0;
+            SET @p_mensaje_resultado = N'ERROR: El código de moneda ya está registrado';
+            RETURN;
+        END;
+
+        INSERT INTO dbo.[Currency] ([code], [name], [exchangeRate], [decimals], [isActive])
+        VALUES (@p_code, @p_name, ISNULL(@p_exchange_rate, 1.0), ISNULL(@p_decimals, 2), 1);
+
+        SET @p_currency_id = SCOPE_IDENTITY();
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Moneda creada con ID ', @p_currency_id);
+    END TRY
+    BEGIN CATCH
+        SET @p_currency_id = 0;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+    END CATCH;
+END;
+GO
+
+-- 2.3. spClienteListar
+IF OBJECT_ID('dbo.spClienteListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spClienteListar;
+GO
+
+CREATE PROCEDURE dbo.spClienteListar
+    @p_cliente NVARCHAR(150) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        c.[id],
+        c.[name],
+        c.[document],
+        c.[contactInfo],
+        c.[address],
+        c.[sellerId],
+        s.[name] AS [sellerName],
+        ISNULL(c.[isActive], 1) AS [isActive],
+        ISNULL(c.[creditDays], 0) AS [creditDays]
+    FROM dbo.[Client] c
+    LEFT JOIN dbo.[Seller] s ON c.[sellerId] = s.[id]
+    WHERE (@p_cliente IS NULL OR LTRIM(RTRIM(@p_cliente)) = '' OR c.[name] LIKE '%' + TRIM(@p_cliente) + '%' OR c.[document] LIKE '%' + TRIM(@p_cliente) + '%')
+    ORDER BY c.[name] ASC;
+END;
+GO
+
+-- 2.4. spBranchListar
+IF OBJECT_ID('dbo.spBranchListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spBranchListar;
+GO
+
+CREATE PROCEDURE dbo.spBranchListar
+    @p_id INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT b.[id], b.[code], b.[name], ISNULL(b.[isActive], 1) AS [isActive]
+    FROM dbo.[Branch] b
+    WHERE (@p_id IS NULL OR b.[id] = @p_id)
+    ORDER BY b.[name] ASC;
+END;
+GO
+
+-- 2.5. spImplantListar
+IF OBJECT_ID('dbo.spImplantListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spImplantListar;
+GO
+
+CREATE PROCEDURE dbo.spImplantListar
+    @p_branchId INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT i.[id], i.[code], i.[name], i.[branchId], b.[name] AS [branchName], ISNULL(i.[isActive], 1) AS [isActive]
+    FROM dbo.[Implant] i
+    LEFT JOIN dbo.[Branch] b ON i.[branchId] = b.[id]
+    WHERE (@p_branchId IS NULL OR i.[branchId] = @p_branchId)
+    ORDER BY i.[name] ASC;
+END;
+GO
+
+-- 2.6. spSellerListar
+IF OBJECT_ID('dbo.spSellerListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spSellerListar;
+GO
+
+CREATE PROCEDURE dbo.spSellerListar
+    @p_id INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT s.[id], s.[code], s.[name], s.[email], ISNULL(s.[isActive], 1) AS [isActive]
+    FROM dbo.[Seller] s
+    WHERE (@p_id IS NULL OR s.[id] = @p_id)
+    ORDER BY s.[name] ASC;
+END;
+GO
+
+-- 2.7. spProviderTypeListar
+IF OBJECT_ID('dbo.spProviderTypeListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spProviderTypeListar;
+GO
+
+CREATE PROCEDURE dbo.spProviderTypeListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT pt.[id], pt.[code], pt.[name], pt.[isAirline], ISNULL(pt.[active], 1) AS [active]
+    FROM dbo.[ProviderType] pt
+    ORDER BY pt.[name] ASC;
+END;
+GO
+
+-- 2.8. spProviderListar
+IF OBJECT_ID('dbo.spProviderListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spProviderListar;
+GO
+
+CREATE PROCEDURE dbo.spProviderListar
+    @p_providerTypeId INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT p.[id], p.[code], p.[name], p.[contactInfo], p.[providerTypeId], pt.[name] AS [providerTypeName], ISNULL(p.[isActive], 1) AS [isActive]
+    FROM dbo.[Provider] p
+    LEFT JOIN dbo.[ProviderType] pt ON p.[providerTypeId] = pt.[id]
+    WHERE (@p_providerTypeId IS NULL OR p.[providerTypeId] = @p_providerTypeId)
+    ORDER BY p.[name] ASC;
+END;
+GO
+
+-- 2.9. spPrestadoraListar
+IF OBJECT_ID('dbo.spPrestadoraListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spPrestadoraListar;
+GO
+
+CREATE PROCEDURE dbo.spPrestadoraListar
+    @p_providerId INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT pr.[id], pr.[code], pr.[name], pr.[location], pr.[category], pr.[providerId], p.[name] AS [providerName], ISNULL(pr.[isActive], 1) AS [isActive]
+    FROM dbo.[Prestadora] pr
+    LEFT JOIN dbo.[Provider] p ON pr.[providerId] = p.[id]
+    WHERE (@p_providerId IS NULL OR pr.[providerId] = @p_providerId)
+    ORDER BY pr.[name] ASC;
+END;
+GO
+
+-- 2.10. spTicketTypeListar
+IF OBJECT_ID('dbo.spTicketTypeListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spTicketTypeListar;
+GO
+
+CREATE PROCEDURE dbo.spTicketTypeListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT tt.[id], tt.[code], tt.[name], tt.[description], ISNULL(tt.[isActive], 1) AS [isActive]
+    FROM dbo.[TicketType] tt
+    ORDER BY tt.[name] ASC;
+END;
+GO
+
+-- 2.11. spTicketPrinterListar
+IF OBJECT_ID('dbo.spTicketPrinterListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spTicketPrinterListar;
+GO
+
+CREATE PROCEDURE dbo.spTicketPrinterListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT tp.[id], tp.[code], tp.[name], tp.[email], ISNULL(tp.[isActive], 1) AS [isActive]
+    FROM dbo.[TicketPrinter] tp
+    ORDER BY tp.[name] ASC;
+END;
+GO
+
+-- 2.12. spProductListar
+IF OBJECT_ID('dbo.spProductListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spProductListar;
+GO
+
+CREATE PROCEDURE dbo.spProductListar
+    @p_type NVARCHAR(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT pr.[id], pr.[code], pr.[type], pr.[description], pr.[basePrice], pr.[cost], ISNULL(pr.[isActive], 1) AS [isActive]
+    FROM dbo.[Product] pr
+    WHERE (@p_type IS NULL OR pr.[type] = @p_type)
+    ORDER BY pr.[description] ASC;
+END;
+GO
+
+-- 2.13. spChargeAndTaxListar
+IF OBJECT_ID('dbo.spChargeAndTaxListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spChargeAndTaxListar;
+GO
+
+CREATE PROCEDURE dbo.spChargeAndTaxListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT ct.[id], ct.[code], ct.[name], ct.[type], ct.[valueType], ct.[value], ISNULL(ct.[isActive], 1) AS [isActive]
+    FROM dbo.[ChargeAndTax] ct
+    ORDER BY ct.[orden] ASC, ct.[name] ASC;
+END;
+GO
+
+-- 2.14. spRoleListar
+IF OBJECT_ID('dbo.spRoleListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spRoleListar;
+GO
+
+CREATE PROCEDURE dbo.spRoleListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT r.[id], r.[name], r.[description], r.[permissions], ISNULL(r.[isActive], 1) AS [isActive]
+    FROM dbo.[Role] r
+    ORDER BY r.[name] ASC;
+END;
+GO
+
+-- 2.15. spUserListar
+IF OBJECT_ID('dbo.spUserListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spUserListar;
+GO
+
+CREATE PROCEDURE dbo.spUserListar
+    @p_roleId INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT u.[id], u.[name], u.[email], u.[roleId], r.[name] AS [roleName], u.[branchId], b.[name] AS [branchName], ISNULL(u.[isActive], 1) AS [isActive]
+    FROM dbo.[User] u
+    LEFT JOIN dbo.[Role] r ON u.[roleId] = r.[id]
+    LEFT JOIN dbo.[Branch] b ON u.[branchId] = b.[id]
+    WHERE (@p_roleId IS NULL OR u.[roleId] = @p_roleId)
+    ORDER BY u.[name] ASC;
+END;
+GO
+
+-- 2.16. spCotizacionListar
+IF OBJECT_ID('dbo.spCotizacionListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionListar;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionListar
+    @p_internalNumber NVARCHAR(50) = NULL,
+    @p_clientId INT = NULL,
+    @p_branchId INT = NULL,
+    @p_state NVARCHAR(25) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT
+        q.[id],
+        q.[internalNumber],
+        q.[date],
+        q.[clientId],
+        c.[name] AS [clientName],
+        c.[document] AS [clientDocument],
+        q.[currency],
+        q.[exchangeRate],
+        q.[branchId],
+        b.[name] AS [branchName],
+        q.[totalAmount],
+        ISNULL(q.[state], N'Nuevo') AS [state],
+        q.[userId],
+        u.[name] AS [userName]
+    FROM dbo.[Quotation] q
+    LEFT JOIN dbo.[Client] c ON q.[clientId] = c.[id]
+    LEFT JOIN dbo.[Branch] b ON q.[branchId] = b.[id]
+    LEFT JOIN dbo.[User] u ON q.[userId] = u.[id]
+    WHERE (@p_internalNumber IS NULL OR q.[internalNumber] LIKE '%' + TRIM(@p_internalNumber) + '%')
+      AND (@p_clientId IS NULL OR q.[clientId] = @p_clientId)
+      AND (@p_branchId IS NULL OR q.[branchId] = @p_branchId)
+      AND (@p_state IS NULL OR q.[state] = @p_state)
+    ORDER BY q.[id] DESC;
+END;
+GO
+
+-- 2.17. spInvoicesListar
+IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spInvoicesListar;
+GO
+
+CREATE PROCEDURE dbo.spInvoicesListar
+    @p_internalNumber NVARCHAR(100) = NULL,
+    @p_clientId INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT i.[id], i.[internalNumber], i.[date], i.[clientId], c.[name] AS [clientName], i.[currency], i.[totalAmount], ISNULL(i.[state], N'NUEVO') AS [state]
+    FROM dbo.[Invoices] i
+    LEFT JOIN dbo.[Client] c ON i.[clientId] = c.[id]
+    WHERE (@p_internalNumber IS NULL OR i.[internalNumber] LIKE '%' + TRIM(@p_internalNumber) + '%')
+      AND (@p_clientId IS NULL OR i.[clientId] = @p_clientId)
+    ORDER BY i.[id] DESC;
+END;
+GO
+
+-- 2.18. spParameterListar
+IF OBJECT_ID('dbo.spParameterListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spParameterListar;
+GO
+
+CREATE PROCEDURE dbo.spParameterListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT sp.[id], sp.[code], sp.[name], sp.[value]
+    FROM dbo.[SystemParameter] sp
+    ORDER BY sp.[code] ASC;
+END;
+GO
+
+-- 2.19. spMenuListar
+IF OBJECT_ID('dbo.spMenuListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spMenuListar;
+GO
+
+CREATE PROCEDURE dbo.spMenuListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT m.[id], m.[code], m.[name], m.[parent], m.[action], ISNULL(m.[activo], 1) AS [activo]
+    FROM dbo.[Menu] m
+    ORDER BY m.[id] ASC;
+END;
+GO
+
+-- 2.20. spMasterListar
+IF OBJECT_ID('dbo.spMasterListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spMasterListar;
+GO
+
+CREATE PROCEDURE dbo.spMasterListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT ma.[id], ma.[code], ma.[name], ISNULL(ma.[inactivo], 0) AS [inactivo]
+    FROM dbo.[Master] ma
+    ORDER BY ma.[name] ASC;
+END;
+GO
+
+-- ============================================================================
+-- SECCIÓN 3: PROCEDIMIENTOS ALMACENADOS DE INTEGRACIÓN ERP (ZEUS / STANDALONE)
+-- ============================================================================
+
+
+
 -- Eliminar si existe
 IF OBJECT_ID('dbo.spCotizacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spCotizacionesCrear;
@@ -2735,7 +3856,8 @@ BEGIN
 END
 GO
 
--- Archivo: spFacturacionesCrear.sql
+GO
+
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -4962,2852 +6084,9 @@ BEGIN
 END
 GO
 
--- Archivo: spFacturaCrear.sql
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
--- Eliminar si existe
-IF OBJECT_ID('dbo.spFacturaCrear', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spFacturaCrear;
-GO
-CREATE PROCEDURE [dbo].[spFacturaCrear]
-	-- Parametros del procedimiento		
-	@id_usuario						INT,  
-	@id_sucursal					INT, 
-	@id_implante					INT, 
-	@dt_fechacont					SMALLDATETIME,
-	@dt_vence						SMALLDATETIME ,
-	@cd_tercero_codigo				VARCHAR(25) ,
-	@ds_tercero_nombre				VARCHAR(250),
-	@cd_cliente_codigo				VARCHAR(25), 
-	@ds_cliente_nombre				VARCHAR(250),
-	@ds_cliente_dir					VARCHAR(250),
-	@ds_cliente_ciudad				VARCHAR(40),
-	@ds_cliente_tel					VARCHAR(50),
-	@ds_cliente_dirdesp				VARCHAR(250),
-	@ds_cliente_email				VARCHAR(60),
-	@ds_cliente_contacto			VARCHAR(40),
-	@ds_cliente_contacto_email		VARCHAR(60),
-	@id_monedas_iata				INT,
-	@cd_vendedor					CHAR(3),
-	@id_tiqueteador					INT,
-	@bn_anexo						VARBINARY = NULL ,
-	@Tcambio						MONEY = 1,
-	@am_tcambiousd					MONEY = 1,
-	@id_tipoventa					INT,
-	@ds_num_resolucion				VARCHAR(20), 
-	@in_num_inicial					NUMERIC(18,0), 
-	@in_num_final					NUMERIC(18,0), 
-	@ds_numeracion_autorizada		VARCHAR(50),
-	@dt_fecha_resolucion			SMALLDATETIME,	
-	@CodigoArchivoFisico			VARCHAR(25),
-	@ds_Observacion					VARCHAR(8000) ,
-	@ds_Campo_libre1				varchar(500),
-	@ds_Campo_libre2				varchar(500),
-	@cd_fuente_Reemplaza			CHAR(2),
-	@cd_serie_Reemplaza				CHAR(2),
-	@cd_consecutivo_Reemplaza		CHAR(8),		
-	@ds_Actividad_Economica			VARCHAR(10),
-	@ds_Tarifa_ICA					VARCHAR(15),	
-	@SqlStmt						NVARCHAR(max),
-	@AnticiposSqlStmt				NVARCHAR(max)=NULL,
-	@TotalFactura					MONEY = 0,
-	@TotalCupoCreditoCliente		MONEY = 0,
-	@bl_BloqueoCupoCredito			BIT = 0,
-	@bl_generadaauto				BIT = 0,
-	@ds_CotizacionesId				Varchar(500)= NULL,
-	@Id_Cierre						INT = NULL,
-	@cd_TipoFact					CHAR(2)= NULL, 
-	@id_fac_remisionRelacionada		INT= NULL, 
-	@id_fac_facturaRelacionada		INT= NULL, 
-	@ds_DescripcionFac				VARCHAR(500)=NULL, 
-	@bl_nocont						BIT = 0, 
-	@ProductosSqlStmt				NVARCHAR(max)=NULL,
-	@cd_CF_TipoComprobante			VARCHAR(15)=NULL,
-	@id_Licitacion					INT   =NULL ,
-	@ValorFactura					MONEY = 0	,
-	@id_Especialista				INT  =NULL,
-	@id_tiqueteador_Facturador		INT = NULL,
-	@id_TipoFormaPagoProveedor		INT = NULL,
-	@id_MedioReservacion			INT = NULL,
-	@bl_refacturacion				BIT = 0,
-	@bl_comisiona					BIT = 0,
-	@cd_fuente_factura				VARCHAR(2)= NULL,
-	@cd_serie_factura				VARCHAR(2)= NULL,
-	@cd_consecutivo_factura			VARCHAR(8)= NULL,
-	@id_NotasAerolinea				INT=NULL,
-	@bl_interface					INT = 0,
-	@id_evento						INT   =NULL ,
-	@bl_NoEnviarFacElectronica		BIT = 0,
-	--@bl_FacturaComision			BIT = 0, -- Descontar comision de la CxP de la factura Original
-	@bl_DescontarComisionCxP		BIT = 0,	 --Descontar comision de la CxP de la factura Original
-	@ds_num_resolucion_Adicional	VARCHAR(20) = '',
-	@id_fac_facturaRefacturacion	VARCHAR(8000) = NULL,
-	@bl_refacturacion_contabilizar_saldos BIT = 0,
-	@ZML_VariablesXML				VARCHAR(MAX) = NULL,
-	@bl_FormatoResumidoFactElectro	BIT= 0, 
-	@bl_ExigeAdjuntoFactElectro		BIT= 0, 
-	@bl_omitir_Validar_IVA_facturacion BIT = 0,
-	@ZML_AjusteIvaXML				VARCHAR(MAX) = NULL,
-	@ds_Respuesta					VARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-	-- SET NOCOUNT ON: Previene que conjuntos de resultados extras interfieran con 
-	-- expresiones SELECT
-	SET NOCOUNT ON;
-
-    -- Declaracion e inicializacion de variables
-  	DECLARE @bl_permit				BIT 	, -- Permiso de ejecucion del proceso
-  			@bl_as 	   				BIT	, -- Auditar exito
-	 		@bl_af 					BIT	, -- Auditar fallido	 		
-			@procmsg				VARCHAR(8000)	, -- Mensaje devuelto por procedimientos llamados desde este procedimiento
-			@Resolucionmsg			VARCHAR(8000)	, -- Mensaje devuelto por procedimientos llamados desde este procedimiento
-			@procret 				BIT 			, -- Valor de retorno de los procedimientos llamados desde este procedimiento
-			@idproce				int		    	, -- Codigo de proceso
-	 		@retry 					BIT			    , -- 1=Reintentar ; 0=Abortar  
-	 		@retrycont				INT			    , -- Contador de reintentos
-	 		@maxretries 			INT			    , -- Maximo numero de reintentos
-	 		@timeout				NVARCHAR(4000)  , -- Tiempo de espera maximo por bloqueo de registros
-	 		@stmt 					NVARCHAR(4000)  , -- Cadena de instrucciones T-SQL
-			@msg	    			VARCHAR(8000)   , -- Mensaje retornado por el sistema
-			@retval					TINYINT 		, -- Valor de retorno de este procedimiento: 0:Exito ; 1:Error(Bloque Catch)
-			@cd_serieRC				CHAR(2)			, -- Recibo de caja automatico
-			@cd_fuenteRC			CHAR(2)			, -- Recibo de caja automatico
-			@cd_consecutivoRC		CHAR(8)			, -- Recibo de caja automatico	
-			@cd_serieRCOtr			CHAR(2)			, -- Recibo de caja automatico
-			@cd_fuenteRCOtr			CHAR(2)			, -- Recibo de caja automatico
-			@cd_consecutivoRCOtr	CHAR(8)			, -- Recibo de caja automatico	
-			@NCF					varchar(25)		,
-			@FechaCaducidad 		SmallDateTime	,
-			@DocumentoCont			Varchar(10)		,
-			@Id_SucursalFullFilment INT				,
-			@bl_usarimplanteFullFilment INT			, 
-			@Id_implanteFullFilment INT				,
-			@Id_SucursalResolucion INT				,
-			@Id_implanteResolucion INT				,
-			@FacturadorElect varchar(50)			;
-
-	SELECT 	@idproce 			 = 93,
-			@retry				 = 1,
-			@retrycont			 = 0,
-			@retval				 = 0;
-  	
-  	-- Manejo de tiempo de espera y de reintentos por bloqueo de tablas/registros  
-   	SELECT @maxretries = convert(INT,Valor) FROM dbo.Parametros WHERE Id = 60 ;
-	SELECT @timeout    = convert(NVARCHAR(4000),Valor) FROM dbo.Parametros WHERE Id = 50 ;		
-	SET @stmt = N'SET LOCK_TIMEOUT '+ltrim(rtrim(@timeout))
-	EXEC sp_executesql @stmt,N''
-	
-	
-	WHILE ((@retry = 1) AND (@retrycont <= @maxretries) )
-	BEGIN
-		SET @retry = 0;
-    
-    	-- Bloque TRY
-    	BEGIN TRY 
-
-			IF (NOT EXISTS(SELECT id FROM Usuario WHERE Id = @id_usuario) AND ISNULL(@Id_Cierre,0)<>0)
-			BEGIN
-				SELECT @id_usuario=id_usuario FROM dbo.Cierres WHERE id = @Id_Cierre  
-			END
-    	    		
-    		--Obteniendo informacion de seguridad y auditoria--
-			EXEC dbo.spzaProcesoUsuario_Consultar @id_usuario   = @id_usuario       ,
-												  @id_proceso   = @idproce 		    , 
-												  @bl_permit    = @bl_permit OUTPUT , 
-												  @bl_auditsuc  = @bl_as 	 OUTPUT , 
-												  @bl_auditfail = @bl_af 	 OUTPUT ;
-			IF (@bl_permit = 0)
-			BEGIN 
-				SET @ds_Respuesta = 'No posee permisos suficientes para ejecutar esta acción.';SET @ds_Respuesta = 'No posee permisos suficientes para ejecutar esta acción.';
-				RETURN @retval;
-			END 
-			
-			IF @id_implante = 0
-				SET @id_implante = NULL;
-
-			IF NOT EXISTS(SELECT * FROM dbo.Implantes WHERE Implantes.id = @id_implante and Implantes.id_sucursal = @id_sucursal) AND @id_implante IS NOT NULL
-			BEGIN
-				SET @procmsg = 'El Implante ingresado en la Factura no esta asociado a la sucursal, verifique la configuracion implante - sucursal'
-				SET @ds_Respuesta = @procmsg;
-				SET @ds_Respuesta = @procmsg;
-				RETURN 1 ;
-			END	
-			
-			IF (RTRIM(ISNULL(@cd_vendedor,'')) = '')
-			BEGIN 
-				SET @ds_Respuesta = 'No ingreso el vendedor de la factura por favor verificar.';SET @ds_Respuesta = 'No ingreso el vendedor de la factura por favor verificar.';
-				RETURN @retval;
-			END
-					 
-			--Jramirez - 20180413 - Ticket #17146
-			DECLARE @in_dias_vence INT , @ds_msj_rpta VARCHAR(8000)
-			--IF EXISTS(Select * From Configuracion_remisiones Where id_cliente=@cd_cliente_codigo AND bl_BloqDiaVence = 1 AND in_dias_vence>=1)
-			--BEGIN 
-			--	Select @in_dias_vence = in_dias_vence From Configuracion_remisiones Where id_cliente=@cd_cliente_codigo AND bl_BloqDiaVence = 1 AND in_dias_vence>=1
-			--	EXEC [spza_Configuracion_remisiones_ConsultarBloqVence]
-			--		@id_usuario 		=1			,
-			--		@id_cliente  		 = @cd_cliente_codigo,
-			--		@in_dias_vence  	= @in_dias_vence,
-			--		@bl_devolverMSJ		= 1,
-			--		@ds_msj_rpta		= @ds_msj_rpta OUTPUT
-			--		IF @ds_msj_rpta <> ''
-			--		BEGIN
-			--			SET @ds_Respuesta = @cd_cliente_codigo;
-			--			RETURN 1 ;
-			--		END 
-			--END 
-
-			--Iniciando / salvando transaccion dependiendo si ya esta iniciada o no--
-		  	BEGIN TRAN;
-			
-			--Verificamos si tiene sucursal por Full Filment, es decir toma la inf de facturacion de otra sucursal
-			SELECT @Id_SucursalFullFilment = sff.Id
-			FROM dbo.Sucursales s
-			INNER JOIN dbo.Sucursales sff ON sff.id = s.Id_SucursalFullFilment
-			WHERE s.id = @id_sucursal and s.bl_usarsucursalFullFilment = 1
-
-			SELECT @Id_implanteFullFilment = iff.id 
-			FROM dbo.Implantes i
-			INNER JOIN Implantes iff ON iff.id = i.Id_implanteFullFilment
-			WHERE i.id=@id_implante 
-
-			--Instrucciones del procedimiento-----------------------------------------
-			SET @procmsg = ''  	
-			SET @Resolucionmsg = ''		
-			DECLARE @cd_serie CHAR(2);
-			DECLARE @cd_fuente CHAR(2);
-			DECLARE @cd_consecutivo CHAR(8);
-			DECLARE @in_ConsecutivoUnicoDocumento INT; --jramirez - 2017/12/05 - Manejo de consecutivo unico
-			DECLARE @id_ConsecutivoUnicoDocumento INT; --jramirez - 2017/12/05 - Manejo de consecutivo unico
-			DECLARE @id_Contingencia INT;
-			Declare @DocumentoCausacionCxP Varchar(15)  --jramirez -- Causacion CxP servicio de terceros
-					
-			IF @cd_fuente_factura <> '' AND @cd_serie_factura <> '' AND @cd_consecutivo_factura <> '' 
-			BEGIN 
-				IF EXISTS(SELECT * FROM dbo.fac_factura WHERE fac_factura.cd_fuente = @cd_fuente_factura and fac_factura.cd_serie = @cd_serie_factura AND fac_factura.cd_consecutivo = @cd_consecutivo_factura)
-				BEGIN 
-					SET @procmsg = 'El Numero de Factura ingresado ya se encuentra en uso'
-				END 
-				ELSE
-				BEGIN
-					SELECT @cd_fuente		= @cd_fuente_factura,
-						   @cd_serie		= @cd_serie_factura,
-						   @cd_consecutivo	= @cd_consecutivo_factura
-				END 
-			END
-			ELSE 
-			BEGIN
-				
-				IF @Id_SucursalFullFilment IS NOT NULL
-				BEGIN 
-					EXEC @procret = dbo.spza_IncrementaConsecutivo @id_MaeTipoTransacciones			= 2,
-													   			@id_sucursal						= @Id_SucursalFullFilment,
-													   			@id_implante						= NULL, 
-													   			@cd_fuente							= @cd_fuente OUTPUT,
-													   			@cd_serie							= @cd_serie	OUTPUT,
-													   			@cd_consecutivo						= @cd_consecutivo OUTPUT,
-													   			@errmsg								= @procmsg OUTPUT, 
-													   			@msg								= @Resolucionmsg OUTPUT,
-																@ds_num_resolucion_Adicional		= @ds_num_resolucion_Adicional,
-																@in_ConsecutivoUnicoDocumento		= @in_ConsecutivoUnicoDocumento OUTPUT,
-																@id_ConsecutivoUnicoDocumento		= @id_ConsecutivoUnicoDocumento OUTPUT,
-																@id_Contingencia					= @id_Contingencia OUTPUT;
-				END
-				ELSE IF @Id_implanteFullFilment IS NOT NULL 
-				BEGIN 
-					EXEC @procret = dbo.spza_IncrementaConsecutivo @id_MaeTipoTransacciones = 2,
-													   			@id_sucursal             = @id_sucursal    ,
-													   			@id_implante             = @Id_implanteFullFilment    , 
-													   			@cd_fuente               = @cd_fuente     OUTPUT ,
-													   			@cd_serie				 = @cd_serie     OUTPUT ,
-													   			@cd_consecutivo          = @cd_consecutivo OUTPUT ,
-													   			@errmsg					 = @procmsg OUTPUT, 
-													   			@msg					 = @Resolucionmsg OUTPUT,
-																@ds_num_resolucion_Adicional = @ds_num_resolucion_Adicional,
-																@in_ConsecutivoUnicoDocumento		=@in_ConsecutivoUnicoDocumento OUTPUT,
-																@id_ConsecutivoUnicoDocumento		= @id_ConsecutivoUnicoDocumento OUTPUT,
-																@id_Contingencia					= @id_Contingencia OUTPUT;
-				END 
-				ELSE 
-				BEGIN 
-					EXEC @procret = dbo.spza_IncrementaConsecutivo @id_MaeTipoTransacciones = 2,
-													   			@id_sucursal             = @id_sucursal    ,
-													   			@id_implante             = @id_implante    , 
-													   			@cd_fuente               = @cd_fuente     OUTPUT ,
-													   			@cd_serie				 = @cd_serie     OUTPUT ,
-													   			@cd_consecutivo          = @cd_consecutivo OUTPUT ,
-													   			@errmsg					 = @procmsg OUTPUT, 
-													   			@msg					 = @Resolucionmsg OUTPUT,
-																@ds_num_resolucion_Adicional = @ds_num_resolucion_Adicional,
-																@in_ConsecutivoUnicoDocumento		=@in_ConsecutivoUnicoDocumento OUTPUT,
-																@id_ConsecutivoUnicoDocumento		= @id_ConsecutivoUnicoDocumento OUTPUT,
-																@id_Contingencia					= @id_Contingencia OUTPUT;
-				END
-			END 	
-			IF NOT @procmsg <> ''
-			AND EXISTS(SELECT * FROM dbo.fac_factura WHERE fac_factura.cd_fuente = @cd_fuente and fac_factura.cd_serie = @cd_serie AND fac_factura.cd_consecutivo = @cd_consecutivo)
-			BEGIN 
-				SET @procmsg = 'El Numero de Factura: ' + @cd_fuente + '-' + @cd_serie + @cd_consecutivo + ' ya se encuentra en uso'
-			END 
-
-
-																					   	
-			IF (@procmsg <> '') -- Proceso de incremento de consecutivo fallido				
-			BEGIN 
-				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN;	
-				END 
-				
-				IF (@bl_af = 1) --Se debe auditar proceso fallido
-				BEGIN 						
-				EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-												 @id_usuario = @id_usuario ,
-												 @cd_status  = 1           , 												 
-												 @admsg      = @procmsg	   ;	 
-				END 		  
-				
-
-			    IF @bl_generadaauto=1
-				BEGIN
-					SET @ds_Respuesta = @procmsg;
-				END 
-				ELSE
-				BEGIN
-					SET @ds_Respuesta = @procmsg;
-				END
-				
-				SET @ds_Respuesta = @procmsg + ' '+  ISNULL(@Resolucionmsg,'') +' SUCURSAL:' + CONVERT(VARCHAR(3),ISNULL(@id_sucursal,0))+' IMPLANTE:' + CONVERT(VARCHAR(3),ISNULL(@id_implante,0));
-				RETURN 1 ;
-
-			END 
-
-			--Comprobante fiscal
-			If  Exists(Select* from parametros where Id=232 and valor='S') 
-			And 
-			Not Exists(Select * from clientes where IndNCF=1 And idcliente=@cd_cliente_codigo)
-			Begin
-				 
-				Declare @ErrorNCF		Int
-				Declare @LoginUsuario	Varchar(250) 
-				Declare @BU				Varchar(25)
-				
-				Select 
-					@ErrorNCF	=	0,
-					@LoginUsuario	=	Isnull(Login,''),
-					@BU		=	CASE 
-									WHEN i.id IS NOT NULL AND Isnull(i.cd_bu,'') <> '' THEN i.cd_bu
-									WHEN s.id IS NOT NULL AND Isnull(s.cd_bu,'') <> '' THEN i.cd_bu
-									ELSE '' 
-								END 
-				From dbo.Usuario u
-				Inner Join dbo.Sucursales s ON s.id = u.id_sucursal
-				Left  Join dbo.Implantes i ON i.id = u.id_implante
-				Where u.Id=@id_usuario
-				
-
-				
-				--Esto se hace para republica dominicana por que se necesita generar el NCF dependiendo del tipo de identificacion 
-				--del cliente y agencias no permite mandar varias series, entonces se pone la serie en el codigo alterno del tipo 
-				--de identificacion.
-				DECLARE @cd_serie_NCF VARCHAR(2)
-				SET @cd_serie_NCF = @cd_serie
-				IF EXISTS(SELECT * FROM dbo.Parametros WHERE Parametros.Id = 240 AND Parametros.Valor = 'República Dominicana')
-				BEGIN
-					SELECT @cd_serie_NCF = @cd_CF_TipoComprobante
-				END 
-
-				Exec @ErrorNCF = spCF_Configuracion
-						@Op='Consecutivo',
-						@Fuente=@cd_fuente,
-						@Series=@Cd_serie_NCF,
-						@Usuario=@LoginUsuario,
-						@BU=@Bu,
-						@AplicacionUsuario='Agencia Minorista SQL',
-						@NoFiscal=@NCF Output,
-						@FechaCaducidad = @FechaCaducidad OutPut,
-						@FechaDocumento = @dt_fechacont
-				
-
-				--Parche Comprobante fiscal: NCF es igual al numero de la factura.
-				If  Exists(Select* from parametros where Id=431 and valor='S') 
-				BEGIN
-					SET @NCF = LEFT(@NCF,7)+@CD_CONSECUTIVO
-
-					UPDATE DC 
-					SET DC.NCF=FF.NCF
-					FROM CF_DOCUMENTOCONTROL DC
-					INNER JOIN FAC_FACTURA FF ON FF.CD_FUENTE = DC.FUENTE AND  FF.NUMERO = DC.DOCUMENTO
-					WHERE DC.FUENTE = @cd_fuente AND DC.DOCUMENTO = @cd_serie + @cd_consecutivo AND DC.NCF<>FF.NCF
-				END 
-
-				IF (@ErrorNCF <> 0 Or @@Error <> 0) -- Proceso de incremento de consecutivo fallido				
-				BEGIN 
-					Set @procmsg = 'Error en generación de Número de Comprobante Fiscal'
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN;	
-					END 
-					
-					IF (@bl_af = 1) --Se debe auditar proceso fallido
-					BEGIN 						
-					EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-													 @id_usuario = @id_usuario ,
-													 @cd_status  = 1           , 												 
-													 @admsg      = @procmsg	   ;	 
-					END 		  
-					
-					SET @ds_Respuesta = @procmsg;
-					SET @ds_Respuesta = @procmsg;
-					RETURN 1 ;
-				END 
-			End
-			
-			--	Bloqueo Cupo Credito
-		 	--IF @bl_BloqueoCupoCredito = 1
-		 	--BEGIN 
-				--DECLARE @TotalSacCliente MONEY,@Total MONEY, @FechaTran VARCHAR(10)
-				--SET @TotalSacCliente = 0
-				--SELECT @FechaTran = left(replace(VALOPAR,'/',''),6) FROM Parametr WHERE parametro ='FECHACT'				
-				----VALOPAR FROM Parametr WHERE parametro ='FECHACT'				
-				
-				--SELECT
-				--	@TotalSacCliente = sum(SACTFAC)
-				--FROM dbo.FACTURAS
-				--WHERE IDCLIPRV = @cd_cliente_codigo
-				--	AND SACTFAC <> 0
-				--	--AND VENCFAC < @FechaTran
-				--	AND ANOMESFAC = @FechaTran
-				--	AND CLASECP ='C'
-					
-				--IF @TotalSacCliente = '' OR @TotalSacCliente IS NULL
-				--	SET @TotalSacCliente = 0
-					
-				--SET @Total = @TotalSacCliente + @TotalFactura 
-				
-				--IF @Total > @TotalCupoCreditoCliente 
-				--BEGIN
-				--	IF @@TRANCOUNT > 0 
-				--	BEGIN 
-				--	END					
-				--	SELECT 	'El Cliente excedió su Cupo Crédito.' + space(40) + CHAR(10) + CHAR(13) + 
-				--		   	'Saldo: ' + convert(VARCHAR,@TotalSacCliente,1) + CHAR(10) + CHAR(13) +
-				--		   	'Total Crédito Factura: ' + convert(VARCHAR,@TotalFactura,1) + CHAR(10) + CHAR(13) +
-				--		   	'Cupo Crédito: ' + convert(VARCHAR,@TotalCupoCreditoCliente,1) + CHAR(10) + CHAR(13) 
-				--		    'Respuesta',
-				--			1 AS 'Estado' ;
-				--	RETURN 1 ;
-				--END 
-
-		 	--END
-/*
-			--	Validando presupuesto de la licitacion
-			IF @id_Licitacion <>0
-		 	BEGIN 
-			
-				DECLARE @RestanteLicitacion MONEY , @presupuestoLicitacion MONEY
-				SET	 @RestanteLicitacion = (SELECT dbo.fnza_RestanteLicitacion(@id_Licitacion))
- 				SET @presupuestoLicitacion = ISNULL ((SELECT am_presupuesto FROM Licitaciones WHERE id=@id_Licitacion),0)
-				IF @ValorFactura > @RestanteLicitacion 
-				BEGIN
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END					
-					SELECT 	'Ha sobrepasado el presupuesto de la licitación.' + space(40) + CHAR(10) + CHAR(13) + 
-							'Presupuesto: ' + convert(VARCHAR,@presupuestoLicitacion,1) + CHAR(10) + CHAR(13) +
-						   	'Saldo: ' + convert(VARCHAR,@RestanteLicitacion ,1) + CHAR(10) + CHAR(13) +
-						   	'Total Factura: ' + convert(VARCHAR,@ValorFactura,1) + CHAR(10) + CHAR(13) +
-							'Valor faltante: ' + convert(VARCHAR,(@RestanteLicitacion-@ValorFactura),1) + CHAR(10) + CHAR(13)	 
-						    'Respuesta',
-							1 AS 'Estado' ;
-					RETURN 1 ;
-				END 
-
-		 	END
-*/		
-			--Datos de resolucion
-			--verificamos si el implante depende de otro implante fullfilment
-			IF EXISTS(SELECT * FROM dbo.Implantes 
-						WHERE id=@id_implante AND bl_usarimplanteFullFilment = 1 AND Id_implanteFullFilment IS NOT NULL)
-			BEGIN
-				IF EXISTS(	
-							SELECT * FROM dbo.Implantes i
-							INNER JOIN Implantes iff ON iff.id = i.Id_implanteFullFilment
-							WHERE i.id=@id_implante 
-								And iff.ds_num_resolucion is not null
-								And iff.in_num_inicial <> 0
-								And iff.in_num_final <> 0
-								And iff.ds_numeracion_autorizada is not null
-						) 	
-				BEGIN
-					SELECT
-						@ds_num_resolucion =iff.ds_num_resolucion,
-						@dt_fecha_resolucion=iff.dt_fecha_resolucion,
-						@in_num_inicial=iff.in_num_inicial,
-						@in_num_final =iff.in_num_final,
-						@ds_numeracion_autorizada =iff.ds_numeracion_autorizada,
-						@Id_SucursalResolucion = i.id_sucursal,
-						@Id_implanteResolucion = i.id	
-					FROM dbo.Implantes i
-					INNER JOIN Implantes iff ON iff.id = i.Id_implanteFullFilment
-					WHERE i.id=@id_implante 									
-				END 	
-				ELSE
-				BEGIN 
-					SELECT
-						@ds_num_resolucion =ds_num_resolucion,
-						@dt_fecha_resolucion=dt_fecha_resolucion,
-						@in_num_inicial=in_num_inicial,
-						@in_num_final =in_num_final,
-						@ds_numeracion_autorizada =ds_numeracion_autorizada,
-						@Id_SucursalResolucion = id,
-						@Id_implanteResolucion = NULL
-					FROM Sucursales WHERE id = @id_sucursal					
-				END 		
-			END 
-			--Implante y sucursales normales
-			ELSE IF EXISTS(SELECT * FROM dbo.Implantes 
-						WHERE id=@id_implante 
-						      And ds_num_resolucion is not null
-						      And in_num_inicial <> 0
-						      And in_num_final <> 0
-						      And ds_numeracion_autorizada is not null
-						      ) 
-			BEGIN
-				SELECT
-					@ds_num_resolucion =ds_num_resolucion,
-					@dt_fecha_resolucion=dt_fecha_resolucion,
-					@in_num_inicial=in_num_inicial,
-					@in_num_final =in_num_final,
-					@ds_numeracion_autorizada =ds_numeracion_autorizada,
-					@Id_SucursalResolucion = id_sucursal,
-					@Id_implanteResolucion = id
-				FROM dbo.Implantes WHERE id = @id_implante
-			END
-			ELSE
-			BEGIN
-				IF @Id_SucursalFullFilment is NOT NULL 
-				BEGIN 
-					SELECT
-						@ds_num_resolucion =ds_num_resolucion,
-						@dt_fecha_resolucion=dt_fecha_resolucion,
-						@in_num_inicial=in_num_inicial,
-						@in_num_final =in_num_final,
-						@ds_numeracion_autorizada =ds_numeracion_autorizada,
-						@Id_SucursalResolucion = Id,
-						@Id_implanteResolucion = NULL
-					FROM Sucursales WHERE id = @Id_SucursalFullFilment
-				END
-				ELSE
-				BEGIN
-					SELECT
-						@ds_num_resolucion =ds_num_resolucion,
-						@dt_fecha_resolucion=dt_fecha_resolucion,
-						@in_num_inicial=in_num_inicial,
-						@in_num_final =in_num_final,
-						@ds_numeracion_autorizada =ds_numeracion_autorizada,
-						@Id_SucursalResolucion = Id,
-						@Id_implanteResolucion = NULL
-					FROM Sucursales WHERE id = @id_sucursal
-				END 
-			END
-
-			IF ISNULL(@id_Contingencia,0)<>0
-			BEGIN
-				IF @id_implante IS NULL
-				BEGIN
-					SELECT @ds_num_resolucion =R.ds_num_resolucion,
-						   @dt_fecha_resolucion=R.dt_fecha_resolucion,
-						   @in_num_inicial=R.in_num_inicial,
-						   @in_num_final =R.in_num_final,
-						   @ds_numeracion_autorizada =R.ds_numeracion_autorizada,
-						   @Id_SucursalResolucion = R.id_sucursal,
-						   @Id_implanteResolucion = NULL 
-					FROM dbo.ConfiguracionTransacciones_Adicionales CA
-					INNER JOIN dbo.resoluciones R ON (R.ds_num_resolucion=CA.ds_num_resolucion AND R.id_sucursal = CA.id_sucursal AND R.id_implante IS NULL)  
-					WHERE CA.id_transaccion = 2 
-	    				AND CA.id_sucursal = @id_sucursal
-						AND CA.id_implante IS NULL
-						AND CA.cd_fuente=@cd_fuente
-						AND CA.cd_serie=@cd_serie
-				END
-				ELSE
-				BEGIN
-					SELECT @ds_num_resolucion =R.ds_num_resolucion,
-						   @dt_fecha_resolucion=R.dt_fecha_resolucion,
-						   @in_num_inicial=R.in_num_inicial,
-						   @in_num_final =R.in_num_final,
-						   @ds_numeracion_autorizada =R.ds_numeracion_autorizada,
-						   @Id_SucursalResolucion = R.id_sucursal,
-						   @Id_implanteResolucion = R.id_implante  
-					FROM dbo.ConfiguracionTransacciones_Adicionales CA
-					INNER JOIN dbo.resoluciones R ON (R.ds_num_resolucion=CA.ds_num_resolucion AND R.id_sucursal = CA.id_sucursal AND R.id_implante=CA.id_implante)  
-					WHERE CA.id_transaccion = 2 
-	    				AND CA.id_sucursal = @id_sucursal
-						AND CA.id_implante = @id_implante
-						AND CA.cd_fuente=@cd_fuente
-						AND CA.cd_serie=@cd_serie
-				END
-			END
-			--Validamos las resoluciones
-
-			IF EXISTS
-					(
-						SELECT * 
-						FROM dbo.resoluciones 
-						WHERE resoluciones.id_sucursal = @Id_SucursalResolucion
-						AND (resoluciones.id_implante = @Id_implanteResolucion or @Id_implanteResolucion is NULL)
-						AND ds_num_resolucion = @ds_num_resolucion
-						AND resoluciones.bl_nopermitirvencidas = 1
-						AND resoluciones.dt_Fechavencimiento < GETDATE()
-					)
-			BEGIN
-				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN ;		
-				END	
-				
-				--IF @bl_generadaauto=1
-				--BEGIN				
-				--	SELECT 	'La resolución: ' + @ds_num_resolucion + ' esta Vencida. Verficar parametrizacion en el maestro de resoluciones o los datos de resolución de la sucursal e implante.' AS 'Respuesta', 2 AS 'Estado' ;
-				--END
-				--ELSE
-				--BEGIN
-				--	SELECT 	'La resolución: ' + @ds_num_resolucion + ' esta Vencida. Verficar parametrizacion en el maestro de resoluciones o los datos de resolución de la sucursal e implante.' AS 'Respuesta', 1 AS 'Estado' ;
-				--END
-				
-				SET @ds_Respuesta = 'La resolucion: ' + @ds_num_resolucion + ' esta Vencida. Verficar parametrizacion en el maestro de resoluciones o los datos de resolución de la sucursal e implante.';
-				RETURN 1 
-			END 
-
-			If @Id_Cierre = 0
-				SET @Id_Cierre = NULL
-			
-			/*inicio rgelis 2012/10/31 req.10779*/	
-			if (ISNULL(@cd_TipoFact,'')='')
-			BEGIN
-			    SELECT @cd_TipoFact=RTrim(LTrim(Valor)) FROM dbo.parametros where Id=237				
-			END
-			/*inicio rgelis 2012/10/31 req.10779*/
-
-			If @id_fac_facturaRelacionada = 0
-			BEGIN
-				SET @id_fac_facturaRelacionada = NUll
-			END
-
-			If @id_fac_remisionRelacionada = 0
-			BEGIN
-				SET @id_fac_remisionRelacionada = NUll
-			END
-			
-			If @id_Licitacion = 0
-			BEGIN
-				SET @id_Licitacion = NUll
-			END
-
-			If @id_evento = 0
-			BEGIN
-				SET @id_evento = NUll
-			END			
-			
-			If @id_tiqueteador_Facturador = 0
-			BEGIN
-				SET @id_tiqueteador_Facturador = NUll
-			END	
-
-			If @id_TipoFormaPagoProveedor = 0
-			BEGIN
-				SET @id_TipoFormaPagoProveedor = NUll
-			END			
-
-			If @id_MedioReservacion = 0
-			BEGIN
-				SET @id_MedioReservacion = NUll
-			END
-
-			IF @id_NotasAerolinea=0
-			BEGIN
-				SET @id_NotasAerolinea=NULL
-			END
-			
-			DECLARE @NewFacId INTEGER 
-			
-			INSERT INTO dbo.fac_factura
-					(
-					id_sucursal,
-					id_implante,
-					cd_fuente,
-					cd_serie,
-					cd_consecutivo,
-					id_usuario,
-					dt_fechacont,
-					dt_vence,
-					cd_tercero_codigo,
-					ds_tercero_nombre,
-					cd_cliente_codigo,
-					ds_cliente_nombre,
-					ds_cliente_dir,
-					ds_cliente_ciudad,
-					ds_cliente_tel,
-					ds_cliente_dirdesp,
-					ds_cliente_email,
-					ds_cliente_contacto,
-					ds_cliente_contacto_email,
-					id_monedas_IATA,
-					am_tcambio,
-					cd_vendedor,
-					id_tiqueteador,
-					bn_anexo,
-					ds_num_resolucion, 
-					in_num_inicial, 
-					in_num_final, 
-					ds_numeracion_autorizada,
-					dt_fecha_resolucion,
-					am_tcambiousd,
-					id_tipoventa,
-					ds_observacion,
-					ds_Campo_libre1,
-					ds_Campo_libre2,
-					cd_fuente_Reemplaza,
-					cd_serie_Reemplaza,
-					cd_consecutivo_Reemplaza,											
-					ds_Actividad_Economica,
-				   	ds_Tarifa_ICA,
-					bl_generadaauto,
-					Id_Cierre,
-					NCF,
-					FechaCaducidad,
-					cd_TipoFact, 
-					id_fac_remisionRelacionada, 
-					id_fac_facturaRelacionada, 
-					ds_DescripcionFac,	
-					bl_nocont, 
-					cd_CF_TipoComprobante,
-					id_Licitacion, 	
-					id_Especialista,	
-					id_tiqueteador_Facturador,
-					id_TipoFormaPagoProveedor,
-					id_MedioReservacion	,
-					bl_refacturacion,
-					bl_comisiona,
-					id_NotasAerolinea,
-					bl_interface,
-					id_evento,
-					bl_NoEnviarFacElectronica,
-					bl_DescontarComisionCxP,
-					ds_num_resolucion_Adicional,
-					bl_refacturacion_contabilizar_saldos,
-					in_ConsecutivoUnicoDocumento,
-					id_ConsecutivoUnicoDocumento,
-					id_Contingencia,
-					bl_FormatoResumidoFactElectro, 
-					bl_ExigeAdjuntoFactElectro 
-					)
-				VALUES 
-					(
-					@id_sucursal,
-					@id_implante,
-					@cd_fuente,
-					@cd_serie,
-					@cd_consecutivo,
-					@id_usuario,
-					@dt_fechacont,
-					@dt_vence,
-					@cd_tercero_codigo,
-					@ds_tercero_nombre,
-					@cd_cliente_codigo,
-					@ds_cliente_nombre,
-					@ds_cliente_dir,
-					@ds_cliente_ciudad,
-					@ds_cliente_tel,
-					@ds_cliente_dirdesp,
-					@ds_cliente_email,
-					@ds_cliente_contacto,
-					@ds_cliente_contacto_email,
-					@id_monedas_iata,
-					@Tcambio,
-					@cd_vendedor,
-					@id_tiqueteador,
-					@bn_anexo,
-					@ds_num_resolucion, 
-					@in_num_inicial, 
-					@in_num_final, 
-					@ds_numeracion_autorizada,
-					@dt_fecha_resolucion,
-					@am_tcambiousd,
-					@id_tipoventa,
-					@ds_Observacion,
-					@ds_Campo_libre1,
-					@ds_Campo_libre2,
-					@cd_fuente_Reemplaza,
-					@cd_serie_Reemplaza,
-					@cd_consecutivo_Reemplaza,											
-					@ds_Actividad_Economica,
-				  	@ds_Tarifa_ICA,
-					@bl_generadaauto,
-					@Id_Cierre,
-					@NCF,
-					@FechaCaducidad,
-					@cd_TipoFact,
-					@id_fac_remisionRelacionada , 
-					@id_fac_facturaRelacionada, 
-					@ds_DescripcionFac,	
-					@bl_nocont, 
-					@cd_CF_TipoComprobante,
-					@id_Licitacion,	
-					@id_Especialista,
-					@id_tiqueteador_Facturador,
-					@id_TipoFormaPagoProveedor,
-					@id_MedioReservacion ,
-					@bl_refacturacion,
-					@bl_comisiona,
-					@id_NotasAerolinea,
-					@bl_interface,
-					@id_evento,
-					@bl_NoEnviarFacElectronica,
-					@bl_DescontarComisionCxP,
-					@ds_num_resolucion_Adicional,
-					@bl_refacturacion_contabilizar_saldos,
-					@in_ConsecutivoUnicoDocumento,
-					@id_ConsecutivoUnicoDocumento,
-					@id_Contingencia,
-					@bl_FormatoResumidoFactElectro, 
-					@bl_ExigeAdjuntoFactElectro 
-					)
-			
-			SET @NewFacId = scope_identity() 
-						
-			--Grabando Items y Formas de Pago
-			--PRINT '--- INICIO DE SQLSTMT ---';
-			--PRINT CAST(@SqlStmt AS NTEXT);
-			--PRINT '--- FIN DE SQLSTMT ---';
-			EXEC dbo.sp_executesql @SqlStmt, N'@NewFacId int, @NewRmId int, @FechaFac smalldatetime, @id_monedas_iata int, @Tcambio money, @id_sucursal int, @id_implante int', @NewFacId, NULL, @dt_fechacont, @id_monedas_iata, @Tcambio, @id_sucursal, @id_implante
-			
-			--Grabando Anticipos de Clientes
-			EXEC dbo.sp_executesql @AnticiposSqlStmt, N'@NewFacId int, @NewRemId int', @NewFacId, NULL
-
-			--Grabando Productos
-			EXEC dbo.sp_executesql @ProductosSqlStmt, N'@NewFacId int, @NewRemId int', @NewFacId, NULL			
-			
-			Declare @ValidarProveedor  Varchar(8000)
-			set @ValidarProveedor   = ''
-			SELECT @ValidarProveedor = @ValidarProveedor + 'El Proveedor: "' + rtrim(Fac_servicios.cd_proveedores) + '" ingresado en el servicio: "' + rtrim(Fac_servicios.ds_servicio) + '" no existe' + char(10) + Char(13)
-			FROM Fac_servicios 
-			LEFT JOIN Proveedores On Proveedores.IdProve = Fac_servicios.cd_proveedores
-			WHERE Id_fac_factura = @NewFacId AND ISNULL(cd_proveedores,'') <> '' AND Proveedores.IdProve IS NULL
-			
-			IF isnull(@ValidarProveedor,'') <> '' 
-			begin
-				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN ;		
-				END
-				SET @ds_Respuesta = @ValidarProveedor;
-				RETURN @retval;
-			end
-
-
-			Declare @ValidarSrvAsociado  Varchar(8000)
-			set @ValidarSrvAsociado   = ''
-			SELECT @ValidarSrvAsociado = @ValidarSrvAsociado + 'El Items: "' + CASE WHEN ISNULL(fs.ds_servicio,'')<>'' THEN rtrim(fs.ds_servicio) ELSE rtrim(fs.ds_descrip) END + '" no tiene servicio asociado y el concepto de facturación: "' + rtrim(cf.ds_nombre) + '" lo exige' + char(10) + Char(13)
-			FROM Fac_servicios fs
-			INNER JOIN ConceptoFacturacion cf  On cf.id = fs.id_ConceptoFacturacion
-			WHERE Id_fac_factura = @NewFacId AND ISNULL(cf.bl_ExigirServicioAsociado,0) <> 0 AND fs.id_Fac_Servicios_Depende IS NULL
-			
-			IF isnull(@ValidarSrvAsociado,'') <> '' 
-			begin
-				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN ;		
-				END
-				SET @ds_Respuesta = @ValidarSrvAsociado;
-				RETURN @retval;
-			end
-
-			--inicio dzuniga 2016/08/05 Req.32444 relacionar a las facturas la nueva factura refacturada
-			IF @id_fac_facturaRefacturacion IS NOT NULL
-			BEGIN
-				INSERT INTO fac_factura_Refacturacion
-				(
-					id_fac_factura ,
-					Id_fac_factura_Refacturacion ,
-					dt_fecha_refacturacion,
-					id_usuario
-				)
-				SELECT 
-					codigo,
-					@NewFacId,
-					getdate(),
-					@id_usuario
-				FROM DBO.fnSplit(@id_fac_facturaRefacturacion,',',0,1) t
-			END
-			
-			--inicio dzuniga 2016/08/05 Req.32444
-
-			--Grabamos los Id de las cotizaciones asociadas a las facturas.
-			If @ds_CotizacionesId Is Not Null
-			Begin
-				Declare @Count Int, @MaxFile Int, @Id_Cotizacion Int
-				Declare @NSrvCotz Int, @NSrvFac Int
-				Declare @TotalCotizacion MONEY, @TotalSrvCotizaFac MONEY 
-				Declare @TempCot Table(id Numeric Identity( 1,1) NOT NULL,  IdC Int);
-				Insert Into @TempCot(IdC)
-				EXEC SpSplitMejorado @ds_CotizacionesId,','
-				Set @MaxFile = @@ROWCOUNT
-				
-				Insert Into dbo.Cotizacion_facturas (id_cotizacion, id_fac_factura)
-				Select Idc,@NewFacId From @TempCot 
-					
-				Set @Count = 1
-				While @Count <= @MaxFile
-				Begin
-					Select @Id_Cotizacion = IdC From @TempCot Where Id = @Count
-					Select @NSrvCotz = Count(Id) From CotizacionServicios Where Id_Cotizacion = @Id_Cotizacion
-					Select @NSrvFac = Count(Id) From CotizacionServicios Where Id_Cotizacion = @Id_Cotizacion and (Id_fac_Factura is not null or Id_fac_remision is not null)
-					Select @TotalSrvCotizaFac=dbo.fnza_Get_CotizacionFacturaTotal(@Id_Cotizacion) --inicio rgelis 2017/08/11 req.51825
-					Select @TotalCotizacion=dbo.fnza_Get_CotizacionTotal(@Id_Cotizacion)
-					
-					If @TotalCotizacion>@TotalSrvCotizaFac
-					Begin
-						Update Cotizacion Set in_estado = Case When bl_CerrarCotizacion = 1 AND bl_grupos = 1 Then 3 Else 2 End
-						where Id = @Id_cotizacion
-					End
-					Else If @NSrvCotz <> @NSrvFac AND @NSrvCotz > 1 
-					Begin
-						--Parcialmente Liquidada
-						Update Cotizacion Set in_estado = Case When bl_CerrarCotizacion = 1 AND bl_grupos = 1 Then 3 Else 2 End --Req. 32437 - JARG
-						where Id = @Id_cotizacion
-					End 
-					Else 
-					Begin
-						--Liquidada
-						Update Cotizacion Set in_estado = 3
-						where Id = @Id_cotizacion
-					End 
-					Set @Count = @Count + 1
-				End				
-			End
-			--inserción de comisiones al crear la factura
-			DECLARE @Id_Factura VARCHAR(18), @EstadoInsertarComisiones Int, @MsjInsertarComisiones Varchar(8000)
-			Set @EstadoInsertarComisiones = 1
-			SET @Id_Factura=CONVERT(VARCHAR(18),@NewFacId)+','
-			EXEC @retval=dbo.spza_Factura_InsertarComisiones 
-							@id_usuario=@id_usuario
-							, @id_Facturas=@Id_Factura
-							, @Estado=@EstadoInsertarComisiones
-							, @Msj=@MsjInsertarComisiones
-							, @MostrarMsj ='N'
-				
-			--inserción de comisiones al crear la factura
-						
-			-- validacion de las categorias de clientes
-			DECLARE @EstadoCategorias Int, @MsjCategorias Varchar(8000)
-			Set @EstadoCategorias = 1
-			IF @bl_interface = 0
-			BEGIN
-				EXEC @retval=dbo.spza_Factura_ValidarClientes_Categorias  
-								@id_usuario=@id_usuario
-								, @id_fac_factura=@NewFacId
-								, @Estado=@EstadoCategorias OUTPUT
-								, @Msj=@MsjCategorias OUTPUT
-								, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @MsjCategorias;
-					RETURN @retval;
-				END
-			END						
-			--validacion de las categorias de clientes
-			
-		
-			DECLARE @Estado Int, @Msj Varchar(8000),@id_Sys_EstadosNota INT
-			Set @Estado = 1
-			EXEC @retval=dbo.spza_Factura_ValidarAnticiposClientes   
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MostrarMsj ='N'
-			IF @retval<>0
-			BEGIN 
-				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN ;		
-				END
-				SET @ds_Respuesta = @Msj;
-				RETURN @retval;
-			END					
-			
-			SELECT @id_Sys_EstadosNota=id FROM dbo.Sys_Estados p WHERE p.id_sys_entidades = 27 AND p.bl_generacontabilizacion = 1 AND p.bl_sys = 1
-			UPDATE dbo.NotasAerolinea
-			SET id_fac_factura=@NewFacId
-			   ,id_sys_estados=@id_Sys_EstadosNota 
-			WHERE id = @id_NotasAerolinea
-			
-			-- Cuando la factura tiene un solo item, validar que el tipofac de la factura sea el mismo del item
-			If exists(Select * From dbo.Parametros Where Id = 284 And Valor = 'S')
-			Begin
-				SET @cd_TipoFact = '';
-				
-				SELECT TOP(1) @cd_TipoFact=cf.cd_TipoFact  
-				FROM dbo.Fac_Factura f
-					INNER JOIN dbo.Tiquetes t ON t.id_fac_factura = f.id
-					INNER JOIN dbo.ConceptoFacturacion cf ON cf.id=t.in_nacionalidad
-				WHERE F.Id = @NewFacId
-					AND ISNULL(@cd_TipoFact,'')=''
-				ORDER BY t.id DESC;
-
-				SELECT TOP(1) @cd_TipoFact=cf.cd_TipoFact  
-				FROM dbo.Fac_Factura f
-					INNER JOIN dbo.fac_TAO ft ON ft.id_fac_factura = f.id
-					INNER JOIN dbo.ConceptoFacturacion cf ON cf.id=ft.in_nacionalidad+3
-				WHERE F.Id = @NewFacId
-					AND ISNULL(@cd_TipoFact,'')=''
-				ORDER BY ft.id DESC;
-
-				SELECT TOP(1) @cd_TipoFact=cf.cd_TipoFact 
-				FROM dbo.Fac_Factura f
-					INNER JOIN dbo.Fac_Servicios s ON s.id_fac_factura = f.id
-					INNER JOIN dbo.ConceptoFacturacion cf ON cf.id=s.id_ConceptoFacturacion
-				WHERE F.Id = @NewFacId
-					AND ISNULL(@cd_TipoFact,'')=''
-				ORDER BY s.id DESC;
-
-				IF (ISNULL(@cd_TipoFact,'')='' OR ISNULL(@cd_TipoFact,'')='RM')
-				BEGIN
-					 SELECT @cd_TipoFact = RTRIM(LTRIM(Valor)) FROM dbo.Parametros WHERE Id = 237 ;
-				END
-
-				UPDATE dbo.Fac_Factura
-				Set cd_TipoFact = @cd_TipoFact
-				WHERE Id = @NewFacId
-			End 
-			-- Cuando la factura tiene un solo item, validar que el tipofac de la factura sea el mismo del item
-			IF @bl_generadaauto=1 
-			BEGIN
-				SELECT 
-					@bl_ExigeAdjuntoFactElectro = bl_ExigeAdjuntoFactElectro
-				FROM dbo.Configuracion_remisiones 
-				WHERE id_cliente=@cd_cliente_codigo
-
-				IF @bl_ExigeAdjuntoFactElectro = 1
-				BEGIN
-					UPDATE dbo.fac_factura 
-					SET bl_ExigeAdjuntoFactElectro=@bl_ExigeAdjuntoFactElectro
-					WHERE id = @NewFacId
-						 AND bl_ExigeAdjuntoFactElectro=0
-				END
-			END 
-			--Facturacion Electronica
-			If Exists (Select * from Parametros Where Id=306 and valor='S' AND @bl_NoEnviarFacElectronica=0 AND ISNULL(@id_Contingencia,0)=0)
-			BEGIN
-				if EXISTS (SELECT * FROM dbo.FUENTES WHERE IDFUENTE = @cd_fuente AND (ManejaFacturaEnLinea = 1 OR ManejaFacturaDeContingencia = 1))
-				BEGIN 
-					Declare @Documentra Varchar(10)
-					Set @Documentra =@cd_Serie + @cd_consecutivo
-					Set @Retval = 0
-					Exec @Retval = SpFacturaElectronica_Peticion  
-										@Categoria = 'Documentos'
-										, @Operacion = 'INSERT'
-										, @Llave1 = @cd_fuente
-										, @Llave2 = @Documentra
-										, @Llave3 = ''
-										, @Llave4 = ''
-										, @Fecha = @dt_fechacont	
-
-					IF (@Retval <> 0 Or @@Error <> 0) -- Proceso fallido				
-					BEGIN 
-						Set @procmsg = 'Error en generación de Facturación Electrónica'
-						IF @@TRANCOUNT > 0 
-						BEGIN 
-							ROLLBACK TRAN;	
-						END 
-					
-						IF (@bl_af = 1) --Se debe auditar proceso fallido
-						BEGIN 						
-						EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-															@id_usuario = @id_usuario ,
-															@cd_status  = 1           , 												 
-															@admsg      = @procmsg	   ;	 
-						END 		  
-					
-						SET @ds_Respuesta = @procmsg;
-						RETURN 1 ;
-					END 
-				END 				
-			End
-			IF ISNULL(@id_Contingencia,0)<>0
-			BEGIN
-				Declare @DocumentraC Varchar(10)
-				Set @DocumentraC =@cd_Serie + @cd_consecutivo
-				Set @Retval = 0
-				Exec @Retval = dbo.[SpContingencias]	 
-						@Op				= 'RegDocContingenciaEvento'
-					,	@Id				= @id_Contingencia
-					,	@Codigo			= NULL
-					,	@Nombre			= ''
-					,	@Descripcion	= ''
-					,	@Tipo			= ''
-					,	@FuenteTal		= '' 
-					,	@SerieTal		= ''
-					,	@FechaInicio	= ''
-					,	@Fechafin		= ''
-					,	@Estado			= ''
-					,	@Usuario		= ''
-					,	@FuenteConsulta = @cd_fuente
-					,	@SerieConsulta	= @cd_Serie
-					,	@Documento		= @DocumentraC
-					,	@ZxmlFuentes	= ''
-				
-				IF (@Retval <> 0 Or @@Error <> 0) -- Proceso fallido				
-				BEGIN 
-					Set @procmsg = 'Error en guardar de el documento de contingencia'
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN;	
-					END 
-					
-					IF (@bl_af = 1) --Se debe auditar proceso fallido
-					BEGIN 						
-					EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-														@id_usuario = @id_usuario ,
-														@cd_status  = 1           , 												 
-														@admsg      = @procmsg	   ;	 
-					END 		  
-					
-					SET @ds_Respuesta = @procmsg;
-					RETURN 1 ;
-				END 
-			END
-			
-			IF EXISTS(SELECT * FROM dbo.Configuracion_remisiones WHERE id_cliente = @cd_cliente_codigo AND (bl_ExentoIva=1 or bl_ExentoIva2=1)) AND @bl_interface = 0
-			BEGIN
-				Set @Estado = 1	   
-			    EXEC @retval=dbo.spza_Factura_ValidarClienteExentoIva  
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END
-			
-
-			
-			IF EXISTS(SELECT * From dbo.Parametros WHERE Id = 399 And RTRIM(Valor) = 'S')
-			BEGIN
-				Set @Estado = 1	   
-			    EXEC @retval=dbo.spza_Factura_ValidarTiqueteAutorizacionPagoTC  
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END
-			
-
-			
-			IF EXISTS(SELECT * From dbo.Parametros WHERE Id = 448 And RTRIM(Valor) = 'S')
-			BEGIN
-				Set @Estado = 1	   
-			    EXEC @retval=dbo.spza_Factura_ValidarTiqueteFormasPago  
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END
-			
-
-			DECLARE @MsjAlerta AS VARCHAR(8000)
-			IF ISNULL(@id_Licitacion,0) <> 0
-			BEGIN
-
-				Set @Estado = 1	
-			    EXEC @retval=dbo.spza_Factura_AfectarLicitacion  @id_usuario=@id_usuario,@id_Licitacion=@id_Licitacion, @id_fac_factura=@NewFacId
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = 'Error afectando la licitación';
-					RETURN @retval;
-				END
-				
-				Set @Estado = 1	 
-			    EXEC @retval=dbo.spza_Factura_ValidarLicitacion  
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MsjAlerta=@MsjAlerta OUTPUT
-							, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END
-			
-
-			IF EXISTS(SELECT * FROM dbo.Cliente_ConfiguracionVariables CV
-					  INNER JOIN dbo.VariableDefinicionMaestro VM ON (VM.IDEN=CV.IDEN_Maestro AND VM.IDEN_TipoVariable=2) 
-					  WHERE CV.id_cliente = @cd_cliente_codigo 
-							AND CV.bl_Exige=1
-							AND VM.Codigo IN('Tiquetes','FacturacionServicios')
-					 ) 
-			BEGIN
-				Set @Estado = 1
-				EXEC @retval=dbo.spza_Factura_ValidarClientes_VariablesAdicionales  
-									@id_usuario=@id_usuario
-									, @id_fac_factura=@NewFacId
-									, @ZML_VariablesXML=@ZML_VariablesXML
-									, @Estado=@Estado OUTPUT
-									, @Msj=@Msj OUTPUT
-									, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END							
-			
-
-			DECLARE @bl_EnvCorreodespuesfacturar int, @bl_EnvCorreodespuesfacturarAuto INT
-			SELECT @bl_EnvCorreodespuesfacturar = 0, @bl_EnvCorreodespuesfacturarAuto = 0
-			
-			SELECT 
-				@bl_EnvCorreodespuesfacturar = bl_EnvCorreodespuesfacturar
-				, @bl_EnvCorreodespuesfacturarAuto = bl_EnvCorreodespuesfacturarAuto
-			FROM dbo.Configuracion_remisiones 
-			WHERE id_cliente = @cd_cliente_codigo AND Configuracion_remisiones.bl_ControlarParametrosImp=1
-
-			IF @bl_interface = 0
-				AND (EXISTS (SELECT * FROM Parametros WHERE Id=395 and Valor = 'S') OR @bl_generadaauto = 1)
-				AND (EXISTS (SELECT * FROM Parametros WHERE Id=394 and Valor = 'S') OR @bl_generadaauto = 0)
-			BEGIN
-				--24, 'Factura'
-				INSERT INTO dbo.ColaImpresion_Documentos (Id_sys_entidades, id_documento )
-				VALUES (24, @NewFacId)				
-			END
-			
-			
-			--Borramos de la automatica de tiquetes
-			DELETE r
-			FROM ReservasGDS_FacAuto R
-			INNER JOIN (SELECT ReservasGDS.Id as IdReserva
-			FROM dbo.fac_factura
-			INNER JOIN dbo.Tiquetes on Tiquetes.id_fac_factura = fac_factura.id
-			INNER JOIN dbo.ReservasGDS ON ReservasGDS.cd_codigo = Tiquetes.ds_records
-			WHERE fac_factura.id = @NewFacId) AS c on c.IdReserva = R.id_reserva
-
-			--Borramos de la automatica de servicios 
-			DELETE r
-			FROM ReservasGDS_FacAuto R
-			INNER JOIN (SELECT ReservasGDS.Id as IdReserva
-			FROM dbo.fac_factura
-			INNER JOIN dbo.Fac_Servicios on Fac_Servicios.id_fac_factura = fac_factura.id
-			INNER JOIN dbo.ReservasGDS ON ReservasGDS.cd_codigo = Fac_Servicios.ds_records
-			WHERE fac_factura.id = @NewFacId) AS c on c.IdReserva = R.id_reserva 
-			
-			-- Bloqueo de Maximo (N) tkts por factura.		
-			DECLARE @MaximoNumeroTktsFacturaManual INT
-			SELECT @MaximoNumeroTktsFacturaManual = Valor FROM dbo.Parametros WHERE Id = 444
-			IF @MaximoNumeroTktsFacturaManual <> 9999 --And @MaximoNumeroTktsFacturaManual <> 0
-			Begin
-				IF @bl_generadaauto = 0 AND (SELECT COUNT (*) FROM dbo.Tiquetes WHERE id_fac_factura = @NewFacId AND ds_itinerario IS NOT NULL AND ds_itinerario <> '') > @MaximoNumeroTktsFacturaManual
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SELECT 
-						@retval = 1, @Estado = 1
-						, @Msj = 'Excedió el máximo numero de tiquetes establecidos por factura. Revisar los parámetros del sistema.' 
-								+ CHAR(13) + 'Parametro: ''Numero máximo de tiquetes en la facturación manual'''
-				
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END 
-			End
-			-- Bloqueo de Maximo (N) tkts por factura.
-			
-		
-			IF EXISTS(SELECT * From dbo.Parametros WHERE Id = 479 And RTRIM(Valor) = 'S')
-			BEGIN
-				Set @Estado = 1	   
-			    EXEC @retval=dbo.spza_Factura_ValidarTiqueteGr  
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END
-			
-			IF EXISTS(SELECT * From dbo.Parametros WHERE Id = 491 And RTRIM(Valor) = 'S')
-			BEGIN
-				Set @Estado = 1	   
-			    EXEC @retval=dbo.spza_Factura_ValidarFacturaParcial  
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END
-			
-
-			Set @Estado = 1	   
-			EXEC @retval=dbo.spza_Factura_ValidarConceptos  
-						@id_usuario=@id_usuario
-						, @id_fac_factura=@NewFacId
-						, @Estado=@Estado OUTPUT
-						, @Msj=@Msj OUTPUT
-						, @MostrarMsj ='N'
-			IF @retval<>0
-			BEGIN 
-				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN ;		
-				END
-				SET @ds_Respuesta = @Msj;
-				RETURN @retval;
-			END
-			
-
-			IF EXISTS(SELECT * FROM dbo.Configuracion_remisiones WHERE id_cliente = @cd_cliente_codigo AND (bl_BloqCupoCrd=1 or bl_BloqDiaVence = 1 or bl_BloqManual = 1 or bl_EnvCorreoBloqDiaVence=1 or bl_EnvCorreoBloqCupoCrd=1 OR bl_AlertaAgotaCupoCrd=1)) --AND @bl_interface = 0
-			BEGIN
-				Set @Estado = 1	   
-				EXEC @retval=dbo.spza_Factura_ValidarCupoCredito 
-							@id_usuario=@id_usuario
-							, @id_fac_factura=@NewFacId
-							, @Estado=@Estado OUTPUT
-							, @Msj=@Msj OUTPUT
-							, @MsjAlerta=@MsjAlerta OUTPUT
-							, @MostrarMsj ='N'
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = @Msj;
-					RETURN @retval;
-				END
-			END
-			
-			
-			
-			Declare @TAjusteIVA TABLE 	(	am_totalBaseFac MONEY,	am_totalIVAFac MONEY,	am_totalFac MONEY,	am_totalBase_Correccion MONEY,	am_totalIVA_Correccion MONEY,	am_total_Correccion MONEY,	am_total_Diferencia MONEY,	idDocumento INT,	in_tipo INT,	id_item INT,	in_tipoitem INT,	id_cargo INT,	id_imp INT,	am_cargo MONEY,	am_imp MONEY,	am_total MONEY,	am_porcentaje MONEY,	am_impdecimal MONEY,	am_imp1 MONEY,	am_toleranciaMas1 MONEY,	am_imp2 MONEY,	am_toleranciaMenos1 MONEY	,ds_descripcion varchar(8000), am_deltaCorreccion money, am_total_Diferencia_OUT money, Documento Varchar(25))
-			Declare @TAjusteIVARes TABLE 	(ds_respuesta VARCHAR(50), in_Estado INT, am_totalBaseFac MONEY,	am_totalIVAFac MONEY,	am_totalFac MONEY,	am_totalBase_Correccion MONEY,	am_totalIVA_Correccion MONEY,	am_total_Correccion MONEY,	am_total_Diferencia MONEY,	idDocumento INT,	in_tipo INT,	id_item INT,	in_tipoitem INT,	id_cargo INT,	id_imp INT,	am_cargo MONEY,	am_imp MONEY,	am_total MONEY,	am_porcentaje MONEY,	am_impdecimal MONEY,	am_imp1 MONEY,	am_toleranciaMas1 MONEY,	am_imp2 MONEY,	am_toleranciaMenos1 MONEY	,ds_descripcion varchar(8000), am_deltaCorreccion money, am_total_Diferencia_OUT money, Documento Varchar(25))
-			Declare @am_total_Diferencia_OUT MONEY
-			SELECT @FacturadorElect = Valor From dbo.Parametros Where Id=307
-			IF (Dbo.[fnza_Get_ValorInterfazVariable](@FacturadorElect,131,'Validar_IVA_facturacion') ='SI') AND @bl_omitir_Validar_IVA_facturacion = 0 AND @bl_generadaauto = 0
-			BEGIN
-
-				INSERT INTO @TAjusteIVA 
-				EXEC @retval = dbo.[spza_FacturaRemision_AjustarIVA] @id_usuario = @id_usuario, @IdDocumento = @NewFacId, @am_total_Diferencia_OUT = @am_total_Diferencia_OUT OUTPUT, @bl_vista_previa = 0, @Debug = 0,@bl_solo_validar = 1, @Tipo = 1
-
-				Declare @Valor_tolerancia_IVA MONEY
-				SELECT @Valor_tolerancia_IVA = isnull(Dbo.[fnza_Get_ValorInterfazVariable](@FacturadorElect,131,'Valor_tolerancia_IVA'),2)
-				--select @Valor_tolerancia_IVA as '@Valor_tolerancia_IVA'
-				IF ABS(@am_total_Diferencia_OUT) >  = ABS(ISNULL(@Valor_tolerancia_IVA,0))
-				BEGIN
-
-					IF @@TRANCOUNT > 0
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-
-					SET @ds_Respuesta = 'Se necesita realizar ajuste de IVA';return 1
-				END
-			END 
-			BEGIN
-				IF @bl_omitir_Validar_IVA_facturacion <>0 AND @bl_generadaauto = 0
-				BEGIN
-					--SET @ZML_AjusteIvaXML=REPLACE(@ZML_AjusteIvaXML,'cd_items VARCHAR(50),','')
-					--SET @ZML_AjusteIvaXML=REPLACE(@ZML_AjusteIvaXML,'''''Se necesita realizar ajuste de IVA'''',2,','')
-					SET @ZML_AjusteIvaXML=REPLACE(@ZML_AjusteIvaXML,'''''','''')
-					INSERT INTO @TAjusteIVARes
-					EXEC(@ZML_AjusteIvaXML)
-					IF EXISTS(SELECT * FROM @TAjusteIVARes WHERE am_deltaCorreccion <> 0)
-					BEGIN
-						DELETE FROM @TAjusteIVA
-						INSERT INTO @TAjusteIVA 
-						EXEC @retval = dbo.[spza_FacturaRemision_AjustarIVA] @id_usuario = @id_usuario, @IdDocumento = @NewFacId, @am_total_Diferencia_OUT = @am_total_Diferencia_OUT OUTPUT, @bl_vista_previa = 1, @Debug = 0,@bl_solo_validar = 0, @Tipo = 1	
-						IF @retval<>0 
-						BEGIN 
-   				
-   							IF @@TRANCOUNT > 0 
-							BEGIN 
-								ROLLBACK TRAN ;		
-							END
-							SELECT @Estado = 1
-								 , @Msj = 'Error el Ajustar los valores del iva';
-							SET @ds_Respuesta = @Msj;
-							RETURN @retval;
-						END
-					END
-				END	
-			END
-
-			IF NOT EXISTS(SELECT TOP 1 F.id FROM dbo.fac_factura F
-						LEFT JOIN dbo.Tiquetes T ON T.id_fac_factura=F.id
-						LEFT JOIN dbo.Fac_Tao FT ON FT.id_fac_factura=F.id
-						LEFT JOIN dbo.Fac_Servicios FS ON FS.id_fac_factura=F.id
-					  WHERE T.id IS NOT NULL OR FT.id IS NOT NULL OR FS.id IS NOT NULL
-					 )
-			BEGIN
-				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN ;		
-				END
-
-				SELECT @Estado = 1
-					  , @Msj = 'Error en el crear factura no tiene item(tiquetes, tao o servicios)';
-				SET @ds_Respuesta = @Msj;
-				RETURN 1;
-			END
-
-			--Contabilizando la Factura
-			SET @retval=0 
-			IF (NOT (dbo.fnza_Get_FacturaTotal(@NewFacId) = 0) AND @bl_nocont = 0) 
-			BEGIN
-				EXEC @retval = dbo.spza_Factura_Contabilizar @id_usuario,@NewFacId,1,@CodigoArchivoFisico
-			END 
-
-			IF @retval<>0 
-			BEGIN 
-   				
-   				IF @@TRANCOUNT > 0 
-				BEGIN 
-					ROLLBACK TRAN ;		
-				END
-				
-				IF (@bl_af = 1) 
-				BEGIN 										
-					EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-													 @id_usuario = @id_usuario ,
-													 @cd_status  = 1           , 												 
-													 @admsg      = 'Error en el proceso de contabilizacion',
-								 					 @msgparams  = @msg;
-				END
-				RETURN @retval;
-			END 
-			ELSE 
-			BEGIN 
-				Set @DocumentoCont = @cd_serie + @cd_consecutivo
-				If	Exists(Select * From Parametros Where Id = 232 and Valor = 'S')
-						And 
-					Not Exists(Select * from Clientes Where IndNCF = 1 And IdCliente = @cd_cliente_codigo)
-				Begin
-					Set @ErrorNCF = 1
-					Exec @ErrorNCF = spCF_DocumentoControl   
-							@Op = 'I', 
-							@Fuente	= @cd_fuente, 
-							@Documento = @DocumentoCont, 
-							@NCF = @NCF
-
-					IF (Isnull(@ErrorNCF, 0) <> 0 Or @@Error <> 0) --
-					BEGIN 
-						Set @procmsg = 'Error al actualizar Control Documentos NCF.'
-						IF @@TRANCOUNT > 0 
-						BEGIN 
-							ROLLBACK TRAN;	
-						END 
-						
-						IF (@bl_af = 1) --Se debe auditar proceso fallido
-						BEGIN 						
-						EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-														 @id_usuario = @id_usuario ,
-														 @cd_status  = 1           , 												 
-														 @admsg      = @procmsg	   ;	 
-						END 		  
-						
-						SET @ds_Respuesta = @procmsg;
-						RETURN 1 ;
-					END 
-											
-							
-				End
-				-----------------------------------------------------------------
-				----ZOL 
-				-----------------------------------------------------------------
-				Set @Estado = 1	
-			    EXEC @retval=dbo.Spza_Interfaces_ProcesarReservaXFactura  @id_usuario=@id_usuario, @id_fac_factura=@NewFacId
-				IF @retval<>0
-				BEGIN 
-					IF @@TRANCOUNT > 0 
-					BEGIN 
-						ROLLBACK TRAN ;		
-					END
-					SET @ds_Respuesta = 'Error actualizando la reserva';
-					RETURN @retval;
-				END
-				-----------------------------------------------------------------
-				----FIN ZOL 
-				-----------------------------------------------------------------				
-				DECLARE @msglog AS VARCHAR(8000)
-				SET @msglog='La factura ' + @cd_fuente+'-'+@cd_serie+@cd_consecutivo + ' fue creada exitosamente'
-
-				--Determinando si se debe auditar el proceso exitoso
-				IF (@bl_as = 1) 
-				BEGIN 										
-					EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-													 @id_usuario = @id_usuario ,
-													 @cd_status  = 1           , 												 
-													 @admsg      = @msglog     ,
-								 					 @msgparams  = NULL;
-				END 			 			
-				
-	 		 	--Si la transaccion fue creada en el procedimiento entonces se actualiza--
-				IF (XACT_STATE() <> 0) and (@@TRANCOUNT > 0) 
-		   	    BEGIN 
-				   COMMIT TRAN;				   
-				END
-				
-				--Obtenemos los datos de los Rc automatico
-				--SELECT 
-				--	@cd_fuenteRC = cd_fuente_RcAuto
-				--	, @cd_serieRC = cd_serie_RcAuto
-				--	, @cd_consecutivoRC = cd_consecutivo_RcAuto
-				--	, @cd_fuenteRCOtr = cd_fuente_RcOtrAuto
-				--	, @cd_serieRCOtr = cd_serie_RcOtrAuto
-				--	, @cd_consecutivoRCOtr = cd_consecutivo_RcOtrAuto
-				--FROM dbo.fac_factura
-				--WHERE id = @NewFacId
- 
-				--SELECT 	
-				--	@cd_fuente+'-'+@cd_serie+@cd_consecutivo
-				--	+'-'+CONVERT(VARCHAR(18),@NewFacId)									AS 'Respuesta', 
-			 -- 		0																	AS 'Estado',
-				--	IsNull(@cd_fuenteRC+'-'+@cd_serieRC+@cd_consecutivoRC,'')			AS 'RcAutomsg',
-				--	IsNull(@cd_fuenteRCOtr+'-'+@cd_serieRCOtr+@cd_consecutivoRCOtr,'')	AS 'RcOtrAutomsg',
-			 -- 		@Resolucionmsg														AS 'Resolucionmsg',
-			 -- 		@NCF																AS 'NCF',
-				--	@FechaCaducidad														AS 'FechaCaducidad'
-				/*inicio rgelis 2012/10/11 req.10814*/
-				IF @bl_generadaauto = 1	AND ISNULL(@Resolucionmsg,'')<> '' 
-				BEGIN
-					SET @MsjAlerta=ISNULL((@MsjAlerta+CHAR(13)+CHAR(10)),'')+ISNULL(@Resolucionmsg,'')
-				END
-				
-				SELECT 	
-					@cd_fuente+'-'+@cd_serie+@cd_consecutivo
-					+'-'+CONVERT(VARCHAR(18),@NewFacId)									AS 'Respuesta', 
-			  		0																	AS 'Estado',
-					RC.ID																AS 'id_ReciboCaja',
-					RC.id_FormaPago														AS 'id_FormaPago',
-					FP.ds_nombre														AS 'ds_FormaPago',
-					RC.cd_Fuente														AS 'cd_fuente',
-					RC.cd_Serie															AS 'cd_serie',
-					RC.cd_Consecutivo													AS 'cd_consecutivo',
-					CASE RC.in_Tipo WHEN 1 THEN 'RC de Tiquetes' 
-										   ELSE 'RC de otros Items'
-									END													AS 'ds_Tipo',
-					RC.am_valor															AS 'am_valor',
-			  		CASE 
-						WHEN 
-							r.ds_num_resolucion IS NOT NULL 
-							AND DATEDIFF(DAY,F.dt_fecha,r.dt_Fechavencimiento)<=ISNULL(r.in_diasvencimiento,0)
-							AND ISNULL(r.in_diasvencimiento,0) > 0
-							AND r.bl_alertarvencimiento = 1
-							THEN 'Faltan ' + convert(VARCHAR,DATEDIFF(DAY,F.dt_fecha,r.dt_Fechavencimiento))  + ' días para el vencimiento de la resolución'
-						ELSE @Resolucionmsg END											AS 'Resolucionmsg',
-			  		ISNULL(@NCF,'')														AS 'NCF',
-					ISNULL(@FechaCaducidad,@dt_vence)									AS 'FechaCaducidad',
-					ISNULL(@MsjAlerta,'')												AS 'ds_Alerta',
-					@in_ConsecutivoUnicoDocumento										AS 'in_ConsecutivoUnicoDocumento',
-					case when cd_fuente_NCausacionSrvTer is not null then isnull(cd_fuente_NCausacionSrvTer,'')+'-'+isnull(cd_serie_NCausacionSrvTer,'') + isnull(cd_consecutivo_NCausacionSrvTer,'') else '' end											AS 'DocumentoCausacionCxP'
-				FROM dbo.fac_factura As F
-					LEFT JOIN dbo.Fac_RecibosCaja As RC ON RC.id_fac_factura=F.id
-					LEFT JOIN dbo.FormasPago As FP ON FP.id=RC.id_FormaPago 
-					LEFT JOIN dbo.resoluciones r ON r.id_sucursal = F.id_sucursal AND r.ds_num_resolucion = F.ds_num_resolucion
-				WHERE F.id = @NewFacId 	
-				
-
-				SELECT TOP 1 
-					@ds_Respuesta = ISNULL('Factura Creada: '+F.cd_fuente+'-'+F.cd_serie+F.cd_consecutivo+'-'+CONVERT(VARCHAR(18),F.id), '') + 
-						CASE WHEN ISNULL(@MsjAlerta, '') <> '' THEN ' - Alerta: ' + @MsjAlerta ELSE '' END +
-						CASE WHEN ISNULL(
-							CASE WHEN r.ds_num_resolucion IS NOT NULL AND DATEDIFF(DAY,F.dt_fecha,r.dt_Fechavencimiento)<=ISNULL(r.in_diasvencimiento,0) AND ISNULL(r.in_diasvencimiento,0) > 0 AND r.bl_alertarvencimiento = 1 THEN 'Faltan ' + convert(VARCHAR,DATEDIFF(DAY,F.dt_fecha,r.dt_Fechavencimiento))  + ' días para el vencimiento de la resolución' ELSE @Resolucionmsg END
-						, '') <> '' THEN ' - Res: ' + 
-							CASE WHEN r.ds_num_resolucion IS NOT NULL AND DATEDIFF(DAY,F.dt_fecha,r.dt_Fechavencimiento)<=ISNULL(r.in_diasvencimiento,0) AND ISNULL(r.in_diasvencimiento,0) > 0 AND r.bl_alertarvencimiento = 1 THEN 'Faltan ' + convert(VARCHAR,DATEDIFF(DAY,F.dt_fecha,r.dt_Fechavencimiento))  + ' días para el vencimiento de la resolución' ELSE @Resolucionmsg END
-						ELSE '' END +
-						CASE WHEN ISNULL(RC.cd_fuente, '') <> '' THEN ' - Pago: ' + ISNULL(FP.ds_nombre, '') + ' ' + ISNULL(RC.cd_Fuente, '') + '-' + ISNULL(RC.cd_Serie, '') + '-' + ISNULL(RC.cd_Consecutivo, '') + ' (' + CASE RC.in_Tipo WHEN 1 THEN 'RC de Tiquetes' ELSE 'RC de otros Items' END + ') ' + ISNULL(CAST(RC.am_valor AS VARCHAR), '') ELSE '' END
-				FROM dbo.fac_factura As F
-					LEFT JOIN dbo.Fac_RecibosCaja As RC ON RC.id_fac_factura=F.id
-					LEFT JOIN dbo.FormasPago As FP ON FP.id=RC.id_FormaPago 
-					LEFT JOIN dbo.resoluciones r ON r.id_sucursal = F.id_sucursal AND r.ds_num_resolucion = F.ds_num_resolucion
-				WHERE F.id = @NewFacId;
-				
-				RETURN @retval;
-				
-			END
-		
-			------------------------------------------------------------------------
-			
-	    END TRY 
-    
-    	-- Bloque CATCH (Manejo de excepciones)
-    	BEGIN CATCH 
- 
- 			-- Tiempo de espera alcanzado --
-		    IF ERROR_NUMBER() = 1222
-		    BEGIN
-      			SET @msg =  'No se pudo ejecutar el proceso. Tiempo de espera agotado.';
-      			SET @retval = 1
-      			
-      			IF (@@TRANCOUNT > 0)
-				BEGIN 
-					ROLLBACK;
-				END
-	   	 
-	   	        RAISERROR (@msg,16,125);
-	   	       	--Se debe auditar proceso fallido
-				IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce ,
-													 			 @id_usuario = @id_usuario ,
-													 			 @cd_status  = 0           , 
-													 			 @admsg      = @msg	   ;														 			 		
-	   	        SET @ds_Respuesta = @msg;
-				RETURN @retval;
-		    END
-		    
-		    -- Registro bloqueado / Conflicto de actualizacion
-		    ELSE 
-		    IF ERROR_NUMBER() IN (1205, 3960)
-    		BEGIN
-    		
-    			IF (@@TRANCOUNT > 0)
-				BEGIN 
-					ROLLBACK;
-				END
-	   	        
-		       	SET @retry     = 1              ;
-		       	SET @retrycont = @retrycont + 1 ; 
-	   	 	END
-	    	ELSE
-		    BEGIN
-		     	-- Error no manejado --					
-				IF (@@TRANCOUNT > 0)
-				BEGIN 
-					ROLLBACK;
-				END	
-													
-				SET @retval = 1;
- 				SET @msg =	'Ha ocurrido un error. Información para soporte tecnico:'			+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-						    'Numero: ' + isnull(CAST(ERROR_NUMBER()   AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							'Mensaje: ' + isnull(ERROR_MESSAGE(),'') 					   		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-						 	'Severidad: ' + isnull(CAST(ERROR_SEVERITY() AS VARCHAR(10)),'') 	+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-						 	'Estado: ' + isnull(CAST(ERROR_STATE()    AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							'Procedimiento: ' + 'spFacturaCrear'							+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							'Linea: ' + isnull(CAST(ERROR_LINE() 	   AS VARCHAR(10)),'')      + CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) ; 							
-	
-				--Se debe auditar proceso fallido
-				IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar	@id_proceso = @idproce   ,
-										 			 			@id_usuario = @id_usuario ,
-										 			 			@cd_status  = 0           , 
-										 			 			@admsg      = @msg	  ;	
-				--RAISERROR (@msg,16,126);
-				--SET @ds_Respuesta = @msg;
-				SET @ds_Respuesta = @msg;
-				RETURN @retval;
-			END
-		END CATCH     
-	END 
-	
-	IF (@retrycont>@maxretries) 
-	BEGIN 
-		SET @retval = 1
-		SET @msg = 'No se pudo finalizar el proceso. Maximo numero de reintentos alcanzado.'
-		--Se debe auditar proceso fallido
-		IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-											 			 @id_usuario = @id_usuario ,
-											 			 @cd_status  = 0           , 
-											 			 @admsg      = @msg	   ;												 	   					   
-  		--RAISERROR (@msg,16,127);
-  		SET @ds_Respuesta = @msg;
-		RETURN @retval;
-  	END   	
-    
-    RETURN @retval;
-END
-
-
-
--- Archivo: spGenerarConceptosAutoConsultar.sql
-﻿IF OBJECT_ID('dbo.spGenerarConceptosAutoConsultar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spGenerarConceptosAutoConsultar;
-GO
-SET QUOTED_IDENTIFIER ON;
-GO
-CREATE PROCEDURE [dbo].[spGenerarConceptosAutoConsultar]
-	-- Parametros del procedimiento
-	@id_usuario			INT,
-	@dt_fechaFactura	SMALLDATETIME	= NULL,
-	@tasa_usd			MONEY			= 1	,
-	@ZML_DatosXML		VARCHAR(MAX)	= NULL  
- 
-AS
-BEGIN
-	-- SET NOCOUNT ON: Previene que conjuntos de resultados extras interfieran con 
-	-- expresiones SELECT
-	SET NOCOUNT ON;
-
-    -- Declaracion e inicializacion de variables
-  	DECLARE @bl_permit			 BIT 	, -- Permiso de ejecucion del proceso
-  			@bl_as 	   			 BIT	, -- Auditar exito
-	 		@bl_af 			     BIT	, -- Auditar fallido	 		
-			@procmsg	VARCHAR(8000)	, -- Mensaje devuelto por procedimientos llamados desde este procedimiento
-			@procret 	BIT 			, -- Valor de retorno de los procedimientos llamados desde este procedimiento
-			@idproce	int		    	, -- Codigo de proceso
-	 		@retry 		BIT			    , -- 1=Reintentar ; 0=Abortar  
-	 		@retrycont	INT			    , -- Contador de reintentos
-	 		@maxretries INT			    , -- Maximo numero de reintentos
-	 		@timeout	NVARCHAR(4000)  , -- Tiempo de espera maximo por bloqueo de registros
-	 		@stmt 		NVARCHAR(4000)  , -- Cadena de instrucciones T-SQL
-			@msg	    VARCHAR(8000)   , -- Mensaje retornado por el sistema
-			@retval		TINYINT 		, -- Valor de retorno de este procedimiento: 0:Exito ; 1:Error(Bloque Catch)
-			@Prefijo As Varchar(50)		, --Prefijo para indicar si es Dolares o Pesos
-			@am_Contado MONEY			,
-			@am_Credito MONEY			,
-			@MonedaLocal Varchar(3)		,
-			@TruncarDecimales Varchar(1),
-			@IdMonedaLocal INT			,
-			@bl_tomarFPAirplusTkt BIT	,
-			@bl_tomarFPTaoTkt BIT;
-
-	SELECT 	@retry				 = 1 		   ,
-			@retrycont			 = 0		   ,
-			@retval				 = 0;
-  	
-  	-- Manejo de tiempo de espera y de reintentos por bloqueo de tablas/registros  
-   	SELECT @maxretries = convert(INT,Valor) FROM dbo.Parametros WHERE Id = 60 ;
-	SELECT @timeout    = convert(NVARCHAR(4000),Valor) FROM dbo.Parametros WHERE Id = 50 ;		
-	SET @stmt = N'SET LOCK_TIMEOUT '+ltrim(rtrim(@timeout))
-	EXEC sp_executesql @stmt,N''
-	
-	Select @TruncarDecimales = Valor From parametros Where Id = 521
-
-	WHILE ( (@retry = 1) AND (@retrycont <= @maxretries) )
-	BEGIN
-		SET @retry = 0;
-    
-    	-- Bloque TRY
-    	BEGIN TRY 
-    	    		
-    		--Obteniendo informacion de seguridad y auditoria--
-			/*EXEC dbo.spzaProcesoUsuario_Consultar @id_usuario   = @id_usuario       ,
-												  @id_proceso   = @idproce 		    , 
-												  @bl_permit    = @bl_permit OUTPUT , 
-												  @bl_auditsuc  = @bl_as 	 OUTPUT , 
-												  @bl_auditfail = @bl_af 	 OUTPUT ;
-			IF (@bl_permit = 0)
-			BEGIN 
-				SELECT 'No posee permisos suficientes para ejecutar esta acciÃ³n.' AS 'Respuesta'
-				RETURN @retval;
-			END */
-
-			
-			
-			--Instrucciones del procedimiento-----------------------------------------
-			DECLARE @NumeroDecimales INT
-			SELECT  @NumeroDecimales = Valor from parametros where Id = 33
-
-			Select @MonedaLocal = Valor From parametros where id=10
-			Select @IdMonedaLocal =  Id From Monedas_iata Where cd_codigo=@MonedaLocal
-
-			DECLARE @PaisLocal VARCHAR(50)
-			SELECT @PaisLocal = Valor From parametros where id=240
-
-			DECLARE @bl_utilizarcencostosuc BIT,@bl_utilizarcencostoimp BIT
-			SELECT @bl_utilizarcencostosuc = CASE WHEN RTRIM(LTRIM(Valor))='S' THEN 1 ELSE 0 END From parametros where id=134
-			SELECT @bl_utilizarcencostoimp = CASE WHEN RTRIM(LTRIM(Valor))='S' THEN 1 ELSE 0 END From parametros where id=137
-			SET @bl_utilizarcencostosuc = ISNULL(@bl_utilizarcencostosuc,0)
-			SET @bl_utilizarcencostoimp = ISNULL(@bl_utilizarcencostoimp,0)
-
-			SELECT @bl_tomarFPAirplusTkt = CASE WHEN rtrim(ltrim(Valor))='S' THEN 1 ELSE 0 END  FROM dbo.Parametros where Id=608
-			SELECT @bl_tomarFPTaoTkt = CASE WHEN rtrim(ltrim(Valor))='S' THEN 1 ELSE 0 END  FROM dbo.Parametros where Id=609
-			SET @bl_tomarFPAirplusTkt=ISNULL(@bl_tomarFPAirplusTkt,0)
-			SET @bl_tomarFPTaoTkt=isnull(@bl_tomarFPTaoTkt,0)
-
-			IF OBJECT_ID('tempdb..#Concepto') IS NOT NULL DROP TABLE #Concepto;
-			CREATE TABLE #Concepto 
-			(Id INT IDENTITY
-			,cd_cliente VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,id_conceptofacturacion INT
-            ,id_tiposservicios INT
-            ,in_nacionalidad INT
-			,id_aerolinea	INT
-			,id_moneda	INT
-            ,ds_paxname VARCHAR(30) COLLATE DATABASE_DEFAULT
-            ,ds_paxape VARCHAR(30) COLLATE DATABASE_DEFAULT
-            ,cd_paxtype CHAR(3) COLLATE DATABASE_DEFAULT
-            ,ds_paxClasificacion CHAR(6) COLLATE DATABASE_DEFAULT
-			,cd_tiquete CHAR(11) COLLATE DATABASE_DEFAULT
-			,cd_proveedores VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,dt_llegada SMALLDATETIME
-			,dt_salida SMALLDATETIME
-			,cd_cencosto VARCHAR(16) COLLATE DATABASE_DEFAULT
-			,cd_auxiliar VARCHAR(16) COLLATE DATABASE_DEFAULT
-			,cd_item VARCHAR(16) COLLATE DATABASE_DEFAULT
-			,CodigoReserva VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,am_tarifa MONEY
-			,am_total MONEY
-			,ColId VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,cd_Consecutivo_depende VARCHAR(50) COLLATE DATABASE_DEFAULT
-			,am_ValorComision MONEY
-			,am_ImpuestoComision MONEY
-			,am_totalfactura MONEY
-			,cd_tourcode VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,am_Contado MONEY --rgelis 2017/02/11 req.47323
-			,am_Credito MONEY --rgelis 2017/02/11 req.47323
-			,cd_tktrevisado VARCHAR(14) COLLATE DATABASE_DEFAULT --inicio rgelis 2017/09/19 req.5282
-			,id_TiposDocumento INT
-            ,cd_Penalidad VARCHAR(14) COLLATE DATABASE_DEFAULT
-			,cd_TipoTiqueteGDS VARCHAR(3) COLLATE DATABASE_DEFAULT --fin rgelis 2017/09/19 req.5282
-			,am_TasaCambio MONEY --rgelis 2017/10/25 req.54014
-			,ds_itinerario VARCHAR(123) COLLATE DATABASE_DEFAULT --rgelis 2018/04/16 req.57446
-			,id_sucursal INT --inicio rgelis 2018/05/07 req.58559
-			,id_implante INT
-			,id_FormasPago INT 
-			,cd_TarjetasCredito VARCHAR(4) COLLATE DATABASE_DEFAULT --fin rgelis 2018/05/07 req.58559
-			,iden_gds INT
-			,cd_codigotc VARCHAR(2) COLLATE DATABASE_DEFAULT
-			,ds_numerotc VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,ds_vencetc VARCHAR(5) COLLATE DATABASE_DEFAULT
-			,ds_autorizaciontc VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,ds_vouchertc VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,in_cuotastc INT
-			,id_FormasPagoTAO INT 
-			,cd_codigotcTAO VARCHAR(2) COLLATE DATABASE_DEFAULT
-			,ds_numerotcTAO VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,ds_vencetcTAO VARCHAR(5) COLLATE DATABASE_DEFAULT
-			,ds_autorizaciontcTAO VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,ds_vouchertcTAO VARCHAR(25) COLLATE DATABASE_DEFAULT
-			,in_cuotastcTAO INT 
-			)
-			
-			DECLARE @ExecSQL VARCHAR(MAX) = 'INSERT INTO #Concepto ' + @ZML_DatosXML;
-			EXEC(@ExecSQL);
-			--select * from #Concepto
-			--RETURN 1
-			
-			-- Loop variables
-			DECLARE @cur_cd_cliente VARCHAR(25),
-					@cur_id_conceptofacturacion INT,
-					@cur_in_nacionalidad INT,
-					@cur_id_aerolinea INT,
-					@cur_id_moneda INT,
-					@cur_ds_paxname VARCHAR(30),
-					@cur_ds_paxape VARCHAR(30),
-					@cur_cd_paxtype CHAR(3),
-					@cur_ds_paxClasificacion CHAR(6),
-					@cur_cd_tiquete CHAR(11),
-					@cur_dt_llegada SMALLDATETIME,
-					@cur_dt_salida SMALLDATETIME,
-					@cur_cd_cencosto VARCHAR(16),
-					@cur_cd_auxiliar VARCHAR(16),
-					@cur_cd_item VARCHAR(16),
-					@cur_CodigoReserva VARCHAR(25),
-					@cur_id_sucursal INT,
-					@cur_id_implante INT,
-					@cur_id_FormasPago INT,
-					@cur_cd_TarjetasCredito VARCHAR(4),
-					@cur_id_TarjetasCredito INT,
-					@cur_iden_gds INT,
-					@cur_ColId VARCHAR(25),
-					@cur_cd_Consecutivo_depende VARCHAR(50),
-					@cur_cd_codigotc VARCHAR(2), 
-					@cur_ds_numerotc VARCHAR(25),
-					@cur_ds_vencetc VARCHAR(5),
-					@cur_ds_autorizaciontc VARCHAR(25), 
-					@cur_ds_vouchertc VARCHAR(25), 
-					@cur_in_cuotastc INT,
-					@cur_id_FormasPagoTAO INT,
-					@cur_id_TarjetasCreditoTAO INT,
-					@cur_cd_codigotcTAO VARCHAR(2),
-					@cur_ds_numerotcTAO VARCHAR(25),
-					@cur_ds_vencetcTAO VARCHAR(5),
-					@cur_ds_autorizaciontcTAO VARCHAR(25),
-					@cur_ds_vouchertcTAO VARCHAR(25),
-					@cur_in_cuotastcTAO INT
-
-			DECLARE @cur_id_reserva_int INT;
-
-			DECLARE @OriginalConcepto TABLE 
-			(
-			 cd_cliente VARCHAR(25)
-			,id_conceptofacturacion INT
-            ,in_nacionalidad INT
-			,id_aerolinea	INT
-			,id_moneda	INT
-            ,ds_paxname VARCHAR(30)
-            ,ds_paxape VARCHAR(30)
-            ,cd_paxtype CHAR(3)
-            ,ds_paxClasificacion CHAR(6)
-			,cd_tiquete CHAR(11)
-			,dt_llegada SMALLDATETIME
-			,dt_salida SMALLDATETIME
-			,cd_cencosto VARCHAR(16)
-			,cd_auxiliar VARCHAR(16)
-			,cd_item VARCHAR(16)
-			,CodigoReserva VARCHAR(25)
-			,id_sucursal INT
-			,id_implante INT
-			,id_FormasPago INT 
-			,cd_TarjetasCredito VARCHAR(4)
-			,iden_gds INT
-			,ColId VARCHAR(25)
-			,cd_Consecutivo_depende VARCHAR(50)
-			,cd_codigotc VARCHAR(2) 
-			,ds_numerotc VARCHAR(25)
-			,ds_vencetc VARCHAR(5)
-			,ds_autorizaciontc VARCHAR(25) 
-			,ds_vouchertc VARCHAR(25) 
-			,in_cuotastc INT
-			,id_FormasPagoTAO INT
-			,cd_codigotcTAO VARCHAR(2)
-			,ds_numerotcTAO VARCHAR(25)
-			,ds_vencetcTAO VARCHAR(5)
-			,ds_autorizaciontcTAO VARCHAR(25)
-			,ds_vouchertcTAO VARCHAR(25)
-			,in_cuotastcTAO INT
-			)
-
-			INSERT INTO @OriginalConcepto (cd_cliente, id_conceptofacturacion, in_nacionalidad, id_aerolinea, id_moneda, ds_paxname, ds_paxape, cd_paxtype, ds_paxClasificacion, cd_tiquete, dt_llegada, dt_salida, cd_cencosto, cd_auxiliar, cd_item, CodigoReserva, id_sucursal, id_implante, id_FormasPago, cd_TarjetasCredito, iden_gds, ColId, cd_Consecutivo_depende, cd_codigotc, ds_numerotc, ds_vencetc, ds_autorizaciontc, ds_vouchertc, in_cuotastc, id_FormasPagoTAO, cd_codigotcTAO, ds_numerotcTAO, ds_vencetcTAO, ds_autorizaciontcTAO, ds_vouchertcTAO, in_cuotastcTAO)
-			SELECT cd_cliente, id_conceptofacturacion, in_nacionalidad, id_aerolinea, id_moneda, ds_paxname, ds_paxape, cd_paxtype, ds_paxClasificacion, cd_tiquete, dt_llegada, dt_salida, cd_cencosto, cd_auxiliar, cd_item, CodigoReserva, id_sucursal, id_implante, id_FormasPago, cd_TarjetasCredito, iden_gds, ColId, cd_Consecutivo_depende, cd_codigotc, ds_numerotc, ds_vencetc, ds_autorizaciontc, ds_vouchertc, in_cuotastc, id_FormasPagoTAO, cd_codigotcTAO, ds_numerotcTAO, ds_vencetcTAO, ds_autorizaciontcTAO, ds_vouchertcTAO, in_cuotastcTAO 
-			FROM #Concepto
-			
-			--select * from @OriginalConcepto
-			--return 1
-			-- 1. Construir @ListaReservas
-			DECLARE @ListaReservas VARCHAR(MAX) = '';
-			SELECT @ListaReservas = @ListaReservas + CAST(id_reserva AS VARCHAR) + ',' 
-			FROM (
-				SELECT DISTINCT r.id AS id_reserva 
-				FROM dbo.ReservasGDS r 
-				INNER JOIN #Concepto c ON r.cd_codigo = c.CodigoReserva
-			) X;
-			IF LEN(@ListaReservas) > 0 SET @ListaReservas = LEFT(@ListaReservas, LEN(@ListaReservas) - 1);
-
-			-- 2. Cargar Itinerarios y FEEs Masivamente
-			IF OBJECT_ID('tempdb..#ItinerariosJob') IS NOT NULL DROP TABLE #ItinerariosJob;
-			CREATE TABLE #ItinerariosJob (id INT, id_reserva INT, orden INT, cd_origen VARCHAR(10), cd_destino VARCHAR(10), cd_clase VARCHAR(10), fecha_salida VARCHAR(20), hora_salida VARCHAR(10), hora_llegada VARCHAR(10), terminal VARCHAR(50), cd_aero_siglas VARCHAR(10), cd_farebasis VARCHAR(50), ds_NumVuelo VARCHAR(50), ds_TipoVuelo VARCHAR(50), am_valor MONEY, bl_NoUtilizado BIT, am_co2 MONEY);
-			
-			IF OBJECT_ID('tempdb..#FeesJob') IS NOT NULL DROP TABLE #FeesJob;
-			CREATE TABLE #FeesJob (id_reserva INT, cd_tiquete VARCHAR(50), in_orden INT, cd_conceptofac VARCHAR(50), cd_subcodigo VARCHAR(50), am_valor MONEY, ds_servicio VARCHAR(200));
-																																
-			IF ISNULL(@ListaReservas,'') <> ''
-			BEGIN 
-				INSERT INTO #ItinerariosJob EXEC dbo.spza_ReservasGDSJOB_Itinerario @id_reserva = @ListaReservas;
-				INSERT INTO #FeesJob EXEC dbo.spza_ReservasGDS_FEEJOB_Consultar @Id_Reservas = @ListaReservas;
-			END
-			
-			DECLARE cur_conceptos CURSOR LOCAL FAST_FORWARD FOR
-			SELECT cd_cliente, id_conceptofacturacion, in_nacionalidad, id_aerolinea, id_moneda, ds_paxname, ds_paxape, cd_paxtype, ds_paxClasificacion, cd_tiquete, dt_llegada, dt_salida, cd_cencosto, cd_auxiliar, cd_item, CodigoReserva, id_sucursal, id_implante, id_FormasPago, cd_TarjetasCredito, iden_gds, ColId, cd_Consecutivo_depende, cd_codigotc, ds_numerotc, ds_vencetc, ds_autorizaciontc, ds_vouchertc, in_cuotastc, id_FormasPagoTAO, cd_codigotcTAO, ds_numerotcTAO, ds_vencetcTAO, ds_autorizaciontcTAO, ds_vouchertcTAO, in_cuotastcTAO 
-			FROM @OriginalConcepto
-
-			OPEN cur_conceptos
-			FETCH NEXT FROM cur_conceptos INTO @cur_cd_cliente, @cur_id_conceptofacturacion, @cur_in_nacionalidad, @cur_id_aerolinea, @cur_id_moneda, @cur_ds_paxname, @cur_ds_paxape, @cur_cd_paxtype, @cur_ds_paxClasificacion, @cur_cd_tiquete, @cur_dt_llegada, @cur_dt_salida, @cur_cd_cencosto, @cur_cd_auxiliar, @cur_cd_item, @cur_CodigoReserva, @cur_id_sucursal, @cur_id_implante, @cur_id_FormasPago, @cur_cd_TarjetasCredito, @cur_iden_gds, @cur_ColId, @cur_cd_Consecutivo_depende, @cur_cd_codigotc, @cur_ds_numerotc, @cur_ds_vencetc, @cur_ds_autorizaciontc, @cur_ds_vouchertc, @cur_in_cuotastc, @cur_id_FormasPagoTAO, @cur_cd_codigotcTAO, @cur_ds_numerotcTAO, @cur_ds_vencetcTAO, @cur_ds_autorizaciontcTAO, @cur_ds_vouchertcTAO, @cur_in_cuotastcTAO
-
-			WHILE @@FETCH_STATUS = 0
-			BEGIN
-				SELECT @cur_id_reserva_int = id FROM dbo.ReservasGDS WHERE cd_codigo = @cur_CodigoReserva
-
-				IF @cur_id_reserva_int IS NOT NULL
-				BEGIN
-					-- 1. Consultar itinerario y actualizar en @Concepto
-					DECLARE @ItinTable TABLE (
-						id INT, id_reserva INT, orden INT, cd_origen VARCHAR(10), cd_destino VARCHAR(10),
-						cd_clase VARCHAR(10), fecha_salida VARCHAR(20), hora_salida VARCHAR(10),
-						hora_llegada VARCHAR(10), terminal VARCHAR(50), cd_aero_siglas VARCHAR(10),
-						cd_farebasis VARCHAR(50), ds_NumVuelo VARCHAR(50), ds_TipoVuelo VARCHAR(50),
-						am_valor MONEY, bl_NoUtilizado BIT, am_co2 MONEY
-					)
-					DELETE FROM @ItinTable
-
-					INSERT INTO @ItinTable
-					SELECT id, id_reserva, orden, cd_origen, cd_destino, cd_clase, fecha_salida, hora_salida, hora_llegada, terminal, cd_aero_siglas, cd_farebasis, ds_NumVuelo, ds_TipoVuelo, am_valor, bl_NoUtilizado, am_co2
-					FROM #ItinerariosJob WHERE id_reserva = @cur_id_reserva_int;
-
-					DECLARE @ds_itinerario VARCHAR(123) = ''
-					SELECT @ds_itinerario = CASE WHEN @ds_itinerario = '' THEN cd_origen + '-' + cd_destino ELSE @ds_itinerario + '-' + cd_destino END
-					FROM @ItinTable
-					ORDER BY orden
-
-					IF @ds_itinerario <> ''
-					BEGIN
-						UPDATE #Concepto
-						SET ds_itinerario = @ds_itinerario
-						WHERE cd_tiquete = @cur_cd_tiquete AND CodigoReserva = @cur_CodigoReserva
-					END
-
-					-- 2. Consultar FEEs/cargos adicionales por tiquete (solo si es tiquete, id_conceptofacturacion 1 o 2)
-					IF @cur_id_conceptofacturacion IN (1, 2)
-					BEGIN
-						DECLARE @FeeTable TABLE (
-							id_reserva INT,
-							cd_tiquete VARCHAR(50) COLLATE DATABASE_DEFAULT,
-							in_orden INT,
-							cd_conceptofac VARCHAR(50) COLLATE DATABASE_DEFAULT,
-							cd_subcodigo VARCHAR(50) COLLATE DATABASE_DEFAULT,
-							am_valor MONEY,
-							ds_servicio VARCHAR(200) COLLATE DATABASE_DEFAULT
-						)
-						DELETE FROM @FeeTable
-
-						INSERT INTO @FeeTable(id_reserva,cd_tiquete,in_orden,cd_conceptofac,cd_subcodigo,am_valor,ds_servicio)
-						SELECT F.id_reserva, F.cd_tiquete, F.in_orden, F.cd_conceptofac, F.cd_subcodigo, F.am_valor, ds_servicio = CASE WHEN ISNULL(F.ds_servicio,'')='' THEN CF.ds_nombre COLLATE DATABASE_DEFAULT +' '+F.cd_tiquete COLLATE DATABASE_DEFAULT ELSE F.ds_servicio COLLATE DATABASE_DEFAULT END 
-						FROM #FeesJob F 
-						LEFT JOIN dbo.ConceptoFacturacion CF ON CF.cd_codigo COLLATE DATABASE_DEFAULT = F.cd_conceptofac COLLATE DATABASE_DEFAULT
-						WHERE F.id_reserva = @cur_id_reserva_int 
-						AND (F.cd_tiquete = @cur_cd_tiquete OR F.cd_tiquete = CASE WHEN LEN(@cur_cd_tiquete)>=13 THEN RIGHT(@cur_cd_tiquete,LEN(@cur_cd_tiquete)-3) ELSE @cur_cd_tiquete END);
-
-						SELECT @cur_id_TarjetasCredito = id FROM dbo.TarjetasCredito WHERE cd_codigo=@cur_cd_TarjetasCredito
-						SELECT @cur_id_TarjetasCreditoTAO = id FROM dbo.TarjetasCredito WHERE cd_codigo=@cur_cd_codigotcTAO
-
-						INSERT INTO #GenerarConceptosAuto (
-							id_ConceptoFacturacion,
-							cd_ConceptoFacturacion,
-							ds_ConceptoFacturacion,
-							id_TiposConceptFac,
-							bl_contorlarCargImp,
-							bl_CalculoAutoValoresFacturacion,
-							id_TiposServicio,
-							cd_TiposServicio,
-							ds_TiposServicio,
-							cd_proveedores,
-							ds_proveedores,
-							cd_tiquete,
-							ds_servicio,
-							ds_descrip,
-							ds_paxname,
-							ds_paxape,
-							cd_paxtype,
-							ds_paxClasificacion,
-							in_nacionalidad,
-							dt_llegada,
-							dt_salida,
-							cd_cencosto,
-							cd_auxiliar,
-							cd_item,
-							Valor,
-							am_Contado,
-							am_Credito,
-							ColId,
-							cd_Consecutivo_depende,
-							CodigoReserva,
-							am_ImpuestoComision,
-							Respuesta,
-							bl_RutaExentaIva,
-							id_FormasPago,
-							id_TarjetasCredito,
-							am_basedescuento,
-							am_pordescuento,
-							id_FormasPagoAirPlus,
-							cd_FormasPagoAirPlus,
-							ds_FormasPagoAirPlus,
-							id_TarjetasCreditoAirPlus,
-							cd_TarjetasCreditoAirPlus,
-							ds_numerotarjetaAirPlus,
-							cd_codigotc, 
-							ds_numerotc,
-							ds_vencetc, 
-							ds_autorizaciontc,
-							ds_vouchertc, 
-							in_cuotastc 
-						)
-						SELECT 
-							id_ConceptoFacturacion=C.id,
-							cd_ConceptoFacturacion=C.cd_codigo,
-							ds_ConceptoFacturacion=C.ds_nombre,
-							id_TiposConceptFac=C.id_TiposConceptoFacturacion,
-							bl_contorlarCargImp=C.bl_contorlarCargImp,
-							bl_CalculoAutoValoresFacturacion=C.bl_CalculoAutoValoresFacturacion,
-							id_TiposServicio=TS.id,
-							cd_TiposServicio=TS.cd_codigo,
-							ds_TiposServicio=TS.ds_nombre,
-							cd_proveedores='',
-							ds_proveedores='',
-							cd_tiquete=F.cd_tiquete,
-							ds_servicio=F.ds_servicio,
-							ds_descrip=F.ds_servicio,
-							ds_paxname=@cur_ds_paxname,
-							ds_paxape=@cur_ds_paxape,
-							cd_paxtype=@cur_cd_paxtype,
-							ds_paxClasificacion=@cur_ds_paxClasificacion,
-							in_nacionalidad=@cur_in_nacionalidad,
-							dt_llegada=@cur_dt_llegada,
-							dt_salida=@cur_dt_salida,
-							cd_cencosto=@cur_cd_cencosto,
-							cd_auxiliar=@cur_cd_auxiliar,
-							cd_item=@cur_cd_item,
-							Valor=F.am_valor,
-							am_Contado=CASE WHEN ISNULL(@cur_id_FormasPago,0)<>2 THEN F.am_valor ELSE 0 END,
-							am_Credito=CASE WHEN ISNULL(@cur_id_FormasPago,0)=2 THEN F.am_valor ELSE 0 END,
-							ColId=@cur_ColId,
-							cd_Consecutivo_depende=@cur_cd_Consecutivo_depende,
-							CodigoReserva=@cur_CodigoReserva,
-							am_ImpuestoComision=0,
-							Respuesta='',
-							bl_RutaExentaIva=0,
-							id_FormasPago=@cur_id_FormasPago,
-							id_TarjetasCredito=@cur_id_TarjetasCredito,
-							am_basedescuento=0,
-							am_pordescuento=0,
-							id_FormasPagoAirPlus=NULL,
-							cd_FormasPagoAirPlus='',
-							ds_FormasPagoAirPlus='',
-							id_TarjetasCreditoAirPlus=NULL,
-							cd_TarjetasCreditoAirPlus='',
-							ds_numerotarjetaAirPlus='',
-							cd_codigotc=@cur_cd_codigotc, 
-							ds_numerotc=@cur_ds_numerotc,
-							ds_vencetc=@cur_ds_vencetc, 
-							ds_autorizaciontc=@cur_ds_autorizaciontc,
-							ds_vouchertc=@cur_ds_vouchertc, 
-							in_cuotastc=@cur_in_cuotastc
-						FROM @FeeTable F
-						INNER JOIN dbo.ConceptoFacturacion C ON C.cd_codigo = F.cd_conceptofac
-						LEFT JOIN dbo.tiposServicio_asignados TSA ON (TSA.id_ConceptoFacturacion = C.id AND TSA.bl_Valdeft = 1) 
-						LEFT JOIN dbo.TiposServicios TS ON TS.id = TSA.id_TipoServicio
-
-						-- Auto-TAO Configuration
-						DECLARE @AUTOTAO CHAR(1) = (SELECT LTRIM(RTRIM(Valor)) FROM dbo.Parametros WHERE id = 192);
-						DECLARE @AUTOTAOAMADEUS CHAR(1) = (SELECT LTRIM(RTRIM(Valor)) FROM dbo.Parametros WHERE id = 213);
-						
-						DECLARE @ValorTAO MONEY = 0;
-						
-						-- Validar si el cliente tiene config especial
-						DECLARE @bl_TAO BIT, @am_TarifaOneWay MONEY, @am_TarifaRoundTrip MONEY, @am_Tarifa_USD300 MONEY, @am_Tarifa_USD300_USD500 MONEY, @am_Tarifa_USD500_USD800 MONEY, @am_Tarifa_USD800 MONEY;
-						SELECT TOP 1 @bl_TAO = ISNULL(bl_TAO,0), @am_TarifaOneWay = am_TarifaOneWay, @am_TarifaRoundTrip = am_TarifaRoundTrip, @am_Tarifa_USD300 = am_Tarifa_USD300, @am_Tarifa_USD300_USD500 = am_Tarifa_USD300_USD500, @am_Tarifa_USD500_USD800 = am_Tarifa_USD500_USD800, @am_Tarifa_USD800 = am_Tarifa_USD800
-						FROM dbo.Configuracion_remisiones WHERE id_cliente = @cur_cd_cliente;
-
-						IF @bl_TAO = 1 OR @AUTOTAO = 'S' OR (@AUTOTAOAMADEUS = 'S' AND @cur_iden_gds = 2)
-						BEGIN
-							IF ISNULL(@bl_TAO, 0) = 0
-							BEGIN
-								-- Cargar de parametros generales
-								SELECT @am_TarifaOneWay = CAST(Valor AS MONEY) FROM dbo.Parametros WHERE id = 61;
-								SELECT @am_TarifaRoundTrip = CAST(Valor AS MONEY) FROM dbo.Parametros WHERE id = 62;
-								SELECT @am_Tarifa_USD300 = CAST(Valor AS MONEY) FROM dbo.Parametros WHERE id = 67;
-								SELECT @am_Tarifa_USD300_USD500 = CAST(Valor AS MONEY) FROM dbo.Parametros WHERE id = 68;
-								SELECT @am_Tarifa_USD500_USD800 = CAST(Valor AS MONEY) FROM dbo.Parametros WHERE id = 69;
-								SELECT @am_Tarifa_USD800 = CAST(Valor AS MONEY) FROM dbo.Parametros WHERE id = 70;
-							END
-
-							-- Determinar rango basado en nacionalidad e itinerario
-							DECLARE @tarifa_base MONEY;
-							SELECT @tarifa_base = am_tarifa FROM #Concepto WHERE cd_tiquete = @cur_cd_tiquete AND CodigoReserva = @cur_CodigoReserva;
-
-							IF @cur_in_nacionalidad = 1
-							BEGIN
-								IF dbo.fnza_ItinerarioTipo(@ds_itinerario) = 'OW' SET @ValorTAO = @am_TarifaOneWay;
-								ELSE SET @ValorTAO = @am_TarifaRoundTrip;
-							END
-							ELSE
-							BEGIN
-								-- Convertir a USD si aplica, aquÃ­ usamos la tarifa base por simplicidad
-								DECLARE @TarifaUSD MONEY = ISNULL(@tarifa_base, 0); 
-								IF @TarifaUSD <= 300 SET @ValorTAO = @am_Tarifa_USD300;
-								ELSE IF @TarifaUSD <= 500 SET @ValorTAO = @am_Tarifa_USD300_USD500;
-								ELSE IF @TarifaUSD <= 800 SET @ValorTAO = @am_Tarifa_USD500_USD800;
-								ELSE SET @ValorTAO = @am_Tarifa_USD800;
-							END
-
-							IF ISNULL(@ValorTAO, 0) > 0
-							BEGIN
-								INSERT INTO #GenerarConceptosAuto (
-										id_ConceptoFacturacion,
-										cd_ConceptoFacturacion,
-										ds_ConceptoFacturacion,
-										id_TiposConceptFac,
-										bl_contorlarCargImp,
-										bl_CalculoAutoValoresFacturacion,
-										id_TiposServicio,
-										cd_TiposServicio,
-										ds_TiposServicio,
-										cd_proveedores,
-										ds_proveedores,
-										cd_tiquete,
-										ds_servicio,
-										ds_descrip,
-										ds_paxname,
-										ds_paxape,
-										cd_paxtype,
-										ds_paxClasificacion,
-										in_nacionalidad,
-										dt_llegada,
-										dt_salida,
-										cd_cencosto,
-										cd_auxiliar,
-										cd_item,
-										Valor,
-										am_Contado,
-										am_Credito,
-										ColId,
-										cd_Consecutivo_depende,
-										CodigoReserva,
-										am_ImpuestoComision,
-										Respuesta,
-										bl_RutaExentaIva,
-										id_FormasPago,
-										id_TarjetasCredito,
-										am_basedescuento,
-										am_pordescuento,
-										id_FormasPagoAirPlus,
-										cd_FormasPagoAirPlus,
-										ds_FormasPagoAirPlus,
-										id_TarjetasCreditoAirPlus,
-										cd_TarjetasCreditoAirPlus,
-										ds_numerotarjetaAirPlus,
-										cd_codigotc, 
-										ds_numerotc,
-										ds_vencetc, 
-										ds_autorizaciontc,
-										ds_vouchertc, 
-										in_cuotastc
-								)
-								SELECT
-										id_ConceptoFacturacion=@cur_in_nacionalidad+3,
-										cd_ConceptoFacturacion=CASE WHEN @cur_in_nacionalidad=2 THEN 'CAI' ELSE 'CAN' END,
-										ds_ConceptoFacturacion='Tarifa Adminstrativa '+CASE WHEN @cur_in_nacionalidad=2 THEN 'Internacional' ELSE 'Nacional' END,
-										id_TiposConceptFac=3,
-										bl_contorlarCargImp=0,
-										bl_CalculoAutoValoresFacturacion=0,
-										id_TiposServicio=NULL,
-										cd_TiposServicio='',
-										ds_TiposServicio='',
-										cd_proveedores='',
-										ds_proveedores='',
-										cd_tiquete=@cur_cd_tiquete,
-										ds_servicio='Tarifa Adminstrativa '+CASE WHEN @cur_in_nacionalidad=2 THEN 'Internacional' ELSE 'Nacional' END + ' Tiquete: ' + ISNULL(@cur_cd_tiquete,''),
-										ds_descrip='Tarifa Adminstrativa '+CASE WHEN @cur_in_nacionalidad=2 THEN 'Internacional' ELSE 'Nacional' END + ' Tiquete: ' + ISNULL(@cur_cd_tiquete,''),
-										ds_paxname=@cur_ds_paxname,
-										ds_paxape=@cur_ds_paxape,
-										cd_paxtype=@cur_cd_paxtype,
-										ds_paxClasificacion=@cur_ds_paxClasificacion,
-										in_nacionalidad=@cur_in_nacionalidad,
-										dt_llegada=@cur_dt_llegada,
-										dt_salida=@cur_dt_salida,
-										cd_cencosto=@cur_cd_cencosto,
-										cd_auxiliar=@cur_cd_auxiliar,
-										cd_item=@cur_cd_item,
-										Valor=@ValorTAO,
-										am_Contado=CASE WHEN (CASE WHEN ISNULL(@cur_id_FormasPagoTAO,0)<>0 THEN ISNULL(@cur_id_FormasPagoTAO,0) ELSE ISNULL(@cur_id_FormasPago,0) END)<>2 THEN @ValorTAO ELSE 0 END,
-										am_Credito=CASE WHEN (CASE WHEN ISNULL(@cur_id_FormasPagoTAO,0)<>0 THEN ISNULL(@cur_id_FormasPagoTAO,0) ELSE ISNULL(@cur_id_FormasPago,0) END)=2 THEN @ValorTAO ELSE 0 END,
-										ColId=@cur_ColId,
-										cd_Consecutivo_depende=@cur_cd_Consecutivo_depende,
-										CodigoReserva=@cur_CodigoReserva,
-										am_ImpuestoComision=0,
-										Respuesta='',
-										bl_RutaExentaIva=0,
-										id_FormasPago=CASE WHEN ISNULL(@cur_id_FormasPagoTAO,0)<>0 THEN @cur_id_FormasPagoTAO ELSE @cur_id_FormasPago END,
-										id_TarjetasCredito=CASE WHEN ISNULL(@cur_id_TarjetasCreditoTAO,0)<>0 THEN @cur_id_TarjetasCreditoTAO ELSE @cur_id_TarjetasCredito END,
-										am_basedescuento=0,
-										am_pordescuento=0,
-										id_FormasPagoAirPlus=NULL,
-										cd_FormasPagoAirPlus='',
-										ds_FormasPagoAirPlus='',
-										id_TarjetasCreditoAirPlus=NULL,
-										cd_TarjetasCreditoAirPlus='',
-										ds_numerotarjetaAirPlus='',
-										cd_codigotc=CASE WHEN ISNULL(@cur_cd_codigotcTAO,'')<>'' THEN @cur_cd_codigotcTAO ELSE @cur_cd_codigotc END, 
-										ds_numerotc=CASE WHEN ISNULL(@cur_ds_numerotcTAO,'')<>'' THEN @cur_ds_numerotcTAO ELSE @cur_ds_numerotc END,
-										ds_vencetc=CASE WHEN ISNULL(@cur_ds_vencetcTAO,'')<>'' THEN @cur_ds_vencetcTAO ELSE @cur_ds_vencetc END, 
-										ds_autorizaciontc=CASE WHEN ISNULL(@cur_ds_autorizaciontcTAO,'')<>'' THEN @cur_ds_autorizaciontcTAO ELSE @cur_ds_autorizaciontc END,
-										ds_vouchertc=CASE WHEN ISNULL(@cur_ds_vouchertcTAO,'')<>'' THEN @cur_ds_vouchertcTAO ELSE @cur_ds_vouchertc END, 
-										in_cuotastc=CASE WHEN ISNULL(@cur_in_cuotastcTAO,0)<>0 THEN @cur_in_cuotastcTAO ELSE @cur_in_cuotastc END
-							END
-						END
-					END
-					
-					-- 3. Consultar servicios adicionales de la tabla ReservaGDS_Servicios
-					/*
-					INSERT INTO #Concepto (
-						cd_cliente, id_conceptofacturacion, id_tiposservicios, in_nacionalidad,
-						id_aerolinea, id_moneda, ds_paxname, ds_paxape, cd_paxtype, ds_paxClasificacion,
-						cd_tiquete, cd_proveedores, dt_llegada, dt_salida, cd_cencosto, cd_auxiliar, cd_item,
-						CodigoReserva, am_tarifa, am_total, ColId, cd_Consecutivo_depende,
-						am_ValorComision, am_ImpuestoComision, am_totalfactura, cd_tourcode,
-						am_Contado, am_Credito, cd_tktrevisado, id_TiposDocumento, cd_Penalidad,
-						cd_TipoTiqueteGDS, am_TasaCambio, ds_itinerario, id_sucursal, id_implante,
-						id_FormasPago, cd_TarjetasCredito, iden_gds
-					)
-					SELECT 
-						@cur_cd_cliente,
-						CASE WHEN cd_conceptofacturacion = 'CAN' THEN 4
-							 WHEN cd_conceptofacturacion = 'CAI' THEN 5
-							 ELSE 3 END,
-						NULL,
-						ISNULL(in_nacionalidad, @cur_in_nacionalidad),
-						@cur_id_aerolinea,
-						@cur_id_moneda,
-						ISNULL(ds_pax_firstnm, @cur_ds_paxname),
-						ISNULL(ds_pax_lastnm, @cur_ds_paxape),
-						ISNULL(ds_pax_prefix, @cur_cd_paxtype),
-						@cur_ds_paxClasificacion,
-						@cur_cd_tiquete,
-						cd_proveedores,
-						ISNULL(dt_checkout, @cur_dt_llegada),
-						ISNULL(dt_checkin, @cur_dt_salida),
-						@cur_cd_cencosto,
-						ISNULL(cd_auxiliar, @cur_cd_auxiliar),
-						@cur_cd_item,
-						@cur_CodigoReserva,
-						am_tarifa,
-						am_tarifa + ISNULL(am_iva, 0),
-						CAST(id AS VARCHAR(25)),
-						@cur_cd_tiquete,
-						ISNULL(am_Comision, 0), 0, am_tarifa + ISNULL(am_iva, 0), NULL,
-						ISNULL(am_TarifaContado, 0) + ISNULL(am_IvaContado, 0) + ISNULL(am_OtrosContado, 0),
-						ISNULL(am_TarifaCredito, 0) + ISNULL(am_IvaCredito, 0) + ISNULL(am_OtrosCredito, 0),
-						NULL, NULL, NULL,
-						NULL, 1.0, NULL, @cur_id_sucursal, @cur_id_implante,
-						@cur_id_FormasPago, @cur_cd_TarjetasCredito, @cur_iden_gds
-					FROM dbo.ReservaGDS_Servicios
-					WHERE id_reserva = @cur_id_reserva_int AND ISNULL(bl_anulado, 0) = 0
-					*/
-				END
-
-				IF @@ERROR <> 0
-					BREAK
-
-				FETCH NEXT FROM cur_conceptos INTO @cur_cd_cliente, @cur_id_conceptofacturacion, @cur_in_nacionalidad, @cur_id_aerolinea, @cur_id_moneda, @cur_ds_paxname, @cur_ds_paxape, @cur_cd_paxtype, @cur_ds_paxClasificacion, @cur_cd_tiquete, @cur_dt_llegada, @cur_dt_salida, @cur_cd_cencosto, @cur_cd_auxiliar, @cur_cd_item, @cur_CodigoReserva, @cur_id_sucursal, @cur_id_implante, @cur_id_FormasPago, @cur_cd_TarjetasCredito, @cur_iden_gds, @cur_ColId, @cur_cd_Consecutivo_depende, @cur_cd_codigotc, @cur_ds_numerotc, @cur_ds_vencetc, @cur_ds_autorizaciontc, @cur_ds_vouchertc, @cur_in_cuotastc, @cur_id_FormasPagoTAO, @cur_cd_codigotcTAO, @cur_ds_numerotcTAO, @cur_ds_vencetcTAO, @cur_ds_autorizaciontcTAO, @cur_ds_vouchertcTAO, @cur_in_cuotastcTAO
-			END
-			CLOSE cur_conceptos
-			DEALLOCATE cur_conceptos
-			
-			SET @msg = 'Conceptos Automaticos Generados Exitosamente'
-
-			--SELECT *
-			--	   ,ltrim(rtrim(@msg)) AS 'Respuesta'  
-			--FROM #Concepto
-
-			UPDATE c
-			SET c.cd_cliente = NULL 
-			from #Concepto c
-			LEFT JOIN ConfiguracionConceptosAutoClientes ccac ON ccac.cd_cliente = c.cd_cliente
-			WHERE ccac.id is NULL 
-
-			Select @NumeroDecimales = 2
-			From #Concepto c
-			inner JOIN Configuracion_remisiones cr ON cr.id_cliente = c.cd_cliente
-			where  bl_decimales_TAO_ConceptoAuto = 1
-
-
-			INSERT INTO #GenerarConceptosAuto SELECT DISTINCT id_ConceptoFacturacion, cd_ConceptoFacturacion, ds_ConceptoFacturacion, id_TiposConceptFac, bl_contorlarCargImp, bl_CalculoAutoValoresFacturacion, id_TiposServicio, cd_TiposServicio, ds_TiposServicio, cd_proveedores, ds_proveedores, cd_tiquete, ds_servicio, ds_descrip, ds_paxname, ds_paxape, cd_paxtype, ds_paxClasificacion, in_nacionalidad, dt_llegada, dt_salida, cd_cencosto, cd_auxiliar, cd_item
-			, Valor 
-			, am_Contado 
-			, am_Credito
-			, ColId, cd_Consecutivo_depende, CodigoReserva, am_ImpuestoComision, Respuesta ,bl_RutaExentaIva --rgelis 2018/04/16 req.57446
-			, id_FormasPago, id_TarjetasCredito --rgelis 2018/05/08 req.58559
-			,am_basedescuento, am_pordescuento
-			,id_FormasPagoAirPlus
-            ,cd_FormasPagoAirPlus 
-            ,ds_FormasPagoAirPlus
-            ,id_TarjetasCreditoAirPlus
-            ,cd_TarjetasCreditoAirPlus
-            ,ds_numerotarjetaAirPlus
-			,cd_codigotc 
-			,ds_numerotc
-			,ds_vencetc 
-			,ds_autorizaciontc
-			,ds_vouchertc 
-			,in_cuotastc
-			From(
-				SELECT id_ConceptoFacturacion
-					  ,cd_ConceptoFacturacion
-					  ,ds_ConceptoFacturacion
-					  ,id_TiposConceptFac
-					  ,bl_contorlarCargImp
-					  ,bl_CalculoAutoValoresFacturacion
-					  ,id_TiposServicio
-					  ,cd_TiposServicio
-					  ,ds_TiposServicio
-					  ,cd_proveedores
-					  ,ds_proveedores
-					  ,cd_tiquete
-					  ,ds_servicio
-					  ,ds_descrip
-					  ,ds_paxname
-					  ,ds_paxape
-					  ,cd_paxtype
-					  ,ds_paxClasificacion
-					  ,in_nacionalidad
-					  ,dt_llegada
-					  ,dt_salida
-					  ,cd_cencosto
-					  ,cd_auxiliar
-					  ,cd_item
-					  ,Valor			
-					  ,am_Contado = CASE
-											WHEN id_FormasPago = 1 THEN valor 
-											WHEN am_Contado<>0 AND am_Credito<>0 THEN valor --inicio rgelis 2017/02/11 req.47323
-				  							WHEN am_Contado<>0 AND am_Credito=0  THEN valor
-				  							ELSE 0 END 
-					  ,am_Credito = CASE	WHEN id_FormasPago = 1 THEN 0
-											WHEN id_formaspago_padre = 2 THEN valor
-											WHEN am_Contado=0 AND am_Credito<>0 THEN valor
-				  							ELSE 0 END --fin rgelis 2017/02/11 req.47323	
-					  ,ColId
-					  ,cd_Consecutivo_depende
-					  ,CodigoReserva 
-					  ,am_ImpuestoComision
-					  ,Respuesta 
-					  ,Id_moneda
-					  ,id_conceptofacturacionOrigen
-					  ,bl_RutaExentaIva --rgelis 2018/04/16 req.57446
-					  ,CASE WHEN id_FormasPago = 1 THEN id_FormasPago ELSE NULL END AS 'id_FormasPago'
-					  ,NULL  'id_TarjetasCredito'  
-					  ,am_basedescuento, am_pordescuento
-					  ,id_FormasPagoAirPlus
-					  ,cd_FormasPagoAirPlus 
-					  ,ds_FormasPagoAirPlus
-					  ,id_TarjetasCreditoAirPlus
-					  ,cd_TarjetasCreditoAirPlus
-					  ,ds_numerotarjetaAirPlus
-					  ,cd_codigotc 
-					  ,ds_numerotc
-					  ,ds_vencetc 
-					  ,ds_autorizaciontc
-					  ,ds_vouchertc 
-					  ,in_cuotastc
-				FROM(
-					SELECT	cfa.id As 'id_ConceptoFacturacion',
-							cfa.cd_codigo As 'cd_ConceptoFacturacion',
-							cfa.ds_nombre As 'ds_ConceptoFacturacion',
-							cfa.id_TiposConceptoFacturacion As 'id_TiposConceptFac',
-							cfa.bl_contorlarCargImp,
-							1 AS 'bl_CalculoAutoValoresFacturacion',
-							ts.id As 'id_TiposServicio',
-							ts.cd_codigo  As 'cd_TiposServicio',
-							ts.ds_nombre  As 'ds_TiposServicio',
-							cf.cd_proveedores,
-							P.RAZONCIAL AS 'ds_proveedores',
-							cf.cd_tiquete,
-							cfa.ds_nombre As 'ds_servicio',
-							cfa.ds_descrip AS 'ds_descrip',
-							cf.ds_paxname,
-							cf.ds_paxape,
-							cf.cd_paxtype,
-							cf.ds_paxClasificacion,
-							cf.in_nacionalidad,
-							cf.dt_llegada,
-							cf.dt_salida,
-							cd_cencosto = CASE WHEN @bl_utilizarcencostoimp = 1 AND ISNULL(I.cd_cencosto,'')<>'' THEN I.cd_cencosto WHEN @bl_utilizarcencostosuc = 1 AND ISNULL(S.cd_cencosto,'')<>'' THEN S.cd_cencosto ELSE cf.cd_cencosto END,
-							cf.cd_auxiliar,
-							cf.cd_item,
-							Valor=ROUND((CASE WHEN ISNULL(CCC.am_valor,0)<>0 THEN ROUND(CCC.am_valor * CASE WHEN cf.id_moneda <>cc.id_moneda THEN  
-																															case when MI.cd_codigo='USD' AND dbo.fnza_Valor_Parametro(424)='N' 
-																															THEN @tasa_usd 
-																															ELSE  dbo.fnza_Get_TasaCambioDia(@dt_fechaFactura,MI.id_monedaContabilidad) END 
-																							 ELSE 1 END
-																							 ,@NumeroDecimales) 
-										   WHEN cc.bl_Valor=1 AND cc.am_Valor>0 THEN ROUND( cc.am_Valor * CASE WHEN cf.id_moneda <>cc.id_moneda THEN  
-																															case when MI.cd_codigo='USD' AND dbo.fnza_Valor_Parametro(424)='N' 
-																															THEN @tasa_usd 
-																															ELSE  dbo.fnza_Get_TasaCambioDia(@dt_fechaFactura,MI.id_monedaContabilidad) END 
-																							 ELSE 1 END
-																							 ,@NumeroDecimales)--rgelis 2016/07/22 correccion por redondeo
-										   WHEN cc.bl_porcentaje = 1 AND cc.am_porcentaje>0 AND cc.in_tipobasecalcular=0 THEN ROUND((cf.am_tarifa*(cc.am_porcentaje/100)),@NumeroDecimales,case when @TruncarDecimales = 'S' then 1 else 0 end)
-										   WHEN cc.bl_porcentaje = 1 AND cc.am_porcentaje>0 AND cc.in_tipobasecalcular=1 THEN ROUND((cf.am_total*(cc.am_porcentaje/100)),@NumeroDecimales,case when @TruncarDecimales = 'S' then 1 else 0 end)
-										   WHEN cc.in_tipobasecalcular= 2  THEN cf.am_ValorComision
-										   WHEN cc.bl_porcentaje = 1 AND cc.am_porcentaje>0 AND cc.in_tipobasecalcular=3 THEN ROUND((cf.am_totalfactura*(cc.am_porcentaje/100)),@NumeroDecimales,case when @TruncarDecimales = 'S' then 1 else 0 end) 
-										   WHEN	cc.bl_rango = 1 AND cc.in_tipobasecalcular=0 THEN dbo.fnza_ValorConceptoAutoRango(c.id,cc.id,cfa.id,cf.am_tarifa)
-										   WHEN	cc.bl_rango = 1 AND cc.in_tipobasecalcular=1 THEN dbo.fnza_ValorConceptoAutoRango(c.id,cc.id,cfa.id,cf.am_total) 
-										   ELSE 0 
-									  END) / CASE WHEN cf.id_moneda <> @IdMonedaLocal AND cf.id_moneda <> cc.id_moneda AND dbo.fnza_Valor_Parametro(504)='S' AND cf.id_conceptofacturacion IN(1,2) AND ISNULL(cf.am_TasaCambio,0)<>0 THEN cf.am_TasaCambio ELSE 1 END --rgelis 2017/10/25/ req.54014
-										   * CASE WHEN cf.id_moneda = @IdMonedaLocal AND cf.id_moneda <> cc.id_moneda AND cc.bl_rango = 1 AND ISNULL(@tasa_usd,0)>1 AND dbo.fnza_Valor_Parametro(504)<>'S' AND @PaisLocal='Colombia' THEN @tasa_usd ELSE 1 END,@NumeroDecimales),
-							cf.ColId,
-							cf.cd_Consecutivo_depende,
-							cf.CodigoReserva, 
-							am_ImpuestoComision = CASE WHEN cc.in_tipobasecalcular = 2 THEN cf.am_ImpuestoComision ELSE 0 END,
-							cf.am_Contado, --rgelis 2017/02/11 req.47323
-							cf.am_Credito, --rgelis 2017/02/11 req.47323 
-							ltrim(rtrim(@msg)) AS 'Respuesta' ,
-							cc.id_moneda,
-							c.id_conceptofacturacion As 'id_conceptofacturacionOrigen',
-							CASE WHEN c.id_conceptofacturacion IN (1,2) THEN dbo.fnza_RutaTktExentaIva(cf.ds_itinerario) ELSE 0 END AS 'bl_RutaExentaIva', --rgelis 2018/04/16 req.57446
-							CFP.id_FormasPago,
-							CFP.id_TarjetasCredito,
-							CFP.ds_NumeroTarjetasCredito AS 'ds_NumeroTarjetasCredito',
-							ISNULL(TC.ds_tcnumber,'') AS 'ds_NumeroTarjetasCreditoGDS',
-							id_formaspago_padre = cf.id_formaspago,
-							am_basedescuento = 	CASE 
-													WHEN cc.bl_porcentaje = 1 AND cc.am_porcentaje>0 AND cc.in_tipobasecalcular=0 THEN cf.am_tarifa
-													WHEN cc.bl_porcentaje = 1 AND cc.am_porcentaje>0 AND cc.in_tipobasecalcular=1 THEN cf.am_total
-													ELSE 0
-												END,
-							am_pordescuento = CASE WHEN cc.bl_porcentaje = 1  THEN cc.am_porcentaje ELSE 0 END,
-							id_FormasPagoAirPlus = CASE WHEN FPTAO.Id IS NOT NULL THEN FPTAO.Id
-														WHEN tcA.Id IS NOT NULL AND cap.id IS NOT NULL THEN cap.Id_FormasPago ELSE NULL END,
-							cd_FormasPagoAirPlus = CASE WHEN FPTAO.Id IS NOT NULL THEN FPTAO.cd_codigo
-														WHEN tcA.Id IS NOT NULL AND cap.id IS NOT NULL THEN fpap.cd_codigo ELSE NULL END,
-							ds_FormasPagoAirPlus = CASE  WHEN FPTAO.Id IS NOT NULL THEN FPTAO.ds_nombre
-														WHEN tcA.Id IS NOT NULL AND cap.id IS NOT NULL THEN fpap.ds_nombre ELSE NULL END,
-							id_TarjetasCreditoAirPlus = CASE WHEN FPTAO.Id IS NOT NULL AND tctao.id IS NOT NULL Then tctao.id
-															 WHEN tcA.Id IS NOT NULL AND cap.id IS NOT NULL Then tcap.id ELSE NULL END,
-							cd_TarjetasCreditoAirPlus = CASE WHEN FPTAO.Id IS NOT NULL AND tctao.id IS NOT NULL Then tctao.cd_codigo
-															 WHEN tcA.Id IS NOT NULL AND cap.id IS NOT NULL Then tcap.cd_codigo ELSE NULL END,
-							ds_numerotarjetaAirPlus = CASE WHEN FPTAO.Id IS NOT NULL AND tctao.id IS NOT NULL Then tkt.cd_NumeroTarjetaTAO
-														   WHEN tcA.Id IS NOT NULL AND cap.id IS NOT NULL Then cap.ds_numerotarjeta ELSE NULL END,
-							cd_codigotc = cf.cd_codigotc,
-							ds_numerotc = cf.ds_numerotc,
-							ds_vencetc = cf.ds_vencetc,
-							ds_autorizaciontc = cf.ds_autorizaciontc,
-							ds_vouchertc = cf.ds_vouchertc, 
-							in_cuotastc = cf.in_cuotastc
-					FROM dbo.ConfiguracionConceptosAutoClientes c
-					INNER JOIN #Concepto cf ON (
-												(
-													ISNULL(cf.cd_cliente,'') = ISNULL(c.cd_cliente,'') 
-													OR (ISNULL(c.cd_cliente,'')='' /*AND ISNULL(cf.cd_cliente,'')=''*/) 
-												) 
-												AND (
-														ISNULL(cf.id_conceptofacturacion,0)=ISNULL(c.id_conceptofacturacion,0) 
-														OR (ISNULL(c.id_conceptofacturacion,0)=0 AND ISNULL(cf.id_conceptofacturacion,0)=0)
-													)
-												AND (
-														ISNULL(cf.id_tiposservicios,0)=ISNULL(c.id_tiposservicios,0) 
-														OR ISNULL(c.id_tiposservicios,0)=0 --AND ISNULL(cf.id_tiposservicios,0)=0)
-													) 
-												AND (
-														ISNULL(cf.in_nacionalidad,3)=ISNULL(c.in_nacionalidad,3) OR ISNULL(c.in_nacionalidad,3)=3
-													)
-												AND (
-														ISNULL(cf.id_aerolinea,0)=ISNULL(c.id_Aerolinea,0) OR ISNULL(c.id_Aerolinea,0)=0
-													)
-												AND (
-														ISNULL(cf.cd_tourcode,'')=ISNULL(c.cd_tourcode,'') OR ISNULL(c.cd_tourcode,'')=''
-													)
-												AND (
-														ISNULL(cf.id_FormasPago,0)=ISNULL(c.id_formaspago,0) OR ISNULL(c.id_formaspago,0)=0
-													)
-												AND (
-														ISNULL(cf.id_moneda,0)=ISNULL(c.id_moneda,0) OR ISNULL(c.id_moneda,0)=0
-													)
-												)
-					LEFT JOIN dbo.TiposDocumento td ON td.id = cf.id_TiposDocumento --inicio rgelis 2017/09/19 req.52820
-					LEFT JOIN dbo.ConfiguracionConceptosAutoClientes_Conceptos cc ON ((cc.id_ConfiguracionConceptosAutoClientes=c.id AND cc.bl_Activo = 1)
-																					  AND ((c.id_conceptofacturacion IN (1,2) 
-																							AND ((ISNULL(cf.cd_tktrevisado,'')<>'' AND cc.in_revisado=1) 
-																								 OR (ISNULL(cf.cd_tktrevisado,'')='' AND cc.in_revisado=2) 
-																								 OR cc.in_revisado in (0,3)
-																								)
-																							AND (((ISNULL(td.bl_EMD,0)=1 OR ISNULL(cf.cd_Penalidad,'')<>'' OR ISNULL(cf.cd_TipoTiqueteGDS,'') = 'EMD') AND cc.in_EMD=1) 
-																								 OR ((ISNULL(td.bl_EMD,0)=0 AND ISNULL(cf.cd_Penalidad,'')='' AND ISNULL(cf.cd_TipoTiqueteGDS,'') <> 'EMD') AND cc.in_EMD=2) 
-																								 OR cc.in_EMD in (0,3)
-																								)
-																							AND (((dbo.fnza_RutaTktExentaIva(cf.ds_itinerario)=1) AND cc.in_Exento=1) --inicio rgelis 2018/04/16 req.57446 
-																								 OR ((dbo.fnza_RutaTktExentaIva(cf.ds_itinerario)=0) AND cc.in_Exento=2) 
-																								 OR cc.in_Exento in (0,3)
-																								) --fin rgelis 2018/04/16 req.57446 
-																							AND (((dbo.fnza_ItinerarioTipo(cf.ds_itinerario)='OW') AND cc.in_Tipoitinerario=1 AND cc.bl_Tipoitinerario=1) --inicio --rgelis 2019/09/27 req.103215 
-																								 OR ((dbo.fnza_ItinerarioTipo(cf.ds_itinerario)='RT') AND cc.in_Tipoitinerario=2 AND cc.bl_Tipoitinerario=1) 
-																								 OR (cc.in_Tipoitinerario in (0,3) AND cc.bl_Tipoitinerario=1)
-																								 OR cc.bl_Tipoitinerario=0
-																								) --fin rgelis 2019/09/27 req.103215 	
-																						   )
-																						   OR c.id_conceptofacturacion NOT IN (1,2)
-																						  )
-																					   AND (
-																							 (ISNULL(cc.id_sucursal,0) = ISNULL(cf.id_sucursal,0) or ISNULL(cc.id_sucursal,0) = 0)
-																							 AND (ISNULL(cc.id_implante,0) = ISNULL(cf.id_implante,0) or ISNULL(cc.id_implante,0) = 0) 
-																						   )
-																					 ) --fin rgelis 2017/09/19 req.52820
-					LEFT JOIN dbo.ConceptoFacturacion cfa ON cfa.id=cc.id_conceptofacturacion
-					LEFT JOIN dbo.tiposServicio_asignados tsa ON (tsa.id_ConceptoFacturacion = cfa.id AND tsa.bl_Valdeft = 1) 
-					LEFT JOIN dbo.TiposServicios ts ON ts.id = tsa.id_TipoServicio
-					LEFT JOIN dbo.PROVEEDORES P ON P.IDPROVE = cfa.cd_proveedor
-					LEFT JOIN dbo.Monedas_IATA MI ON MI.id = CC.id_moneda
-					--LEFT JOIN dbo.ReservaGDS_Detalles rd on rd.ds_tkt_number = cf.cd_tiquete and cf.id_conceptofacturacion in (1,2)
-					--LEFT JOIN dbo.TarjetasCredito TA ON TA.cd_codigo = CF.cd_TarjetasCredito
-					OUTER APPLY dbo.fnza_ReservasGdsFormasPago_Table(cf.CodigoReserva,cf.cd_tiquete) AS TC
-					LEFT JOIN dbo.ConfiguracioFacturaTarjetasPropias_NumerosTC CFP ON (CFP.ds_NumeroTarjetasCredito = tc.ds_tcnumber AND CFP.id_Sucursal = CF.id_sucursal AND ISNULL(CFP.id_implante,0) = ISNULL(CF.id_implante,0))
-					--OUTER APPLY dbo.fnza_ReservasGdsFormasPago_Table(cf.CodigoReserva,cf.cd_tiquete) AS TC
-					LEFT JOIN dbo.ConfiguracionClientesConceptos CCC ON CCC.id_conceptofacturacion=cc.id_conceptofacturacion AND CCC.Id_Cliente = c.cd_cliente AND CCC.bl_inactivo=0
-					--LEFT JOIN dbo.ReservasGDS r ON r.cd_codigo = cf.CodigoReserva
-					LEFT JOIN dbo.ReservaGDS_Detalles tkt ON tkt.ds_tkt_number = cf.cd_tiquete and cf.id_conceptofacturacion in (1,2)
-					LEFT JOIN dbo.tarjetascredito tcA on tcA.cd_codigo = tkt.ds_cc_code AND (tcA.bl_airplus = 1 OR @bl_tomarFPAirplusTkt=1)
-					LEFT JOIN dbo.Cliente_FP_AirPlus cap on cap.id_cliente = cf.cd_cliente
-					LEFT JOIN dbo.tarjetascredito tcap on tcap.id=cap.Id_TarjetasCredito
-					LEFT JOIN dbo.FormasPago fpap on fpap.id = cap.Id_FormasPago
-					LEFT JOIN dbo.Sucursales S ON S.id = cf.id_sucursal
-					LEFT JOIN dbo.Implantes I ON I.id=cf.id_implante
-					LEFT JOIN dbo.FormasPago FPTAO ON FPTAO.cd_codigo=Tkt.cd_FormaPagoTAO AND @bl_tomarFPTaoTkt=1 
-					LEFT JOIN dbo.tarjetascredito tctao on tctao.cd_codigo=tkt.cd_TarjetaCreditoTAO
-					WHERE cc.id is NOT NULL 
-					GROUP BY c.id,
-							cc.id,
-							cc.id_conceptofacturacion,
-							cfa.id,
-							cfa.id_TiposConceptoFacturacion,
-							cfa.bl_contorlarCargImp,
-							cf.cd_proveedores,
-							P.RAZONCIAL,
-							cf.cd_tiquete,
-							cfa.cd_codigo,
-							cfa.ds_nombre,
-							cfa.ds_descrip,
-							ts.id,
-							ts.cd_codigo,
-							ts.ds_nombre,
-							cf.ds_paxname,
-							cf.ds_paxape,
-							cf.cd_paxtype,
-							cf.ds_paxClasificacion,
-							cf.in_nacionalidad,
-							cf.dt_llegada,
-							cf.dt_salida,
-							cf.cd_cencosto,
-							cf.cd_auxiliar,
-							cf.cd_item,
-							cf.am_tarifa,
-							cf.am_total,
-							cc.bl_Valor,
-							cc.bl_porcentaje,
-							cc.am_valor,
-							cc.am_porcentaje,
-							cc.bl_rango,
-							cf.ColId,
-							cc.bl_Activo,
-							cc.in_tipobasecalcular,
-							cf.cd_Consecutivo_depende,
-							cf.CodigoReserva,
-							cf.am_ValorComision,
-							cf.am_ImpuestoComision,
-							cf.am_totalfactura ,
-							MI.id_monedaContabilidad  ,
-							cc.id_moneda ,
-							cf.id_moneda, 
-							MI.cd_codigo,
-							cf.am_Contado, --rgelis 2017/02/11 req.47323
-							cf.am_Credito, --rgelis 2017/02/11 req.47323 
-							cc.id_moneda,
-							c.id_conceptofacturacion,
-							cf.id_conceptofacturacion, --rgelis 2017/10/25 req.54014
-							CF.am_TasaCambio, --rgelis 2017/10/25 req.54014
-							cf.ds_itinerario, --rgelis 2018/04/16 req.57446
-							CFP.id_FormasPago, --rgelis 2018/05/08 req.58559
-							CFP.id_TarjetasCredito,
-							CFP.ds_NumeroTarjetasCredito,
-							TC.ds_tcnumber,
-							cf.id_formaspago,
-							CCC.am_valor,
-							tcA.Id,
-							cap.id,
-							cap.Id_FormasPago, 
-							fpap.cd_codigo,
-							fpap.ds_nombre,
-							tcap.id, 
-							tcap.cd_codigo,
-							cap.ds_numerotarjeta,
-							S.cd_cencosto,
-							I.cd_cencosto,
-							FPTAO.Id,
-							FPTAO.cd_codigo,
-							FPTAO.ds_nombre,
-							tctao.id,
-							tctao.cd_codigo,
-							tkt.cd_NumeroTarjetaTAO,
-							cf.cd_codigotc,
-							cf.ds_numerotc,
-							cf.ds_vencetc,
-							cf.ds_autorizaciontc,
-							cf.ds_vouchertc, 
-							cf.in_cuotastc
-				) AS C
-			 ) AS F			
-			--------------------------------------------------------------------------
-			
-			
-			--Determinando si se debe auditar el proceso exitoso
-			/*IF (@bl_as = 1) 
-			BEGIN 										
-				EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-												 @id_usuario = @id_usuario ,
-												 @cd_status  = 1           , 												 
-												 @admsg      = NULL        ,
-							 					 @msgparams  = @msg;
-			END*/ 			 			
-			--SELECT ltrim(rtrim(@msg)) AS 'Respuesta';
-			RETURN @retval;
-	    END TRY 
-    
-    	-- Bloque CATCH (Manejo de excepciones)
-    	BEGIN CATCH 
- 		
- 			-- Tiempo de espera alcanzado --
-		   IF ERROR_NUMBER() = 1222
-		    BEGIN
-      			SET @msg =  'No se pudo ejecutar el proceso. Tiempo de espera agotado.';
-      			SET @retval = 1
-      			
-	   	        RAISERROR (@msg,16,125);
-	   	       	--Se debe auditar proceso fallido
-				/*IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce ,
-													 			 @id_usuario = @id_usuario ,
-													 			 @cd_status  = 0           , 
-													 			 @admsg      = @msg	   ;*/				
-	   	       RETURN @retval;
-		    END
-		    
-		    -- Registro bloqueado / Conflicto de actualizacion
-		    ELSE IF ERROR_NUMBER() IN (1205, 3960)
-    		BEGIN	   	        
-		       	SET @retry     = 1              ;
-		       	SET @retrycont = @retrycont + 1 ; 
-
-	    	 END
-	    	 ELSE
-		     BEGIN
-		     	-- Error no manejado --
-				IF (XACT_STATE() <> 0)
-	   	        BEGIN 				
-					SET @retval = 1;
-  	 				SET @msg =	'Ha ocurrido un error. InformaciÃ³n para soporte tecnico:'			+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							    'Numero: ' + isnull(CAST(ERROR_NUMBER()   AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Mensaje: ' + isnull(ERROR_MESSAGE(),'') 					   		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							 	'Severidad: ' + isnull(CAST(ERROR_SEVERITY() AS VARCHAR(10)),'') 	+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-							 	'Estado: ' + isnull(CAST(ERROR_STATE()    AS VARCHAR(10)),'') 		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Procedimiento: ' + 'spGenerarConceptosAutoConsultar'		+ CHAR(13)+ CHAR(10) + CHAR(13)+ CHAR(10) +
-								'Linea: ' + isnull(CAST(ERROR_LINE() 	   AS VARCHAR(10)),''); 							
-		
-					RAISERROR (@msg,16,126);
-					--Se debe auditar proceso fallido
-					/*IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar	@id_proceso = @idproce   ,
-											 			 			@id_usuario = @id_usuario ,
-											 			 			@cd_status  = 0           , 
-											 			 			@admsg      = @msg	  ;*/				
-					RETURN @retval;
-	   	        END 
-		     END
-		END CATCH     
-	END 
-	
-	IF (@retrycont>@maxretries) 
-	BEGIN 
-		SET @retval = 1
-		SET @msg = 'No se pudo finalizar el proceso. Maximo numero de reintentos alcanzado.'
-		--Se debe auditar proceso fallido
-		/*IF (@bl_af = 1) EXEC dbo.spzaAuditoria_Insertar  @id_proceso = @idproce    ,
-											 			 @id_usuario = @id_usuario ,
-											 			 @cd_status  = 0           , 
-											 			 @admsg      = @msg	   ;*/												 	   					   
-  		RAISERROR (@msg,16,127);
-  		RETURN @retval;
-  	END   	
-    
-    RETURN @retval;
-END
 GO
 
+PRINT 'Procedimientos almacenados y funciones T-SQL compiladas exitosamente.';
 
 
-
--- ==========================================================
--- Archivo: spInterfaceFile.sql (SQL Server)
--- ==========================================================
-IF OBJECT_ID('dbo.spInterfaceFile', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spInterfaceFile;
-GO
-CREATE PROCEDURE dbo.spInterfaceFile
-    @op VARCHAR(50) = NULL,
-    @Booking VARCHAR(MAX) = NULL,
-    @file VARCHAR(255) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @Ext VARCHAR(10);
-
-    IF @file IS NOT NULL AND CHARINDEX('.', @file) > 0
-    BEGIN
-        SET @Ext = LOWER(RIGHT(@file, LEN(@file) - CHARINDEX('.', @file) + 1));
-    END
-    ELSE
-    BEGIN
-        SET @Ext = '';
-    END
-
-    IF @Ext = '.fil'
-    BEGIN
-        IF OBJECT_ID('dbo.SpInterfaceSabre_Importar', 'P') IS NOT NULL
-            EXEC dbo.SpInterfaceSabre_Importar @Op = @op, @Booking = @Booking;
-        ELSE IF OBJECT_ID('dbo.spInterfaceSabre', 'P') IS NOT NULL
-            EXEC dbo.spInterfaceSabre @Op = @op, @Booking = @Booking;
-        ELSE
-            RAISERROR('No se encontr� el procedimiento almacenado para Sabre (SpInterfaceSabre_Importar).', 16, 1);
-    END
-    ELSE
-    BEGIN
-        IF OBJECT_ID('dbo.SpInterfaceAmadeus_Importar', 'P') IS NOT NULL
-            EXEC dbo.SpInterfaceAmadeus_Importar @Op = @op, @Booking = @Booking;
-        ELSE IF OBJECT_ID('dbo.spInterfaceAmadeus', 'P') IS NOT NULL
-            EXEC dbo.spInterfaceAmadeus @Op = @op, @Booking = @Booking;
-        ELSE
-            RAISERROR('No se encontr� el procedimiento almacenado para Amadeus (SpInterfaceAmadeus_Importar).', 16, 1);
-    END
-END
 GO

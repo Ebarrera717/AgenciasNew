@@ -1,11 +1,28 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query(`
+                    SELECT [id], [code], [name], [email], [isActive], CASE WHEN [isActive] = 1 THEN 0 ELSE 1 END AS [inactive]
+                    FROM dbo.[TicketPrinter]
+                    ORDER BY [id] DESC
+                `);
+                await pool.close();
+                return NextResponse.json(paginateArray(req, res.recordset as any[], (tp: any) => [tp.code, tp.name]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         const printers = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnTicketPrinterListar()`)
         return NextResponse.json(paginateArray(req, printers, tp => [tp.code, tp.name]))
     } catch (error) {
@@ -18,6 +35,29 @@ export async function POST(req: NextRequest) {
         const body = await req.json()
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', body.code || '')
+                    .input('name', body.name || '')
+                    .input('email', body.email || null)
+                    .query(`
+                        INSERT INTO dbo.[TicketPrinter] ([code], [name], [email], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @email, 1)
+                    `);
+                await pool.close();
+                const dbId = res.recordset[0]?.id;
+                const printer = { id: dbId, ...body };
+                return NextResponse.json(printer);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spTicketPrinterCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::INT, $5::INT, $6::TEXT)`,
@@ -55,6 +95,31 @@ export async function PUT(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const isAct = body.isActive !== undefined ? (body.isActive ? 1 : 0) : (body.inactive ? 0 : 1);
+                await pool.request()
+                    .input('id', parseInt(body.id))
+                    .input('code', body.code || '')
+                    .input('name', body.name || '')
+                    .input('email', body.email || null)
+                    .input('isActive', isAct)
+                    .query(`
+                        UPDATE dbo.[TicketPrinter]
+                        SET [code] = @code, [name] = @name, [email] = @email, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const printer = { ...body };
+                return NextResponse.json(printer);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spTicketPrinterActualizar($1::INT, $2::TEXT, $3::TEXT, $4::TEXT, $5::INT, $6::TEXT)`,
             parseInt(body.id),
@@ -95,6 +160,21 @@ export async function DELETE(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         if (!id) return NextResponse.json({ message: 'ID is required' }, { status: 400 })
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query(`DELETE FROM dbo.[TicketPrinter] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ message: 'Ticket printer deleted successfully' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spTicketPrinterEliminar($1::INT, $2::INT, $3::TEXT)`,

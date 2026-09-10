@@ -1,0 +1,22 @@
+// ============================================================================
+// PRUEBA DE CONCEPTO (PoC) - MUESTRA DE ESQUEMA PRISMA PARA SQL SERVER
+// Archivo: prisma/schema_sqlserver_preview.prisma
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL_SQLSERVER")
+}
+
+model Currency {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.NVarChar(10)
+  name         String   @db.NVarChar(100)
+  exchangeRate Float    @default(1.0)
+  decimals     Int      @default(2)
+  isActive     Boolean  @default(true)
+}

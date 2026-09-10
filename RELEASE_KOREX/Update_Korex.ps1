@@ -116,8 +116,14 @@ Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -For
 Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
 
 Write-Log "Deteniendo el sitio web Korex en IIS para liberar puertos..."
-Import-Module WebAdministration -ErrorAction SilentlyContinue
-Stop-Website -Name "Korex" -ErrorAction SilentlyContinue
+try {
+    Import-Module WebAdministration -ErrorAction SilentlyContinue
+    if (Test-Path "IIS:\Sites\Korex") {
+        Stop-Website -Name "Korex" -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Log "Aviso IIS previo: $_" "WARN"
+}
 Start-Sleep -Seconds 2
 
 # Paso 2. Extraer configuración de base de datos (priorizando parámetros de instalación)
@@ -208,43 +214,34 @@ if ($DbUrl) {
 }
 
 # Paso 5. Re-registrar e Iniciar el Servicio Windows (Total Update)
-Write-Log "Re-registrando servicio de Windows para aplicar la nueva versión de la aplicación..."
-if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
-    Write-Log "Deteniendo y borrando registro de servicio Korex_NextJS..."
-    Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-    sc.exe delete "Korex_NextJS" | Out-Null
-    Start-Sleep -Seconds 2
-}
-if (Get-Service -Name "AgenciasNew_NextJS" -ErrorAction SilentlyContinue) {
-    Write-Log "Borrando registro de servicio antiguo AgenciasNew_NextJS..."
-    Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
-    sc.exe delete "AgenciasNew_NextJS" | Out-Null
-    Start-Sleep -Seconds 1
-}
-
-if (Test-Path "$TargetDir\daemon") {
-    Write-Log "Removiendo cache del daemon antiguo..."
-    Remove-Item "$TargetDir\daemon" -Recurse -Force -ErrorAction SilentlyContinue
-}
+Write-Log "Deteniendo servicio de Windows para aplicar la nueva versión de la aplicación..."
+Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
 
 if (Test-Path ".\install-service.js") {
     Write-Log "Ejecutando install-service.js con la nueva versión..."
     node .\install-service.js >> $LogFile 2>&1
-    Start-Sleep -Seconds 2
+    Start-Sleep -Seconds 4
 }
 
 # Forzar arranque y verificar estado
-if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
-    $svcStatus = (Get-Service -Name "Korex_NextJS").Status
+$svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
+if (-not $svc) {
+    $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
+}
+
+if ($svc) {
+    $svcStatus = $svc.Status
     if ($svcStatus -ne 'Running') {
-        Start-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
+        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 4
-        $svcStatus = (Get-Service -Name "Korex_NextJS").Status
+        $svcStatus = (Get-Service -Name $svc.Name).Status
     }
     if ($svcStatus -ne 'Running') {
-        Write-Log "ERROR: El servicio Korex_NextJS está registrado pero no pudo iniciarse de forma estable en el arranque." "ERROR"
+        Write-Log "ERROR: El servicio $($svc.Name) está registrado pero no pudo iniciarse de forma estable en el arranque." "ERROR"
         
-        # Intentar extraer el error desde el log de daemon
         $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
         $errDetails = ""
         if (Test-Path $errLogPath) {
@@ -254,7 +251,7 @@ if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
             $errDetails = "No se pudieron recuperar detalles adicionales del log de daemon."
         }
         
-        Show-Alert "Fallo de Inicio del Servicio" "El servicio de Windows 'Korex_NextJS' se registró pero se cerró inmediatamente en el arranque.`n`nDetalle del error en el servidor (Node.js):`n$errDetails"
+        Show-Alert "Fallo de Inicio del Servicio" "El servicio de Windows '$($svc.Name)' se registró pero se cerró inmediatamente en el arranque.`n`nDetalle del error en el servidor (Node.js):`n$errDetails"
         exit 1
     }
     Write-Log "Estado final del servicio: $svcStatus"
@@ -267,19 +264,22 @@ if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
 # Paso 6. Recrear el sitio web y AppPool de IIS para asegurar configuración limpia
 $SiteName = "Korex"
 Write-Log "Reconfigurando el sitio web y AppPool de '$SiteName' en IIS..."
-Import-Module WebAdministration
-
-if (Get-Website -Name $SiteName -ErrorAction SilentlyContinue) {
-    Write-Log "Removiendo sitio IIS existente..."
-    Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
-    Remove-Website -Name $SiteName -Force -Confirm:$false -ErrorAction SilentlyContinue
-    Remove-Item "IIS:\Sites\$SiteName" -Recurse -Force -ErrorAction SilentlyContinue
+try {
+    Import-Module WebAdministration -ErrorAction SilentlyContinue
+    if (Test-Path "IIS:\Sites\$SiteName") {
+        Write-Log "Removiendo sitio IIS existente..."
+        Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
+        Remove-Website -Name $SiteName -Force -Confirm:$false -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Log "Aviso al remover sitio previo ${SiteName}: $_" "WARN"
 }
-
-if (Get-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue) {
-    Write-Log "Removiendo AppPool IIS existente..."
-    Remove-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue
-}
+try {
+    if (Get-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue) {
+        Write-Log "Removiendo AppPool IIS existente..."
+        Remove-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue
+    }
+} catch {}
 
 try {
     Write-Log "Creando nuevo sitio IIS y AppPool '$SiteName' en puerto $SitePort..."

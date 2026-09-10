@@ -1,11 +1,28 @@
 import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query(`
+                    SELECT [id], [code], [name], [value]
+                    FROM dbo.[SystemParameter]
+                    ORDER BY [code] ASC
+                `);
+                await pool.close();
+                return NextResponse.json(paginateArray(req, res.recordset as any[], (p: any) => [p.code, p.name, p.value]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         const parameters = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnParameterListar()`)
         return NextResponse.json(paginateArray(req, parameters, p => [p.code, p.name, p.value]))
     } catch (error) {
@@ -19,6 +36,29 @@ export async function POST(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', code || '')
+                    .input('name', name || '')
+                    .input('value', value || '')
+                    .query(`
+                        INSERT INTO dbo.[SystemParameter] ([code], [name], [value])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @value)
+                    `);
+                await pool.close();
+                const dbId = res.recordset[0]?.id;
+                const parameter = { id: dbId, code, name, value };
+                return NextResponse.json({ message: 'Parámetro creado', parameter });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spParameterCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::INT, $5::INT, $6::TEXT)`,
             code,
@@ -55,6 +95,29 @@ export async function PUT(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .input('code', code || '')
+                    .input('name', name || '')
+                    .input('value', value || '')
+                    .query(`
+                        UPDATE dbo.[SystemParameter]
+                        SET [code] = @code, [name] = @name, [value] = @value
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const parameter = { id, code, name, value };
+                return NextResponse.json({ message: 'Parámetro actualizado', parameter });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spParameterActualizar($1::INT, $2::TEXT, $3::TEXT, $4::TEXT, $5::INT, $6::TEXT)`,
             parseInt(id),
@@ -91,6 +154,21 @@ export async function DELETE(req: NextRequest) {
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         
         if (!id) return NextResponse.json({ message: 'Missing ID' }, { status: 400 })
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query(`DELETE FROM dbo.[SystemParameter] WHERE [id] = @id`);
+                await pool.close();
+                return NextResponse.json({ message: 'Parámetro eliminado' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spParameterEliminar($1::INT, $2::INT, $3::TEXT)`,

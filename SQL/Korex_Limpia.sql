@@ -17137,8 +17137,8 @@ INSERT INTO public."Seller" VALUES (1, '73009263', 'Rubiel', 'rubiel1985@msn.com
 --
 
 INSERT INTO public."SystemParameter" VALUES (1, 'PRODUCTO_RESERVA_GDS', 'Producto por Defecto para Reservas GDS', '');
-INSERT INTO public."SystemParameter" VALUES (2, 'LICENSE_KEY', 'Clave de Licencia del Sistema', 'KOR1.eyJjIjoiS09SRVggQUdFTkNJQSBQUlVFQkEiLCJuIjoiNzk4OTg0NTYiLCJlIjoiMjAyNi0wOS0xOCIsImkiOiIyMDI2LTA4LTE4In0.9ff9b9c70c96a3be611adf0c8866f8cf0340bc5311586f66e1afde9be49a9421');
-INSERT INTO public."SystemParameter" VALUES (3, 'LICENSE_EXPIRATION_DATE', 'Fecha de Expiración de Licencia', '2026-09-18');
+INSERT INTO public."SystemParameter" VALUES (2, 'LICENSE_KEY', 'Clave de Licencia del Sistema', '');
+INSERT INTO public."SystemParameter" VALUES (3, 'LICENSE_EXPIRATION_DATE', 'Fecha de Expiración de Licencia', '');
 INSERT INTO public."SystemParameter" VALUES (4, 'PuertoSQLServer', 'Puerto SQL Server', '');
 INSERT INTO public."SystemParameter" VALUES (5, 'EnviarCotizacionesAutoSQLserver', 'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', '1');
 INSERT INTO public."SystemParameter" VALUES (6, 'EnviarFacturacionAutoSQLserver', 'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', '1');
@@ -17148,8 +17148,8 @@ INSERT INTO public."SystemParameter" VALUES (9, 'ServidorSQLServer', 'Host de SQ
 INSERT INTO public."SystemParameter" VALUES (10, 'UsuarioSQLServer', 'Usuario SQL Server', 'zeusagencias');
 INSERT INTO public."SystemParameter" VALUES (11, 'ClaveSQLServer', 'Contraseña SQL Server', 'zzeusagencias');
 INSERT INTO public."SystemParameter" VALUES (12, 'BaseSQLServer', 'Base de Datos SQL Server', 'Zeusagencias_23');
-INSERT INTO public."SystemParameter" VALUES (13, 'AGENCY_NAME', 'Nombre o Razón Social de la Agencia', 'KOREX AGENCIA PRUEBA');
-INSERT INTO public."SystemParameter" VALUES (14, 'AGENCY_NIT', 'NIT de la Agencia', '79898456');
+INSERT INTO public."SystemParameter" VALUES (13, 'AGENCY_NAME', 'Nombre o Razón Social de la Agencia', '');
+INSERT INTO public."SystemParameter" VALUES (14, 'AGENCY_NIT', 'NIT de la Agencia', '');
 INSERT INTO public."SystemParameter" VALUES (15, 'TASA_CAMBIO_IATA', 'Tasa de Cambio IATA', '4200.00');
 INSERT INTO public."SystemParameter" VALUES (16, 'TARIFA_ADMIN_OW', 'Tarifa Administrativa Nacional One Way', '29100');
 INSERT INTO public."SystemParameter" VALUES (17, 'TARIFA_ADMIN_RT', 'Tarifa Administrativa Nacional Roundtrip', '52800');

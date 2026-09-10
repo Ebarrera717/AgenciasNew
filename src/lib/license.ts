@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver';
 
 const SECRET_KEY = process.env.LICENSE_SECRET || 'Korex_Master_License_Secret_Key_2026_Secure';
 
@@ -78,17 +79,35 @@ export function verifyLicenseKey(licenseKey: string): LicenseVerificationResult 
  */
 export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
     try {
-        const agencyNameParam = await prisma.systemParameter.findUnique({ where: { code: 'AGENCY_NAME' } });
-        const agencyNitParam = await prisma.systemParameter.findUnique({ where: { code: 'AGENCY_NIT' } });
+        let configuredClient: string | null = null;
+        let configuredNit: string | null = null;
+        let paramKeyValue: string | null = null;
 
-        const configuredClient = agencyNameParam?.value?.trim() || null;
-        const configuredNit = agencyNitParam?.value?.trim() || null;
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query("SELECT [code], [value] FROM dbo.[SystemParameter] WHERE [code] IN ('AGENCY_NAME', 'AGENCY_NIT', 'LICENSE_KEY')");
+                await pool.close();
+                for (const row of res.recordset) {
+                    if (row.code === 'AGENCY_NAME') configuredClient = row.value?.trim() || null;
+                    if (row.code === 'AGENCY_NIT') configuredNit = row.value?.trim() || null;
+                    if (row.code === 'LICENSE_KEY') paramKeyValue = row.value?.trim() || null;
+                }
+            } catch (err: any) {
+                if (pool) await pool.close();
+                console.error('[LICENSE] Error leyendo parámetros en SQL Server:', err);
+            }
+        } else {
+            const agencyNameParam = await prisma.systemParameter.findUnique({ where: { code: 'AGENCY_NAME' } });
+            const agencyNitParam = await prisma.systemParameter.findUnique({ where: { code: 'AGENCY_NIT' } });
+            configuredClient = agencyNameParam?.value?.trim() || null;
+            configuredNit = agencyNitParam?.value?.trim() || null;
+            const paramKey = await prisma.systemParameter.findUnique({ where: { code: 'LICENSE_KEY' } });
+            paramKeyValue = paramKey?.value?.trim() || null;
+        }
 
-        const paramKey = await prisma.systemParameter.findUnique({
-            where: { code: 'LICENSE_KEY' }
-        });
-
-        if (!paramKey || !paramKey.value) {
+        if (!paramKeyValue) {
             return {
                 isLicensed: false,
                 isExpired: true,
@@ -100,7 +119,7 @@ export async function getStoredLicenseStatus(): Promise<LicenseStatus> {
             };
         }
 
-        const verification = verifyLicenseKey(paramKey.value);
+        const verification = verifyLicenseKey(paramKeyValue);
         if (!verification.isValid || !verification.payload) {
             return {
                 isLicensed: false,
@@ -171,31 +190,58 @@ export async function applyLicenseKey(
     const finalClient = (clientNameInput && clientNameInput.trim()) || client.trim();
     const finalNit = (nitInput && nitInput.trim()) || nit.trim();
 
-    // Actualizar en SystemParameter usando Prisma upsert
-    await prisma.systemParameter.upsert({
-        where: { code: 'LICENSE_KEY' },
-        update: { value: licenseKey.trim(), name: 'Clave de Licencia del Sistema' },
-        create: { code: 'LICENSE_KEY', name: 'Clave de Licencia del Sistema', value: licenseKey.trim() }
-    });
+    if (isSQLServerMode()) {
+        let pool: any;
+        try {
+            pool = await getSQLServerConnection();
+            const upsertParam = async (code: string, name: string, val: string) => {
+                await pool.request()
+                    .input('code', code)
+                    .input('name', name)
+                    .input('val', val)
+                    .query(`
+                        IF EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = @code)
+                            UPDATE dbo.[SystemParameter] SET [value] = @val, [name] = @name WHERE [code] = @code;
+                        ELSE
+                            INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (@code, @name, @val);
+                    `);
+            };
+            await upsertParam('LICENSE_KEY', 'Clave de Licencia del Sistema', licenseKey.trim());
+            await upsertParam('LICENSE_EXPIRATION_DATE', 'Fecha de Expiración de Licencia', expirationDate);
+            await upsertParam('AGENCY_NAME', 'Nombre o Razón Social de la Agencia', finalClient);
+            await upsertParam('AGENCY_NIT', 'NIT de la Agencia', finalNit);
+            await pool.close();
+        } catch (err) {
+            if (pool) await pool.close();
+            console.error('Error actualizando licencia en SQL Server:', err);
+        }
+    } else {
+        // Actualizar en SystemParameter usando Prisma upsert
+        await prisma.systemParameter.upsert({
+            where: { code: 'LICENSE_KEY' },
+            update: { value: licenseKey.trim(), name: 'Clave de Licencia del Sistema' },
+            create: { code: 'LICENSE_KEY', name: 'Clave de Licencia del Sistema', value: licenseKey.trim() }
+        });
 
-    await prisma.systemParameter.upsert({
-        where: { code: 'LICENSE_EXPIRATION_DATE' },
-        update: { value: expirationDate, name: 'Fecha de Expiración de Licencia' },
-        create: { code: 'LICENSE_EXPIRATION_DATE', name: 'Fecha de Expiración de Licencia', value: expirationDate }
-    });
+        await prisma.systemParameter.upsert({
+            where: { code: 'LICENSE_EXPIRATION_DATE' },
+            update: { value: expirationDate, name: 'Fecha de Expiración de Licencia' },
+            create: { code: 'LICENSE_EXPIRATION_DATE', name: 'Fecha de Expiración de Licencia', value: expirationDate }
+        });
 
-    // Registrar Nombre y NIT de la Agencia oficialmente en la base de datos
-    await prisma.systemParameter.upsert({
-        where: { code: 'AGENCY_NAME' },
-        update: { value: finalClient, name: 'Nombre o Razón Social de la Agencia' },
-        create: { code: 'AGENCY_NAME', name: 'Nombre o Razón Social de la Agencia', value: finalClient }
-    });
+        // Registrar Nombre y NIT de la Agencia oficialmente en la base de datos
+        await prisma.systemParameter.upsert({
+            where: { code: 'AGENCY_NAME' },
+            update: { value: finalClient, name: 'Nombre o Razón Social de la Agencia' },
+            create: { code: 'AGENCY_NAME', name: 'Nombre o Razón Social de la Agencia', value: finalClient }
+        });
 
-    await prisma.systemParameter.upsert({
-        where: { code: 'AGENCY_NIT' },
-        update: { value: finalNit, name: 'NIT de la Agencia' },
-        create: { code: 'AGENCY_NIT', name: 'NIT de la Agencia', value: finalNit }
-    });
+        await prisma.systemParameter.upsert({
+            where: { code: 'AGENCY_NIT' },
+            update: { value: finalNit, name: 'NIT de la Agencia' },
+            create: { code: 'AGENCY_NIT', name: 'NIT de la Agencia', value: finalNit }
+        });
+    }
 
     // Registrar en SystemLog
     try {

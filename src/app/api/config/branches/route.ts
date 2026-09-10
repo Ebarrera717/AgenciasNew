@@ -4,11 +4,25 @@ import prisma from '@/lib/prisma'
 import { getCellCustomizationConfig, syncCellCustomization } from '@/lib/cell-customization'
 import { generateHtmlTemplate } from '@/lib/excel-to-html'
 import { logSystemEvent } from '@/lib/logger'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().execute('dbo.spBranchListar');
+                await pool.close();
+                return NextResponse.json(paginateArray(req, res.recordset || [], (b: any) => [b.code, b.name]));
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
+
         const branches = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnBranchListar()`)
         
         const branchesWithData = await Promise.all(branches.map(async b => {
@@ -37,6 +51,33 @@ export async function POST(req: NextRequest) {
         const body = await req.json()
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
+        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request()
+                    .input('code', body.code || '')
+                    .input('name', body.name || '')
+                    .input('resolutionId', resolutionId)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        INSERT INTO dbo.[Branch] ([code], [name], [resolutionId], [isActive])
+                        OUTPUT INSERTED.id
+                        VALUES (@code, @name, @resolutionId, @isActive)
+                    `);
+                await pool.close();
+                const dbId = res.recordset[0]?.id;
+                const branch = { id: dbId, ...body };
+                logSystemEvent({ userId: actingUserId, action: 'CREATE', module: 'MASTER_DATA', description: `Sucursal ${branch.name} creada.`, metadata: branch });
+                return NextResponse.json(branch);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         
         let logoBuffer = null;
         if (body.logo) {
@@ -73,9 +114,6 @@ export async function POST(req: NextRequest) {
                 console.error("Error generating invoice HTML template during branch creation:", htmlErr);
             }
         }
-
-        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
-        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spBranchCrear($1::TEXT, $2::TEXT, $3::BYTEA, $4::BYTEA, $5::JSONB, $6::TEXT, $7::INT, $8::BYTEA, $9::JSONB, $10::TEXT, $11::BOOLEAN, $12::INT, $13::INT, $14::TEXT)`,
@@ -122,6 +160,34 @@ export async function PUT(req: NextRequest) {
         const body = await req.json()
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+        const dbId = parseInt(body.id);
+        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
+        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', dbId)
+                    .input('code', body.code || '')
+                    .input('name', body.name || '')
+                    .input('resolutionId', resolutionId)
+                    .input('isActive', isAct ? 1 : 0)
+                    .query(`
+                        UPDATE dbo.[Branch]
+                        SET [code] = @code, [name] = @name, [resolutionId] = @resolutionId, [isActive] = @isActive
+                        WHERE [id] = @id
+                    `);
+                await pool.close();
+                const branch = { ...body };
+                logSystemEvent({ userId: actingUserId, action: 'UPDATE', module: 'MASTER_DATA', description: `Sucursal ${branch.name} actualizada.`, metadata: branch });
+                return NextResponse.json(branch);
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
         
         let logoBuffer = null;
         if (body.logo) {
@@ -141,7 +207,6 @@ export async function PUT(req: NextRequest) {
             invoiceTemplateBuffer = Buffer.from(cleanBase64, 'base64');
         }
 
-        const dbId = parseInt(body.id);
         let finalLogoBuffer = logoBuffer;
         let finalTemplateBuffer = templateBuffer;
         let finalInvoiceTemplateBuffer = invoiceTemplateBuffer;
@@ -185,9 +250,6 @@ export async function PUT(req: NextRequest) {
                 console.error("Error generating/updating invoice HTML template during branch update:", htmlErr);
             }
         }
-
-        const resolutionId = body.resolutionId ? parseInt(body.resolutionId) : null;
-        const isAct = body.isActive !== undefined ? body.isActive : (body.inactive !== undefined ? !body.inactive : true);
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spBranchActualizar($1::INT, $2::TEXT, $3::TEXT, $4::BYTEA, $5::BYTEA, $6::JSONB, $7::TEXT, $8::INT, $9::BYTEA, $10::JSONB, $11::TEXT, $12::BOOLEAN, $13::INT, $14::TEXT)`,
@@ -234,6 +296,22 @@ export async function DELETE(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         if (!id) return NextResponse.json({ message: 'ID is required' }, { status: 400 })
+
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                await pool.request()
+                    .input('id', parseInt(id))
+                    .query(`DELETE FROM dbo.[Branch] WHERE [id] = @id`);
+                await pool.close();
+                logSystemEvent({ userId: actingUserId, action: 'DELETE', module: 'MASTER_DATA', description: `Sucursal con ID ${id} eliminada.` });
+                return NextResponse.json({ message: 'Branch deleted successfully' });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                throw err;
+            }
+        }
 
         const results: any[] = await prisma.$queryRawUnsafe(
             `CALL public.spBranchEliminar($1::INT, $2::INT, $3::TEXT)`,

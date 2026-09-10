@@ -2,8 +2,16 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { LogIn, User, Lock, Loader2 } from 'lucide-react'
+import { LogIn, User, Lock, Loader2, AlertTriangle, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+
+interface ErrorDetails {
+    message: string
+    detail?: string
+    suggestion?: string
+    category?: 'DATABASE' | 'CREDENTIALS' | 'SERVER'
+    errorCode?: string
+}
 
 export default function LoginForm() {
     const [view, setView] = useState<'login' | 'forgot'>('login')
@@ -11,6 +19,8 @@ export default function LoginForm() {
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null)
+    const [showTechnicalDetails, setShowTechnicalDetails] = useState(true)
     const [successMsg, setSuccessMsg] = useState<string | null>(null)
     const router = useRouter()
 
@@ -18,6 +28,7 @@ export default function LoginForm() {
         e.preventDefault()
         setIsLoading(true)
         setError(null)
+        setErrorDetails(null)
         setSuccessMsg(null)
 
         try {
@@ -29,9 +40,29 @@ export default function LoginForm() {
                 body: JSON.stringify({ email, password }),
             })
 
-            const data = await res.json()
+            let data: any = {}
+            const rawText = await res.text()
+            try {
+                data = JSON.parse(rawText)
+            } catch (e) {
+                data = {
+                    message: `Error en respuesta del servidor (HTTP ${res.status})`,
+                    detail: rawText || 'El servidor devolvió una respuesta no válida (HTML o texto).',
+                    category: 'SERVER',
+                    suggestion: '1. Verifique que el servicio backend Korex_NextJS esté activo.\n2. Revise que las credenciales de SQL Server en .env sean correctas.'
+                }
+            }
 
             if (!res.ok) {
+                const details: ErrorDetails = {
+                    message: data.message || 'Error en el inicio de sesión',
+                    detail: data.detail,
+                    suggestion: data.suggestion,
+                    category: data.category,
+                    errorCode: data.errorCode
+                }
+                setErrorDetails(details)
+                setShowTechnicalDetails(true)
                 throw new Error(data.message || 'Error en el inicio de sesión')
             }
 
@@ -50,6 +81,7 @@ export default function LoginForm() {
         e.preventDefault()
         setIsLoading(true)
         setError(null)
+        setErrorDetails(null)
         setSuccessMsg(null)
 
         try {
@@ -64,11 +96,16 @@ export default function LoginForm() {
             const data = await res.json()
 
             if (!res.ok) {
+                const details: ErrorDetails = {
+                    message: data.message || 'Error al procesar solicitud',
+                    detail: data.detail,
+                    suggestion: data.suggestion
+                }
+                setErrorDetails(details)
                 throw new Error(data.message + (data.detail ? ` (detalle: ${data.detail})` : ''))
             }
 
             setSuccessMsg(data.message)
-            // No cambiamos el view inmediatamente para que el usuario vea el mensaje
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -107,14 +144,27 @@ export default function LoginForm() {
                         </div>
                     </div>
 
-                    {error && (
+                    {errorDetails ? (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-red-500/10 border border-red-500/20 dark:border-red-500/30 rounded-xl p-4 text-left space-y-2"
+                        >
+                            <div className="flex items-start gap-2.5">
+                                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <h4 className="text-sm font-bold text-red-600 dark:text-red-400">{errorDetails.message}</h4>
+                                    {errorDetails.suggestion && (
+                                        <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-1 whitespace-pre-line leading-relaxed font-mono">
+                                            {errorDetails.suggestion}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    ) : error && (
                         <div className="text-red-500 text-sm text-center bg-red-500/10 py-2 px-4 rounded-lg">
                             {error}
-                            <div className="text-[10px] mt-1 opacity-70">Error detectado. Intenta de nuevo.</div>
-                            {/* Mostrar detalle si existe para depuración */}
-                            {typeof error === 'string' && error.includes('detalle:') && (
-                                <div className="text-[10px] text-zinc-500 mt-2 break-all">{error}</div>
-                            )}
                         </div>
                     )}
 
@@ -137,6 +187,7 @@ export default function LoginForm() {
                         onClick={() => {
                             setView('login')
                             setError(null)
+                            setErrorDetails(null)
                             setSuccessMsg(null)
                         }}
                         className="w-full text-zinc-500 dark:text-zinc-400 text-sm font-medium hover:text-zinc-900 dark:hover:text-white transition-colors"
@@ -203,7 +254,67 @@ export default function LoginForm() {
                     </div>
                 </div>
 
-                {error && (
+                {errorDetails ? (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-red-500/10 border border-red-500/20 dark:border-red-500/30 rounded-xl p-4 text-left space-y-3"
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-red-500/20 text-red-500 rounded-lg shrink-0 mt-0.5">
+                                <AlertTriangle className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                    <h4 className="text-sm font-bold text-red-600 dark:text-red-400 leading-tight">
+                                        {errorDetails.message}
+                                    </h4>
+                                    {errorDetails.category && (
+                                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full shrink-0">
+                                            {errorDetails.category === 'DATABASE' ? 'BD/SQL' : errorDetails.category}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {errorDetails.suggestion && (
+                                    <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-300 bg-white/50 dark:bg-zinc-800/60 p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700/50 space-y-1">
+                                        <div className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                                            <HelpCircle className="w-3.5 h-3.5" />
+                                            Pasos sugeridos para solucionar:
+                                        </div>
+                                        <div className="whitespace-pre-line text-[11px] leading-relaxed opacity-90 font-mono">
+                                            {errorDetails.suggestion}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {errorDetails.detail && (
+                                    <div className="mt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                                            className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 flex items-center gap-1 font-medium transition-colors"
+                                        >
+                                            {showTechnicalDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                            {showTechnicalDetails ? 'Ocultar detalle técnico' : 'Ver detalle técnico del error'}
+                                        </button>
+
+                                        {showTechnicalDetails && (
+                                            <motion.pre
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                className="mt-1.5 p-2.5 bg-zinc-950 text-red-300 text-[10px] font-mono rounded-lg overflow-x-auto border border-red-900/40 break-all whitespace-pre-wrap max-h-36"
+                                            >
+                                                {errorDetails.detail}
+                                                {errorDetails.errorCode ? `\n[Código Error: ${errorDetails.errorCode}]` : ''}
+                                            </motion.pre>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </motion.div>
+                ) : error && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
