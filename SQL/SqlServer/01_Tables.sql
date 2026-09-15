@@ -215,17 +215,17 @@ BEGIN
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Quotation PRIMARY KEY,
         [internalNumber] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Quotation_InternalNumber UNIQUE,
         [date] DATETIME2 NOT NULL CONSTRAINT DF_Quotation_Date DEFAULT GETDATE(),
-        [clientId] INT NOT NULL CONSTRAINT FK_Quotation_Client REFERENCES dbo.[Client]([id]),
-        [currency] NVARCHAR(10) NOT NULL,
-        [exchangeRate] FLOAT NOT NULL,
-        [branchId] INT NOT NULL CONSTRAINT FK_Quotation_Branch REFERENCES dbo.[Branch]([id]),
-        [implantId] INT NULL CONSTRAINT FK_Quotation_Implant REFERENCES dbo.[Implant]([id]),
-        [sellerId] INT NULL CONSTRAINT FK_Quotation_Seller REFERENCES dbo.[Seller]([id]),
-        [ticketPrinterId] INT NULL CONSTRAINT FK_Quotation_TicketPrinter REFERENCES dbo.[TicketPrinter]([id]),
-        [baseCommissionable] FLOAT NOT NULL,
-        [commissionPercentage] FLOAT NOT NULL,
-        [chargesAndTaxes] FLOAT NOT NULL,
-        [totalAmount] FLOAT NOT NULL,
+        [clientId] INT NULL,
+        [currency] NVARCHAR(10) NULL,
+        [exchangeRate] FLOAT NULL,
+        [branchId] INT NULL,
+        [implantId] INT NULL,
+        [sellerId] INT NULL,
+        [ticketPrinterId] INT NULL,
+        [baseCommissionable] FLOAT NULL CONSTRAINT DF_Quotation_baseCommissionable DEFAULT 0,
+        [commissionPercentage] FLOAT NULL CONSTRAINT DF_Quotation_commissionPercentage DEFAULT 0,
+        [chargesAndTaxes] FLOAT NULL CONSTRAINT DF_Quotation_chargesAndTaxes DEFAULT 0,
+        [totalAmount] FLOAT NULL CONSTRAINT DF_Quotation_totalAmount DEFAULT 0,
         [userId] INT NULL CONSTRAINT FK_Quotation_User REFERENCES dbo.[User]([id]),
         [state] NVARCHAR(25) NULL CONSTRAINT DF_Quotation_State DEFAULT N'Nuevo',
         [stateDescription] NVARCHAR(MAX) NULL,
@@ -347,6 +347,113 @@ BEGIN
         [servicios] NVARCHAR(MAX) NULL,
         [descripcion] NVARCHAR(MAX) NULL,
         [passenger] NVARCHAR(255) NULL
+    );
+END;
+
+-- 19a. Combo
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Combo' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Combo] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Combo PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL,
+        [name] NVARCHAR(255) NOT NULL,
+        [cupos] INT NULL CONSTRAINT DF_Combo_Cupos DEFAULT 0,
+        [currencyId] INT NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_Combo_CreatedAt DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NULL CONSTRAINT DF_Combo_UpdatedAt DEFAULT GETDATE(),
+        [isActive] BIT NOT NULL CONSTRAINT DF_Combo_IsActive DEFAULT 1
+    );
+END;
+
+-- 19b. QuotationProductPassenger
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationProductPassenger' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationProductPassenger] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationProductPassenger PRIMARY KEY,
+        [quotationProductId] INT NOT NULL CONSTRAINT FK_QuotationProductPassenger_QuotationProduct REFERENCES dbo.[QuotationProduct]([id]) ON DELETE CASCADE,
+        [name] NVARCHAR(255) NOT NULL,
+        [document] NVARCHAR(50) NOT NULL
+    );
+END;
+
+-- 19c. QuotationProductTax
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationProductTax' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationProductTax] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationProductTax PRIMARY KEY,
+        [quotationProductId] INT NOT NULL CONSTRAINT FK_QuotationProductTax_QuotationProduct REFERENCES dbo.[QuotationProduct]([id]) ON DELETE CASCADE,
+        [chargeAndTaxId] INT NOT NULL CONSTRAINT FK_QuotationProductTax_ChargeAndTax REFERENCES dbo.[ChargeAndTax]([id]),
+        [valueSnapshot] FLOAT NOT NULL,
+        [valueTypeSnapshot] NVARCHAR(50) NOT NULL,
+        [explicitAmount] FLOAT NULL,
+        [isMain] BIT NOT NULL CONSTRAINT DF_QuotationProductTax_IsMain DEFAULT 0
+    );
+END;
+
+-- 19d. QuotationProductVariable
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationProductVariable' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationProductVariable] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationProductVariable PRIMARY KEY,
+        [quotationProductId] INT NOT NULL CONSTRAINT FK_QuotationProductVariable_QuotationProduct REFERENCES dbo.[QuotationProduct]([id]) ON DELETE CASCADE,
+        [masterVariableId] INT NOT NULL CONSTRAINT FK_QuotationProductVariable_MasterVariable REFERENCES dbo.[MasterVariable]([id]),
+        [value] NVARCHAR(MAX) NOT NULL
+    );
+END;
+
+-- 19e. QuotationProductPayment
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationProductPayment' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationProductPayment] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationProductPayment PRIMARY KEY,
+        [quotationProductId] INT NOT NULL CONSTRAINT FK_QuotationProductPayment_QuotationProduct REFERENCES dbo.[QuotationProduct]([id]) ON DELETE CASCADE,
+        [amount] FLOAT NOT NULL,
+        [paymentMethod] NVARCHAR(100) NULL,
+        [date] DATETIME2 NULL CONSTRAINT DF_QuotationProductPayment_Date DEFAULT GETDATE(),
+        [reference] NVARCHAR(255) NULL,
+        [creditCardId] INT NULL,
+        [cardNumber] NVARCHAR(20) NULL,
+        [authorizationCode] NVARCHAR(50) NULL,
+        [voucher] NVARCHAR(50) NULL,
+        [expirationDate] NVARCHAR(10) NULL
+    );
+END;
+
+-- 19f. QuotationCombo
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationCombo' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationCombo] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationCombo PRIMARY KEY,
+        [quotationId] INT NOT NULL CONSTRAINT FK_QuotationCombo_Quotation REFERENCES dbo.[Quotation]([id]) ON DELETE CASCADE,
+        [comboId] INT NOT NULL CONSTRAINT FK_QuotationCombo_Combo REFERENCES dbo.[Combo]([id])
+    );
+END;
+
+-- 19g. QuotationManualService
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationManualService' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationManualService] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationManualService PRIMARY KEY,
+        [quotationId] INT NOT NULL CONSTRAINT FK_QuotationManualService_Quotation REFERENCES dbo.[Quotation]([id]) ON DELETE CASCADE,
+        [providerName] NVARCHAR(255) NULL,
+        [serviceName] NVARCHAR(255) NULL,
+        [cost] FLOAT NULL CONSTRAINT DF_QuotationManualService_Cost DEFAULT 0,
+        [salePrice] FLOAT NULL CONSTRAINT DF_QuotationManualService_SalePrice DEFAULT 0,
+        [utility] FLOAT NULL CONSTRAINT DF_QuotationManualService_Utility DEFAULT 0,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_QuotationManualService_CreatedAt DEFAULT GETDATE()
+    );
+END;
+
+-- 19h. QuotationStateHistory
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationStateHistory' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationStateHistory] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationStateHistory PRIMARY KEY,
+        [quotationId] INT NOT NULL CONSTRAINT FK_QuotationStateHistory_Quotation REFERENCES dbo.[Quotation]([id]) ON DELETE CASCADE,
+        [state] NVARCHAR(25) NOT NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_QuotationStateHistory_CreatedAt DEFAULT GETDATE(),
+        [userId] INT NULL CONSTRAINT FK_QuotationStateHistory_User REFERENCES dbo.[User]([id])
     );
 END;
 
@@ -558,7 +665,64 @@ BEGIN
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Payment PRIMARY KEY,
         [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_Payment_Code UNIQUE,
         [name] NVARCHAR(150) NOT NULL,
+        [isCash] BIT NOT NULL CONSTRAINT DF_Payment_IsCash DEFAULT 0,
+        [isCredit] BIT NOT NULL CONSTRAINT DF_Payment_IsCredit DEFAULT 0,
         [isActive] BIT NOT NULL CONSTRAINT DF_Payment_IsActive DEFAULT 1
+    );
+END;
+
+-- 34. QuotationState
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationState' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[QuotationState] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationState PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_QuotationState_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [color] NVARCHAR(50) NULL,
+        [isActive] BIT NOT NULL CONSTRAINT DF_QuotationState_IsActive DEFAULT 1,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_QuotationState_CreatedAt DEFAULT GETDATE()
+    );
+END;
+
+-- 35. PreQuotation
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PreQuotation' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[PreQuotation] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PreQuotation PRIMARY KEY,
+        [consecutivo] INT NOT NULL CONSTRAINT UQ_PreQuotation_Consecutivo UNIQUE,
+        [clientNameText] NVARCHAR(255) NULL,
+        [clientId] INT NULL,
+        [headerDescription] NVARCHAR(MAX) NULL,
+        [providerId] INT NULL,
+        [ticketPrinterId] INT NULL,
+        [sellerId] INT NULL,
+        [branchId] INT NULL,
+        [preQuotationType] NVARCHAR(100) NULL CONSTRAINT DF_PreQuotation_Type DEFAULT N'General',
+        [quotationNotice] NVARCHAR(MAX) NULL,
+        [noticeResponse] NVARCHAR(MAX) NULL,
+        [startDate] DATETIME2 NULL,
+        [endDate] DATETIME2 NULL,
+        [customFields] NVARCHAR(MAX) NULL CONSTRAINT DF_PreQuotation_CustomFields DEFAULT N'{}',
+        [state] NVARCHAR(50) NULL CONSTRAINT DF_PreQuotation_State DEFAULT N'POR COTIZAR',
+        [convertedQuotationId] INT NULL,
+        [convertedAt] DATETIME2 NULL,
+        [convertedUserId] INT NULL,
+        [userId] INT NULL,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_PreQuotation_CreatedAt DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NULL CONSTRAINT DF_PreQuotation_UpdatedAt DEFAULT GETDATE()
+    );
+END;
+
+-- 36. PreQuotationStateHistory
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PreQuotationStateHistory' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[PreQuotationStateHistory] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PreQuotationStateHistory PRIMARY KEY,
+        [preQuotationId] INT NOT NULL CONSTRAINT FK_PreQuotationStateHistory_PreQuotation REFERENCES dbo.[PreQuotation]([id]) ON DELETE CASCADE,
+        [state] NVARCHAR(50) NOT NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [userId] INT NULL,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_PreQuotationStateHistory_CreatedAt DEFAULT GETDATE()
     );
 END;
 

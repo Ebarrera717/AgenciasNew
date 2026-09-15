@@ -17,6 +17,8 @@ const isSqlUrl = (url: string) => {
     return url.startsWith('sqlserver://') || url.startsWith('mssql://');
 };
 
+import { executePostgresQuery } from './postgres'
+
 const prismaClientSingleton = () => {
     console.log('--- Instantiating NEW PrismaClient ---')
     const connectionString = getActiveDbUrl()
@@ -26,6 +28,12 @@ const prismaClientSingleton = () => {
         const proxyObj = new Proxy({} as any, {
             get(target, prop) {
                 if (prop === 'then' || prop === 'catch' || prop === 'finally') return undefined;
+                if (prop === '$queryRawUnsafe' || prop === '$executeRawUnsafe') {
+                    return async (query: string, ...params: any[]) => {
+                        console.log(`[PRISMA_SQLSERVER_PROXY] Redirigiendo ${String(prop)} a ejecutor directo de PostgreSQL: ${query.substring(0, 60)}...`);
+                        return executePostgresQuery(query, params);
+                    };
+                }
                 return new Proxy(() => {}, {
                     get(t, p) {
                         return () => Promise.reject(new Error(`[PRISMA_SQLSERVER_PROXY] Prisma no debe ser invocado en modo SQL Server direct. La consulta '${String(prop)}.${String(p)}' debe ser ejecutada mediante getSQLServerConnection().`));

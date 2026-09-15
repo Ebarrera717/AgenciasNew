@@ -60,7 +60,58 @@ Todos los botones de la plataforma DEBEN utilizar exactamente el mismo patrón d
 
 ---
 
-## 3. Lista de Verificación Pre-Entrega
+## 3. Regla Obligatoria de Columna "ACCIONES" en Tablas de Datos (`[ : Acciones ]`)
+
+Queda **estrictamente prohibido** colocar iconos horizontales sueltos (`FileCode`, `Printer`, `Edit2`, `Trash2`, etc.) directamente sobre la celda de la columna `ACCIONES` en las tablas de listados.
+
+Todas las tablas de listados del sistema (*Cotizaciones*, *Historial de Cotizaciones*, *Facturación*, *Pre-Cotizaciones*, *Ejecuciones*, *Reportes*, *Maestros*) **DEBEN utilizar exclusivamente el botón desplegable unificado `[ : Acciones ]`**:
+
+### A. Estructura del Botón Desplegable `[ : Acciones ]`
+```tsx
+<button
+    onClick={(e) => {
+        e.stopPropagation();
+        setActiveMenuId(activeMenuId === row.id ? null : row.id);
+    }}
+    className="p-1.5 px-3 text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 rounded-xl transition-all font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+    title="Opciones"
+>
+    <MoreVertical className="w-4 h-4" />
+    <span>Acciones</span>
+</button>
+```
+
+### B. Estructura del Menú Flotante de Opciones
+Debe desplegarse con un backdrop invisible para cerrar al hacer clic afuera y un contenedor animado con `AnimatePresence`:
+```tsx
+<AnimatePresence>
+    {activeMenuId === row.id && (
+        <>
+            <div
+                className="fixed inset-0 z-20 cursor-default"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMenuId(null);
+                }}
+            />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                transition={{ duration: 0.12 }}
+                className="absolute right-6 top-12 z-30 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-1.5 space-y-0.5 text-left"
+            >
+                {/* Opciones tipadas con iconos y colores estandarizados */}
+            </motion.div>
+        </>
+    )}
+</AnimatePresence>
+```
+
+---
+
+## 4. Lista de Verificación Pre-Entrega
 - [ ] ¿Todos los botones de creación principal (+ Nuevo...) usan `bg-blue-600`, `h-12`, `px-5`, `rounded-xl`, `text-sm font-bold`?
+- [ ] ¿Toda tabla de listado utiliza el botón desplegable `[ : Acciones ]` con `MoreVertical` en lugar de iconos horizontales sueltos?
 - [ ] ¿Los iconos en la barra lateral mantienen un estilo limpio sin colores discordantes en estado inactivo?
 - [ ] ¿Los modales usan el botón principal de confirmación azul y el secundario neutro/gris?

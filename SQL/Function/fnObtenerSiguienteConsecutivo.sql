@@ -30,7 +30,10 @@ BEGIN
     -- 1. Intentar buscar un consecutivo específico para la combinación sucursal e implante
     SELECT * INTO v_rec
     FROM public."TransactionConsecutive"
-    WHERE UPPER("transactionType") = p_transaction_type
+    WHERE (
+        UPPER("transactionType") = p_transaction_type 
+        OR (p_transaction_type IN ('QUOTATION', 'COTIZACION') AND UPPER("transactionType") IN ('QUOTATION', 'COTIZACION'))
+    )
       AND "isActive" = true
       AND (
           (p_branch_id IS NOT NULL AND "branchId" = p_branch_id)
@@ -59,9 +62,9 @@ BEGIN
     ELSE
         -- Fallback si no existe parámetro de consecutivo configurado todavía
         v_prefix := CASE 
+            WHEN p_transaction_type IN ('QUOTATION', 'COTIZACION') THEN 'COT'
             WHEN p_transaction_type = 'INVOICE' THEN 'INV'
             WHEN p_transaction_type = 'CREDIT_NOTE' THEN 'NC'
-            WHEN p_transaction_type = 'QUOTATION' THEN 'COT'
             ELSE 'DOC'
         END;
 

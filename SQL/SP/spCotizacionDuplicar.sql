@@ -46,8 +46,13 @@ BEGIN
         v_user_id := v_orig_quotation."userId";
     END IF;
 
-    -- Generar consecutivo único interno
-    v_internal_number := 'QUO-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+    -- Generar consecutivo único interno desde TransactionConsecutive
+    SELECT x.v_consec_json->>'formattedConsecutive' INTO v_internal_number
+    FROM (SELECT public."fnObtenerSiguienteConsecutivo"('QUOTATION', v_orig_quotation."branchId", v_orig_quotation."implantId") AS v_consec_json) x;
+
+    IF v_internal_number IS NULL OR v_internal_number = '' THEN
+        v_internal_number := 'COT-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+    END IF;
 
     -- Insertar la cabecera duplicada de la cotización
     INSERT INTO public."Quotation" (

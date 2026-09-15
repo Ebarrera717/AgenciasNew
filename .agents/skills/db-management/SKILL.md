@@ -43,12 +43,12 @@ Esta guía detalla las reglas obligatorias y el flujo de trabajo paso a paso par
 ## 2. Actualización, Compilación Local y Sincronización Automática
 
 > [!CRITICAL]
-> **REGLA MANDATORIA DE AUTO-DESPLIEGUE LOCAL**:
-> Cada vez que se modifique o cree cualquier archivo SQL (en `SQL/SP/`, `SQL/Function/`, `SQL/Table/`), **SE DEBE EJECUTAR INMEDIATAMENTE EN EL MISMO TURNO EL COMANDO**:
+> **REGLA MANDATORIA DE AUTO-DESPLIEGUE E INYECCIÓN LOCAL (POSTGRESQL + SQL SERVER)**:
+> Cada vez que se modifique o cree cualquier archivo SQL (en `SQL/SP/`, `SQL/Function/`, `SQL/Table/`, `SQL/SqlServer/`, `SQL/Actualizador/`), **SE DEBE EJECUTAR E INYECTAR INMEDIATAMENTE EN EL MISMO TURNO EN LAS BASES DE DATOS LOCALES ACTIVAS (PostgreSQL local `Korex_colaereo` y SQL Server `ZEUSAGENCIAS10` / `Korex_Pruebas`)**:
 > ```bash
 > node deploy/gen_schema_json.js
 > ```
-> NUNCA dar por finalizada una modificación SQL ni responder al usuario sin haber corrido previamente este comando para compilar en la BD PostgreSQL local (`Korex_colaereo`).
+> NUNCA dar por finalizada una modificación SQL ni responder al usuario sin haber compilado e inyectado previamente este cambio en las bases de datos locales y verificado la ejecución limpia de los SPs/funciones.
 
 Este script ejecuta la validación de 7 capas y el despliegue automático:
 1. Compila y despliega los `.sql` en tiempo real en la BD PostgreSQL local (auto-inyectando bloques `DO $$` de limpieza si faltan).

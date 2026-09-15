@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { executePostgresQuery } from '@/lib/postgres'
 import { executeSQLServerProcedure } from '@/lib/sqlserver'
 import { registerLog } from '@/lib/logger'
 
@@ -14,11 +14,9 @@ export async function POST(req: NextRequest) {
         const idsStr = Array.isArray(ids) ? ids.join(',') : ids.toString();
 
         // 1. Obtener XML desde Postgres
-        const result = await prisma.$queryRawUnsafe<any[]>(
+        const result = await executePostgresQuery(
             `CALL spExportInvoices($1, $2, $3)`,
-            idsStr,
-            userId ? Number(userId) : 0,
-            '' 
+            [idsStr, userId ? Number(userId) : 0, '']
         )
 
         const row = result && result.length > 0 ? result[0] : null;
@@ -82,9 +80,9 @@ export async function POST(req: NextRequest) {
             if (spResult.length > 0) {
                 console.log(`[EXPORT_API] Actualizando estados en Postgres para: ${idsStr}`);
                 try {
-                    await prisma.$executeRawUnsafe(
+                    await executePostgresQuery(
                         `CALL public."spFacturaActualizarEstado"($1::JSONB)`,
-                        JSON.stringify(spResult)
+                        [JSON.stringify(spResult)]
                      );
                 } catch (spPgError) {
                     console.error('[EXPORT_API] Error al actualizar estado en Postgres:', spPgError);

@@ -225,39 +225,61 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 ? porcentajeComisionUtilidad - (formData.comisionFreelancePercentage || 0)
                 : (formData.comisionTotalPercentage || 0) - (formData.comisionFreelancePercentage || 0);
 
+            const selectedBranch = data?.branches?.find((b: any) => String(b.id) === String(formData.branchId));
+            const selectedSeller = data?.sellers?.find((s: any) => String(s.id) === String(formData.sellerId));
+            const selectedImplant = data?.implants?.find((i: any) => String(i.id) === String(formData.implantId));
+            const selectedPrinter = data?.ticketPrinters?.find((t: any) => String(t.id) === String(formData.ticketPrinterId));
+            const selectedClient = data?.clients?.find((c: any) => String(c.id) === String(formData.clientId));
+
             const payload = {
                 ...formData,
                 comisionPropiaPercentage: calculatedComisionPropia,
                 commissionPercentage: calculatedComisionPropia,
                 clientId: formData.clientId || null,
+                clientDocument: selectedClient?.document || null,
                 branchId: formData.branchId || null,
+                branchCode: selectedBranch?.code || null,
                 implantId: formData.implantId || null,
+                implantCode: selectedImplant?.code || null,
                 sellerId: formData.sellerId || null,
+                sellerCode: selectedSeller?.code || null,
                 ticketPrinterId: formData.ticketPrinterId || null,
+                ticketPrinterCode: selectedPrinter?.code || null,
                 totalAmount: total,
                 combos: (formData.selectedCombos || []).map(c => ({ comboId: c.id })),
                 items: formData.items.map(item => {
                     const taxes: any[] = [];
 
+                    const defaultMainTax = data?.taxes?.find((t: any) => t.type === 'PRINCIPAL' || t.code === 'TAR' || t.name?.toUpperCase().includes('TARIFA'));
+                    const mainTaxIdNum = item.mainTaxId != null ? Number(item.mainTaxId) : (defaultMainTax ? Number(defaultMainTax.id) : null);
+
                     // Add main tax if exists
-                    if (item.mainTaxId) {
-                        const amount = item.price * item.quantity;
-                        taxes.push({ chargeAndTaxId: item.mainTaxId, explicitAmount: amount });
+                    if (mainTaxIdNum != null) {
+                        const mainTaxEntryInApplied = (item.appliedTaxes || []).find((t: any) => Number(t.id || t.chargeAndTaxId) === mainTaxIdNum);
+                        const amount = mainTaxEntryInApplied?.amount ?? ((item.price || 0) * (item.quantity || 1));
+                        taxes.push({ chargeAndTaxId: mainTaxIdNum, explicitAmount: amount });
                     }
 
                     // Add secondary taxes
-                    (item.appliedTaxes || []).forEach(t => {
-                        const taxId = t.id || (t as any).chargeAndTaxId;
-                        if (taxId && taxId !== item.mainTaxId) {
+                    (item.appliedTaxes || []).forEach((t: any) => {
+                        const taxId = Number(t.id || t.chargeAndTaxId);
+                        if (taxId && taxId !== mainTaxIdNum) {
                             taxes.push({ chargeAndTaxId: taxId, explicitAmount: t.amount });
                         }
                     });
 
+                    const selProd = data?.products?.find((p: any) => String(p.id) === String(item.productId));
+                    const selProv = data?.providers?.find((p: any) => String(p.id) === String(item.providerId));
+                    const selPrest = data?.prestadoras?.find((p: any) => String(p.id) === String(item.prestadoraId));
+
                     return {
                         ...item,
                         productId: item.productId || null,
+                        productCode: selProd?.code || null,
                         providerId: item.providerId || null,
+                        providerCode: selProv?.code || null,
                         prestadoraId: item.prestadoraId || null,
+                        prestadoraCode: selPrest?.code || null,
                         cost: item.cost || 0,
                         service: item.service || item.servicios || '',
                         servicios: item.servicios || item.service || '',
@@ -420,11 +442,34 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
         const summary: Record<string, number> = {}
         if (!data?.taxes) return summary;
 
+        const defaultMainTax = data.taxes.find((t: any) => t.type === 'PRINCIPAL' || t.code === 'TAR' || t.name?.toUpperCase().includes('TARIFA'));
+
         formData.items.forEach(item => {
-            // All charges and taxes are now consolidated in appliedTaxes
+            const itemTaxesMap = new Map<number, number>();
+
+            // 1. Incluir el cargo principal (TARIFA) basado en el precio total del ítem
+            const mainTaxIdNum = item.mainTaxId != null ? Number(item.mainTaxId) : (defaultMainTax ? Number(defaultMainTax.id) : null);
+            const mainTaxAmt = (item.price || 0) * (item.quantity || 1);
+            if (mainTaxIdNum != null) {
+                itemTaxesMap.set(mainTaxIdNum, mainTaxAmt);
+            }
+
+            // 2. Incluir/Sobrescribir desde el arreglo de cargos e impuestos adicionales (appliedTaxes)
             (item.appliedTaxes || []).forEach(tax => {
                 const rawTaxId = (tax as any).id ?? (tax as any).chargeAndTaxId;
                 const taxId = rawTaxId != null ? Number(rawTaxId) : null;
+                if (taxId != null) {
+                    const amt = Number(tax.amount || 0);
+                    if (taxId === mainTaxIdNum && amt === 0 && mainTaxAmt > 0) {
+                        itemTaxesMap.set(taxId, mainTaxAmt);
+                    } else {
+                        itemTaxesMap.set(taxId, amt);
+                    }
+                }
+            });
+
+            // 3. Agrupar por nombre de cargo maestro con soporte de redirección por targetTaxId
+            itemTaxesMap.forEach((amount, taxId) => {
                 let master = data.taxes.find((t: any) => Number(t.id) === taxId);
 
                 if (master && master.targetTaxId) {
@@ -434,8 +479,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                     }
                 }
 
-                const name = master ? master.name : ((tax as any).name || 'Otros');
-                summary[name] = (summary[name] || 0) + (tax.amount || 0);
+                const name = master ? master.name : 'Otros';
+                summary[name] = (summary[name] || 0) + amount;
             });
         });
         return summary;
@@ -624,11 +669,20 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
 
                                 const mainTaxId = p.mainTaxId;
 
-                                // Inferir el precio desde el monto del cargo principal guardado
-                                const mainTaxEntry = safeAppliedTaxes.find((t: any) => t.chargeAndTaxId === mainTaxId);
+                                // Inferir el precio desde el monto del cargo principal guardado o primera tarifa
+                                const mainTaxEntry = safeAppliedTaxes.find((t: any) => Number(t.chargeAndTaxId || t.id) === Number(mainTaxId));
                                 let inferredPrice = p.price;
-                                if (mainTaxEntry && mainTaxEntry.explicitAmount != null) {
-                                    inferredPrice = mainTaxEntry.explicitAmount / (p.quantity || 1);
+                                if (mainTaxEntry) {
+                                    const taxVal = mainTaxEntry.explicitAmount ?? mainTaxEntry.amount;
+                                    if (taxVal != null && taxVal > 0) {
+                                        inferredPrice = taxVal / (p.quantity || 1);
+                                    }
+                                } else if ((!inferredPrice || inferredPrice === 0) && safeAppliedTaxes.length > 0) {
+                                    const firstTax = safeAppliedTaxes[0];
+                                    const taxVal = firstTax.explicitAmount ?? firstTax.amount;
+                                    if (taxVal != null && taxVal > 0) {
+                                        inferredPrice = taxVal / (p.quantity || 1);
+                                    }
                                 }
 
                                 // Usar el costo exacto guardado sin realizar divisiones ni calculos
@@ -663,8 +717,9 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                     _providerName: p.provider?.name,
                                     _prestadoraName: p.prestadora?.name,
                                     appliedTaxes: safeAppliedTaxes.map((t: any) => ({
-                                        chargeAndTaxId: t.chargeAndTaxId,
-                                        amount: t.explicitAmount ?? 0
+                                        id: t.chargeAndTaxId || t.id,
+                                        chargeAndTaxId: t.chargeAndTaxId || t.id,
+                                        amount: t.explicitAmount ?? t.amount ?? 0
                                     })),
                                     variables: safeVariables.map((v: any) => ({
                                         id: v.id,
@@ -1802,8 +1857,11 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                             const rawId = (t as any).id ?? (t as any).chargeAndTaxId;
                                                             return rawId != null && Number(rawId) === taxIdNum;
                                                         });
-                                                        const isChecked = !!appliedTax;
-                                                        const isPrincipal = item.mainTaxId != null && Number(item.mainTaxId) === taxIdNum;
+                                                        const defaultMainTax = data?.taxes?.find((t: any) => t.type === 'PRINCIPAL' || t.code === 'TAR' || t.name?.toUpperCase().includes('TARIFA'));
+                                                        const mainTaxIdNum = item.mainTaxId != null ? Number(item.mainTaxId) : (defaultMainTax ? Number(defaultMainTax.id) : null);
+                                                        const isPrincipal = mainTaxIdNum != null && mainTaxIdNum === taxIdNum;
+                                                        const isChecked = isPrincipal || !!appliedTax;
+                                                        const currentTaxAmount = appliedTax?.amount ?? (isPrincipal ? (item.price || 0) * (item.quantity || 1) : 0);
 
                                                         return (
                                                             <div key={tax.id} className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800/80 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800">
@@ -1820,7 +1878,6 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                                                 const checked = e.target.checked;
                                                                                 const currentTaxes = item.appliedTaxes || [];
                                                                                 const taxIdNum = Number(tax.id);
-                                                                                const mainTaxIdNum = item.mainTaxId != null ? Number(item.mainTaxId) : null;
 
                                                                                 if (checked) {
                                                                                     let initialAmount = 0;
@@ -1830,9 +1887,9 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                                                     } else if (tax.valueType === 'FIXED') {
                                                                                         initialAmount = (tax.value || 0) * item.quantity;
                                                                                     } else {
-                                                                                        initialAmount = (tax.value || 0) * item.quantity;
+                                                                                        initialAmount = baseValue || (tax.value || 0) * item.quantity;
                                                                                     }
-                                                                                    const nextTaxes = [...currentTaxes, { id: taxIdNum, amount: initialAmount }];
+                                                                                    const nextTaxes = [...currentTaxes, { id: taxIdNum, chargeAndTaxId: taxIdNum, amount: initialAmount }];
 
                                                                                     if (mainTaxIdNum === null) {
                                                                                         const newItems = [...formData.items];
@@ -1887,11 +1944,11 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                                                 )}
                                                                                 value={
                                                                                     focusedTax?.itemIdx === index && focusedTax?.taxId === Number(tax.id)
-                                                                                        ? (focusedTax.rawValue ?? appliedTax.amount ?? '')
-                                                                                        : formatMoney(appliedTax.amount, decimals)
+                                                                                        ? (focusedTax.rawValue ?? currentTaxAmount ?? '')
+                                                                                        : formatMoney(currentTaxAmount, decimals)
                                                                                 }
                                                                                 disabled={tax.isEditable === false && !isPrincipal}
-                                                                                onFocus={() => setFocusedTax({ itemIdx: index, taxId: Number(tax.id), rawValue: appliedTax.amount?.toString() || '' })}
+                                                                                onFocus={() => setFocusedTax({ itemIdx: index, taxId: Number(tax.id), rawValue: appliedTax?.amount?.toString() || currentTaxAmount.toString() })}
                                                                                 onBlur={() => {
                                                                                     setFocusedTax(null);
                                                                                     const taxIdNum = Number(tax.id);

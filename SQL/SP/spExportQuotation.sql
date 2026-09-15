@@ -356,7 +356,7 @@ BEGIN
     SELECT 
         COALESCE(b.code, '') as cd_sucursal, 
         COALESCE(i.code, '') as cd_implante, 
-        'Q' || LPAD(q."id"::text, 7, '0') as cd_consecutivo, 
+        COALESCE(NULLIF(TRIM(q."internalNumber"), ''), 'Q' || LPAD(q."id"::text, 7, '0')) as cd_consecutivo, 
         public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuario, 
         q.date as dt_fechacont, 
         q.date as dt_fecha,

@@ -22,6 +22,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [loadingMenu, setLoadingMenu] = useState(true)
     const [isLicenseValid, setIsLicenseValid] = useState<boolean | null>(null)
 
+    const [dbInfo, setDbInfo] = useState<{ isSQLServer: boolean; shortName: string; dbName: string; name: string } | null>(null)
+
     const checkLicenseStatus = () => {
         fetch('/api/config/license')
             .then((res) => res.json())
@@ -58,9 +60,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             })
     }
 
+    const loadDbInfo = () => {
+        fetch('/api/config/db-provider')
+            .then((res) => res.json())
+            .then((data) => setDbInfo(data))
+            .catch(() => setDbInfo({ isSQLServer: false, shortName: 'PostgreSQL', dbName: 'Korex_colaereo', name: 'PostgreSQL' }))
+    }
+
     useEffect(() => {
         checkLicenseStatus()
         loadMenuData()
+        loadDbInfo()
         window.addEventListener('menuUpdated', loadMenuData)
         return () => {
             window.removeEventListener('menuUpdated', loadMenuData)
@@ -157,11 +167,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Sidebar */}
             <aside className="w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 backdrop-blur-md hidden md:flex flex-col sticky top-0 h-screen">
                 <div className="p-6">
-                    <div className="flex items-center gap-3 mb-10">
+                    <div className="flex items-center gap-3 mb-4">
                         <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white font-bold text-xl">
                             KX
                         </div>
-                        <span className="text-xl font-bold dark:text-white">KoreX</span>
+                        <div className="flex flex-col">
+                            <span className="text-xl font-bold dark:text-white leading-none">KoreX</span>
+                            <span className="text-[10px] text-zinc-400 font-medium">Platform</span>
+                        </div>
+                    </div>
+
+                    {/* Database Engine Indicator Badge */}
+                    <div className={`mb-6 px-3 py-2 rounded-xl border shadow-xs flex items-center gap-2.5 transition-all ${
+                        dbInfo?.isSQLServer
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400'
+                            : 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-400'
+                    }`}>
+                        <Database className="w-4 h-4 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold opacity-75">Motor Activo</span>
+                            <span className="text-xs font-black truncate">
+                                {dbInfo?.shortName || 'Cargando...'}
+                            </span>
+                        </div>
                     </div>
 
                     <nav className="space-y-1">

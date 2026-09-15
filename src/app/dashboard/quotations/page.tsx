@@ -1,16 +1,44 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Filter, FileText, Download, Trash2, Eye, Edit2, MoreVertical, Printer, FileCode } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import {
+    Search,
+    FileText,
+    Calendar,
+    ArrowRight,
+    Loader2,
+    Download,
+    Edit,
+    Trash2,
+    Printer,
+    Receipt,
+    Copy,
+    CopyPlus,
+    FileSpreadsheet,
+    ArrowUp,
+    ArrowDown,
+    MoreVertical,
+    RefreshCw,
+    FileCode,
+    Eye,
+    X,
+    CheckCircle2,
+    Database
+} from 'lucide-react'
 import { format } from 'date-fns'
-import { generateQuotationPDF } from '@/lib/pdf-utils'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import * as XLSX from 'xlsx'
+import QuotationInvoiceModal from './QuotationInvoiceModal'
 
 export default function QuotationsListPage() {
+    const router = useRouter()
     const [quotations, setQuotations] = useState<any[]>([])
     const [states, setStates] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
+    const [exportingXmlId, setExportingXmlId] = useState<number | null>(null)
     
     // Filtros de búsqueda
     const [filterReferencia, setFilterReferencia] = useState('')
@@ -20,23 +48,29 @@ export default function QuotationsListPage() {
     const [filterElaboradoPor, setFilterElaboradoPor] = useState('')
     const [filterMontoTotal, setFilterMontoTotal] = useState('')
     const [filterEstado, setFilterEstado] = useState('')
+    const [filterReserva, setFilterReserva] = useState('')
+    const [filterPasajero, setFilterPasajero] = useState('')
 
-    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
-    const [idIni, setIdIni] = useState('')
-    const [idFin, setIdFin] = useState('')
-    const [quotationFormats, setQuotationFormats] = useState<any[]>([])
-    const [selectedFormatId, setSelectedFormatId] = useState<number | null>(null)
-    const [openFormatMenuId, setOpenFormatMenuId] = useState<number | null>(null)
+    // Ordenamiento por ID (Por defecto DESC por ID de mayor a menor)
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
-    // Para modal de cambio de estado
+    const [selectedIds, setSelectedIds] = useState<number[]>([])
+    const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
+    const [invoiceQuotationId, setInvoiceQuotationId] = useState<number | null>(null)
+    const [activeMenuId, setActiveMenuId] = useState<number | null>(null)
+
+    // Modal de Cambio de Estado
     const [selectedQuotationForState, setSelectedQuotationForState] = useState<any | null>(null)
     const [newState, setNewState] = useState('')
     const [stateDescription, setStateDescription] = useState('')
     const [savingState, setSavingState] = useState(false)
 
-    const router = useRouter()
+    // Modal de Detalle
+    const [detailQuotation, setDetailQuotation] = useState<any | null>(null)
 
-    const fetchQuotations = (filters?: {
+    const [dbInfo, setDbInfo] = useState<{ isSQLServer: boolean; shortName: string; dbName: string; name: string } | null>(null)
+
+    const fetchQuotations = async (filters?: {
         referencia?: string;
         fechaDesde?: string;
         fechaHasta?: string;
@@ -44,51 +78,50 @@ export default function QuotationsListPage() {
         elaboradoPor?: string;
         montoTotal?: string;
         estado?: string;
+        reserva?: string;
+        pasajero?: string;
     }) => {
         setLoading(true)
-        
-        const params = new URLSearchParams()
-        if (filters) {
-            if (filters.referencia) params.append('referencia', filters.referencia)
-            if (filters.fechaDesde) params.append('fechaDesde', filters.fechaDesde)
-            if (filters.fechaHasta) params.append('fechaHasta', filters.fechaHasta)
-            if (filters.cliente) params.append('cliente', filters.cliente)
-            if (filters.elaboradoPor) params.append('elaboradoPor', filters.elaboradoPor)
-            if (filters.montoTotal) params.append('montoTotal', filters.montoTotal)
-            if (filters.estado) params.append('estado', filters.estado)
+        try {
+            const params = new URLSearchParams()
+            if (filters) {
+                if (filters.referencia) params.append('referencia', filters.referencia)
+                if (filters.fechaDesde) params.append('fechaDesde', filters.fechaDesde)
+                if (filters.fechaHasta) params.append('fechaHasta', filters.fechaHasta)
+                if (filters.cliente) params.append('cliente', filters.cliente)
+                if (filters.elaboradoPor) params.append('elaboradoPor', filters.elaboradoPor)
+                if (filters.montoTotal) params.append('montoTotal', filters.montoTotal)
+                if (filters.estado) params.append('estado', filters.estado)
+                if (filters.reserva) params.append('reserva', filters.reserva)
+                if (filters.pasajero) params.append('pasajero', filters.pasajero)
+            }
+
+            const url = `/api/quotations/history?${params.toString()}`
+
+            const [quoRes, statesRes, dbRes] = await Promise.all([
+                fetch(url).then(res => res.json()),
+                fetch('/api/config/quotation-states').then(res => res.json()).catch(() => []),
+                fetch('/api/config/db-provider').then(res => res.json()).catch(() => null)
+            ])
+
+            if (dbRes) setDbInfo(dbRes)
+            setQuotations(Array.isArray(quoRes) ? quoRes : [])
+            if (Array.isArray(statesRes) && statesRes.length > 0) {
+                setStates(statesRes)
+            } else {
+                setStates([
+                    { code: 'NUEVO', name: 'Nuevo', color: 'blue' },
+                    { code: 'ENVIADO', name: 'Enviado', color: 'emerald' },
+                    { code: 'APROBADO', name: 'Aprobado', color: 'emerald' },
+                    { code: 'RECHAZADO', name: 'Rechazado', color: 'red' },
+                    { code: 'CANCELADO', name: 'Cancelado', color: 'zinc' }
+                ])
+            }
+        } catch (error) {
+            console.error('Error fetching history:', error)
+        } finally {
+            setLoading(false)
         }
-
-        const url = `/api/quotations/list?${params.toString()}`
-
-        Promise.all([
-            fetch(url).then(res => res.json()),
-            fetch('/api/config/quotation-states').then(res => res.json()).catch(() => []),
-            fetch('/api/config/quotation-formats').then(res => res.json()).catch(() => [])
-        ])
-            .then(([quoData, stateData, fmtData]) => {
-                if (Array.isArray(quoData)) {
-                    setQuotations(quoData)
-                } else {
-                    console.error("API returned error or non-array:", quoData)
-                    setQuotations([])
-                }
-                if (Array.isArray(stateData) && stateData.length > 0) {
-                    setStates(stateData)
-                } else {
-                    setStates(prev => prev.length > 0 ? prev : [
-                        { code: 'NUEVO', name: 'Nuevo', color: 'blue' },
-                        { code: 'ENVIADO', name: 'ENVIADO', color: 'emerald' }
-                    ])
-                }
-                if (Array.isArray(fmtData)) {
-                    setQuotationFormats(fmtData)
-                }
-                setLoading(false)
-            })
-            .catch(err => {
-                console.error(err)
-                setLoading(false)
-            })
     }
 
     const handleApplyFilters = () => {
@@ -99,7 +132,9 @@ export default function QuotationsListPage() {
             cliente: filterCliente,
             elaboradoPor: filterElaboradoPor,
             montoTotal: filterMontoTotal,
-            estado: filterEstado
+            estado: filterEstado,
+            reserva: filterReserva,
+            pasajero: filterPasajero
         })
     }
 
@@ -111,6 +146,8 @@ export default function QuotationsListPage() {
         setFilterElaboradoPor('')
         setFilterMontoTotal('')
         setFilterEstado('')
+        setFilterReserva('')
+        setFilterPasajero('')
         fetchQuotations({})
     }
 
@@ -118,6 +155,33 @@ export default function QuotationsListPage() {
         fetchQuotations()
     }, [])
 
+    // Aplicar ordenamiento por ID
+    const sortedQs = [...quotations].sort((a, b) => {
+        if (sortDirection === 'asc') return a.id - b.id
+        return b.id - a.id
+    })
+
+    const filteredQs = sortedQs
+
+    const handleToggleSort = () => {
+        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    }
+
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedIds(filteredQs.map(q => q.id))
+        } else {
+            setSelectedIds([])
+        }
+    }
+
+    const handleSelectOne = (id: number) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        )
+    }
+
+    // Guardar Cambio de Estado
     const handleSaveState = async () => {
         if (!selectedQuotationForState || !newState) return
         setSavingState(true)
@@ -149,39 +213,155 @@ export default function QuotationsListPage() {
         }
     }
 
-    const handleDownloadPdf = (q: any) => {
-        const firstProd = q.products && q.products.length > 0 ? q.products[0] : null;
-
-        const pdfData = {
-            ...q,
-            clientName: q.client?.name || 'Cliente sin nombre',
-            clientDocument: q.client?.document || '',
-            providerName: firstProd?.provider?.name || 'Varios/Ninguno',
-            prestadoraName: firstProd?.prestadora?.name || 'Varios/Ninguno',
-            checkIn: firstProd?.checkInDate ? format(new Date(firstProd.checkInDate), 'yyyy-MM-dd') : '',
-            checkOut: firstProd?.checkOutDate ? format(new Date(firstProd.checkOutDate), 'yyyy-MM-dd') : '',
-            paxName: firstProd?.passengers?.[0]?.name || 'N/A',
-            paxDocument: firstProd?.passengers?.[0]?.document || 'N/A',
-            paxAdults: firstProd?.paxAdults || 1,
-            paxChildren: firstProd?.paxChildren || 0,
-            nights: firstProd?.nights || 0,
-            items: (q.products || []).map((p: any) => ({
-                ...p,
-                productDescription: p.product?.description || ''
-            }))
-        }
-        generateQuotationPDF(pdfData)
-    }
-
-    const handleExportXml = async (q: any) => {
+    // Exportar XML individual
+    const handleExportSingleXml = async (q: any) => {
+        setExportingXmlId(q.id)
         try {
-            const loggedUser = JSON.parse(localStorage.getItem('user') || '{"id": 1}');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
             const res = await fetch('/api/quotations/export', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ids: [q.id], // Enviamos como arreglo para consistencia
-                    userId: loggedUser.id,
+                    ids: [q.id],
+                    userId: user.id || 1,
+                    exportType: 'QUOTATION'
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert("ERROR AL EXPORTAR XML:\n" + (data.message || "Error desconocido"));
+                return;
+            }
+            if (data.xml) {
+                const blob = new Blob([data.xml], { type: 'application/xml' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Cotizacion_${q.id}.xml`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+            alert(`✅ XML de la Cotización #${q.id} generado exitosamente.`);
+        } catch (err: any) {
+            console.error(err);
+            alert("Error al exportar XML: " + err.message);
+        } finally {
+            setExportingXmlId(null)
+        }
+    }
+
+    // Copiar resultado completo a Excel (Portapapeles TSV/HTML)
+    const handleCopyToClipboard = () => {
+        const listToCopy = selectedIds.length > 0
+            ? filteredQs.filter(q => selectedIds.includes(q.id))
+            : filteredQs;
+
+        if (listToCopy.length === 0) {
+            alert('No hay cotizaciones para copiar.')
+            return
+        }
+
+        const headers = ['ID', 'No. Interno', 'Fecha', 'Reserva / Localizador', 'Cliente', 'Pasajero / Titular', 'Elaborado por', 'Proveedor', 'Noches', 'Monto Total', 'Moneda', 'Estado']
+        
+        const rows = listToCopy.map(q => [
+            q.id,
+            q.internalNumber || '',
+            format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy'),
+            q.reservationCode || '',
+            q.clientName || '',
+            q.passengerName || 'Mismo titular',
+            q.userName || '',
+            q.providerName || '',
+            q.nights || 1,
+            q.totalAmount,
+            q.currency || 'USD',
+            q.state || 'NUEVO'
+        ])
+
+        const tsvContent = [
+            headers.join('\t'),
+            ...rows.map(row => row.join('\t'))
+        ].join('\n')
+
+        const htmlContent = `
+            <table>
+                <thead>
+                    <tr>${headers.map(h => `<th style="background-color:#f4f4f5;font-weight:bold;">${h}</th>`).join('')}</tr>
+                </thead>
+                <tbody>
+                    ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+                </tbody>
+            </table>
+        `
+
+        try {
+            const blobText = new Blob([tsvContent], { type: 'text/plain' })
+            const blobHtml = new Blob([htmlContent], { type: 'text/html' })
+            const clipboardItem = new ClipboardItem({
+                'text/plain': blobText,
+                'text/html': blobHtml
+            })
+            navigator.clipboard.write([clipboardItem]).then(() => {
+                alert(`✅ ${listToCopy.length} cotización(es) copiada(s) al portapapeles. ¡Puedes pegarlas directamente en Excel (Ctrl+V)!`)
+            }).catch(() => {
+                navigator.clipboard.writeText(tsvContent)
+                alert(`✅ ${listToCopy.length} cotización(es) copiada(s) al portapapeles. ¡Puedes pegarlas directamente en Excel (Ctrl+V)!`)
+            })
+        } catch (err) {
+            navigator.clipboard.writeText(tsvContent)
+            alert(`✅ ${listToCopy.length} cotización(es) copiada(s) al portapapeles. ¡Puedes pegarlas directamente en Excel (Ctrl+V)!`)
+        }
+    }
+
+    // Exportar a Excel (.xlsx)
+    const handleDownloadExcel = () => {
+        const listToDownload = selectedIds.length > 0
+            ? filteredQs.filter(q => selectedIds.includes(q.id))
+            : filteredQs;
+
+        if (listToDownload.length === 0) {
+            alert('No hay cotizaciones para exportar a Excel.')
+            return
+        }
+
+        const dataForExcel = listToDownload.map(q => ({
+            'Referencia ID': q.id,
+            'No. Interno': q.internalNumber || '',
+            'Fecha': format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy'),
+            'Reserva / Localizador': q.reservationCode || '',
+            'Cliente': q.clientName || '',
+            'Pasajero / Titular': q.passengerName || 'Mismo titular',
+            'Elaborado por': q.userName || '',
+            'Proveedor': q.providerName || '',
+            'Noches': q.nights || 1,
+            'Monto Total': parseFloat(q.totalAmount) || 0,
+            'Moneda': q.currency || 'USD',
+            'Estado': q.state || 'NUEVO'
+        }))
+
+        const worksheet = XLSX.utils.json_to_sheet(dataForExcel)
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Cotizaciones')
+        XLSX.writeFile(workbook, `Historial_Cotizaciones_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`)
+    }
+
+    // Exportar a Zeus ERP
+    const handleExportZeus = async () => {
+        if (selectedIds.length === 0) {
+            alert('Por favor selecciona al menos una cotización para exportar a Zeus ERP.')
+            return
+        }
+
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const res = await fetch('/api/quotations/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ids: selectedIds,
+                    userId: user.id || 1,
                     exportType: 'QUOTATION'
                 })
             });
@@ -189,113 +369,199 @@ export default function QuotationsListPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                // Si el servidor devolvió un error (400, 500), mostramos el mensaje detallado
-                alert("ERROR DE SERVIDOR: " + (data.message || "Error desconocido") + (data.details ? "\nDetalles: " + data.details : ""));
+                alert("ERROR DE EXPORTACIÓN ZEUS ERP:\n" + (data.message || "Error desconocido") + (data.details ? "\nDetalles: " + data.details : ""));
                 return;
             }
 
-            // Mostrar resultado de SQL Server si existe
             if (data.success) {
-                alert("EXPORTACIÓN EXITOSA A SQL SERVER:\n" + data.message);
+                let detalle = "✅ EXPORTACIÓN A ZEUS ERP COMPLETADA\n\n";
+                if (data.spResult && data.spResult.length > 0) {
+                    detalle += "Detalle de exportación por cotización:\n";
+                    data.spResult.forEach((row: any) => {
+                        const cotNum = row.Cotizacion || row.cd_consecutivo || row.IdProcesado || selectedIds.join(', ');
+                        const cotDisplay = String(cotNum).startsWith('#') ? String(cotNum) : `#${cotNum}`;
+                        const idZeus = row.IdProcesado || row.id_Cotizacion || row.id;
+                        const isAlreadyExisted = row.bl_existe === 1 || row.bl_existe === true || (row.Estado && String(row.Estado).toLowerCase().includes('ya existe'));
+
+                        if (isAlreadyExisted) {
+                            detalle += `  • Cotización ${cotDisplay}: ⚠️ Ya existe en Zeus ERP${idZeus ? ` (ID Zeus: #${idZeus})` : ''}\n`;
+                        } else {
+                            detalle += `  • Cotización ${cotDisplay}: ✅ Creada exitosamente en Zeus ERP${idZeus ? ` (ID Zeus: #${idZeus})` : ''}\n`;
+                        }
+                    });
+                } else {
+                    detalle += data.message || "Cotización enviada a SQL Server correctamente.";
+                }
+                alert(detalle);
+                fetchQuotations();
             } else {
-                alert("ATENCIÓN: Se generó el XML pero hubo un problema con SQL Server.\nMensaje: " + data.message);
+                alert("❌ ERROR EN ZEUS ERP:\n" + data.message);
             }
 
-            // Descargar el XML localmente
-            if (data.xml) {
-                const blob = new Blob([data.xml], { type: 'application/xml' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `cotizacion_${q.id}.xml`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+        } catch (error: any) {
+            console.error('Export error:', error);
+            alert(`Error crítico al conectar con el servidor: ${error.message}`);
+        }
+    }
+
+    const handleDelete = async (id: number) => {
+        if (!confirm('¿Estás seguro de que deseas eliminar esta cotización? Esta acción no se puede deshacer.')) return;
+        try {
+            const res = await fetch(`/api/quotations/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-User-Id': JSON.parse(localStorage.getItem('user') || '{}').id?.toString() || ''
+                }
+            });
+            if (res.ok) {
+                setQuotations(quotations.filter(q => q.id !== id));
+            } else {
+                const error = await res.json();
+                alert(`Error: ${error.message}`);
             }
-        } catch (err: any) {
-            console.error(err);
-            alert("Error al exportar: " + err.message);
+        } catch (error) {
+            console.error('Error deleting quotation:', error);
+            alert('Ocurrió un error al eliminar la cotización.');
+        }
+    }
+
+    const handleDuplicate = async (id: number) => {
+        if (!confirm(`¿Estás seguro de duplicar la cotización #${id}? Se generará una nueva cotización idéntica con un nuevo consecutivo para que puedas editarla.`)) return;
+        setDuplicatingId(id);
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const res = await fetch(`/api/quotations/${id}/duplicate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-Id': user.id?.toString() || '1'
+                }
+            });
+            const data = await res.json();
+            if (res.ok && data.newQuotationId) {
+                const consecutiveDisplay = data.internalNumber ? (data.internalNumber.startsWith('#') ? data.internalNumber : '#' + data.internalNumber) : `#${data.newQuotationId}`;
+                alert(`✅ Cotización duplicada exitosamente. Se ha creado la nueva cotización ${consecutiveDisplay}. Redirigiendo a la pantalla de edición...`);
+                router.push(`/dashboard/quotations/${data.newQuotationId}/edit`);
+            } else {
+                alert(`❌ Error al duplicar cotización: ${data.message}`);
+            }
+        } catch (error: any) {
+            console.error('Error duplicating quotation:', error);
+            alert('Ocurrió un error al duplicar la cotización.');
+        } finally {
+            setDuplicatingId(null);
         }
     }
 
     return (
-        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-8 md:p-12">
-            <header className="flex items-center justify-between mb-12">
+        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 sm:p-6 max-w-[1700px] mx-auto">
+            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                 <div>
-                    <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-2">Cotizaciones</h1>
-                    <p className="text-zinc-500 dark:text-zinc-400 font-medium">Gestión y seguimiento de tus ofertas</p>
+                    <h1 className="text-2xl md:text-3xl font-black text-zinc-900 dark:text-white flex items-center gap-2.5 tracking-tight flex-wrap">
+                        <FileText className="w-7 h-7 text-blue-600 shrink-0" /> Historial de Cotizaciones
+                        {dbInfo && (
+                            <span className={`px-3 py-1 rounded-xl text-xs font-black border flex items-center gap-1.5 shadow-xs ${
+                                dbInfo.isSQLServer 
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' 
+                                    : 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400'
+                            }`}>
+                                <Database className="w-3.5 h-3.5" />
+                                {dbInfo.shortName} ({dbInfo.dbName})
+                            </span>
+                        )}
+                    </h1>
+                    <p className="text-zinc-500 dark:text-zinc-400 font-medium text-xs md:text-sm mt-0.5">Consulta y administra todas las cotizaciones emitidas</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setIsPrintModalOpen(true)}
-                        className="px-5 h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl flex items-center gap-2 shadow-sm text-sm font-bold transition-all cursor-pointer active:scale-95"
+                <div className="flex items-center gap-2.5 shrink-0">
+                    <button
+                        onClick={handleExportZeus}
+                        className="px-4 h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-md font-bold transition-all flex items-center gap-2 text-xs cursor-pointer active:scale-95"
+                        title="Exportar cotizaciones seleccionadas a Zeus ERP"
                     >
-                        <Printer className="w-5 h-5" />
-                        Imprimir Reporte
-                    </motion.button>
-                    <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => router.push('/dashboard/quotations/new')}
-                        className="px-5 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-2 shadow-md shadow-blue-500/20 text-sm font-bold transition-all cursor-pointer active:scale-95 shrink-0"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Nueva Cotización
-                    </motion.button>
+                        <Download className="w-4 h-4" /> Exportar Zeus ERP
+                    </button>
+
+                    <Link href="/dashboard/quotations/new">
+                        <button className="px-4 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md font-bold transition-all flex items-center gap-2 text-xs cursor-pointer active:scale-95">
+                            Nueva Cotización <ArrowRight className="w-4 h-4" />
+                        </button>
+                    </Link>
                 </div>
             </header>
+
             {/* Filtros Avanzados */}
-            <div className="bg-white dark:bg-zinc-900/50 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 mb-8 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                    <Filter className="w-5 h-5 text-blue-600" />
-                    <h2 className="text-sm font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-widest">Filtros de Búsqueda</h2>
+            <div className="bg-white dark:bg-zinc-900/50 p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <h2 className="text-xs font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-widest">Filtros de Búsqueda</h2>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {/* Referencia */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Referencia / ID</label>
                         <input
                             type="text"
-                            placeholder="Ej. #12 o COT-001..."
-                            className="h-11 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-100 dark:border-zinc-700/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            placeholder="Ej. 5 o 01-10..."
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
                             value={filterReferencia}
                             onChange={(e) => setFilterReferencia(e.target.value)}
                         />
                     </div>
+
+                    {/* Reserva / Localizador */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Reserva / Localizador</label>
+                        <input
+                            type="text"
+                            placeholder="Ej. ABC123..."
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            value={filterReserva}
+                            onChange={(e) => setFilterReserva(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Pasajero */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Pasajero</label>
+                        <input
+                            type="text"
+                            placeholder="Nombre del pasajero..."
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            value={filterPasajero}
+                            onChange={(e) => setFilterPasajero(e.target.value)}
+                        />
+                    </div>
                     
                     {/* Cliente */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Cliente</label>
                         <input
                             type="text"
                             placeholder="Nombre del cliente..."
-                            className="h-11 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-100 dark:border-zinc-700/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
                             value={filterCliente}
                             onChange={(e) => setFilterCliente(e.target.value)}
                         />
                     </div>
 
                     {/* Elaborado por */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Elaborado por</label>
                         <input
                             type="text"
-                            placeholder="Nombre del vendedor..."
-                            className="h-11 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-100 dark:border-zinc-700/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            placeholder="Nombre vendedor..."
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
                             value={filterElaboradoPor}
                             onChange={(e) => setFilterElaboradoPor(e.target.value)}
                         />
                     </div>
 
                     {/* Estado */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Estado</label>
                         <select
-                            className="h-11 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-100 dark:border-zinc-700/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-semibold"
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-2.5 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-semibold"
                             value={filterEstado}
                             onChange={(e) => setFilterEstado(e.target.value)}
                         >
@@ -307,50 +573,50 @@ export default function QuotationsListPage() {
                     </div>
 
                     {/* Fecha Desde */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Fecha Desde</label>
                         <input
                             type="date"
-                            className="h-11 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-100 dark:border-zinc-700/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
                             value={filterFechaDesde}
                             onChange={(e) => setFilterFechaDesde(e.target.value)}
                         />
                     </div>
 
                     {/* Fecha Hasta */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Fecha Hasta</label>
                         <input
                             type="date"
-                            className="h-11 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-100 dark:border-zinc-700/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
                             value={filterFechaHasta}
                             onChange={(e) => setFilterFechaHasta(e.target.value)}
                         />
                     </div>
 
                     {/* Monto Total */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest pl-1">Monto Total</label>
                         <input
                             type="number"
                             placeholder="Monto exacto..."
-                            className="h-11 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-100 dark:border-zinc-700/50 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
+                            className="h-9 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 border border-zinc-200 dark:border-zinc-700/50 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-zinc-700 dark:text-zinc-200 font-medium"
                             value={filterMontoTotal}
                             onChange={(e) => setFilterMontoTotal(e.target.value)}
                         />
                     </div>
 
                     {/* Acciones de Filtro */}
-                    <div className="flex items-end gap-2 h-11 mt-auto">
+                    <div className="flex items-end gap-2 h-9 mt-auto col-span-2 sm:col-span-1 lg:col-span-1">
                         <button
                             onClick={handleApplyFilters}
-                            className="flex-1 h-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm shadow-md shadow-blue-500/10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                            className="flex-1 h-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/10 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                         >
-                            <Search className="w-4 h-4" /> Buscar
+                            <Search className="w-3.5 h-3.5" /> Buscar
                         </button>
                         <button
                             onClick={handleClearFilters}
-                            className="h-full px-4 border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-850 rounded-xl font-black text-xs uppercase tracking-wider transition-all"
+                            className="h-full px-3 border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all"
                             title="Limpiar filtros"
                         >
                             Limpiar
@@ -359,308 +625,454 @@ export default function QuotationsListPage() {
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-white dark:bg-zinc-900/50 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
-                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Referencia</th>
-                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Cliente</th>
-                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Elaborado por</th>
-                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Fechas</th>
-                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Total</th>
-                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Estado</th>
-                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        {loading ? (
-                            <tr><td colSpan={7} className="p-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600 mx-auto"></div></td></tr>
-                        ) : quotations.length === 0 ? (
-                            <tr><td colSpan={7} className="p-20 text-center text-zinc-500 font-medium">No se encontraron cotizaciones.</td></tr>
-                        ) : (
-                            quotations.map((q) => {
-                                const mainProd = q.products.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
-                                const firstProd = mainProd;
-                                return (
-                                    <tr key={q.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-blue-600">#{q.id}</div>
-                                            <div className="text-[10px] text-zinc-400 mt-0.5">{format(new Date(q.date), 'dd MMM, yyyy')}</div>
+            {/* Contenedor de Tabla con Barra de Herramientas de Exportación */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm min-h-[450px]">
+                {/* Barra Superior de Herramientas Excel */}
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl">
+                    <div className="flex items-center gap-3 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <span>Total cotizaciones: <strong className="text-blue-600 dark:text-blue-400 font-black text-sm">{filteredQs.length}</strong></span>
+                        {selectedIds.length > 0 && (
+                            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-[11px] font-bold">
+                                {selectedIds.length} seleccionada(s)
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleCopyToClipboard}
+                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
+                            title="Copiar cotizaciones al portapapeles para pegar en Excel (Ctrl+V)"
+                        >
+                            <Copy className="w-3.5 h-3.5" /> Copiar a Excel
+                        </button>
+
+                        <button
+                            onClick={handleDownloadExcel}
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
+                            title="Descargar archivo Excel (.xlsx)"
+                        >
+                            <FileSpreadsheet className="w-3.5 h-3.5" /> Excel (.xlsx)
+                        </button>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center h-[400px]">
+                        <Loader2 className="animate-spin w-10 h-10 text-blue-600" />
+                    </div>
+                ) : filteredQs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-[400px] text-zinc-400">
+                        <FileText className="w-16 h-16 mb-4 opacity-20" />
+                        <h3 className="text-xl font-bold text-zinc-600 dark:text-zinc-300 mb-1">No hay cotizaciones</h3>
+                        <p className="text-xs">Aún no se ha emitido ninguna o no coincide con la búsqueda.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto min-h-[420px] pb-36">
+                        <table className="w-full text-left border-collapse text-xs md:text-sm">
+                            <thead className="bg-zinc-50/70 dark:bg-zinc-800/40">
+                                <tr>
+                                    <th className="px-4 py-3.5 w-10 border-b border-zinc-200 dark:border-zinc-800">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            checked={selectedIds.length === filteredQs.length && filteredQs.length > 0}
+                                            onChange={handleSelectAll}
+                                        />
+                                    </th>
+                                    <th 
+                                        onClick={handleToggleSort} 
+                                        className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:text-blue-600 transition-colors select-none whitespace-nowrap"
+                                        title="Hacer clic para alternar orden por Referencia / ID"
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            <span>Referencia / ID</span>
+                                            {sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />}
+                                        </div>
+                                    </th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Reserva / Localizador</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Fecha</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Cliente</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Elaborado por</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Monto Total</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Estado</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right whitespace-nowrap">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                {filteredQs.map((q, qIndex) => (
+                                    <tr key={q.id} className={`group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all ${selectedIds.includes(q.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
+                                        <td className="px-4 py-3.5">
+                                            <input
+                                                type="checkbox"
+                                                className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                checked={selectedIds.includes(q.id)}
+                                                onChange={() => handleSelectOne(q.id)}
+                                            />
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-zinc-900 dark:text-white">{q.client?.name}</div>
-                                            <div className="text-[10px] text-zinc-500 font-medium">Pax: {(firstProd?.passengers && Array.isArray(firstProd.passengers) && firstProd.passengers.length > 0) ? firstProd.passengers[0].name : 'Mismo titular'}</div>
-                                            <div className="text-xs text-zinc-400 mt-1">{firstProd?.prestadora?.name || 'Varios/Ninguno'}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-zinc-700 dark:text-zinc-300 text-xs">
-                                                {q.user?.name || <span className="text-zinc-400 italic text-xs font-normal">N/A</span>}
+                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                            <div className="font-bold text-zinc-900 dark:text-white text-xs md:text-sm">
+                                                {q.internalNumber ? (q.internalNumber.startsWith('#') ? q.internalNumber : '#' + q.internalNumber) : '#' + q.id}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                                                {firstProd?.checkInDate ? format(new Date(firstProd.checkInDate), 'dd/MM/yy') : '-'} - {firstProd?.checkOutDate ? format(new Date(firstProd.checkOutDate), 'dd/MM/yy') : '-'}
+                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                            <div className="font-semibold text-zinc-800 dark:text-zinc-200 text-xs md:text-sm">
+                                                {q.reservationCode || '-'}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-black text-zinc-900 dark:text-white">
-                                                ${q.totalAmount.toLocaleString()} <span className="text-[10px] text-zinc-500 uppercase">{q.currency}</span>
+                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                            <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300 text-xs">
+                                                <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                                                <span>{format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy')}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1 items-start">
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedQuotationForState(q)
-                                                        setNewState(q.state || 'NUEVO')
-                                                        setStateDescription(q.stateDescription || '')
-                                                    }}
-                                                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase cursor-pointer hover:opacity-85 transition-all text-left flex items-center gap-1 border border-zinc-200 dark:border-zinc-800 shadow-sm ${
-                                                        (q.state || 'NUEVO') === 'ENVIADO' 
-                                                        ? "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-950/30" 
-                                                        : "bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-950/30"
-                                                    }`}
-                                                    title="Haga clic para cambiar el estado"
-                                                >
-                                                    {q.state || 'NUEVO'}
-                                                </button>
-                                                
-                                                {/* Mostrar la descripción si existe */}
-                                                {q.stateDescription && (
-                                                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium italic max-w-[200px] truncate" title={q.stateDescription}>
-                                                        {q.stateDescription}
-                                                    </span>
-                                                )}
-                                                
-                                                {/* Mostrar la fecha y hora si existe */}
-                                                {q.stateUpdatedAt && (
-                                                    <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider">
-                                                        {format(new Date(q.stateUpdatedAt), 'dd/MM/yy HH:mm')}
-                                                    </span>
-                                                )}
+                                        <td className="px-4 py-3.5">
+                                            <div className="font-bold text-zinc-900 dark:text-white text-xs md:text-sm">
+                                                {q.clientName || 'Cliente'}
+                                            </div>
+                                            <div className="text-[11px] text-zinc-400">
+                                                Pax: {q.passengerName || 'Mismo titular'}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 relative">
-                                                <button
-                                                    onClick={() => handleExportXml(q)}
-                                                    className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-all"
-                                                    title="Descargar XML (Integración)"
-                                                >
-                                                    <FileCode className="w-5 h-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        if (quotationFormats.length === 0) {
-                                                            window.open(`/dashboard/quotations/print?idIni=${q.id}&idFin=${q.id}`, '_blank')
-                                                        } else {
-                                                            setOpenFormatMenuId(openFormatMenuId === q.id ? null : q.id)
-                                                        }
-                                                    }}
-                                                    className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all relative"
-                                                    title="Imprimir Cotización"
-                                                >
-                                                    <Printer className="w-5 h-5" />
-                                                </button>
-                                                {openFormatMenuId === q.id && quotationFormats.length > 0 && (
-                                                    <div className="absolute right-0 mt-1 w-52 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-xl z-20 overflow-hidden"
-                                                        style={{ top: '100%' }}>
-                                                        <div className="p-2 space-y-0.5">
-                                                            <button
-                                                                onClick={() => {
-                                                                    window.open(`/dashboard/quotations/print?idIni=${q.id}&idFin=${q.id}`, '_blank')
-                                                                    setOpenFormatMenuId(null)
-                                                                }}
-                                                                className="w-full text-left px-3 py-2 rounded-xl text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-all"
-                                                            >
-                                                                Formato Predeterminado
-                                                            </button>
-                                                            {quotationFormats.map((fmt: any) => (
-                                                                <button
-                                                                    key={fmt.id}
-                                                                    onClick={() => {
-                                                                        window.open(`/dashboard/quotations/print?idIni=${q.id}&idFin=${q.id}&formatId=${fmt.id}`, '_blank')
-                                                                        setOpenFormatMenuId(null)
-                                                                    }}
-                                                                    className="w-full text-left px-3 py-2 rounded-xl text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 transition-all"
+                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                            <div className="font-medium text-zinc-700 dark:text-zinc-300 text-xs">
+                                                {q.userName || 'Sistema'}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                            <div className="font-black text-emerald-600 dark:text-emerald-400 text-xs md:text-sm tabular-nums">
+                                                ${parseFloat(q.totalAmount).toLocaleString()} <span className="text-[10px] text-zinc-400 font-normal">{q.currency || 'COP'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                                q.state === 'ENVIADO' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                q.state === 'APROBADO' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                                                q.state === 'RECHAZADO' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                q.state === 'CANCELADO' ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400' :
+                                                'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                            }`}>
+                                                {q.state || 'NUEVO'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3.5 text-right whitespace-nowrap relative">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveMenuId(activeMenuId === q.id ? null : q.id);
+                                                }}
+                                                className="p-1.5 px-3 text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 rounded-xl transition-all font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+                                                title="Opciones de cotización"
+                                            >
+                                                <MoreVertical className="w-4 h-4" />
+                                                <span>Acciones</span>
+                                            </button>
+
+                                            <AnimatePresence>
+                                                {activeMenuId === q.id && (
+                                                    <>
+                                                        {/* Backdrop invisible para cerrar el menú al hacer clic fuera */}
+                                                        <div
+                                                            className="fixed inset-0 z-20 cursor-default"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setActiveMenuId(null);
+                                                            }}
+                                                        />
+                                                        
+                                                        {/* Menú Flotante de Acciones */}
+                                                        {(() => {
+                                                            const openUpwards = filteredQs.length > 3 && qIndex >= filteredQs.length - 2 && qIndex > 1;
+                                                            return (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, scale: 0.95, y: openUpwards ? 4 : -4 }}
+                                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                                    exit={{ opacity: 0, scale: 0.95, y: openUpwards ? 4 : -4 }}
+                                                                    transition={{ duration: 0.12 }}
+                                                                    className={`absolute right-4 ${openUpwards ? 'bottom-12' : 'top-12'} z-30 w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-1.5 space-y-0.5 text-left`}
                                                                 >
-                                                                    {fmt.name}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
+                                                                    {/* 1. Duplicar */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                    handleDuplicate(q.id);
+                                                                }}
+                                                                disabled={duplicatingId === q.id}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all flex items-center gap-2.5 disabled:opacity-50 cursor-pointer"
+                                                            >
+                                                                {duplicatingId === q.id ? (
+                                                                    <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                                                                ) : (
+                                                                    <CopyPlus className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                                                )}
+                                                                <span>Duplicar Cotización</span>
+                                                            </button>
+
+                                                            {/* 2. Facturar */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                    setInvoiceQuotationId(q.id);
+                                                                    setIsInvoiceModalOpen(true);
+                                                                }}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-xl transition-all flex items-center gap-2.5 cursor-pointer"
+                                                            >
+                                                                <Receipt className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                                                <span>Facturar Cotización</span>
+                                                            </button>
+
+                                                            {/* 3. Imprimir */}
+                                                            <Link
+                                                                href={`/dashboard/quotations/print?idIni=${q.id}&idFin=${q.id}`}
+                                                                target="_blank"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                }}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all flex items-center gap-2.5 cursor-pointer"
+                                                            >
+                                                                <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                                                                <span>Imprimir Cotización</span>
+                                                            </Link>
+
+                                                            {/* 4. Editar */}
+                                                            <Link
+                                                                href={`/dashboard/quotations/${q.id}/edit`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                }}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-xl transition-all flex items-center gap-2.5 cursor-pointer"
+                                                            >
+                                                                <Edit className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                                                <span>Editar Cotización</span>
+                                                            </Link>
+
+                                                            {/* 5. Cambiar Estado */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                    setSelectedQuotationForState(q);
+                                                                    setNewState(q.state || 'NUEVO');
+                                                                    setStateDescription('');
+                                                                }}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-xl transition-all flex items-center gap-2.5 cursor-pointer"
+                                                            >
+                                                                <RefreshCw className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                                                                <span>Cambiar Estado</span>
+                                                            </button>
+
+                                                            {/* 6. Exportar XML */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                    handleExportSingleXml(q);
+                                                                }}
+                                                                disabled={exportingXmlId === q.id}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-xl transition-all flex items-center gap-2.5 disabled:opacity-50 cursor-pointer"
+                                                            >
+                                                                {exportingXmlId === q.id ? (
+                                                                    <Loader2 className="w-4 h-4 animate-spin text-cyan-600" />
+                                                                ) : (
+                                                                    <FileCode className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                                                                )}
+                                                                <span>Exportar XML</span>
+                                                            </button>
+
+                                                            {/* 7. Ver Detalle */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                    setDetailQuotation(q);
+                                                                }}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-500/10 rounded-xl transition-all flex items-center gap-2.5 cursor-pointer"
+                                                            >
+                                                                <Eye className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
+                                                                <span>Ver Detalle</span>
+                                                            </button>
+
+                                                            <div className="h-px bg-zinc-100 dark:bg-zinc-800/80 my-1" />
+
+                                                            {/* 8. Eliminar */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                    handleDelete(q.id);
+                                                                }}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2.5 cursor-pointer"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                                                                <span>Eliminar Cotización</span>
+                                                            </button>
+                                                         </motion.div>
+                                                             );
+                                                         })()}
+                                                     </>
                                                 )}
-                                                <button
-                                                    onClick={() => router.push(`/dashboard/quotations/${q.id}/edit`)}
-                                                    className="p-2 text-zinc-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all"
-                                                    title="Editar Cotización"
-                                                >
-                                                    <Edit2 className="w-5 h-5" />
-                                                </button>
-                                                <button className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all">
-                                                    <Trash2 className="w-5 h-5" />
-                                                </button>
-                                            </div>
+                                            </AnimatePresence>
                                         </td>
                                     </tr>
-                                )
-                            })
-                        )}
-                    </tbody>
-                </table>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
-            {/* Print Range Modal */}
-            <AnimatePresence>
-                {isPrintModalOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-md shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden"
-                        >
-                            <div className="p-8">
-                                <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-2">Imprimir Reporte</h3>
-                                <p className="text-zinc-500 text-sm mb-6">Selecciona el rango de cotizaciones para generar el reporte.</p>
-                                
-                                <div className="space-y-4 mb-8">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Cotización Inicial</label>
-                                        <input
-                                            type="number"
-                                            value={idIni}
-                                            onChange={(e) => setIdIni(e.target.value)}
-                                            className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-2xl px-4 border-none shadow-inner text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
-                                            placeholder="Ej. 1"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Cotización Final</label>
-                                        <input
-                                            type="number"
-                                            value={idFin}
-                                            onChange={(e) => setIdFin(e.target.value)}
-                                            className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-2xl px-4 border-none shadow-inner text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none"
-                                            placeholder="Ej. 100"
-                                        />
-                                    </div>
-                                </div>
+            {/* Modal Facturación */}
+            <QuotationInvoiceModal
+                isOpen={isInvoiceModalOpen}
+                onClose={() => {
+                    setIsInvoiceModalOpen(false);
+                    setInvoiceQuotationId(null);
+                }}
+                quotationId={invoiceQuotationId}
+            />
 
-                                {/* Selector de Formato de Cotización */}
-                                {quotationFormats.length > 0 && (
-                                    <div className="space-y-2 mb-6">
-                                        <label className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Formato de Cotización</label>
-                                        <select
-                                            value={selectedFormatId ?? ''}
-                                            onChange={e => setSelectedFormatId(e.target.value ? parseInt(e.target.value) : null)}
-                                            className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-2xl px-4 border-none shadow-inner text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none dark:text-white"
-                                        >
-                                            <option value="">Formato Predeterminado</option>
-                                            {quotationFormats.map((fmt: any) => (
-                                                <option key={fmt.id} value={fmt.id}>{fmt.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                <div className="flex gap-4">
-                                    <button
-                                        onClick={() => setIsPrintModalOpen(false)}
-                                        className="flex-1 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold text-zinc-600 hover:bg-zinc-200 transition-all"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (idIni && idFin) {
-                                                const fmtParam = selectedFormatId ? `&formatId=${selectedFormatId}` : ''
-                                                window.open(`/dashboard/quotations/print?idIni=${idIni}&idFin=${idFin}${fmtParam}`, '_blank');
-                                                setIsPrintModalOpen(false);
-                                            } else {
-                                                alert("Ingresa ambos IDs para continuar.");
-                                            }
-                                        }}
-                                        className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <Printer className="w-4 h-4" />
-                                        Generar
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Modal para Cambiar Estado */}
+            {/* Modal Cambiar Estado */}
             <AnimatePresence>
                 {selectedQuotationForState && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm"
-                    >
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                         <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-md shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-md w-full shadow-2xl border border-zinc-200 dark:border-zinc-800"
                         >
-                            <div className="p-8">
-                                <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-2">Cambiar Estado</h3>
-                                <p className="text-zinc-500 text-sm mb-6">Actualiza el estado de la cotización #{selectedQuotationForState.id}.</p>
-                                
-                                <div className="space-y-4 mb-8">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Nuevo Estado</label>
-                                        <select
-                                            value={newState}
-                                            onChange={(e) => setNewState(e.target.value)}
-                                            className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-2xl px-4 border-none shadow-inner text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none dark:text-white"
-                                        >
-                                            {states.map((s: any) => (
-                                                <option key={s.id || s.code} value={s.code}>{s.name.toUpperCase()}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-black text-zinc-400 uppercase tracking-widest pl-1">Descripción del Cambio</label>
-                                        <textarea
-                                            value={stateDescription}
-                                            onChange={(e) => setStateDescription(e.target.value)}
-                                            className="w-full h-24 bg-zinc-50 dark:bg-zinc-800 rounded-2xl p-4 border-none shadow-inner text-sm font-semibold focus:ring-2 focus:ring-blue-500 transition-all outline-none resize-none dark:text-white"
-                                            placeholder="Ej. Cambio de tarifas solicitadas por el cliente..."
-                                        />
-                                    </div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                    <RefreshCw className="w-5 h-5 text-purple-600" />
+                                    Cambiar Estado (#{selectedQuotationForState.id})
+                                </h3>
+                                <button
+                                    onClick={() => setSelectedQuotationForState(null)}
+                                    className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Estado</label>
+                                    <select
+                                        value={newState}
+                                        onChange={(e) => setNewState(e.target.value)}
+                                        className="w-full h-11 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-purple-500"
+                                    >
+                                        {states.map((s: any) => (
+                                            <option key={s.id || s.code} value={s.code}>{s.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
 
-                                <div className="flex gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Observaciones / Motivo</label>
+                                    <textarea
+                                        rows={3}
+                                        value={stateDescription}
+                                        onChange={(e) => setStateDescription(e.target.value)}
+                                        placeholder="Motivo del cambio de estado..."
+                                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-sm font-medium text-zinc-800 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-purple-500"
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2 pt-2">
                                     <button
                                         onClick={() => setSelectedQuotationForState(null)}
-                                        disabled={savingState}
-                                        className="flex-1 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 transition-all disabled:opacity-50"
+                                        className="px-4 h-10 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         onClick={handleSaveState}
                                         disabled={savingState}
-                                        className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                        className="px-5 h-10 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-500/20 flex items-center gap-1.5 disabled:opacity-50"
                                     >
-                                        {savingState ? 'Guardando...' : 'Guardar'}
+                                        {savingState ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                        Guardar Estado
                                     </button>
                                 </div>
                             </div>
                         </motion.div>
-                    </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal Ver Detalle Rápido */}
+            <AnimatePresence>
+                {detailQuotation && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-zinc-200 dark:border-zinc-800"
+                        >
+                            <div className="flex items-center justify-between mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                                <div>
+                                    <h3 className="text-xl font-black text-zinc-900 dark:text-white flex items-center gap-2">
+                                        Cotización #{detailQuotation.id}
+                                    </h3>
+                                    <p className="text-xs text-zinc-400 font-medium">Fecha: {format(new Date(detailQuotation.createdAt || new Date()), 'dd/MM/yyyy HH:mm')}</p>
+                                </div>
+                                <button
+                                    onClick={() => setDetailQuotation(null)}
+                                    className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 text-xs mb-6">
+                                <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3.5 rounded-2xl">
+                                    <span className="font-bold text-zinc-400 uppercase tracking-widest block text-[10px] mb-1">Cliente</span>
+                                    <span className="font-bold text-zinc-800 dark:text-zinc-200 text-sm block">{detailQuotation.clientName}</span>
+                                    <span className="text-zinc-500">Pasajero: {detailQuotation.passengerName || 'Mismo titular'}</span>
+                                </div>
+
+                                <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3.5 rounded-2xl">
+                                    <span className="font-bold text-zinc-400 uppercase tracking-widest block text-[10px] mb-1">Elaborado Por</span>
+                                    <span className="font-bold text-zinc-800 dark:text-zinc-200 text-sm block">{detailQuotation.userName}</span>
+                                    <span className="text-zinc-500">Reserva: {detailQuotation.reservationCode || 'N/A'}</span>
+                                </div>
+
+                                <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3.5 rounded-2xl">
+                                    <span className="font-bold text-zinc-400 uppercase tracking-widest block text-[10px] mb-1">Proveedor</span>
+                                    <span className="font-bold text-zinc-800 dark:text-zinc-200 text-sm block">{detailQuotation.providerName || 'Varios/Ninguno'}</span>
+                                </div>
+
+                                <div className="bg-emerald-50 dark:bg-emerald-950/30 p-3.5 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block text-[10px] mb-1">Monto Total</span>
+                                    <span className="font-black text-emerald-700 dark:text-emerald-300 text-lg block tabular-nums">
+                                        ${parseFloat(detailQuotation.totalAmount).toLocaleString()} {detailQuotation.currency}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                                <Link
+                                    href={`/dashboard/quotations/print?idIni=${detailQuotation.id}&idFin=${detailQuotation.id}`}
+                                    target="_blank"
+                                    className="px-4 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5"
+                                >
+                                    <Printer className="w-4 h-4" /> Imprimir
+                                </Link>
+                                <button
+                                    onClick={() => setDetailQuotation(null)}
+                                    className="px-4 h-10 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
         </div>

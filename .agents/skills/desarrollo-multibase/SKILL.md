@@ -149,3 +149,17 @@ CLIENTE - INSTALADOR POSTGRESQL
 CLIENTE - INSTALADOR SQL SERVER
  └── SQL Server
 ```
+
+---
+
+## 11. Patrones Obligatorios de Resiliencia T-SQL y Paridad Multibase
+
+1. **Typed Parameter Binding (`src/lib/sqlserver.ts`)**:
+   - `executeSQLServerProcedure` inspecciona dinámicamente el tipo de cada parámetro.
+   - Parámetros numéricos enteros usan `mssql.Int`, decimales/flotantes usan `mssql.Float`, booleanos usan `mssql.Bit`, y nulos usan `null`.
+2. **Validación Segura de Llaves Foráneas (FK) en SPs**:
+   - Antes de realizar inserciones o actualizaciones en procedimientos almacenados (`spCotizacionCrear`, `spFacturacionesCrear`, etc.), se debe verificar si los IDs relacionados existen en la tabla maestra. Si no existen en el catálogo local, el SP asigna automáticamente `NULL` para evitar violaciones de clave foránea.
+3. **Reseteo Automático de Consecutivos (IDs)**:
+   - Al eliminar registros en SPs (`sp...Eliminar`), se valida si la tabla quedó vacía (`IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])`). De ser así, se ejecuta `DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);` en SQL Server y se reinicia la secuencia en PostgreSQL para garantizar que el siguiente registro inicie en **ID #1**.
+4. **Resiliencia de DDL y Defectos Numéricos**:
+   - Todos los campos numéricos en DDL T-SQL (`01_Tables.sql`) deben declarar `FLOAT NULL CONSTRAINT DF_... DEFAULT 0` e `INT NULL` en llaves foráneas optativas.

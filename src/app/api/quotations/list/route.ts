@@ -20,23 +20,56 @@ export async function GET(request: NextRequest) {
             console.log('[QUOTATIONS_LIST] Modo SQL Server activo. Consultando spCotizacionListar en SQL Server...');
             const pool = await getSQLServerConnection();
             const req = pool.request();
-            if (referencia) req.input('p_internalNumber', referencia);
-            if (estado) req.input('p_state', estado);
+            if (referencia) req.input('p_referencia', referencia);
+            if (fechaDesde) req.input('p_fecha_desde', fechaDesde);
+            if (fechaHasta) req.input('p_fecha_hasta', fechaHasta);
+            if (cliente) req.input('p_cliente', cliente);
+            if (elaboradoPor) req.input('p_elaborado_por', elaboradoPor);
+            if (montoTotal !== null) req.input('p_monto_total', montoTotal);
+            if (estado) req.input('p_estado', estado);
 
             const result = await req.execute('spCotizacionListar');
             await pool.close();
 
+            const parseJson = (val: any) => {
+                if (!val) return null;
+                if (typeof val === 'object') return val;
+                try { return JSON.parse(val); } catch (e) { return null; }
+            };
+
             const rows = result.recordset || [];
-            const quotations = rows.map(r => ({
-                id: r.id,
-                internalNumber: r.internalNumber || `#${r.id}`,
-                date: r.date,
-                clientName: r.clientName || 'Cliente',
-                userName: r.userName || 'Usuario',
-                totalAmount: r.totalAmount || 0,
-                currency: r.currency || 'COP',
-                state: r.state || 'NUEVO'
-            }));
+            const quotations = rows.map(r => {
+                const clientObj = parseJson(r.clientJson) || { id: r.clientId, name: r.clientName || 'Cliente', document: r.clientDocument || '' };
+                const userObj = parseJson(r.userJson) || (r.userId ? { id: r.userId, name: r.userName || 'Usuario' } : null);
+                const rawProducts = parseJson(r.productsJson) || [];
+                const products = rawProducts.map((p: any) => ({
+                    ...p,
+                    product: parseJson(p.productJson),
+                    provider: parseJson(p.providerJson),
+                    prestadora: parseJson(p.prestadoraJson),
+                    passengers: parseJson(p.passengersJson) || [],
+                    variables: parseJson(p.variablesJson) || [],
+                    appliedTaxes: parseJson(p.appliedTaxesJson) || []
+                }));
+
+                return {
+                    id: r.id,
+                    internalNumber: r.internalNumber || `${r.id}`,
+                    date: r.date,
+                    clientId: r.clientId,
+                    client: clientObj,
+                    userId: r.userId,
+                    user: userObj,
+                    branchName: r.branchName,
+                    totalAmount: r.totalAmount || 0,
+                    currency: r.currency || 'COP',
+                    exchangeRate: r.exchangeRate || 1,
+                    state: r.state || 'NUEVO',
+                    stateDescription: r.stateDescription || '',
+                    stateUpdatedAt: r.stateUpdatedAt || null,
+                    products
+                };
+            });
 
             return NextResponse.json(quotations);
         }

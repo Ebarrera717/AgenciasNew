@@ -1,10 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
     try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const safeQuery = async (q: string) => {
+                    try {
+                        const r = await pool!.request().query(q);
+                        return r.recordset || [];
+                    } catch (e: any) {
+                        console.warn(`[invoices/base-data] SQL Server query failed: ${q}`, e.message);
+                        return [];
+                    }
+                };
+
+                const [
+                    providers, prestadoras, branches, implants, products,
+                    taxes, sellers, ticketPrinters, variables, currencies,
+                    creditCards, payments, ticketTypes, parameters, cities
+                ] = await Promise.all([
+                    safeQuery('SELECT * FROM dbo.[Provider] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Prestadora] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Branch] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT [id], [code], [name], [branchId] FROM dbo.[Implant] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Product] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[ChargeAndTax] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Seller] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[TicketPrinter] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[MasterVariable] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Currency] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[CreditCard] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Payment] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[TicketType] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[SystemParameter]'),
+                    safeQuery('SELECT * FROM dbo.[Cities]')
+                ]);
+                await pool.close();
+
+                return NextResponse.json({
+                    clients: [],
+                    providers,
+                    prestadoras,
+                    branches,
+                    implants,
+                    products,
+                    taxes,
+                    sellers,
+                    ticketPrinters,
+                    variables,
+                    currentUser: null,
+                    combos: [],
+                    currencies,
+                    creditCards,
+                    payments,
+                    ticketTypes,
+                    parameters,
+                    cities
+                });
+            } catch (err: any) {
+                if (pool) await pool.close();
+                console.error('Error fetching invoices base-data in SQL Server mode:', err);
+                return NextResponse.json({ message: 'Error fetching base data', detail: err.message }, { status: 500 });
+            }
+        }
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : undefined
 

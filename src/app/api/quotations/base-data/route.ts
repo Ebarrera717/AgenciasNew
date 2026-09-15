@@ -10,49 +10,62 @@ export async function GET(req: NextRequest) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                const safeQuery = async (q: string) => {
+                    try {
+                        const r = await pool!.request().query(q);
+                        return r.recordset || [];
+                    } catch (e: any) {
+                        console.warn(`[base-data] SQL Server query failed: ${q}`, e.message);
+                        return [];
+                    }
+                };
+
                 const [
-                    providersRes, prestadorasRes, branchesRes, implantsRes, productsRes,
-                    taxesRes, sellersRes, printersRes, variablesRes, currenciesRes,
-                    cardsRes, paymentsRes, statesRes, paramsRes, citiesRes
+                    providers, prestadoras, branches, implants, products,
+                    taxes, sellers, ticketPrinters, variables, currencies,
+                    creditCards, payments, quotationStates, parameters, cities
                 ] = await Promise.all([
-                    pool.request().query('SELECT * FROM dbo.[Provider] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[Prestadora] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[Branch] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT [id], [code], [name], [branchId] FROM dbo.[Implant] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[Product] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[ChargeAndTax] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[Seller] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[TicketPrinter] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[MasterVariable] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[Currency] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[CreditCard] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[Payment] WHERE [isActive] = 1 OR [isActive] IS NULL'),
-                    pool.request().query('SELECT * FROM dbo.[QuotationState] ORDER BY [id] ASC'),
-                    pool.request().query('SELECT * FROM dbo.[SystemParameter]'),
-                    pool.request().query('SELECT * FROM dbo.[Cities]')
+                    safeQuery('SELECT * FROM dbo.[Provider] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Prestadora] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Branch] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT [id], [code], [name], [branchId] FROM dbo.[Implant] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Product] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[ChargeAndTax] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Seller] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[TicketPrinter] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[MasterVariable] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Currency] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[CreditCard] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[Payment] WHERE [isActive] = 1 OR [isActive] IS NULL'),
+                    safeQuery('SELECT * FROM dbo.[QuotationState] ORDER BY [id] ASC'),
+                    safeQuery('SELECT * FROM dbo.[SystemParameter]'),
+                    safeQuery('SELECT * FROM dbo.[Cities]')
                 ]);
                 await pool.close();
 
+                const showTotalsParam = parameters.find((p: any) => p.code === 'MOSTRAR_TOTALIZACION_COTIZACION');
+                const showTotals = showTotalsParam ? showTotalsParam.value?.trim().toLowerCase() === 'true' : true;
+
                 return NextResponse.json({
                     clients: [],
-                    providers: providersRes.recordset || [],
-                    prestadoras: prestadorasRes.recordset || [],
-                    branches: branchesRes.recordset || [],
-                    implants: implantsRes.recordset || [],
-                    products: productsRes.recordset || [],
-                    taxes: taxesRes.recordset || [],
-                    sellers: sellersRes.recordset || [],
-                    ticketPrinters: printersRes.recordset || [],
-                    variables: variablesRes.recordset || [],
+                    providers,
+                    prestadoras,
+                    branches,
+                    implants,
+                    products,
+                    taxes,
+                    sellers,
+                    ticketPrinters,
+                    variables,
                     currentUser: null,
                     combos: [],
-                    currencies: currenciesRes.recordset || [],
-                    creditCards: cardsRes.recordset || [],
-                    payments: paymentsRes.recordset || [],
-                    quotationStates: statesRes.recordset || [],
-                    showTotals: true,
-                    parameters: paramsRes.recordset || [],
-                    cities: citiesRes.recordset || []
+                    currencies,
+                    creditCards,
+                    payments,
+                    quotationStates,
+                    showTotals,
+                    parameters,
+                    cities
                 });
             } catch (err: any) {
                 if (pool) await pool.close();

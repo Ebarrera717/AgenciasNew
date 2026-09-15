@@ -11,7 +11,7 @@ BEGIN
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spCotizacionDuplicar(
+CREATE OR REPLACE PROCEDURE public."spCotizacionDuplicar"(
     IN p_quotation_id INT,
     IN p_acting_user_id INT,
     INOUT p_new_quotation_id INT DEFAULT 0,

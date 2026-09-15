@@ -70,7 +70,21 @@ BEGIN
                 LIMIT 1
             ), 'Proveedor Desconocido'),
             'createdAt', q.date,
-            'totalAmount', q."totalAmount",
+            'totalAmount', COALESCE(
+                NULLIF(q."totalAmount", 0),
+                (
+                    SELECT COALESCE(SUM(qpt."explicitAmount"), 0)
+                    FROM public."QuotationProductTax" qpt
+                    JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id
+                    WHERE qp."quotationId" = q.id
+                ),
+                (
+                    SELECT COALESCE(SUM(qp.price * qp.quantity), 0)
+                    FROM public."QuotationProduct" qp
+                    WHERE qp."quotationId" = q.id
+                ),
+                0
+            ),
             'currency', q.currency,
             'userName', COALESCE(u.name, 'Sistema'),
             'state', COALESCE(q.state, 'NUEVO'),

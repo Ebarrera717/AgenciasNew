@@ -1,7 +1,23 @@
 import mssql from 'mssql'
 import prisma from './prisma'
 
+import fs from 'fs'
+import path from 'path'
+
 export function isSQLServerMode(): boolean {
+    try {
+        const envPath = path.join(process.cwd(), '.env');
+        if (fs.existsSync(envPath)) {
+            const content = fs.readFileSync(envPath, 'utf8');
+            const match = content.match(/^DATABASE_PROVIDER\s*=\s*["']?([^"'\r\n]+)/m);
+            if (match && match[1]) {
+                const prov = match[1].replace(/["']/g, '').trim().toLowerCase();
+                if (prov === 'sqlserver') return true;
+                if (prov === 'postgresql') return false;
+            }
+        }
+    } catch (e) {}
+
     const provider = (process.env.DATABASE_PROVIDER || '').toLowerCase().trim();
     if (provider === 'sqlserver') return true;
     if (provider === 'postgresql') return false;
@@ -9,6 +25,7 @@ export function isSQLServerMode(): boolean {
     const dbUrl = (process.env.DATABASE_URL || '').trim();
     return dbUrl.startsWith('sqlserver://') || dbUrl.startsWith('mssql://');
 }
+
 
 export function parseSQLServerUrl(connStr: string) {
     let clean = connStr.replace(/^(sqlserver|mssql):\/\//i, '');
@@ -54,7 +71,21 @@ export function parseSQLServerUrl(connStr: string) {
  */
 export async function getSQLServerConnection() {
     let configRow: any = null;
-    const sqlUrl = process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL;
+    let sqlUrl = process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL;
+
+    try {
+        const envPath = path.join(process.cwd(), '.env');
+        if (fs.existsSync(envPath)) {
+            const content = fs.readFileSync(envPath, 'utf8');
+            const match = content.match(/^DATABASE_URL_SQLSERVER\s*=\s*["']?([^"'\r\n]+)/m) || content.match(/^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)/m);
+            if (match && match[1]) {
+                const cleanUrl = match[1].replace(/["']/g, '').trim();
+                if (cleanUrl.startsWith('sqlserver://') || cleanUrl.startsWith('mssql://')) {
+                    sqlUrl = cleanUrl;
+                }
+            }
+        }
+    } catch (e) {}
 
     if (sqlUrl && (sqlUrl.startsWith('sqlserver://') || sqlUrl.startsWith('mssql://'))) {
         console.log('[SQL_CONN] Usando connection string de SQL Server desde variables de entorno (.env)...');
@@ -156,17 +187,31 @@ export async function getSQLServerConnection() {
 export async function executeSQLServerProcedure(spName: string, params: any) {
     let pool;
     try {
-        console.log(`[SQL_SERVER_EXEC] Procedimiento: ${spName} | Parámetros:`, JSON.stringify(params));
+        const fullSpName = spName.includes('.') ? spName : `dbo.${spName}`;
+        console.log(`[SQL_SERVER_EXEC] Procedimiento: ${fullSpName} | Parámetros:`, JSON.stringify(params));
         pool = await getSQLServerConnection();
         const request = pool.request();
 
         if (params) {
             Object.keys(params).forEach(key => {
-                request.input(key, mssql.VarChar(mssql.MAX), params[key]);
+                const val = params[key];
+                if (val === null || val === undefined) {
+                    request.input(key, mssql.VarChar(mssql.MAX), null);
+                } else if (typeof val === 'number') {
+                    if (Number.isInteger(val)) {
+                        request.input(key, mssql.Int, val);
+                    } else {
+                        request.input(key, mssql.Float, val);
+                    }
+                } else if (typeof val === 'boolean') {
+                    request.input(key, mssql.Bit, val);
+                } else {
+                    request.input(key, mssql.VarChar(mssql.MAX), String(val));
+                }
             });
         }
 
-        const result = await request.execute(spName);
+        const result = await request.execute(fullSpName);
         await pool.close();
         return result.recordset || result.rowsAffected;
     } catch (err: any) {
@@ -174,3 +219,4 @@ export async function executeSQLServerProcedure(spName: string, params: any) {
         throw err;
     }
 }
+

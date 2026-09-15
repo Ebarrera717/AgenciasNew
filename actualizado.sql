@@ -12,230 +12,3834 @@ BEGIN
     FOR r IN 
         SELECT oid::regprocedure AS proc_name 
         FROM pg_proc 
-        WHERE proname ILIKE 'spCotizacionDuplicar'
+        WHERE proname ILIKE 'spSellerCrear'
     LOOP
         EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spCotizacionDuplicar(
-    IN p_quotation_id INT,
-    IN p_acting_user_id INT,
-    INOUT p_new_quotation_id INT DEFAULT 0,
+CREATE OR REPLACE PROCEDURE public.spSellerCrear(
+    p_code TEXT,
+    p_name TEXT,
+    p_email TEXT,
+    p_is_active BOOLEAN DEFAULT true,
+    p_acting_user_id INT DEFAULT 1,
+    INOUT p_seller_id INT DEFAULT 0,
     INOUT p_mensaje_resultado TEXT DEFAULT ''
 )
 LANGUAGE plpgsql
-AS $procedure$
-DECLARE
-    v_internal_number TEXT;
-    v_new_id INT;
-    v_orig_quotation RECORD;
-    v_orig_qp RECORD;
-    v_new_qp_id INT;
-    v_user_id INT := NULL;
+AS $$
 BEGIN
-    -- Validar existencia de la cotización origen
-    SELECT * INTO v_orig_quotation 
-    FROM public."Quotation" 
-    WHERE id = p_quotation_id;
+    INSERT INTO public."Seller" ("code", "name", "email", "isActive")
+    VALUES (p_code, p_name, p_email, COALESCE(p_is_active, true))
+    RETURNING id INTO p_seller_id;
 
-    IF v_orig_quotation.id IS NULL THEN
-        p_mensaje_resultado := 'ERROR: Cotización origen no encontrada (ID ' || p_quotation_id || ').';
+    p_mensaje_resultado := 'SUCCESS: Vendedor creado exitosamente.';
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;;
+
+    -- Duplicar combos asociados
+    INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
+    SELECT v_new_id, "comboId"
+    FROM public."QuotationCombo"
+    WHERE "quotationId" = p_quotation_id;
+
+    -- Duplicar servicios manuales si la tabla existe
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationManualService') THEN
+        INSERT INTO public."QuotationManualService" ("quotationId", "providerName", "serviceName", "cost", "salePrice", "utility")
+        SELECT v_new_id, "providerName", "serviceName", "cost", "salePrice", "utility"
+        FROM public."QuotationManualService"
+        WHERE "quotationId" = p_quotation_id;
+    END IF;
+
+    -- Duplicar productos y sus detalles
+    FOR v_orig_qp IN 
+        SELECT * FROM public."QuotationProduct" WHERE "quotationId" = p_quotation_id
+    LOOP
+        INSERT INTO public."QuotationProduct" (
+            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
+            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
+            "serviceType", "destination", "reservationCode", "sellerCommission",
+            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
+            "service", "servicios", "descripcion", "passenger"
+        ) VALUES (
+            v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
+            v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
+            v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
+            v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
+            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
+        ) RETURNING id INTO v_new_qp_id;
+
+        -- Duplicar Pasajeros del producto
+        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
+        SELECT v_new_qp_id, "name", "document"
+        FROM public."QuotationProductPassenger"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+        -- Duplicar Impuestos del producto
+        INSERT INTO public."QuotationProductTax" ("quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain")
+        SELECT v_new_qp_id, "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
+        FROM public."QuotationProductTax"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+        -- Duplicar Variables del producto
+        INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
+        SELECT v_new_qp_id, "masterVariableId", "value"
+        FROM public."QuotationProductVariable"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+        -- Duplicar Pagos del producto
+        INSERT INTO public."QuotationProductPayment" ("quotationProductId", "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate")
+        SELECT v_new_qp_id, "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
+        FROM public."QuotationProductPayment"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+    END LOOP;
+
+    p_new_quotation_id := v_new_id;
+    p_mensaje_resultado := 'SUCCESS: Cotización duplicada correctamente con ID ' || v_new_id;
+
+    -- Registrar en auditoría
+    CALL public."spLogRegistrar"(
+        v_user_id, 
+        'QUOTATION', 
+        'DUPLICATE', 
+        'Se duplicó la cotización #' || p_quotation_id || ' generando la cotización #' || v_new_id || ' (' || v_internal_number || ')', 
+        jsonb_build_object('sourceQuotationId', p_quotation_id, 'newQuotationId', v_new_id), 
+        v_new_id
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$procedure$;;
+
+-- Inyectado automáticamente: spSiteModuleMasterToggle.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spSiteModuleMasterToggle'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spSiteModuleMasterToggle"(
+    p_type text,
+    p_id integer,
+    p_active boolean
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF UPPER(p_type) = 'MENU' THEN
+        UPDATE public."Menu"
+        SET activo = p_active
+        WHERE id = p_id;
+    ELSIF UPPER(p_type) = 'MASTER' THEN
+        UPDATE public."Master"
+        SET inactivo = NOT p_active
+        WHERE id = p_id;
+    ELSE
+        RAISE EXCEPTION 'Tipo no válido: %. Se requiere MENU o MASTER.', p_type;
+    END IF;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnAirportListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnAirportListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnAirportListar"()
+RETURNS TABLE(id integer, code text, name text, "citiesId" integer, "cityName" text)
+LANGUAGE plpgsql AS $function$
+BEGIN
+    RETURN QUERY SELECT a.id, a.code::text, a.name::text, a."citiesId", c.name::text FROM public."Airports" a LEFT JOIN public."Cities" c ON a."citiesId" = c.id ORDER BY a.name ASC;
+END; $function$;;
+
+-- Inyectado automáticamente: fnBranchListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnBranchListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnBranchListar()
+RETURNS SETOF public."Branch"
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public."Branch" ORDER BY name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnCityListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCityListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnCityListar"()
+RETURNS TABLE(id integer, code text, name text, "countriesId" integer, statecode text, iata text, "countryName" text)
+LANGUAGE plpgsql AS $function$
+BEGIN
+    RETURN QUERY SELECT c.id, c.code::text, c.name::text, c."countriesId", c.statecode::text, c.iata::text, co.name::text FROM public."Cities" c LEFT JOIN public."Countries" co ON c."countriesId" = co.id ORDER BY c.name ASC;
+END; $function$;;
+
+-- Inyectado automáticamente: fnComboListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnComboListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnComboListar()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        jsonb_build_object(
+            'id', c.id,
+            'code', c.code,
+            'name', c.name,
+            'cupos', c."cupos",
+            'currencyId', c."currencyId",
+            'createdAt', c."createdAt",
+            'products', COALESCE((
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'id', cp.id,
+                        'productId', cp."productId",
+                        'product', jsonb_build_object('id', p.id, 'code', p.code, 'description', p.description),
+                        'quantity', cp.quantity,
+                        'price', cp.price,
+                        'cost', COALESCE(cp."cost", 0),
+                        'providerId', cp."providerId",
+                        'prestadoraId', cp."prestadoraId",
+                        'checkInDate', cp."checkInDate",
+                        'checkOutDate', cp."checkOutDate",
+                        'paxAdults', cp."paxAdults",
+                        'paxChildren', cp."paxChildren",
+                        'mainTaxId', cp."mainTaxId",
+                        'inNationality', COALESCE(cp."inNationality", 1),
+                        'appliedTaxes', (
+                            SELECT jsonb_agg(
+                                jsonb_build_object(
+                                    'id', cpt.id,
+                                    'chargeAndTaxId', cpt."chargeAndTaxId",
+                                    'amount', cpt.amount,
+                                    'isMain', cpt."isMain",
+                                    'chargeAndTax', (
+                                        SELECT jsonb_build_object('id', ct.id, 'name', ct.name, 'value', ct.value, 'valueType', ct."valueType")
+                                        FROM public."ChargeAndTax" ct WHERE ct.id = cpt."chargeAndTaxId"
+                                    )
+                                )
+                            )
+                            FROM public."ComboProductTax" cpt
+                            WHERE cpt."comboProductId" = cp.id
+                        )
+                    )
+                )
+                FROM public."ComboProduct" cp
+                JOIN public."Product" p ON cp."productId" = p.id
+                WHERE cp."comboId" = c.id
+            ), '[]'::jsonb)
+        )
+    FROM public."Combo" c
+    ORDER BY c."createdAt" DESC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnCotizacion.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCotizacion'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnCotizacion(p_quotation_id INT)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_result JSONB;
+BEGIN
+    SELECT 
+        jsonb_build_object(
+            'id', q.id,
+            'internalNumber', q."internalNumber",
+            'date', q.date,
+            'clientId', q."clientId",
+            'currency', q.currency,
+            'exchangeRate', q."exchangeRate",
+            'branchId', q."branchId",
+            'implantId', q."implantId",
+            'sellerId', q."sellerId",
+            'ticketPrinterId', q."ticketPrinterId",
+            'commissionPercentage', q."commissionPercentage",
+            'chargesAndTaxes', q."chargesAndTaxes",
+            'totalAmount', q."totalAmount",
+            'state', q.state,
+            'stateDescription', q."stateDescription",
+            'stateUpdatedAt', q."stateUpdatedAt",
+            'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
+                'id', c.id,
+                'name', c.name,
+                'document', c.document
+            ) ELSE jsonb_build_object('id', null, 'name', 'Cliente desconocido', 'document', '') END,
+            'combos', COALESCE((
+                SELECT jsonb_agg(jsonb_build_object('id', qc."comboId", 'comboId', qc."comboId", 'name', cb.name))
+                FROM public."QuotationCombo" qc
+                JOIN public."Combo" cb ON qc."comboId" = cb.id
+                WHERE qc."quotationId" = q.id
+            ), '[]'::jsonb),
+            'products', COALESCE(
+                (
+                    SELECT jsonb_agg(
+                        jsonb_build_object(
+                            'id', qp.id,
+                            'productId', qp."productId",
+                            'product', jsonb_build_object(
+                                'id', p.id,
+                                'description', p.description,
+                                'code', p.code
+                            ),
+                            'provider', CASE WHEN prov.id IS NOT NULL THEN jsonb_build_object('id', prov.id, 'name', prov.name) ELSE NULL END,
+                            'prestadora', CASE WHEN h.id IS NOT NULL THEN jsonb_build_object('id', h.id, 'name', h.name) ELSE NULL END,
+                            'providerId', qp."providerId",
+                            'prestadoraId', qp."prestadoraId",
+                            'quantity', qp.quantity,
+                            'price', qp.price,
+                            'cost', qp.cost,
+                            'checkInDate', qp."checkInDate",
+                            'checkOutDate', qp."checkOutDate",
+                            'nights', qp.nights,
+                            'paxAdults', qp."paxAdults",
+                            'paxChildren', qp."paxChildren",
+                            'serviceType', qp."serviceType",
+                            'destination', qp.destination,
+                            'reservationCode', qp."reservationCode",
+                            'sellerCommission', qp."sellerCommission",
+                            'ticketPrinterCommission', qp."ticketPrinterCommission",
+                            'comboId', qp."comboId",
+                            'mainTaxId', qp."mainTaxId",
+                            'inNationality', COALESCE(qp."inNationality", 1),
+                            'service', COALESCE(qp.service, qp.servicios),
+                            'servicios', COALESCE(qp.servicios, qp.service),
+                            'descripcion', qp.descripcion,
+                            'passengers', COALESCE((
+                                SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'name', qpax.name, 'document', qpax.document))
+                                FROM public."QuotationProductPassenger" qpax
+                                WHERE qpax."quotationProductId" = qp.id
+                            ), '[]'::jsonb),
+                            'variables', COALESCE((
+                                SELECT jsonb_agg(jsonb_build_object('id', qvar.id, 'masterVariableId', qvar."masterVariableId", 'value', qvar.value))
+                                FROM public."QuotationProductVariable" qvar
+                                WHERE qvar."quotationProductId" = qp.id
+                            ), '[]'::jsonb),
+                            'appliedTaxes', COALESCE((
+                                SELECT jsonb_agg(jsonb_build_object('id', qpt."chargeAndTaxId", 'chargeAndTaxId', qpt."chargeAndTaxId", 'explicitAmount', qpt."explicitAmount", 'valueSnapshot', qpt."valueSnapshot", 'valueTypeSnapshot', qpt."valueTypeSnapshot", 'isMain', qpt."isMain"))
+                                FROM public."QuotationProductTax" qpt
+                                WHERE qpt."quotationProductId" = qp.id
+                            ), '[]'::jsonb),
+                            'payments', COALESCE((
+                                SELECT jsonb_agg(jsonb_build_object(
+                                    'id', qpmt.id,
+                                    'amount', qpmt.amount,
+                                    'paymentMethod', qpmt."paymentMethod",
+                                    'date', qpmt.date,
+                                    'reference', qpmt.reference,
+                                    'creditCardId', qpmt."creditCardId",
+                                    'cardNumber', qpmt."cardNumber",
+                                    'authorizationCode', qpmt."authorizationCode",
+                                    'voucher', qpmt.voucher,
+                                    'expirationDate', qpmt."expirationDate"
+                                ))
+                                FROM public."QuotationProductPayment" qpmt
+                                WHERE qpmt."quotationProductId" = qp.id
+                            ), '[]'::jsonb)
+                        )
+                    )
+                    FROM public."QuotationProduct" qp
+                    LEFT JOIN public."Product" p ON qp."productId" = p.id
+                    LEFT JOIN public."Provider" prov ON qp."providerId" = prov.id
+                    LEFT JOIN public."Prestadora" h ON qp."prestadoraId" = h.id
+                    WHERE qp."quotationId" = q.id
+                ),
+                '[]'::jsonb
+            )
+        )
+    INTO v_result
+    FROM public."Quotation" q
+    LEFT JOIN public."Client" c ON q."clientId" = c.id
+    WHERE q.id = p_quotation_id;
+
+    RETURN v_result;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnCountryListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCountryListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnCountryListar"()
+RETURNS TABLE(id integer, code text, name text, dane text, region text, prefix text, "curencyId" integer)
+LANGUAGE plpgsql AS $function$
+BEGIN
+    RETURN QUERY SELECT c.id, c.code::text, c.name::text, c.dane::text, c.region::text, c.prefix::text, c."curencyId" FROM public."Countries" c ORDER BY c.id ASC;
+END; $function$;;
+
+-- Inyectado automáticamente: fnCreditCardListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCreditCardListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnCreditCardListar"()
+RETURNS TABLE(
+    id integer,
+    code text,
+    name text,
+    type text,
+    inactive boolean
+)
+LANGUAGE plpgsql
+AS $function$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        c.id,
+        c.code,
+        c.name,
+        c.type,
+        c.inactive
+    FROM public."CreditCard" c
+    ORDER BY c.id ASC;
+END;
+$function$;;
+
+-- Inyectado automáticamente: fnCreditCardValidar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnCreditCardValidar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnCreditCardValidar"(
+    p_referencia text
+)
+RETURNS TABLE(
+    es_valido boolean,
+    codigo_tarjeta text,
+    numero_tarjeta text,
+    tarjeta_id integer,
+    nombre_tarjeta text,
+    mensaje text
+)
+LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_code text;
+    v_number text;
+    v_id integer;
+    v_name text;
+BEGIN
+    IF p_referencia IS NULL OR TRIM(p_referencia) = '' THEN
+        RETURN QUERY SELECT true, ''::text, ''::text, NULL::integer, ''::text, 'OK'::text;
         RETURN;
     END IF;
 
-    -- Validar si p_acting_user_id existe en la tabla User, de lo contrario usar el de la cotización origen
-    IF p_acting_user_id IS NOT NULL THEN
-        SELECT id INTO v_user_id FROM public."User" WHERE id = p_acting_user_id;
+    p_referencia := TRIM(p_referencia);
+
+    -- Si tiene al menos 2 caracteres iniciales que son letras (ej: VI0000000000007023)
+    IF length(p_referencia) >= 2 AND substring(p_referencia from 1 for 2) ~ '^[A-Za-z]{2}$' THEN
+        v_code := UPPER(substring(p_referencia from 1 for 2));
+        v_number := substring(p_referencia from 3);
+
+        SELECT c.id, c.name INTO v_id, v_name
+        FROM public."CreditCard" c
+        WHERE UPPER(TRIM(c.code)) = v_code AND c.inactive = false
+        LIMIT 1;
+
+        IF v_id IS NOT NULL THEN
+            RETURN QUERY SELECT true, v_code, v_number, v_id, v_name, 'SUCCESS'::text;
+        ELSE
+            RETURN QUERY SELECT false, v_code, v_number, NULL::integer, ''::text, ('El código de tarjeta "' || v_code || '" no existe en el Maestro de Tarjetas de Crédito.')::text;
+        END IF;
+    ELSE
+        -- Si son solo números o no empieza por código de 2 letras
+        RETURN QUERY SELECT true, ''::text, p_referencia, NULL::integer, ''::text, 'Sin código de tipo de tarjeta'::text;
+    END IF;
+END;
+$function$;;
+
+-- Inyectado automáticamente: fnDocumentResolutionListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnDocumentResolutionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnDocumentResolutionListar"()
+RETURNS TABLE (
+    id integer,
+    "branchId" integer,
+    "branchName" text,
+    "implantId" integer,
+    "implantName" text,
+    "resolutionNumber" text,
+    "initialNumber" integer,
+    "finalNumber" integer,
+    "currentNumber" integer,
+    "resolutionDate" timestamp without time zone,
+    "prefix" text,
+    "expirationDate" timestamp without time zone,
+    "isActive" boolean,
+    "createdAt" timestamp without time zone
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        dr.id,
+        dr."branchId",
+        COALESCE(b.name, '')::text AS "branchName",
+        dr."implantId",
+        COALESCE(imp.name, '')::text AS "implantName",
+        dr."resolutionNumber"::text,
+        dr."initialNumber",
+        dr."finalNumber",
+        dr."currentNumber",
+        dr."resolutionDate",
+        COALESCE(dr.prefix, '')::text,
+        dr."expirationDate",
+        dr."isActive",
+        dr."createdAt"
+    FROM public."DocumentResolution" dr
+    LEFT JOIN public."Branch" b ON b.id = dr."branchId"
+    LEFT JOIN public."Implant" imp ON imp.id = dr."implantId"
+    ORDER BY dr.id DESC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnEquivalenceInterface.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnEquivalenceInterface'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnEquivalenceInterface"(
+	p_id_interface integer,
+	p_id_master integer,
+	p_value text
+)
+RETURNS text
+LANGUAGE 'plpgsql'
+COST 100
+VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+    v_equivalence TEXT;
+    v_master_code TEXT;
+BEGIN
+    -- Si el valor es nulo o vacío, retornamos el mismo valor
+    IF p_value IS NULL OR trim(p_value) = '' THEN
+        RETURN p_value;
     END IF;
 
-    IF v_user_id IS NULL THEN
-        v_user_id := v_orig_quotation."userId";
+    -- Buscamos el equivalente en la tabla EquivalencesInterfaces
+    SELECT cd_codigo 
+    INTO v_equivalence
+    FROM public."EquivalencesInterfaces"
+    WHERE id_interfaces = p_id_interface
+      AND id_master = p_id_master
+      AND cd_codigoInte = p_value
+    LIMIT 1;
+
+    -- Si no se encuentra equivalencia:
+    IF v_equivalence IS NULL OR trim(v_equivalence) = '' THEN
+        -- Si corresponde al maestro de Impuestos (ChargeAndTax), mapear por defecto a 'OTR' (Otros Impuestos)
+        SELECT code INTO v_master_code FROM public."Master" WHERE id = p_id_master LIMIT 1;
+        IF v_master_code = 'ChargeAndTax' THEN
+            RETURN 'OTR';
+        ELSE
+            RETURN p_value;
+        END IF;
+    ELSE
+        RETURN v_equivalence;
+    END IF;
+END;
+$BODY$;
+
+ALTER FUNCTION public."fnEquivalenceInterface"(integer, integer, text) OWNER TO postgres;;
+
+-- Inyectado automáticamente: fnImpuestoListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnImpuestoListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnImpuestoListar()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        jsonb_build_object(
+            'id', t.id,
+            'code', t.code,
+            'name', t.name,
+            'type', t.type,
+            'valueType', t."valueType",
+            'value', t.value,
+            'isEditable', t."isEditable",
+            'orden', COALESCE(t.orden, 0),
+            'productIds', COALESCE(t."productIds", '[]'::jsonb),
+            'targetTaxId', t."targetTaxId",
+            'isActive', COALESCE(t."isActive", true),
+            'gdsEquivalences', COALESCE((
+                SELECT string_agg(DISTINCT eq."cd_codigointe", ', ')
+                FROM public."EquivalencesInterfaces" eq
+                INNER JOIN public."Master" m ON m.id = eq.id_master
+                WHERE m.code = 'ChargeAndTax' AND eq.cd_codigo = t.code
+            ), '')
+        )
+    FROM public."ChargeAndTax" t
+    ORDER BY 
+        CASE 
+            WHEN COALESCE(t.orden, 0) > 0 THEN t.orden 
+            WHEN t.code = 'TAR' THEN 1 
+            ELSE 9999 
+        END ASC, 
+        t.name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnInterfaceExtractParamValue.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnInterfaceExtractParamValue'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnInterfaceExtractParamValue"(
+    p_interface_id INTEGER,
+    p_field_code TEXT,
+    p_booking_file TEXT
+)
+RETURNS TEXT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_prefix TEXT;
+    v_delimiter TEXT;
+    v_start_pos INTEGER;
+    v_length INTEGER;
+    v_line TEXT;
+    v_extracted TEXT := NULL;
+    v_pos INTEGER;
+    v_lines TEXT[];
+    i INTEGER;
+BEGIN
+    IF p_booking_file IS NULL OR TRIM(p_booking_file) = '' THEN
+        RETURN NULL;
     END IF;
 
-    -- Generar consecutivo único interno
-    v_internal_number := 'QUO-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+    -- 1. Buscar regla parametrizada para la interfaz y código de campo
+    SELECT "prefix", "delimiter", "startPosition", "length"
+    INTO v_prefix, v_delimiter, v_start_pos, v_length
+    FROM public."InterfaceExtractParam"
+    WHERE "interfaceId" = p_interface_id
+      AND UPPER("fieldCode") = UPPER(TRIM(p_field_code))
+      AND "isActive" = TRUE
+    ORDER BY id DESC
+    LIMIT 1;
 
-    -- Insertar la cabecera duplicada de la cotización
-    INSERT INTO public."Quotation" (
-        "internalNumber", "date", "clientId", "currency", "exchangeRate",
-        "branchId", "implantId", "sellerId", "ticketPrinterId",
-        "baseCommissionable", "commissionPercentage", "chargesAndTaxes",
-        "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
-        "costoTotal", "valorBase", "utilidad", "comisionTotalPercentage",
-        "comisionFreelancePercentage", "comisionFreelanceValue",
-        "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
-        "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
-    ) VALUES (
-        v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
-        v_orig_quotation."branchId", v_orig_quotation."implantId", v_orig_quotation."sellerId", v_orig_quotation."ticketPrinterId",
-        v_orig_quotation."baseCommissionable", v_orig_quotation."commissionPercentage", v_orig_quotation."chargesAndTaxes",
-        v_orig_quotation."totalAmount", v_user_id, 'NUEVO', 'Copia de cotización #' || p_quotation_id::text, CURRENT_TIMESTAMP,
-        v_orig_quotation."costoTotal", v_orig_quotation."valorBase", v_orig_quotation."utilidad", v_orig_quotation."comisionTotalPercentage",
-        v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
-        v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
-        v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
-        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription"
-    ) RETURNING id INTO v_new_id;
+    -- Fallbacks por defecto si no hay regla configurada
+    IF v_prefix IS NULL OR v_prefix = '' THEN
+        IF UPPER(TRIM(p_field_code)) = 'CLIENT' THEN
+            v_prefix := 'RM*NC-';
+        ELSIF UPPER(TRIM(p_field_code)) = 'SELLER' THEN
+            v_prefix := 'RM*VEN-';
+        ELSIF UPPER(TRIM(p_field_code)) = 'TICKETPRINTER' THEN
+            v_prefix := 'RM*TK-';
+        ELSIF UPPER(TRIM(p_field_code)) = 'BRANCH' THEN
+            v_prefix := 'RM*SUC-';
+        ELSIF UPPER(TRIM(p_field_code)) = 'IMPLANT' THEN
+            v_prefix := 'RM*IMP-';
+        ELSE
+            RETURN NULL;
+        END IF;
+    END IF;
 
-    -- Insertar registro inicial en el historial de estados
+    IF v_delimiter IS NULL THEN
+        v_delimiter := '-';
+    END IF;
+
+    -- 2. Dividir archivo en líneas
+    v_lines := string_to_array(p_booking_file, E'\n');
+
+    -- 3. Recorrer líneas buscando el prefijo constante
+    FOR i IN 1..array_length(v_lines, 1) LOOP
+        v_line := TRIM(v_lines[i]);
+        v_line := REPLACE(v_line, E'\r', '');
+
+        v_pos := POSITION(v_prefix IN v_line);
+        IF v_pos = 0 AND UPPER(TRIM(p_field_code)) = 'SELLER' THEN
+            v_pos := POSITION('RM*VE-' IN v_line);
+            IF v_pos > 0 THEN v_prefix := 'RM*VE-'; END IF;
+        END IF;
+        IF v_pos = 0 AND UPPER(TRIM(p_field_code)) = 'TICKETPRINTER' THEN
+            v_pos := POSITION('RM*ASE-' IN v_line);
+            IF v_pos > 0 THEN v_prefix := 'RM*ASE-'; END IF;
+        END IF;
+        IF v_pos > 0 THEN
+            v_extracted := SUBSTRING(v_line FROM v_pos + CHAR_LENGTH(v_prefix));
+            v_extracted := TRIM(v_extracted);
+
+            IF v_delimiter IS NOT NULL AND v_delimiter <> '' THEN
+                v_pos := POSITION(v_delimiter IN v_extracted);
+                IF v_pos > 1 THEN
+                    v_extracted := SUBSTRING(v_extracted FROM 1 FOR v_pos - 1);
+                END IF;
+            END IF;
+
+            IF v_length IS NOT NULL AND v_length > 0 AND CHAR_LENGTH(v_extracted) > v_length THEN
+                v_extracted := SUBSTRING(v_extracted FROM 1 FOR v_length);
+            END IF;
+
+            v_extracted := TRIM(v_extracted);
+            IF v_extracted <> '' THEN
+                RETURN v_extracted;
+            END IF;
+        END IF;
+    END LOOP;
+
+    RETURN NULL;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnInterfacesList.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnInterfacesList'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+DROP FUNCTION IF EXISTS public."fnInterfacesList"();
+
+CREATE OR REPLACE FUNCTION public."fnInterfacesList"()
+RETURNS TABLE(
+    id integer,
+    code text,
+    name text,
+    inactivo boolean,
+    bl_genera_archivoplano boolean,
+    ds_storedprocedure_archivoplano text,
+    bl_job boolean,
+    ds_namejob text,
+    bl_facturador boolean,
+    id_gds integer
+) 
+LANGUAGE 'plpgsql'
+AS $BODY$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        i.id,
+        i.code,
+        i.name,
+        i.inactivo,
+        i.bl_genera_archivoplano,
+        i.ds_storedprocedure_archivoplano,
+        i.bl_job,
+        i.ds_namejob,
+        i.bl_facturador,
+        i.id_gds
+    FROM public."Interfaces" i
+    ORDER BY i.name ASC;
+END;
+$BODY$;
+
+ALTER FUNCTION public."fnInterfacesList"() OWNER TO postgres;;
+
+-- Inyectado automáticamente: fnMasterList.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMasterList'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnMasterList"()
+RETURNS TABLE(
+    id integer,
+    code text,
+    name text,
+    inactivo boolean
+) 
+LANGUAGE 'plpgsql'
+AS $BODY$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        m.id,
+        m.code,
+        m.name,
+        m.inactivo
+    FROM public."Master" m
+    ORDER BY m.name ASC;
+END;
+$BODY$;
+
+ALTER FUNCTION public."fnMasterList"() OWNER TO postgres;;
+
+-- Inyectado automáticamente: fnMenu.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMenu'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnMenu()
+RETURNS SETOF public."Menu"
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public."Menu"
+    WHERE activo = true
+    ORDER BY id ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnMenuAll.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnMenuAll'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnMenuAll()
+RETURNS SETOF public."Menu"
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public."Menu"
+    ORDER BY id ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnObtenerSiguienteConsecutivo.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnObtenerSiguienteConsecutivo'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnObtenerSiguienteConsecutivo"(
+    p_transaction_type text,
+    p_branch_id integer DEFAULT NULL,
+    p_implant_id integer DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_rec RECORD;
+    v_next_val integer;
+    v_prefix text := '';
+    v_res_json jsonb;
+BEGIN
+    p_transaction_type := UPPER(TRIM(COALESCE(p_transaction_type, 'INVOICE')));
+
+    -- 1. Intentar buscar un consecutivo específico para la combinación sucursal e implante
+    SELECT * INTO v_rec
+    FROM public."TransactionConsecutive"
+    WHERE (
+        UPPER("transactionType") = p_transaction_type 
+        OR (p_transaction_type IN ('QUOTATION', 'COTIZACION') AND UPPER("transactionType") IN ('QUOTATION', 'COTIZACION'))
+    )
+      AND "isActive" = true
+      AND (
+          (p_branch_id IS NOT NULL AND "branchId" = p_branch_id)
+          OR ("branchId" IS NULL)
+      )
+      AND (
+          (p_implant_id IS NOT NULL AND "implantId" = p_implant_id)
+          OR ("implantId" IS NULL)
+      )
+    ORDER BY 
+        CASE WHEN "branchId" = p_branch_id THEN 1 ELSE 2 END,
+        CASE WHEN "implantId" = p_implant_id THEN 1 ELSE 2 END,
+        id ASC
+    LIMIT 1
+    FOR UPDATE;
+
+    -- Si existe un registro configurado
+    IF v_rec.id IS NOT NULL THEN
+        v_next_val := v_rec."currentNumber";
+        v_prefix := COALESCE(v_rec.prefix, '');
+
+        -- Incrementar atómicamente para la siguiente transacción
+        UPDATE public."TransactionConsecutive"
+        SET "currentNumber" = "currentNumber" + 1
+        WHERE id = v_rec.id;
+    ELSE
+        -- Fallback si no existe parámetro de consecutivo configurado todavía
+        v_prefix := CASE 
+            WHEN p_transaction_type IN ('QUOTATION', 'COTIZACION') THEN 'COT'
+            WHEN p_transaction_type = 'INVOICE' THEN 'INV'
+            WHEN p_transaction_type = 'CREDIT_NOTE' THEN 'NC'
+            ELSE 'DOC'
+        END;
+
+        -- Usar la secuencia PostgreSQL si no hay registro manual
+        v_next_val := nextval('public."Invoices_id_seq"');
+    END IF;
+
+    v_res_json := jsonb_build_object(
+        'consecutivoNumber', v_next_val,
+        'prefix', v_prefix,
+        'formattedConsecutive', CASE WHEN v_prefix <> '' THEN v_prefix || '-' || v_next_val::text ELSE v_next_val::text END
+    );
+
+    RETURN v_res_json;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnPaymentListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnPaymentListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnPaymentListar"()
+RETURNS TABLE(id integer, code text, name text, iscash boolean, iscredit boolean, inactive boolean)
+LANGUAGE plpgsql AS $function$
+BEGIN
+    RETURN QUERY SELECT p.id, p.code, p.name, p.iscash, p.iscredit, p.inactive FROM public."Payment" p ORDER BY p.id ASC;
+END; $function$;;
+
+-- Inyectado automáticamente: fnPreCotizacionListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnPreCotizacionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+-- =============================================
+-- Función: fnPreCotizacionListar
+-- Descripción: Consulta el listado de Pre-Cotizaciones con LEFT JOIN obligatorio,
+--              cálculo de tiempos transcurridos y trazabilidad unificada (Pre-Cotización -> Cotización -> Factura).
+-- Base de Datos: PostgreSQL (Korex_colaereo)
+-- =============================================
+CREATE OR REPLACE FUNCTION public."fnPreCotizacionListar"(
+    p_search TEXT DEFAULT NULL,
+    p_state TEXT DEFAULT NULL,
+    p_branch_id INT DEFAULT NULL
+)
+RETURNS TABLE (
+    id INT,
+    consecutivo INT,
+    client_name TEXT,
+    client_id INT,
+    header_description TEXT,
+    provider_id INT,
+    provider_name TEXT,
+    ticket_printer_id INT,
+    ticket_printer_name TEXT,
+    seller_id INT,
+    seller_name TEXT,
+    branch_id INT,
+    branch_name TEXT,
+    pre_quotation_type TEXT,
+    quotation_notice TEXT,
+    notice_response TEXT,
+    start_date TIMESTAMP,
+    end_date TIMESTAMP,
+    custom_fields JSONB,
+    state TEXT,
+    user_id INT,
+    user_name TEXT,
+    created_at TIMESTAMP,
+    converted_quotation_id INT,
+    converted_internal_number TEXT,
+    converted_at TIMESTAMP,
+    converted_user_name TEXT,
+    invoice_number TEXT,
+    elapsed_minutes INT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id,
+        p.consecutivo,
+        COALESCE(c.name, p."clientNameText", 'Cliente sin nombre')::TEXT AS client_name,
+        p."clientId",
+        COALESCE(p."headerDescription", '')::TEXT,
+        p."providerId",
+        COALESCE(pr.name, '')::TEXT AS provider_name,
+        p."ticketPrinterId",
+        COALESCE(tp.name, '')::TEXT AS ticket_printer_name,
+        p."sellerId",
+        COALESCE(s.name, '')::TEXT AS seller_name,
+        p."branchId",
+        COALESCE(b.name, '')::TEXT AS branch_name,
+        COALESCE(p."preQuotationType", 'General')::TEXT,
+        COALESCE(p."quotationNotice", '')::TEXT,
+        COALESCE(p."noticeResponse", '')::TEXT,
+        p."startDate",
+        p."endDate",
+        COALESCE(p."customFields", '{}'::jsonb),
+        p.state::TEXT,
+        p."userId",
+        COALESCE(u.name, 'Sistema')::TEXT AS user_name,
+        p."createdAt",
+        p."convertedQuotationId",
+        COALESCE(q."internalNumber", '')::TEXT AS converted_internal_number,
+        p."convertedAt",
+        COALESCE(cu.name, '')::TEXT AS converted_user_name,
+        ''::TEXT AS invoice_number,
+        (EXTRACT(EPOCH FROM (COALESCE(p."convertedAt", CURRENT_TIMESTAMP) - p."createdAt")) / 60)::INT AS elapsed_minutes
+    FROM public."PreQuotation" p
+    LEFT JOIN public."Client" c ON p."clientId" = c.id
+    LEFT JOIN public."Provider" pr ON p."providerId" = pr.id
+    LEFT JOIN public."TicketPrinter" tp ON p."ticketPrinterId" = tp.id
+    LEFT JOIN public."Seller" s ON p."sellerId" = s.id
+    LEFT JOIN public."Branch" b ON p."branchId" = b.id
+    LEFT JOIN public."User" u ON p."userId" = u.id
+    LEFT JOIN public."User" cu ON p."convertedUserId" = cu.id
+    LEFT JOIN public."Quotation" q ON p."convertedQuotationId" = q.id
+    WHERE (p_branch_id IS NULL OR p_branch_id = 0 OR p."branchId" = p_branch_id)
+      AND (p_state IS NULL OR p_state = '' OR p.state = p_state)
+      AND (
+        p_search IS NULL OR p_search = '' OR
+        p.consecutivo::TEXT ILIKE '%' || TRIM(p_search) || '%' OR
+        c.name ILIKE '%' || TRIM(p_search) || '%' OR
+        p."clientNameText" ILIKE '%' || TRIM(p_search) || '%' OR
+        p."headerDescription" ILIKE '%' || TRIM(p_search) || '%' OR
+        p."quotationNotice" ILIKE '%' || TRIM(p_search) || '%'
+      )
+    ORDER BY p.id DESC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnPrestadoraListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnPrestadoraListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnPrestadoraListar()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        jsonb_build_object(
+            'id', h.id,
+            'code', h.code,
+            'name', h.name,
+            'category', h.category,
+            'type', h.type,
+            'location', h.location,
+            'providerId', h."providerId",
+            'isActive', COALESCE(h."isActive", true),
+            'provider', (
+                SELECT jsonb_build_object('id', p.id, 'name', p.name)
+                FROM public."Provider" p WHERE p.id = h."providerId"
+            )
+        )
+    FROM public."Prestadora" h
+    ORDER BY h.name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnProductoListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnProductoListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnProductoListar()
+RETURNS SETOF public."Product"
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public."Product" ORDER BY id DESC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnProveedorListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnProveedorListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnProveedorListar()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        jsonb_build_object(
+            'id', p.id,
+            'code', p.code,
+            'name', p.name,
+            'contactInfo', p."contactInfo",
+            'commissionConfig', p."commissionConfig",
+            'providerTypeId', p."providerTypeId",
+            'providerTypeName', pt.name,
+            'isAirline', COALESCE(pt."isAirline", false),
+            'airlineCode', p."airlineCode",
+            'sigla', p."sigla",
+            'isActive', COALESCE(p."isActive", true),
+            'prestadoras', COALESCE((
+                SELECT jsonb_agg(h)
+                FROM public."Prestadora" h
+                WHERE h."providerId" = p.id
+            ), '[]'::jsonb)
+        )
+    FROM public."Provider" p
+    LEFT JOIN public."ProviderType" pt ON pt.id = p."providerTypeId"
+    ORDER BY p.name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnProviderTypeListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnProviderTypeListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnProviderTypeListar()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        jsonb_build_object(
+            'id', pt.id,
+            'code', pt.code,
+            'name', pt.name,
+            'isAirline', pt."isAirline",
+            'active', pt.active,
+            'isActive', COALESCE(pt."isActive", pt.active, true)
+        )
+    FROM public."ProviderType" pt
+    ORDER BY pt.name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnQuitarEspeciales.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnQuitarEspeciales'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnQuitarEspeciales"(texto TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    IF texto IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    -- Reemplaza cualquier carácter que NO sea letra, número o espacio por un espacio ' '
+    -- Incluye soporte para letras con tildes y ñ (a-zA-Z0-9áéíóúÁÉÍÓÚñÑ)
+    RETURN REGEXP_REPLACE(texto, '[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]', ' ', 'g');
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;;
+
+-- Inyectado automáticamente: fnQuotationStateListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnQuotationStateListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+
+CREATE OR REPLACE FUNCTION public."fnQuotationStateListar"()
+RETURNS TABLE(id integer, code text, name text, color text, "createdAt" timestamp)
+LANGUAGE plpgsql AS $function$
+BEGIN
+    RETURN QUERY SELECT t.id, t.code::text, t.name::text, t.color::text, t."createdAt"::timestamp FROM public."QuotationState" t ORDER BY t.name ASC;
+END; $function$;;
+
+-- Inyectado automáticamente: fnReportDinamic.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnReportDinamic'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+DROP FUNCTION IF EXISTS public."fnReportDinamic"(INTEGER);
+DROP FUNCTION IF EXISTS public."fnReportDinamic"(INTEGER, JSON);
+
+CREATE OR REPLACE FUNCTION public."fnReportDinamic"(
+    p_report_id INTEGER,
+    p_filter_values JSON DEFAULT '{}'::json
+)
+RETURNS json
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_base_table VARCHAR;
+    v_custom_sql TEXT;
+    v_sql TEXT;
+    v_select_clause TEXT;
+    v_from_clause TEXT;
+    v_where_clause TEXT := '1=1';
+    v_order_col VARCHAR;
+    v_order_dir VARCHAR;
+    v_result json;
+    v_filter RECORD;
+    v_val TEXT;
+    v_val_to TEXT;
+BEGIN
+    -- 1. Obtener la configuración del reporte
+    SELECT base_table, custom_sql INTO v_base_table, v_custom_sql
+    FROM public."Report"
+    WHERE id = p_report_id;
+
+    IF v_base_table IS NULL AND v_custom_sql IS NULL THEN
+        RAISE EXCEPTION 'Reporte no encontrado';
+    END IF;
+
+    -- 2. Construir el Origen de Datos (Custom SQL o Tabla Base)
+    IF v_custom_sql IS NOT NULL AND v_custom_sql <> '' THEN
+        -- Si hay SQL personalizado, lo usamos como fuente
+        v_from_clause := '(' || v_custom_sql || ') t1 ';
+        v_select_clause := '*';
+    ELSE
+        -- 2.1 Construir el SELECT (Columnas Visibles)
+        SELECT string_agg(
+            CASE 
+                WHEN is_calculated THEN formula_expression || ' AS "' || COALESCE(alias, 'Calculado') || '"'
+                ELSE COALESCE(table_alias || '.', '') || '"' || column_name || '"' || ' AS "' || COALESCE(alias, column_name) || '"'
+            END,
+            ', ' ORDER BY sort_order ASC
+        ) INTO v_select_clause
+        FROM public."ReportColumns"
+        WHERE report_id = p_report_id AND is_visible = true;
+
+        IF v_select_clause IS NULL THEN
+            v_select_clause := '*'; 
+        END IF;
+
+        -- 2.2 Construir el FROM y los JOINS
+        v_from_clause := 'public."' || v_base_table || '" t1 ';
+
+        SELECT v_from_clause || string_agg(
+            join_type || ' public."' || table_name || '" ' || alias || ' ON ' || join_condition,
+            ' ' ORDER BY sort_order ASC
+        ) INTO v_from_clause
+        FROM public."ReportJoins"
+        WHERE report_id = p_report_id;
+
+        IF v_from_clause IS NULL THEN
+            v_from_clause := 'public."' || v_base_table || '" t1 ';
+        END IF;
+    END IF;
+
+    -- 4. Construir el WHERE (Filtros Dinámicos con Rangos)
+    FOR v_filter IN SELECT * FROM public."ReportFilters" WHERE report_id = p_report_id LOOP
+        v_val := p_filter_values->>(COALESCE(v_filter.table_alias, 't1') || '.' || v_filter.column_name);
+        v_val_to := p_filter_values->>(COALESCE(v_filter.table_alias, 't1') || '.' || v_filter.column_name || '_to');
+        
+        DECLARE
+            v_field_expr TEXT;
+        BEGIN
+            -- Determinar la expresión del campo
+            IF v_custom_sql IS NOT NULL AND v_custom_sql <> '' THEN
+                -- En Custom SQL, si el usuario puso algo como q."date", 
+                -- debemos quitar el "q." porque afuera solo existe el alias "t1"
+                IF v_filter.column_name ~ '\.' THEN
+                    v_field_expr := 't1."' || split_part(v_filter.column_name, '.', 2) || '"';
+                    -- Limpiar comillas si el split_part las dejó
+                    v_field_expr := replace(v_field_expr, '"', ''); 
+                    -- Re-envolver con comillas de forma segura
+                    v_field_expr := 't1."' || v_field_expr || '"';
+                ELSE
+                    v_field_expr := 't1."' || v_filter.column_name || '"';
+                END IF;
+            ELSIF v_filter.column_name ~ '["\.]' THEN
+                v_field_expr := v_filter.column_name;
+            ELSE
+                v_field_expr := COALESCE(v_filter.table_alias, 't1') || '."' || v_filter.column_name || '"';
+            END IF;
+
+            IF (v_val IS NOT NULL AND v_val <> '') OR (v_val_to IS NOT NULL AND v_val_to <> '') THEN
+                IF v_filter.filter_type = 'date' THEN
+                    IF v_val IS NOT NULL AND v_val <> '' AND v_val_to IS NOT NULL AND v_val_to <> '' THEN
+                        v_where_clause := v_where_clause || ' AND ' || v_field_expr || ' BETWEEN ''' || v_val || '''::date AND ''' || v_val_to || '''::date';
+                    ELSIF v_val IS NOT NULL AND v_val <> '' THEN
+                        v_where_clause := v_where_clause || ' AND ' || v_field_expr || ' >= ''' || v_val || '''::date';
+                    ELSIF v_val_to IS NOT NULL AND v_val_to <> '' THEN
+                        v_where_clause := v_where_clause || ' AND ' || v_field_expr || ' <= ''' || v_val_to || '''::date';
+                    END IF;
+                ELSIF v_filter.filter_type = 'number' THEN
+                    IF v_val IS NOT NULL AND v_val <> '' AND v_val_to IS NOT NULL AND v_val_to <> '' THEN
+                        v_where_clause := v_where_clause || ' AND ' || v_field_expr || ' BETWEEN ' || v_val || ' AND ' || v_val_to;
+                    ELSIF v_val IS NOT NULL AND v_val <> '' THEN
+                        v_where_clause := v_where_clause || ' AND ' || v_field_expr || ' >= ' || v_val;
+                    ELSIF v_val_to IS NOT NULL AND v_val_to <> '' THEN
+                        v_where_clause := v_where_clause || ' AND ' || v_field_expr || ' <= ' || v_val_to;
+                    END IF;
+                ELSE -- text / like
+                    v_where_clause := v_where_clause || ' AND ' || v_field_expr || ' ILIKE ''%' || v_val || '%''';
+                END IF;
+            END IF;
+        END;
+    END LOOP;
+
+    -- 5. Ensamblar SQL Final con Ordenamiento Múltiple
+    v_sql := 'SELECT json_agg(row_to_json(t)) FROM (SELECT ' || v_select_clause || ' FROM ' || v_from_clause || ' WHERE ' || v_where_clause;
+    
+    -- Agregar ORDER BY si está definido (Múltiple)
+    DECLARE
+        v_order_by TEXT;
+    BEGIN
+        SELECT string_agg(
+            CASE 
+                WHEN column_expr ~ '^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$' THEN -- Formato t1.columna
+                    split_part(column_expr, '.', 1) || '."' || split_part(column_expr, '.', 2) || '"'
+                ELSE column_expr 
+            END || ' ' || direction, 
+            ', ' ORDER BY sort_order ASC
+        ) INTO v_order_by
+        FROM public."ReportSorts" WHERE report_id = p_report_id;
+        
+        IF v_order_by IS NOT NULL THEN
+            v_sql := v_sql || ' ORDER BY ' || v_order_by;
+        END IF;
+    END;
+
+    v_sql := v_sql || ') t';
+
+    -- 6. Ejecutar dinámicamente
+    EXECUTE v_sql INTO v_result;
+
+    IF v_result IS NULL THEN
+        v_result := '[]'::json;
+    END IF;
+
+    RETURN v_result;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnResolucionListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnResolucionListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnResolucionListar()
+RETURNS SETOF public."Resolution"
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public."Resolution" ORDER BY name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnRoleListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnRoleListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+-- =============================================
+-- Función: fnRoleListar
+-- Descripción: Consulta el listado de roles con su matriz de permisos y conteo de usuarios asignados.
+-- Base de Datos: PostgreSQL (Korex_colaereo)
+-- =============================================
+CREATE OR REPLACE FUNCTION public."fnRoleListar"()
+RETURNS TABLE (
+    id INT,
+    name VARCHAR,
+    description TEXT,
+    permissions JSONB,
+    user_count BIGINT
+) 
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        r.id,
+        r.name::VARCHAR,
+        COALESCE(r.description, '')::TEXT,
+        COALESCE(r.permissions, '{}'::jsonb)::JSONB,
+        COUNT(u.id)::BIGINT AS user_count
+    FROM public."Role" r
+    LEFT JOIN public."User" u ON u."roleId" = r.id
+    GROUP BY r.id, r.name, r.description, r.permissions
+    ORDER BY r.id ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnRptCotizacion.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnRptCotizacion'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+DROP FUNCTION IF EXISTS public."fnRptCotizacion"(integer, integer);
+
+CREATE OR REPLACE FUNCTION public."fnRptCotizacion"(
+	p_id_ini integer,
+	p_id_fin integer)
+    RETURNS TABLE(
+        -- Cabecera Cotización
+        "idCotizacion" integer,
+        "internalNumber" text,
+        "asesor" text,
+        "fecha" timestamp without time zone,
+        "currency" text,
+        "tCambio" double precision,
+        "state" text,
+        "descripcionPlan" text,
+        "observaciones" text,
+        "baseCommissionable" double precision,
+        "commissionPercentage" double precision,
+        "totalAmount" double precision,
+        "costoTotal" double precision,
+        "valorBase" double precision,
+        "utilidad" double precision,
+        "comisionFreelanceValue" double precision,
+        "comisionPropiaValue" double precision,
+        "comisionTotalPercentage" double precision,
+        "comisionFreelancePercentage" double precision,
+        "comisionPropiaPercentage" double precision,
+        "comisionUtilidadPercentage" double precision,
+
+        -- Cliente
+        "clienteNombre" text,
+        "clienteIdentificacion" text,
+        "clienteDireccion" text,
+        "clienteTelefono" text,
+
+        -- Resúmenes de cabecera
+        "pasajeros" text,
+        "totalAdultos" integer,
+        "totalNinos" integer,
+        "baseComisionable" double precision,
+        "comisionAsesor" double precision,
+        "fechasViaje" text,
+        "hotelesServicios" text,
+        "vendedor" text,
+        "logo" bytea,
+        "destinoCabecera" text,
+        "fechaInicioCabecera" timestamp without time zone,
+        "fechaFinCabecera" timestamp without time zone,
+        "pasajeroCabecera" text,
+        "paxAdultosCabecera" integer,
+        "paxNinosCabecera" integer,
+        "reservacionCabecera" text,
+        "descripcionManualCabecera" text,
+
+        -- Datos del Producto/Item
+        "idProducto" integer,
+        "productDescripcion" text,
+        "productTipo" text,
+        "productCodigo" text,
+        "productConcepto" text,
+        "productItinerario" text,
+        "productClase" text,
+        "productVuelo" text,
+        "precio" double precision,
+        "cantidad" integer,
+        "costo" double precision,
+        "checkIn" text,
+        "checkOut" text,
+        "noches" integer,
+        "paxAdultos" integer,
+        "paxNinos" integer,
+        "destino" text,
+        "codigoReserva" text,
+        "tipoServicio" text,
+        "servicio" text,
+        "descripcion" text,
+
+        -- Proveedor del producto
+        "proveedorNombre" text,
+        "proveedorNIT" text,
+        "proveedorContacto" text,
+
+        -- Prestadora del producto
+        "prestadoraNombre" text,
+        "prestadoraCategoria" text,
+        "prestadoraUbicacion" text,
+
+        -- Valores financieros calculados del producto
+        "tarifaNeta" double precision,
+        "impuestos" double precision,
+        "adicionalesServ" double precision,
+        "comision" double precision,
+        "descuento" double precision,
+        "sobrecomision" double precision,
+        "fee" double precision,
+        "total" double precision
+    ) 
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+    ROWS 1000
+
+AS $BODY$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        -- Cabecera Cotización
+        q.id AS "idCotizacion",
+        COALESCE(q."internalNumber", '')::text AS "internalNumber",
+        COALESCE(u.name, '')::text AS "asesor",
+        q.date AS "fecha",
+        COALESCE(q.currency, '')::text AS "currency",
+        q."exchangeRate"::double precision AS "tCambio",
+        COALESCE(q.state, '')::text AS "state",
+        ('Cotización ' || q."internalNumber")::text AS "descripcionPlan",
+        COALESCE(q.state, '')::text AS "observaciones",
+        COALESCE(q."baseCommissionable", 0)::double precision AS "baseCommissionable",
+        COALESCE(q."commissionPercentage", 0)::double precision AS "commissionPercentage",
+        COALESCE(q."totalAmount", 0)::double precision AS "totalAmount",
+        COALESCE(q."costoTotal", 0)::double precision AS "costoTotal",
+        COALESCE(q."valorBase", 0)::double precision AS "valorBase",
+        COALESCE(q."utilidad", 0)::double precision AS "utilidad",
+        COALESCE(
+            q."comisionFreelanceValue", 
+            CASE WHEN COALESCE(q."valorBase", 0) > 0 AND COALESCE(q."comisionFreelancePercentage", 0) > 0 
+                 THEN ROUND(((COALESCE(q."comisionFreelancePercentage", 0) / 100.0) * q."valorBase")::numeric, 2) 
+                 ELSE 0 END
+        )::double precision AS "comisionFreelanceValue",
+        COALESCE(
+            q."comisionPropiaValue", 
+            COALESCE(q."utilidad", 0) - COALESCE(
+                q."comisionFreelanceValue", 
+                CASE WHEN COALESCE(q."valorBase", 0) > 0 AND COALESCE(q."comisionFreelancePercentage", 0) > 0 
+                     THEN ROUND(((COALESCE(q."comisionFreelancePercentage", 0) / 100.0) * q."valorBase")::numeric, 2) 
+                     ELSE 0 END
+            )
+        )::double precision AS "comisionPropiaValue",
+        COALESCE(
+            q."comisionTotalPercentage", 
+            COALESCE(
+                q."comisionUtilidadPercentage", 
+                CASE WHEN COALESCE(q."valorBase", 0) > 0 
+                     THEN ROUND(((COALESCE(q."utilidad", 0) / q."valorBase") * 100.0)::numeric, 2) 
+                     ELSE 0 END
+            )
+        )::double precision AS "comisionTotalPercentage",
+        COALESCE(q."comisionFreelancePercentage", 0)::double precision AS "comisionFreelancePercentage",
+        ROUND(COALESCE(
+            q."comisionPropiaPercentage", 
+            COALESCE(
+                q."comisionUtilidadPercentage", 
+                CASE WHEN COALESCE(q."valorBase", 0) > 0 
+                     THEN ROUND(((COALESCE(q."utilidad", 0) / q."valorBase") * 100.0)::numeric, 2) 
+                     ELSE 0 END
+            ) - COALESCE(q."comisionFreelancePercentage", 0)
+        )::numeric, 2)::double precision AS "comisionPropiaPercentage",
+        COALESCE(
+            q."comisionUtilidadPercentage", 
+            CASE WHEN COALESCE(q."valorBase", 0) > 0 
+                 THEN ROUND(((COALESCE(q."utilidad", 0) / q."valorBase") * 100.0)::numeric, 2) 
+                 ELSE 0 END
+        )::double precision AS "comisionUtilidadPercentage",
+
+        -- Cliente
+        COALESCE(c.name, '')::text AS "clienteNombre",
+        COALESCE(c.document, '')::text AS "clienteIdentificacion",
+        COALESCE(c.address, '')::text AS "clienteDireccion",
+        COALESCE(c."contactInfo", '')::text AS "clienteTelefono",
+
+        -- Resúmenes de cabecera (pasajeros/adultos/niños = del producto actual)
+        (
+            SELECT string_agg(p.name, ', ')
+            FROM "QuotationProductPassenger" p
+            WHERE p."quotationProductId" = qp.id
+        )::text AS "pasajeros",
+        COALESCE(qp."paxAdults", 0)::integer AS "totalAdultos",
+        COALESCE(qp."paxChildren", 0)::integer AS "totalNinos",
+        COALESCE(q."baseCommissionable", 0)::double precision AS "baseComisionable",
+        COALESCE(q."commissionPercentage", 0)::double precision AS "comisionAsesor",
+        COALESCE(to_char(qp."checkInDate", 'DD/MM/YYYY') || ' al ' || to_char(qp."checkOutDate", 'DD/MM/YYYY'), '')::text AS "fechasViaje",
+        COALESCE(prod.description, '')::text AS "hotelesServicios",
+        COALESCE(sel.name, '')::text AS "vendedor",
+        COALESCE(i.logo, b.logo) AS "logo",
+        COALESCE(q.destination, '')::text AS "destinoCabecera",
+        q."startDate" AS "fechaInicioCabecera",
+        q."endDate" AS "fechaFinCabecera",
+        COALESCE(q.passenger, '')::text AS "pasajeroCabecera",
+        COALESCE(q."paxAdults", 0)::integer AS "paxAdultosCabecera",
+        COALESCE(q."paxChildren", 0)::integer AS "paxNinosCabecera",
+        COALESCE(q."reservationCode", '')::text AS "reservacionCabecera",
+        COALESCE(q."manualDescription", '')::text AS "descripcionManualCabecera",
+
+        -- Datos del Producto/Item
+        qp.id AS "idProducto",
+        COALESCE(prod.description, '')::text AS "productDescripcion",
+        COALESCE(prod.type, '')::text AS "productTipo",
+        COALESCE(prod.code, '')::text AS "productCodigo",
+        COALESCE(prod."billingConcept", '')::text AS "productConcepto",
+        COALESCE(prod."airlineItinerary", '')::text AS "productItinerario",
+        COALESCE(prod."classItinerary", '')::text AS "productClase",
+        COALESCE(prod."flightItinerary", '')::text AS "productVuelo",
+        COALESCE(qp.price, 0)::double precision AS "precio",
+        COALESCE(qp.quantity, 1)::integer AS "cantidad",
+        COALESCE(qp.cost, 0)::double precision AS "costo",
+        COALESCE(to_char(qp."checkInDate", 'DD/MM/YYYY'), '')::text AS "checkIn",
+        COALESCE(to_char(qp."checkOutDate", 'DD/MM/YYYY'), '')::text AS "checkOut",
+        COALESCE(qp.nights, 0)::integer AS "noches",
+        COALESCE(qp."paxAdults", 0)::integer AS "paxAdultos",
+        COALESCE(qp."paxChildren", 0)::integer AS "paxNinos",
+        COALESCE(qp.destination, '')::text AS "destino",
+        COALESCE(qp."reservationCode", '')::text AS "codigoReserva",
+        COALESCE(qp."serviceType", '')::text AS "tipoServicio",
+        COALESCE(qp.service, '')::text AS "servicio",
+        COALESCE(qp.description, '')::text AS "descripcion",
+
+        -- Proveedor
+        COALESCE(prov.name, '')::text AS "proveedorNombre",
+        COALESCE(prov.code, '')::text AS "proveedorNIT",
+        COALESCE(prov."contactInfo", '')::text AS "proveedorContacto",
+
+        -- Prestadora
+        COALESCE(pre.name, '')::text AS "prestadoraNombre",
+        COALESCE(pre.category, '')::text AS "prestadoraCategoria",
+        COALESCE(pre.location, '')::text AS "prestadoraUbicacion",
+
+        -- Valores financieros del producto
+        (
+            COALESCE(qp.price, 0) +
+            COALESCE((
+                SELECT SUM(qpt2."explicitAmount")
+                FROM "QuotationProductTax" qpt2
+                JOIN "ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
+                LEFT JOIN "ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
+                WHERE qpt2."quotationProductId" = qp.id
+                  AND qpt2."isMain" = false
+                  AND ct2."targetTaxId" IS NOT NULL
+                  AND (
+                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
+                  )
+            ), 0)
+        )::double precision AS "tarifaNeta",
+
+        COALESCE(
+            (
+                SELECT SUM(qpt2."explicitAmount")
+                FROM "QuotationProductTax" qpt2
+                JOIN "ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
+                WHERE qpt2."quotationProductId" = qp.id
+                  AND qpt2."isMain" = false
+                  AND ct2.type = 'TAX'
+            ), 0
+        )::double precision AS "impuestos",
+
+        COALESCE(
+            (
+                SELECT SUM(qpt2."explicitAmount")
+                FROM "QuotationProductTax" qpt2
+                JOIN "ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
+                LEFT JOIN "ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
+                WHERE qpt2."quotationProductId" = qp.id
+                  AND qpt2."isMain" = false
+                  AND ct2.type = 'CHARGE'
+                  AND NOT (
+                      ct2."targetTaxId" IS NOT NULL AND (
+                          target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
+                      )
+                  )
+            ), 0
+        )::double precision AS "adicionalesServ",
+
+        COALESCE(qp."sellerCommission", 0)::double precision AS "comision",
+        0::double precision AS "descuento",
+        0::double precision AS "sobrecomision",
+        0::double precision AS "fee",
+        COALESCE(
+            (
+                SELECT SUM(qpt2."explicitAmount")
+                FROM "QuotationProductTax" qpt2
+                WHERE qpt2."quotationProductId" = qp.id
+            ), 0
+        )::double precision AS "total"
+
+    FROM "Quotation" q
+    LEFT JOIN "Client" c ON q."clientId" = c.id
+    LEFT JOIN "Seller" sel ON q."sellerId" = sel.id
+    LEFT JOIN "User" u ON q."userId" = u.id
+    LEFT JOIN "Branch" b ON q."branchId" = b.id
+    LEFT JOIN "Implant" i ON q."implantId" = i.id
+    LEFT JOIN "QuotationProduct" qp ON qp."quotationId" = q.id
+    LEFT JOIN "Product" prod ON qp."productId" = prod.id
+    LEFT JOIN "Provider" prov ON qp."providerId" = prov.id
+    LEFT JOIN "Prestadora" pre ON qp."prestadoraId" = pre.id
+    WHERE q.id BETWEEN p_id_ini AND p_id_fin
+    ORDER BY q.id, qp.id;
+END;
+$BODY$;;
+
+-- Inyectado automáticamente: fnSysConsecutivoListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnSysConsecutivoListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnSysConsecutivoListar()
+RETURNS TABLE (
+    id INT,
+    codigo VARCHAR,
+    nombre VARCHAR,
+    "branchId" INT,
+    "branchName" VARCHAR,
+    "implantId" INT,
+    "implantName" VARCHAR,
+    fuente VARCHAR,
+    serie VARCHAR,
+    consecutivo BIGINT,
+    "createdAt" TIMESTAMP,
+    "updatedAt" TIMESTAMP
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        sc.id,
+        sc.codigo,
+        sc.nombre,
+        sc."branchId",
+        b.name AS "branchName",
+        sc."implantId",
+        imp.name AS "implantName",
+        sc.fuente,
+        sc.serie,
+        sc.consecutivo,
+        sc."createdAt",
+        sc."updatedAt"
+    FROM public."SysConsecutivo" sc
+    LEFT JOIN public."Branch" b ON b.id = sc."branchId"
+    LEFT JOIN public."Implant" imp ON imp.id = sc."implantId"
+    ORDER BY sc.id DESC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnTicketPrinterListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnTicketPrinterListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnTicketPrinterListar()
+RETURNS SETOF public."TicketPrinter"
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public."TicketPrinter" ORDER BY name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnTicketTypeListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnTicketTypeListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+
+CREATE OR REPLACE FUNCTION public."fnTicketTypeListar"()
+RETURNS TABLE(id integer, code text, name text, description text, "isActive" boolean)
+LANGUAGE plpgsql AS $function$
+BEGIN
+    RETURN QUERY SELECT t.id, t.code::text, t.name::text, t.description::text, t."isActive" FROM public."TicketType" t ORDER BY t.name ASC;
+END; $function$;;
+
+-- Inyectado automáticamente: fnTransactionConsecutiveListar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnTransactionConsecutiveListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public."fnTransactionConsecutiveListar"()
+RETURNS TABLE (
+    id integer,
+    "transactionType" text,
+    "description" text,
+    "prefix" text,
+    "initialNumber" integer,
+    "currentNumber" integer,
+    "branchId" integer,
+    "branchName" text,
+    "implantId" integer,
+    "implantName" text,
+    "isActive" boolean,
+    "createdAt" timestamp without time zone
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        tc.id,
+        tc."transactionType"::text,
+        tc."description"::text,
+        COALESCE(tc.prefix, '')::text,
+        tc."initialNumber",
+        tc."currentNumber",
+        tc."branchId",
+        COALESCE(b.name, '')::text AS "branchName",
+        tc."implantId",
+        COALESCE(imp.name, '')::text AS "implantName",
+        tc."isActive",
+        tc."createdAt"
+    FROM public."TransactionConsecutive" tc
+    LEFT JOIN public."Branch" b ON b.id = tc."branchId"
+    LEFT JOIN public."Implant" imp ON imp.id = tc."implantId"
+    ORDER BY tc.id DESC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnUserPermissions.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnUserPermissions'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+-- =============================================
+-- Función: fnUserPermissions
+-- Descripción: Retorna el rol y la matriz de permisos JSON de un usuario desde la base de datos PostgreSQL.
+-- Base de Datos: PostgreSQL (Korex_colaereo)
+-- =============================================
+CREATE OR REPLACE FUNCTION public."fnUserPermissions"(p_user_id INT)
+RETURNS TABLE (
+    user_id INT,
+    role_id INT,
+    role_name VARCHAR,
+    permissions JSONB
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        u.id AS user_id,
+        r.id AS role_id,
+        r.name::VARCHAR AS role_name,
+        COALESCE(r.permissions, '{}'::jsonb)::JSONB AS permissions
+    FROM public."User" u
+    JOIN public."Role" r ON u."roleId" = r.id
+    WHERE u.id = p_user_id;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnUsuarioListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnUsuarioListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnUsuarioListar()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        jsonb_build_object(
+            'id', u.id,
+            'name', u.name,
+            'email', u.email,
+            'roleId', u."roleId",
+            'role', (
+                SELECT jsonb_build_object('id', r.id, 'name', r.name)
+                FROM public."Role" r
+                WHERE r.id = u."roleId"
+            ),
+            'branchId', u."branchId",
+            'branch', CASE WHEN u."branchId" IS NOT NULL THEN (
+                SELECT jsonb_build_object('id', b.id, 'name', b.name, 'code', b.code)
+                FROM public."Branch" b
+                WHERE b.id = u."branchId"
+            ) ELSE NULL END,
+            'implantId', u."implantId",
+            'implant', CASE WHEN u."implantId" IS NOT NULL THEN (
+                SELECT jsonb_build_object('id', i.id, 'name', i.name, 'code', i.code)
+                FROM public."Implant" i
+                WHERE i.id = u."implantId"
+            ) ELSE NULL END,
+            'ticketPrinterId', u."ticketPrinterId",
+            'ticketPrinter', CASE WHEN u."ticketPrinterId" IS NOT NULL THEN (
+                SELECT jsonb_build_object('id', t.id, 'name', t.name, 'code', t.code)
+                FROM public."TicketPrinter" t
+                WHERE t.id = u."ticketPrinterId"
+            ) ELSE NULL END
+        )
+    FROM public."User" u
+    ORDER BY u.name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fnVariableListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fnVariableListar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fnVariableListar()
+RETURNS SETOF public."MasterVariable"
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT * FROM public."MasterVariable" ORDER BY name ASC;
+END;
+$$;;
+
+-- Inyectado automáticamente: fn_obtener_decimales_moneda.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'fn_obtener_decimales_moneda'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.fn_obtener_decimales_moneda(p_currency_code TEXT)
+RETURNS INT
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_decimals INT;
+BEGIN
+    SELECT COALESCE(decimals, 2) INTO v_decimals
+    FROM public."Currency"
+    WHERE LOWER(code) = LOWER(p_currency_code);
+    
+    RETURN COALESCE(v_decimals, 2);
+END;
+$$;;
+
+-- Inyectado automáticamente: spAirportActualizar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spAirportActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spAirportActualizar"(IN p_id integer, IN p_code text, IN p_name text, IN p_citiesId integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
+LANGUAGE plpgsql AS $procedure$
+DECLARE v_existente integer;
+BEGIN
+    SELECT id INTO v_existente FROM public."Airports" WHERE id = p_id;
+    IF v_existente IS NULL THEN p_mensaje_resultado := 'ERROR: No existe.'; RETURN; END IF;
+    SELECT id INTO v_existente FROM public."Airports" WHERE "code" = p_code AND id <> p_id;
+    IF v_existente IS NOT NULL THEN p_mensaje_resultado := 'ERROR: El código ya existe.'; RETURN; END IF;
+    UPDATE public."Airports" SET "code" = COALESCE(TRIM(p_code), ''), "name" = TRIM(p_name), "citiesId" = p_citiesId WHERE id = p_id;
+    p_mensaje_resultado := 'SUCCESS';
+EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;;
+
+-- Inyectado automáticamente: spAirportCrear.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spAirportCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spAirportCrear"(IN p_code text, IN p_name text, IN p_citiesId integer, IN p_user_id integer, INOUT p_id integer, INOUT p_mensaje_resultado text)
+LANGUAGE plpgsql AS $procedure$
+DECLARE v_existente integer;
+BEGIN
+    SELECT id INTO v_existente FROM public."Airports" WHERE "code" = p_code;
+    IF v_existente IS NOT NULL THEN p_mensaje_resultado := 'ERROR: El código ya existe.'; RETURN; END IF;
+    INSERT INTO public."Airports" ("code", "name", "citiesId") VALUES (COALESCE(TRIM(p_code), ''), TRIM(p_name), p_citiesId) RETURNING id INTO p_id;
+    p_mensaje_resultado := 'SUCCESS';
+EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; p_id := 0; END; $procedure$;;
+
+-- Inyectado automáticamente: spAirportEliminar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spAirportEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spAirportEliminar"(IN p_id integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
+LANGUAGE plpgsql AS $procedure$
+BEGIN
+    DELETE FROM public."Airports" WHERE id = p_id; p_mensaje_resultado := 'SUCCESS';
+EXCEPTION WHEN foreign_key_violation THEN p_mensaje_resultado := 'ERROR: En uso.'; WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;;
+
+-- Inyectado automáticamente: spBranchActualizar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spBranchActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spBranchActualizar(
+    p_id INT,
+    p_code TEXT,
+    p_name TEXT,
+    p_logo BYTEA,
+    p_template BYTEA,
+    p_template_config JSONB,
+    p_html_template TEXT,
+    p_resolution_id INT DEFAULT NULL,
+    p_invoice_template BYTEA DEFAULT NULL,
+    p_invoice_template_config JSONB DEFAULT NULL,
+    p_invoice_html_template TEXT DEFAULT NULL,
+    p_is_active BOOLEAN DEFAULT true,
+    p_acting_user_id INT DEFAULT 1,
+    INOUT p_mensaje_resultado TEXT DEFAULT ''
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public."Branch" WHERE id = p_id) THEN
+        p_mensaje_resultado := 'ERROR: Sucursal con ID ' || p_id || ' no encontrada.';
+        RETURN;
+    END IF;
+
+    UPDATE public."Branch"
+    SET "code" = p_code,
+        "name" = p_name,
+        "logo" = COALESCE(p_logo, "logo"),
+        "template" = COALESCE(p_template, "template"),
+        "templateConfig" = COALESCE(p_template_config, "templateConfig"),
+        "htmlTemplate" = COALESCE(p_html_template, "htmlTemplate"),
+        "resolutionId" = p_resolution_id,
+        "invoiceTemplate" = COALESCE(p_invoice_template, "invoiceTemplate"),
+        "invoiceTemplateConfig" = COALESCE(p_invoice_template_config, "invoiceTemplateConfig"),
+        "invoiceHtmlTemplate" = COALESCE(p_invoice_html_template, "invoiceHtmlTemplate"),
+        "isActive" = COALESCE(p_is_active, true)
+    WHERE id = p_id;
+
+    p_mensaje_resultado := 'SUCCESS: Sucursal actualizada exitosamente.';
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;;
+
+-- Inyectado automáticamente: spBranchCrear.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spBranchCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spBranchCrear(
+    p_code TEXT,
+    p_name TEXT,
+    p_logo BYTEA,
+    p_template BYTEA,
+    p_template_config JSONB,
+    p_html_template TEXT,
+    p_resolution_id INT DEFAULT NULL,
+    p_invoice_template BYTEA DEFAULT NULL,
+    p_invoice_template_config JSONB DEFAULT NULL,
+    p_invoice_html_template TEXT DEFAULT NULL,
+    p_is_active BOOLEAN DEFAULT true,
+    p_acting_user_id INT DEFAULT 1,
+    INOUT p_branch_id INT DEFAULT 0,
+    INOUT p_mensaje_resultado TEXT DEFAULT ''
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    INSERT INTO public."Branch" (
+        "code", "name", "logo", "template", "templateConfig", "htmlTemplate",
+        "resolutionId", "invoiceTemplate", "invoiceTemplateConfig", "invoiceHtmlTemplate", "isActive"
+    )
+    VALUES (
+        p_code, p_name, p_logo, p_template, p_template_config, p_html_template,
+        p_resolution_id, p_invoice_template, p_invoice_template_config, p_invoice_html_template, COALESCE(p_is_active, true)
+    )
+    RETURNING id INTO p_branch_id;
+
+    p_mensaje_resultado := 'SUCCESS: Sucursal creada con ID ' || p_branch_id;
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;;
+
+-- Inyectado automáticamente: spBranchEliminar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spBranchEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spBranchEliminar(
+    p_id INT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public."Branch" WHERE id = p_id) THEN
+        p_mensaje_resultado := 'ERROR: Sucursal con ID ' || p_id || ' no encontrada.';
+        RETURN;
+    END IF;
+
+    DELETE FROM public."Branch" WHERE id = p_id;
+    p_mensaje_resultado := 'SUCCESS: Sucursal eliminada exitosamente.';
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;;
+
+-- Inyectado automáticamente: spCellCustomizationDelete.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCellCustomizationDelete'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spCellCustomizationDelete(
+    p_code text,
+    p_branch_id integer,
+    p_implant_id integer
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_branch_id IS NOT NULL THEN
+        DELETE FROM public."CellCustomization"
+        WHERE "code" = p_code AND "branchId" = p_branch_id AND "implantId" IS NULL;
+    ELSIF p_implant_id IS NOT NULL THEN
+        DELETE FROM public."CellCustomization"
+        WHERE "code" = p_code AND "implantId" = p_implant_id;
+    END IF;
+END;
+$$;;
+
+-- Inyectado automáticamente: spCellCustomizationUpsert.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCellCustomizationUpsert'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spCellCustomizationUpsert(
+    p_code text,
+    p_name text,
+    p_value text,
+    p_branch_id integer,
+    p_implant_id integer
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_branch_id IS NOT NULL THEN
+        INSERT INTO public."CellCustomization" ("code", "name", "value", "branchId", "implantId")
+        VALUES (p_code, p_name, p_value, p_branch_id, NULL)
+        ON CONFLICT ("branchId", "code") WHERE "branchId" IS NOT NULL
+        DO UPDATE SET "name" = EXCLUDED."name", "value" = EXCLUDED."value";
+    ELSIF p_implant_id IS NOT NULL THEN
+        INSERT INTO public."CellCustomization" ("code", "name", "value", "branchId", "implantId")
+        VALUES (p_code, p_name, p_value, NULL, p_implant_id)
+        ON CONFLICT ("implantId", "code") WHERE "implantId" IS NOT NULL
+        DO UPDATE SET "name" = EXCLUDED."name", "value" = EXCLUDED."value";
+    END IF;
+END;
+$$;;
+
+-- Inyectado automáticamente: spCityActualizar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCityActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spCityActualizar"(IN p_id integer, IN p_code text, IN p_name text, IN p_countriesId integer, IN p_statecode text, IN p_iata text, IN p_user_id integer, INOUT p_mensaje_resultado text)
+LANGUAGE plpgsql AS $procedure$
+DECLARE v_existente integer;
+BEGIN
+    SELECT id INTO v_existente FROM public."Cities" WHERE id = p_id;
+    IF v_existente IS NULL THEN p_mensaje_resultado := 'ERROR: No existe.'; RETURN; END IF;
+    SELECT id INTO v_existente FROM public."Cities" WHERE "code" = p_code AND id <> p_id;
+    IF v_existente IS NOT NULL THEN p_mensaje_resultado := 'ERROR: El código ya existe.'; RETURN; END IF;
+    UPDATE public."Cities" SET "code" = COALESCE(TRIM(p_code), ''), "name" = TRIM(p_name), "countriesId" = p_countriesId, "statecode" = p_statecode, "iata" = p_iata WHERE id = p_id;
+    p_mensaje_resultado := 'SUCCESS';
+EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;;
+
+-- Inyectado automáticamente: spCityCrear.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCityCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spCityCrear"(IN p_code text, IN p_name text, IN p_countriesId integer, IN p_statecode text, IN p_iata text, IN p_user_id integer, INOUT p_id integer, INOUT p_mensaje_resultado text)
+LANGUAGE plpgsql AS $procedure$
+DECLARE v_existente integer;
+BEGIN
+    SELECT id INTO v_existente FROM public."Cities" WHERE "code" = p_code;
+    IF v_existente IS NOT NULL THEN p_mensaje_resultado := 'ERROR: El código ya existe.'; RETURN; END IF;
+    INSERT INTO public."Cities" ("code", "name", "countriesId", "statecode", "iata") VALUES (COALESCE(TRIM(p_code), ''), TRIM(p_name), p_countriesId, p_statecode, p_iata) RETURNING id INTO p_id;
+    p_mensaje_resultado := 'SUCCESS';
+EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; p_id := 0; END; $procedure$;;
+
+-- Inyectado automáticamente: spCityEliminar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCityEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spCityEliminar"(IN p_id integer, IN p_user_id integer, INOUT p_mensaje_resultado text)
+LANGUAGE plpgsql AS $procedure$
+BEGIN
+    DELETE FROM public."Cities" WHERE id = p_id; p_mensaje_resultado := 'SUCCESS';
+EXCEPTION WHEN foreign_key_violation THEN p_mensaje_resultado := 'ERROR: En uso.'; WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;;
+
+-- Inyectado automáticamente: spClienteActualizar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spClienteActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name;
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spClienteActualizar(
+    p_id INT,
+    p_name TEXT,
+    p_document TEXT,
+    p_contact_info TEXT,
+    p_address TEXT,
+    p_mandatory_variables JSONB,
+    p_acting_user_id INT,
+    p_seller_id INT DEFAULT NULL,
+    p_is_active BOOLEAN DEFAULT true,
+    p_credit_days INT DEFAULT 0,
+    INOUT p_mensaje_resultado TEXT DEFAULT ''
+)
+AS $BODY$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public."Client" WHERE document = p_document AND id <> p_id) THEN
+        p_mensaje_resultado := 'ERROR: El documento ya está registrado por otro cliente.';
+        RETURN;
+    END IF;
+
+    UPDATE public."Client" SET
+        "name" = p_name,
+        "document" = p_document,
+        "contactInfo" = p_contact_info,
+        "address" = p_address,
+        "mandatoryVariables" = p_mandatory_variables,
+        "sellerId" = p_seller_id,
+        "isActive" = COALESCE(p_is_active, true),
+        "creditDays" = COALESCE(p_credit_days, 0)
+    WHERE id = p_id;
+
+    p_mensaje_resultado := 'SUCCESS: Cliente ' || p_id || ' actualizado.';
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$BODY$
+LANGUAGE plpgsql;;
+
+-- Inyectado automáticamente: spClienteCrear.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spClienteCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name;
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spClienteCrear(
+    p_name TEXT,
+    p_document TEXT,
+    p_contact_info TEXT,
+    p_address TEXT,
+    p_mandatory_variables JSONB,
+    p_acting_user_id INT,
+    p_seller_id INT DEFAULT NULL,
+    p_is_active BOOLEAN DEFAULT true,
+    p_credit_days INT DEFAULT 0,
+    INOUT p_client_id INT DEFAULT 0,
+    INOUT p_mensaje_resultado TEXT DEFAULT ''
+)
+AS $BODY$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public."Client" WHERE document = p_document) THEN
+        p_mensaje_resultado := 'ERROR: El documento ya está registrado';
+        RETURN;
+    END IF;
+
+    INSERT INTO public."Client" ("name", "document", "contactInfo", "address", "mandatoryVariables", "sellerId", "isActive", "creditDays")
+    VALUES (p_name, p_document, p_contact_info, p_address, p_mandatory_variables, p_seller_id, COALESCE(p_is_active, true), COALESCE(p_credit_days, 0))
+    RETURNING id INTO p_client_id;
+
+    p_mensaje_resultado := 'SUCCESS: Cliente creado con ID ' || p_client_id;
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$BODY$
+LANGUAGE plpgsql;;
+
+-- Inyectado automáticamente: spClienteEliminar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spClienteEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name;
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spClienteEliminar(
+    p_id INT,
+    p_acting_user_id INT DEFAULT 1,
+    INOUT p_mensaje_resultado TEXT DEFAULT ''
+)
+AS $BODY$
+DECLARE
+    v_name TEXT;
+    v_count INT := 0;
+BEGIN
+    SELECT name INTO v_name FROM public."Client" WHERE id = p_id;
+    IF v_name IS NULL THEN
+        p_mensaje_resultado := 'ERROR: El cliente no existe.';
+        RETURN;
+    END IF;
+
+    SELECT (
+        SELECT COUNT(*) FROM public."Quotation" WHERE "clientId" = p_id
+    ) + (
+        SELECT COUNT(*) FROM public."Invoices" WHERE "clientId" = p_id
+    ) + (
+        SELECT COUNT(*) FROM public."PreQuotation" WHERE "clientId" = p_id
+    ) INTO v_count;
+
+    IF v_count > 0 THEN
+        p_mensaje_resultado := 'ERROR: No es posible eliminar el cliente "' || v_name || '" porque cuenta con ' || v_count || ' registro(s) de cotizaciones o facturas asociadas. Puedes marcarlo como INACTIVO para ocultarlo en futuras operaciones.';
+        RETURN;
+    END IF;
+
+    DELETE FROM public."Client" WHERE id = p_id;
+    p_mensaje_resultado := 'SUCCESS: Cliente eliminado.';
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$BODY$
+LANGUAGE plpgsql;;
+
+-- Inyectado automáticamente: spComboActualizar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spComboActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spComboActualizar(
+    p_id INT,
+    p_code TEXT,
+    p_name TEXT,
+    p_cupos INT,
+    p_currency_id INT,
+    p_products JSONB,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+    DECLARE
+        v_item RECORD;
+        v_tax RECORD;
+        v_combo_product_id INT;
+        v_local_combo_id INT := p_id;
+    BEGIN
+        IF v_local_combo_id IS NULL THEN
+            p_mensaje_resultado := 'ERROR: p_id is NULL (backend error).';
+            RETURN;
+        END IF;
+
+        -- Actualizar datos básicos
+        UPDATE public."Combo" SET "code" = p_code, "name" = p_name, "cupos" = COALESCE(p_cupos, 0), "currencyId" = p_currency_id, "updatedAt"=CURRENT_TIMESTAMP WHERE id = v_local_combo_id;
+
+        -- Limpiar productos previos
+        DELETE FROM public."ComboProductTax" WHERE "comboProductId" IN (SELECT id FROM public."ComboProduct" WHERE "comboId" = v_local_combo_id);
+        DELETE FROM public."ComboProduct" WHERE "comboId" = v_local_combo_id;
+
+        -- Insertar productos nuevos
+        IF p_products IS NOT NULL AND jsonb_array_length(p_products) > 0 THEN
+            FOR v_item IN SELECT * FROM jsonb_to_recordset(p_products) AS x(
+                "productId" INT, quantity INT, price FLOAT, cost FLOAT, "providerId" INT, "prestadoraId" INT, 
+                "checkInDate" TIMESTAMP, "checkOutDate" TIMESTAMP,
+                "paxAdults" INT, "paxChildren" INT, "mainTaxId" INT, "appliedTaxes" JSONB, "inNationality" INT
+            )
+            LOOP
+                IF v_item."productId" IS NOT NULL THEN
+                    INSERT INTO public."ComboProduct" (
+                        "comboId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId", 
+                        "checkInDate", "checkOutDate",
+                        "paxAdults", "paxChildren", "mainTaxId", "inNationality"
+                    ) VALUES (
+                        v_local_combo_id, v_item."productId", COALESCE(v_item.quantity, 1), COALESCE(v_item.price, 0), v_item.cost, v_item."providerId", v_item."prestadoraId",
+                        v_item."checkInDate", v_item."checkOutDate",
+                        v_item."paxAdults", v_item."paxChildren", v_item."mainTaxId", COALESCE(v_item."inNationality", 1)
+                    ) RETURNING id INTO v_combo_product_id;
+
+                    -- Insertar impuestos del producto si existen
+                    IF v_item."appliedTaxes" IS NOT NULL THEN
+                        FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS t("chargeAndTaxId" INT, amount FLOAT, "isMain" BOOLEAN)
+                        LOOP
+                            INSERT INTO public."ComboProductTax" ("comboProductId", "chargeAndTaxId", "amount", "isMain")
+                            VALUES (v_combo_product_id, v_tax."chargeAndTaxId", v_tax.amount, COALESCE(v_tax."isMain", FALSE));
+                        END LOOP;
+                    END IF;
+                END IF;
+            END LOOP;
+        END IF;
+
+        p_mensaje_resultado := 'SUCCESS: Combo ' || v_local_combo_id || ' actualizado correctamente.';
+    EXCEPTION WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+    END;
+$$;;
+
+-- Inyectado automáticamente: spCotizacionActualizar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'dbo' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+IF OBJECT_ID('dbo.spCotizacionActualizar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionActualizar;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionActualizar
+    @p_id INT,
+    @p_data NVARCHAR(MAX),
+    @p_acting_user_id INT = 1,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE id = @p_id)
+        BEGIN
+            SET @p_mensaje_resultado = N'ERROR: Cotización ' + CAST(@p_id AS NVARCHAR(20)) + N' no existe.';
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END
+
+        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
+        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
+        DECLARE @exchangeRate FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
+        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
+        DECLARE @implantId INT = JSON_VALUE(@p_data, '$.implantId');
+        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
+        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
+        DECLARE @totalAmount FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
+        DECLARE @baseCommissionable FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
+        DECLARE @chargesAndTaxes FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
+        DECLARE @commissionPercentage FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
+        DECLARE @state NVARCHAR(50) = ISNULL(JSON_VALUE(@p_data, '$.state'), N'NUEVO');
+        DECLARE @stateDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.stateDescription');
+        DECLARE @destination NVARCHAR(250) = JSON_VALUE(@p_data, '$.destination');
+        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
+        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
+        DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
+        DECLARE @paxAdults INT = JSON_VALUE(@p_data, '$.paxAdults');
+        DECLARE @paxChildren INT = JSON_VALUE(@p_data, '$.paxChildren');
+        DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
+        DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
+            SET @clientId = NULL;
+        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
+            SET @branchId = NULL;
+        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
+            SET @sellerId = NULL;
+        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
+            SET @implantId = NULL;
+        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
+            SET @ticketPrinterId = NULL;
+
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.[Quotation]
+        SET
+            clientId = @clientId,
+            currency = @currency,
+            exchangeRate = @exchangeRate,
+            branchId = ISNULL(@branchId, branchId),
+            implantId = @implantId,
+            sellerId = @sellerId,
+            ticketPrinterId = @ticketPrinterId,
+            totalAmount = @totalAmount,
+            baseCommissionable = @baseCommissionable,
+            chargesAndTaxes = @chargesAndTaxes,
+            commissionPercentage = @commissionPercentage,
+            state = @state,
+            stateDescription = ISNULL(@stateDescription, stateDescription),
+            stateUpdatedAt = GETDATE(),
+            destination = @destination,
+            startDate = @startDate,
+            endDate = @endDate,
+            passenger = @passenger,
+            paxAdults = @paxAdults,
+            paxChildren = @paxChildren,
+            reservationCode = @reservationCode,
+            manualDescription = @manualDescription
+        WHERE id = @p_id;
+
+        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
+        BEGIN
+            DELETE FROM dbo.[QuotationProductTax] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProductPassenger] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProductVariable] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProductPayment] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProduct] WHERE quotationId = @p_id;
+
+            DECLARE @item_val_upd NVARCHAR(MAX);
+            DECLARE item_cur_upd CURSOR LOCAL FAST_FORWARD FOR
+            SELECT [value] FROM OPENJSON(@p_data, '$.items');
+
+            OPEN item_cur_upd;
+            FETCH NEXT FROM item_cur_upd INTO @item_val_upd;
+
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                DECLARE @productIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.productId') AS INT);
+                DECLARE @quantityUpd INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.quantity') AS INT), 1);
+                DECLARE @priceUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.price') AS FLOAT), 0);
+                DECLARE @costUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.cost') AS FLOAT), 0);
+                DECLARE @providerIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.providerId') AS INT);
+                DECLARE @prestadoraIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.prestadoraId') AS INT);
+                DECLARE @checkInDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.checkIn') AS DATETIME2);
+                DECLARE @checkOutDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.checkOut') AS DATETIME2);
+                DECLARE @nightsUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.nights') AS INT);
+                DECLARE @paxAdultsItemUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.paxAdults') AS INT);
+                DECLARE @paxChildrenItemUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.paxChildren') AS INT);
+                DECLARE @serviceTypeUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.serviceType');
+                DECLARE @destinationItemUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.destination');
+                DECLARE @reservationCodeItemUpd NVARCHAR(100) = JSON_VALUE(@item_val_upd, '$.reservationCode');
+                DECLARE @sellerCommissionUpd FLOAT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.sellerCommission') AS FLOAT);
+                DECLARE @ticketPrinterCommissionUpd FLOAT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.ticketPrinterCommission') AS FLOAT);
+                DECLARE @comboIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.comboId') AS INT);
+                DECLARE @mainTaxIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.mainTaxId') AS INT);
+                DECLARE @inNationalityUpd INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.inNationality') AS INT), 1);
+                DECLARE @serviceUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.service');
+                DECLARE @serviciosUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.servicios');
+                DECLARE @descripcionUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.descripcion');
+                DECLARE @passengerItemUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.passenger');
+
+                IF @providerIdUpd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerIdUpd) SET @providerIdUpd = NULL;
+                IF @prestadoraIdUpd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraIdUpd) SET @prestadoraIdUpd = NULL;
+
+                DECLARE @qp_id_upd INT;
+                INSERT INTO dbo.[QuotationProduct] (
+                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
+                    checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
+                    reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
+                    service, servicios, descripcion, passenger
+                ) VALUES (
+                    @p_id, @productIdUpd, @quantityUpd, @priceUpd, @costUpd, @providerIdUpd, @prestadoraIdUpd,
+                    @checkInDateUpd, @checkOutDateUpd, @nightsUpd, @paxAdultsItemUpd, @paxChildrenItemUpd, @serviceTypeUpd, @destinationItemUpd,
+                    @reservationCodeItemUpd, @sellerCommissionUpd, @ticketPrinterCommissionUpd, @comboIdUpd, @mainTaxIdUpd, @inNationalityUpd,
+                    @serviceUpd, @serviciosUpd, @descripcionUpd, @passengerItemUpd
+                );
+                SET @qp_id_upd = SCOPE_IDENTITY();
+
+                -- Insert Applied Taxes (QuotationProductTax)
+                IF JSON_QUERY(@item_val_upd, '$.appliedTaxes') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
+                    SELECT
+                        @qp_id_upd,
+                        TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.explicitAmount') AS FLOAT), ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.amount') AS FLOAT), 0)),
+                        TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT),
+                        JSON_VALUE(tax.value, '$.valueTypeSnapshot'),
+                        CASE WHEN TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) = @mainTaxIdUpd OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
+                    FROM OPENJSON(@item_val_upd, '$.appliedTaxes') AS tax
+                    WHERE TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) IS NOT NULL;
+                END
+
+                -- Insert Passengers (QuotationProductPassenger)
+                IF JSON_QUERY(@item_val_upd, '$.passengers') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
+                    SELECT
+                        @qp_id_upd,
+                        JSON_VALUE(pax.value, '$.name'),
+                        JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@item_val_upd, '$.passengers') AS pax
+                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
+                END
+
+                -- Insert Variables (QuotationProductVariable)
+                IF JSON_QUERY(@item_val_upd, '$.variables') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, value)
+                    SELECT
+                        @qp_id_upd,
+                        TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT),
+                        JSON_VALUE(v.value, '$.value')
+                    FROM OPENJSON(@item_val_upd, '$.variables') AS v
+                    WHERE TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT) IS NOT NULL;
+                END
+
+                -- Insert Payments (QuotationProductPayment)
+                IF JSON_QUERY(@item_val_upd, '$.payments') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPayment] (
+                        quotationProductId, amount, paymentMethod, date, reference, creditCardId, cardNumber, authorizationCode, voucher, expirationDate
+                    )
+                    SELECT
+                        @qp_id_upd,
+                        ISNULL(TRY_CAST(JSON_VALUE(pmt.value, '$.amount') AS FLOAT), 0),
+                        JSON_VALUE(pmt.value, '$.paymentMethod'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.date') AS DATETIME2),
+                        JSON_VALUE(pmt.value, '$.reference'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.creditCardId') AS INT),
+                        JSON_VALUE(pmt.value, '$.cardNumber'),
+                        JSON_VALUE(pmt.value, '$.authorizationCode'),
+                        JSON_VALUE(pmt.value, '$.voucher'),
+                        JSON_VALUE(pmt.value, '$.expirationDate')
+                    FROM OPENJSON(@item_val_upd, '$.payments') AS pmt;
+                END
+
+                FETCH NEXT FROM item_cur_upd INTO @item_val_upd;
+            END
+
+            CLOSE item_cur_upd;
+            DEALLOCATE item_cur_upd;
+        END
+
+        -- Recalculate totalAmount if 0 or missing
+        DECLARE @calcTotalUpd FLOAT = (
+            SELECT SUM(ISNULL(qpt.explicitAmount, 0))
+            FROM dbo.[QuotationProductTax] qpt
+            JOIN dbo.[QuotationProduct] qp ON qpt.quotationProductId = qp.id
+            WHERE qp.quotationId = @p_id
+        );
+        IF @calcTotalUpd IS NULL OR @calcTotalUpd = 0
+        BEGIN
+            SET @calcTotalUpd = (
+                SELECT SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1))
+                FROM dbo.[QuotationProduct] qp
+                WHERE qp.quotationId = @p_id
+            );
+        END
+
+        IF @calcTotalUpd IS NOT NULL AND @calcTotalUpd > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @calcTotalUpd,
+                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotalUpd),
+                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotalUpd)
+            WHERE id = @p_id;
+        END
+        ELSE IF @totalAmount > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @totalAmount
+            WHERE id = @p_id;
+        END
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = N'SUCCESS: Cotización ' + CAST(@p_id AS NVARCHAR(20)) + N' actualizada correctamente.';
+        SELECT @p_id AS p_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
+        SELECT 0 AS p_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH
+END;;
+
+-- Inyectado automáticamente: spCotizacionActualizarEstado.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionActualizarEstado'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spCotizacionActualizarEstado(
+    p_response JSONB
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_estados_str TEXT;
+    v_item_text TEXT;
+    v_id INT;
+    v_estado TEXT;
+    v_row_json JSONB;
+BEGIN
+    /**
+     * Este procedimiento recibe la respuesta de SQL Server (spCotizacionesCrear)
+     * Parsea UNICAMENTE el nodo 'Estados' que contiene el formato 'ID:Estado|ID:Estado|'
+     */
+    
+    -- El input puede ser un array de objetos o un objeto individual
+    -- Buscamos el campo 'Estados' en cada objeto
+	
+    IF JSONB_TYPEOF(p_response) = 'array' THEN
+        FOR v_row_json IN SELECT jsonb_array_elements(p_response)
+        LOOP
+            v_estados_str := v_row_json->>'Estados';
+            
+            IF v_estados_str IS NOT NULL AND v_estados_str <> '' THEN
+                -- Iterar sobre cada par ID:Estado separado por '|'
+                FOR v_item_text IN SELECT unnest(string_to_array(btrim(v_estados_str, '|'), '|'))
+                LOOP
+                    v_item_text := trim(v_item_text);
+                    IF v_item_text LIKE '%:%' THEN
+                        BEGIN
+                            -- Split por ':'
+                            v_id := split_part(v_item_text, ':', 1)::INT;
+                            v_estado := split_part(v_item_text, ':', 2);
+                            
+                            -- Actualizar con el estado LITERAL recibido
+                            UPDATE public."Quotation"
+                            SET "state" = v_estado
+                            WHERE id = v_id;
+                        EXCEPTION WHEN OTHERS THEN
+                            -- Ignorar errores de casteo en items individuales
+                        END;
+                    END IF;
+                END LOOP;
+            END IF;
+        END LOOP;
+    ELSIF JSONB_TYPEOF(p_response) = 'object' THEN
+        v_estados_str := p_response->>'Estados';
+        IF v_estados_str IS NOT NULL AND v_estados_str <> '' THEN
+            FOR v_item_text IN SELECT unnest(string_to_array(btrim(v_estados_str, '|'), '|'))
+            LOOP
+                v_item_text := trim(v_item_text);
+                IF v_item_text LIKE '%:%' THEN
+                    BEGIN
+                        v_id := split_part(v_item_text, ':', 1)::INT;
+                        v_estado := split_part(v_item_text, ':', 2);
+                        
+                        UPDATE public."Quotation"
+                        SET "state" = v_estado
+                        WHERE id = v_id;
+                    EXCEPTION WHEN OTHERS THEN END;
+                END IF;
+            END LOOP;
+        END IF;
+    END IF;
+	--SELECT * from public."Quotation" WHERE id = 31; 
+	--UPDATE public."Quotation"
+	--SET "state" = 'Nuevo'--v_row_json::text
+	--WHERE id = 31; 
+END;
+$$;;
+
+-- Inyectado automáticamente: spCotizacionActualizarEstadoManual.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionActualizarEstadoManual'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spCotizacionActualizarEstadoManual(
+    p_quotation_id INT,
+    p_state TEXT,
+    p_description TEXT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Validaciones
+    IF p_state IS NULL OR p_state = '' THEN
+        p_mensaje_resultado := 'ERROR: El estado es obligatorio.';
+        RETURN;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation" WHERE id = p_quotation_id) THEN
+        p_mensaje_resultado := 'ERROR: La cotización con ID ' || p_quotation_id || ' no existe.';
+        RETURN;
+    END IF;
+
+    -- Validar si el estado existe en la tabla de estados
+    IF NOT EXISTS (SELECT 1 FROM public."QuotationState" WHERE code = p_state) THEN
+        p_mensaje_resultado := 'ERROR: El estado "' || p_state || '" no es válido.';
+        RETURN;
+    END IF;
+
+    UPDATE public."Quotation" SET
+        "state" = p_state,
+        "stateDescription" = p_description,
+        "stateUpdatedAt" = CURRENT_TIMESTAMP
+    WHERE id = p_quotation_id;
+
+    -- Insertar historial de estado
     INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
-    VALUES (v_new_id, 'NUEVO', 'Copia de cotización #' || p_quotation_id::text, CURRENT_TIMESTAMP, v_user_id);
+    VALUES (p_quotation_id, p_state, p_description, CURRENT_TIMESTAMP, p_acting_user_id);
 
-    -- Duplicar combos asociados
-    INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
-    SELECT v_new_id, "comboId"
-    FROM public."QuotationCombo"
-    WHERE "quotationId" = p_quotation_id;
+    p_mensaje_resultado := 'SUCCESS: Estado de cotización actualizado correctamente.';
 
-    -- Duplicar servicios manuales si la tabla existe
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationManualService') THEN
-        INSERT INTO public."QuotationManualService" ("quotationId", "providerName", "serviceName", "cost", "salePrice", "utility")
-        SELECT v_new_id, "providerName", "serviceName", "cost", "salePrice", "utility"
-        FROM public."QuotationManualService"
-        WHERE "quotationId" = p_quotation_id;
-    END IF;
-
-    -- Duplicar productos y sus detalles
-    FOR v_orig_qp IN 
-        SELECT * FROM public."QuotationProduct" WHERE "quotationId" = p_quotation_id
-    LOOP
-        INSERT INTO public."QuotationProduct" (
-            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
-            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
-            "serviceType", "destination", "reservationCode", "sellerCommission",
-            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger"
-        ) VALUES (
-            v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
-            v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
-            v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
-            v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
-        ) RETURNING id INTO v_new_qp_id;
-
-        -- Duplicar Pasajeros del producto
-        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-        SELECT v_new_qp_id, "name", "document"
-        FROM public."QuotationProductPassenger"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Impuestos del producto
-        INSERT INTO public."QuotationProductTax" ("quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain")
-        SELECT v_new_qp_id, "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
-        FROM public."QuotationProductTax"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Variables del producto
-        INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
-        SELECT v_new_qp_id, "masterVariableId", "value"
-        FROM public."QuotationProductVariable"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Pagos del producto
-        INSERT INTO public."QuotationProductPayment" ("quotationProductId", "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate")
-        SELECT v_new_qp_id, "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
-        FROM public."QuotationProductPayment"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-    END LOOP;
-
-    p_new_quotation_id := v_new_id;
-    p_mensaje_resultado := 'SUCCESS: Cotización duplicada correctamente con ID ' || v_new_id;
-
-    -- Registrar en auditoría
+    -- Registrar en Auditoría
     CALL public."spLogRegistrar"(
-        v_user_id, 
+        p_acting_user_id, 
         'QUOTATION', 
-        'DUPLICATE', 
-        'Se duplicó la cotización #' || p_quotation_id || ' generando la cotización #' || v_new_id || ' (' || v_internal_number || ')', 
-        jsonb_build_object('sourceQuotationId', p_quotation_id, 'newQuotationId', v_new_id), 
-        v_new_id
+        'UPDATE_STATE', 
+        'Se cambió el estado de la cotización ID ' || p_quotation_id || ' a ' || p_state || '. Descripción: ' || COALESCE(p_description, ''), 
+        jsonb_build_object('quotationId', p_quotation_id, 'state', p_state, 'description', p_description), 
+        p_quotation_id
     );
 
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END;
-$procedure$;;
+$$;;
 
-    -- Duplicar combos asociados
-    INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
-    SELECT v_new_id, "comboId"
-    FROM public."QuotationCombo"
-    WHERE "quotationId" = p_quotation_id;
+-- Inyectado automáticamente: spCotizacionCrear.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'dbo' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
 
-    -- Duplicar servicios manuales si la tabla existe
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationManualService') THEN
-        INSERT INTO public."QuotationManualService" ("quotationId", "providerName", "serviceName", "cost", "salePrice", "utility")
-        SELECT v_new_id, "providerName", "serviceName", "cost", "salePrice", "utility"
-        FROM public."QuotationManualService"
-        WHERE "quotationId" = p_quotation_id;
+IF OBJECT_ID('dbo.spCotizacionCrear', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionCrear;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionCrear
+    @p_data NVARCHAR(MAX),
+    @p_acting_user_id INT = 1,
+    @p_quotation_id INT = NULL OUTPUT,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])
+        BEGIN
+            DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);
+        END
+
+        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
+        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
+        DECLARE @exchangeRate FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
+        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
+        DECLARE @implantId INT = JSON_VALUE(@p_data, '$.implantId');
+        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
+        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
+        DECLARE @totalAmount FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
+        DECLARE @baseCommissionable FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
+        DECLARE @chargesAndTaxes FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
+        DECLARE @commissionPercentage FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
+        DECLARE @destination NVARCHAR(250) = JSON_VALUE(@p_data, '$.destination');
+        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
+        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
+        DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
+        DECLARE @paxAdults INT = JSON_VALUE(@p_data, '$.paxAdults');
+        DECLARE @paxChildren INT = JSON_VALUE(@p_data, '$.paxChildren');
+        DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
+        DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
+            SET @clientId = NULL;
+        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
+            SET @branchId = NULL;
+        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
+            SET @sellerId = NULL;
+        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
+            SET @implantId = NULL;
+        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
+            SET @ticketPrinterId = NULL;
+
+        DECLARE @internalNum NVARCHAR(100) = NULL;
+        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @consecutivo_formateado = @internalNum OUTPUT;
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.[Quotation] (
+            internalNumber, [date], clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
+            baseCommissionable, chargesAndTaxes, totalAmount, commissionPercentage, userId, state, stateDescription, stateUpdatedAt,
+            destination, startDate, endDate, passenger, paxAdults, paxChildren, reservationCode, manualDescription
+        ) VALUES (
+            ISNULL(@internalNum, N'TEMP'), GETDATE(), @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId, @ticketPrinterId,
+            @baseCommissionable, @chargesAndTaxes, @totalAmount, @commissionPercentage, @actingUserId, N'NUEVO', N'Creación de cotización', GETDATE(),
+            @destination, @startDate, @endDate, @passenger, @paxAdults, @paxChildren, @reservationCode, @manualDescription
+        );
+
+        SET @p_quotation_id = SCOPE_IDENTITY();
+
+        IF @internalNum IS NULL OR @internalNum = N'TEMP'
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET internalNumber = CAST(@p_quotation_id AS NVARCHAR(50))
+            WHERE id = @p_quotation_id;
+        END
+
+        INSERT INTO dbo.[QuotationStateHistory] (quotationId, state, [description], createdAt, userId)
+        VALUES (@p_quotation_id, N'NUEVO', N'Creación de cotización', GETDATE(), @actingUserId);
+
+        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
+        BEGIN
+            DECLARE @item_val NVARCHAR(MAX);
+            DECLARE item_cur CURSOR LOCAL FAST_FORWARD FOR
+            SELECT [value] FROM OPENJSON(@p_data, '$.items');
+
+            OPEN item_cur;
+            FETCH NEXT FROM item_cur INTO @item_val;
+
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                DECLARE @productId INT = TRY_CAST(JSON_VALUE(@item_val, '$.productId') AS INT);
+                DECLARE @quantity INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.quantity') AS INT), 1);
+                DECLARE @price FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.price') AS FLOAT), 0);
+                DECLARE @cost FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.cost') AS FLOAT), 0);
+                DECLARE @providerId INT = TRY_CAST(JSON_VALUE(@item_val, '$.providerId') AS INT);
+                DECLARE @prestadoraId INT = TRY_CAST(JSON_VALUE(@item_val, '$.prestadoraId') AS INT);
+                DECLARE @checkInDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkIn') AS DATETIME2);
+                DECLARE @checkOutDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkOut') AS DATETIME2);
+                DECLARE @nights INT = TRY_CAST(JSON_VALUE(@item_val, '$.nights') AS INT);
+                DECLARE @paxAdultsItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxAdults') AS INT);
+                DECLARE @paxChildrenItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxChildren') AS INT);
+                DECLARE @serviceType NVARCHAR(250) = JSON_VALUE(@item_val, '$.serviceType');
+                DECLARE @destinationItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.destination');
+                DECLARE @reservationCodeItem NVARCHAR(100) = JSON_VALUE(@item_val, '$.reservationCode');
+                DECLARE @sellerCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.sellerCommission') AS FLOAT);
+                DECLARE @ticketPrinterCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.ticketPrinterCommission') AS FLOAT);
+                DECLARE @comboId INT = TRY_CAST(JSON_VALUE(@item_val, '$.comboId') AS INT);
+                DECLARE @mainTaxId INT = TRY_CAST(JSON_VALUE(@item_val, '$.mainTaxId') AS INT);
+                DECLARE @inNationality INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.inNationality') AS INT), 1);
+                DECLARE @service NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.service');
+                DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.servicios');
+                DECLARE @descripcion NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.descripcion');
+                DECLARE @passengerItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.passenger');
+
+                IF @providerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerId) SET @providerId = NULL;
+                IF @prestadoraId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraId) SET @prestadoraId = NULL;
+
+                DECLARE @qp_id INT;
+                INSERT INTO dbo.[QuotationProduct] (
+                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
+                    checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
+                    reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
+                    service, servicios, descripcion, passenger
+                ) VALUES (
+                    @p_quotation_id, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
+                    @checkInDate, @checkOutDate, @nights, @paxAdultsItem, @paxChildrenItem, @serviceType, @destinationItem,
+                    @reservationCodeItem, @sellerCommission, @ticketPrinterCommission, @comboId, @mainTaxId, @inNationality,
+                    @service, @servicios, @descripcion, @passengerItem
+                );
+                SET @qp_id = SCOPE_IDENTITY();
+
+                -- Insert Applied Taxes (QuotationProductTax)
+                IF JSON_QUERY(@item_val, '$.appliedTaxes') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
+                    SELECT
+                        @qp_id,
+                        TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.explicitAmount') AS FLOAT), ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.amount') AS FLOAT), 0)),
+                        TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT),
+                        JSON_VALUE(tax.value, '$.valueTypeSnapshot'),
+                        CASE WHEN TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) = @mainTaxId OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
+                    FROM OPENJSON(@item_val, '$.appliedTaxes') AS tax
+                    WHERE TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) IS NOT NULL;
+                END
+
+                -- Insert Passengers (QuotationProductPassenger)
+                IF JSON_QUERY(@item_val, '$.passengers') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
+                    SELECT
+                        @qp_id,
+                        JSON_VALUE(pax.value, '$.name'),
+                        JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@item_val, '$.passengers') AS pax
+                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
+                END
+
+                -- Insert Variables (QuotationProductVariable)
+                IF JSON_QUERY(@item_val, '$.variables') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, value)
+                    SELECT
+                        @qp_id,
+                        TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT),
+                        JSON_VALUE(v.value, '$.value')
+                    FROM OPENJSON(@item_val, '$.variables') AS v
+                    WHERE TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT) IS NOT NULL;
+                END
+
+                -- Insert Payments (QuotationProductPayment)
+                IF JSON_QUERY(@item_val, '$.payments') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPayment] (
+                        quotationProductId, amount, paymentMethod, date, reference, creditCardId, cardNumber, authorizationCode, voucher, expirationDate
+                    )
+                    SELECT
+                        @qp_id,
+                        ISNULL(TRY_CAST(JSON_VALUE(pmt.value, '$.amount') AS FLOAT), 0),
+                        JSON_VALUE(pmt.value, '$.paymentMethod'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.date') AS DATETIME2),
+                        JSON_VALUE(pmt.value, '$.reference'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.creditCardId') AS INT),
+                        JSON_VALUE(pmt.value, '$.cardNumber'),
+                        JSON_VALUE(pmt.value, '$.authorizationCode'),
+                        JSON_VALUE(pmt.value, '$.voucher'),
+                        JSON_VALUE(pmt.value, '$.expirationDate')
+                    FROM OPENJSON(@item_val, '$.payments') AS pmt;
+                END
+
+                FETCH NEXT FROM item_cur INTO @item_val;
+            END
+
+            CLOSE item_cur;
+            DEALLOCATE item_cur;
+        END
+
+        -- Recalculate totalAmount if 0 or missing
+        DECLARE @calcTotal FLOAT = (
+            SELECT SUM(ISNULL(qpt.explicitAmount, 0))
+            FROM dbo.[QuotationProductTax] qpt
+            JOIN dbo.[QuotationProduct] qp ON qpt.quotationProductId = qp.id
+            WHERE qp.quotationId = @p_quotation_id
+        );
+        IF @calcTotal IS NULL OR @calcTotal = 0
+        BEGIN
+            SET @calcTotal = (
+                SELECT SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1))
+                FROM dbo.[QuotationProduct] qp
+                WHERE qp.quotationId = @p_quotation_id
+            );
+        END
+
+        IF @calcTotal IS NOT NULL AND @calcTotal > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @calcTotal,
+                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotal),
+                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotal)
+            WHERE id = @p_quotation_id;
+        END
+        ELSE IF @totalAmount > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @totalAmount
+            WHERE id = @p_quotation_id;
+        END
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = N'SUCCESS: Cotización creada correctamente con ID ' + CAST(@p_quotation_id AS NVARCHAR(20));
+        SELECT @p_quotation_id AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
+        SELECT 0 AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH
+END;;
+
+-- Inyectado automáticamente: spCotizacionEliminar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spCotizacionEliminar(
+    p_quotation_id INT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_exists BOOLEAN;
+    v_internal_number TEXT;
+BEGIN
+    SELECT "internalNumber" INTO v_internal_number FROM public."Quotation" WHERE id = p_quotation_id;
+    IF NOT FOUND THEN
+        p_mensaje_resultado := 'ERROR: Cotización no encontrada con ID ' || p_quotation_id;
+        RETURN;
     END IF;
 
-    -- Duplicar productos y sus detalles
-    FOR v_orig_qp IN 
-        SELECT * FROM public."QuotationProduct" WHERE "quotationId" = p_quotation_id
-    LOOP
-        INSERT INTO public."QuotationProduct" (
-            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
-            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
-            "serviceType", "destination", "reservationCode", "sellerCommission",
-            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger"
-        ) VALUES (
-            v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
-            v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
-            v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
-            v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
-        ) RETURNING id INTO v_new_qp_id;
+    DELETE FROM public."Quotation" WHERE id = p_quotation_id;
 
-        -- Duplicar Pasajeros del producto
-        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-        SELECT v_new_qp_id, "name", "document"
-        FROM public."QuotationProductPassenger"
-        WHERE "quotationProductId" = v_orig_qp.id;
+    -- Si no quedan cotizaciones, reiniciar la secuencia a 1
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    END IF;
 
-        -- Duplicar Impuestos del producto
-        INSERT INTO public."QuotationProductTax" ("quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain")
-        SELECT v_new_qp_id, "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
-        FROM public."QuotationProductTax"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Variables del producto
-        INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
-        SELECT v_new_qp_id, "masterVariableId", "value"
-        FROM public."QuotationProductVariable"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Pagos del producto
-        INSERT INTO public."QuotationProductPayment" ("quotationProductId", "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate")
-        SELECT v_new_qp_id, "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
-        FROM public."QuotationProductPayment"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-    END LOOP;
-
-    p_new_quotation_id := v_new_id;
-    p_mensaje_resultado := 'SUCCESS: Cotización duplicada correctamente con ID ' || v_new_id;
-
-    -- Registrar en auditoría
-    CALL public."spLogRegistrar"(
-        v_user_id, 
-        'QUOTATION', 
-        'DUPLICATE', 
-        'Se duplicó la cotización #' || p_quotation_id || ' generando la cotización #' || v_new_id || ' (' || v_internal_number || ')', 
-        jsonb_build_object('sourceQuotationId', p_quotation_id, 'newQuotationId', v_new_id), 
-        v_new_id
-    );
-
+    p_mensaje_resultado := 'SUCCESS: Cotización ' || v_internal_number || ' eliminada con éxito.';
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END;
-$procedure$;;
+$$;;
 
 -- Inyectado automáticamente: spCotizacionesCrear.sql
 DO $$
@@ -599,31 +4203,51 @@ BEGIN
         DECLARE @val_cd_tiqueteador VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_tiqueteador)[1]', 'VARCHAR(25)');
 
         -- 1. Validar Cliente
-        IF @val_cd_cliente_codigo IS NOT NULL AND @val_cd_cliente_codigo <> '' AND NOT EXISTS (SELECT 1 FROM dbo.CLIENTES WHERE IDCLIENTE = @val_cd_cliente_codigo)
+        IF @val_cd_cliente_codigo IS NOT NULL AND @val_cd_cliente_codigo <> ''
         BEGIN
-            SELECT 'cliente ' + @val_cd_cliente_codigo + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-            RETURN 1;
+            IF NOT EXISTS (
+                SELECT 1 FROM dbo.[Client] WHERE document = @val_cd_cliente_codigo OR CAST(id AS VARCHAR(25)) = @val_cd_cliente_codigo
+            )
+            BEGIN
+                SELECT 'cliente ' + @val_cd_cliente_codigo + ' no existe' AS 'Respuesta', 1 AS 'Estado';
+                RETURN 1;
+            END
         END
 
         -- 2. Validar Sucursal
-        IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> '' AND NOT EXISTS (SELECT 1 FROM dbo.Sucursales WHERE cd_codigo = @val_cd_sucursal)
+        IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
         BEGIN
-            SELECT 'sucursal ' + @val_cd_sucursal + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-            RETURN 1;
+            IF NOT EXISTS (
+                SELECT 1 FROM dbo.[Branch] WHERE code = @val_cd_sucursal OR CAST(id AS VARCHAR(25)) = @val_cd_sucursal
+            )
+            BEGIN
+                SELECT 'sucursal ' + @val_cd_sucursal + ' no existe' AS 'Respuesta', 1 AS 'Estado';
+                RETURN 1;
+            END
         END
 
-        -- 3. Validar Vendedor (dbo.MAEVENDE)
-        IF @val_cd_vendedor IS NOT NULL AND @val_cd_vendedor <> '' AND NOT EXISTS (SELECT 1 FROM dbo.MAEVENDE WHERE IDVENDE = @val_cd_vendedor)
+        -- 3. Validar Vendedor
+        IF @val_cd_vendedor IS NOT NULL AND @val_cd_vendedor <> ''
         BEGIN
-            SELECT 'vendedor ' + @val_cd_vendedor + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-            RETURN 1;
+            IF NOT EXISTS (
+                SELECT 1 FROM dbo.[Seller] WHERE code = @val_cd_vendedor OR CAST(id AS VARCHAR(25)) = @val_cd_vendedor
+            )
+            BEGIN
+                SELECT 'vendedor ' + @val_cd_vendedor + ' no existe' AS 'Respuesta', 1 AS 'Estado';
+                RETURN 1;
+            END
         END
 
-        -- 4. Validar Tiqueteador (dbo.Tiqueteadores)
-        IF @val_cd_tiqueteador IS NOT NULL AND @val_cd_tiqueteador <> '' AND NOT EXISTS (SELECT 1 FROM dbo.Tiqueteadores WHERE cd_codigo = @val_cd_tiqueteador)
+        -- 4. Validar Tiqueteador
+        IF @val_cd_tiqueteador IS NOT NULL AND @val_cd_tiqueteador <> ''
         BEGIN
-            SELECT 'tiqueteador ' + @val_cd_tiqueteador + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-            RETURN 1;
+            IF NOT EXISTS (
+                SELECT 1 FROM dbo.[TicketPrinter] WHERE code = @val_cd_tiqueteador OR CAST(id AS VARCHAR(25)) = @val_cd_tiqueteador
+            )
+            BEGIN
+                SELECT 'tiqueteador ' + @val_cd_tiqueteador + ' no existe' AS 'Respuesta', 1 AS 'Estado';
+                RETURN 1;
+            END
         END
 
         -- 5. Validar Proveedores de Servicios
@@ -634,13 +4258,20 @@ BEGIN
         WHERE S.node.value('cd_proveedores[1]', 'VARCHAR(25)') IS NOT NULL 
           AND S.node.value('cd_proveedores[1]', 'VARCHAR(25)') <> ''
           AND NOT EXISTS (
-              SELECT 1 FROM dbo.PROVEEDORES WHERE IDPROVE = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
+              SELECT 1 FROM dbo.[Provider] WHERE code = S.node.value('cd_proveedores[1]', 'VARCHAR(25)') OR CAST(id AS VARCHAR(25)) = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
           );
 
         IF @invalid_proveedor IS NOT NULL
         BEGIN
             SELECT 'proveedor ' + @invalid_proveedor + ' no existe' AS 'Respuesta', 1 AS 'Estado';
             RETURN 1;
+        END
+
+        -- 6. Si la base de datos es Standalone KoreX (sin tabla dbo.Cotizacion de Zeus ERP), responder OK
+        IF OBJECT_ID('dbo.Cotizacion', 'U') IS NULL
+        BEGIN
+            SELECT 'Cotización exportada exitosamente (Entorno Standalone KoreX)' AS 'Respuesta', 0 AS 'Estado';
+            RETURN 0;
         END
 
         -- Extraer datos del XML
@@ -720,8 +4351,8 @@ BEGIN
 			dt_fecha = ISNULL(C.Cotizacion.value('dt_fecha[1]','SMALLDATETIME'),'19000101'),
 			id_usuarioAct = ISNULL(U.id,1),
 			dt_fechaAct = ISNULL(C.Cotizacion.value('dt_fechaAct[1]','SMALLDATETIME'),'19000101'),
-			cd_tercero_codigo = ISNULL(TR.IDTERCERO,''),
-			ds_tercero_nombre = ISNULL(TR.NOMBRETER,''),
+			cd_tercero_codigo = ISNULL(CL.document, ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),'')),
+			ds_tercero_nombre = ISNULL(CL.name, ISNULL(C.Cotizacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),'')),
 			cd_cliente_codigo = ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),''),
 			ds_cliente_nombre = ISNULL(C.Cotizacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),''),
 			ds_cliente_dir = ISNULL(C.Cotizacion.value('ds_cliente_dir[1]','VARCHAR(250)'),''),
@@ -733,7 +4364,7 @@ BEGIN
 			ds_cliente_contacto_email = ISNULL(C.Cotizacion.value('ds_cliente_contacto_email[1]','VARCHAR(60)'),''),
 			id_monedas_IATA = ISNULL(M.id,1),
 			cd_vendedor = ISNULL(C.Cotizacion.value('cd_vendedor[1]','VARCHAR(3)'),''),
-			id_tiqueteador = ISNULL(Tq.id, (SELECT TOP 1 id FROM dbo.Tiqueteadores)),
+			id_tiqueteador = ISNULL(Tq.id, ISNULL((SELECT TOP 1 id FROM dbo.[TicketPrinter]), 1)),
 			bn_anexo = NULL,
 			am_tcambio = ISNULL(C.Cotizacion.value('am_tcambio[1]','SMALLMONEY'),1),
 			am_tcambiousd = ISNULL(C.Cotizacion.value('am_tcambiousd[1]','MONEY'),1),
@@ -776,13 +4407,12 @@ BEGIN
 			id_Cotizacion = NULL,
 			bl_existe = CASE WHEN CC.id IS NOT NULL THEN 1 ELSE 0 END 
         FROM @xmlData.nodes('Cotizaciones/Cotizacion') AS C(Cotizacion)
-		LEFT JOIN dbo.Sucursales S ON S.cd_codigo=C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)')
-		LEFT JOIN dbo.Implantes I ON I.cd_codigo=C.Cotizacion.value('cd_implante[1]','VARCHAR(25)')
-		LEFT JOIN dbo.Usuario U ON U.Login=C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)')
-		LEFT JOIN dbo.CLIENTES CL ON CL.IDCLIENTE = C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)')
-		LEFT JOIN dbo.TERCEROS TR ON TR.IDTERCERO = CL.IDTERCERO 
+		LEFT JOIN dbo.[Branch] S ON (S.code = C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)') OR CAST(S.id AS VARCHAR(25)) = C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)'))
+		LEFT JOIN dbo.[Implant] I ON (I.code = C.Cotizacion.value('cd_implante[1]','VARCHAR(25)') OR CAST(I.id AS VARCHAR(25)) = C.Cotizacion.value('cd_implante[1]','VARCHAR(25)'))
+		LEFT JOIN dbo.[User] U ON (U.email = C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)') OR U.name = C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)'))
+		LEFT JOIN dbo.[Client] CL ON (CL.document = C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)') OR CAST(CL.id AS VARCHAR(25)) = C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'))
 		LEFT JOIN dbo.Monedas_IATA M ON M.cd_codigo=C.Cotizacion.value('cd_monedas_IATA[1]','VARCHAR(3)')
-		LEFT JOIN dbo.Tiqueteadores Tq ON Tq.cd_codigo=C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(6)')
+		LEFT JOIN dbo.[TicketPrinter] Tq ON (Tq.code = C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(6)') OR CAST(Tq.id AS VARCHAR(25)) = C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(6)'))
 		LEFT JOIN dbo.TipoVenta Tv ON Tv.cd_codigo=C.Cotizacion.value('cd_tipoventa[1]','VARCHAR(16)')
 		LEFT JOIN dbo.Cotizacion CC ON CC.cd_consecutivo = C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')		 
 		
@@ -1815,7 +5445,7 @@ BEGIN
 
 		DECLARE @estado VARCHAR(8000)
 		SET @estado=''
-		SELECT @estado=@estado+CONVERT(VARCHAR(25),CONVERT(INT,REPLACE(ISNULL(cd_consecutivo,'0'),'Q',''))) + ':' + CASE WHEN id_Cotizacion IS NOT NULL THEN 'Enviado' ELSE 'Nuevo' END + '|'
+		SELECT @estado=@estado+ISNULL(cd_consecutivo,'0') + ':' + CASE WHEN id_Cotizacion IS NOT NULL THEN 'Enviado' ELSE 'Nuevo' END + '|'
 		FROM @Cotizacion;
         -- Retorno mejorado: Lista resumida de lo procesado
         SELECT 
@@ -3630,6 +7260,2027 @@ EXCEPTION
             v_msg     = MESSAGE_TEXT,
             v_context = PG_EXCEPTION_CONTEXT;
 		v_line := substring(v_context from 'line ([0-9]+)')::TEXT;
+        mensaje_resultado := format('ERROR: %s | EN LÍNEA: %s | ESTADO: %s', v_msg, v_line, v_state);
+END;
+$$;;
+
+-- Inyectado automáticamente: spExportInvoices.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spExportInvoices'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spExportInvoices(
+    Envoices_id TEXT,
+	User_id INT,
+	INOUT mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+/*
+    AUTOR: Rubiel Gelis Guzman / Antigravity
+    DESCRIPCIÓN: Generación de XML para exportación de Facturas (Invoices). Restructurado según especificaciones del usuario.
+*/
+DECLARE
+    v_xml TEXT;
+    v_nombre_usuario TEXT;
+	v_state   TEXT;
+    v_msg     TEXT;
+    v_context TEXT;
+    v_line    TEXT;
+BEGIN
+    -- 1. Inicializar
+    mensaje_resultado := '';
+
+    Envoices_id := TRIM(BOTH ',' FROM TRIM(COALESCE(Envoices_id, '')));
+    IF Envoices_id = '' THEN
+        mensaje_resultado := 'ERROR: No se han proporcionado IDs de Facturacion válidos.';
+        RETURN;
+    END IF;
+
+    -- 2. Validación de usuario
+    SELECT "name" INTO v_nombre_usuario FROM public."User" WHERE id = User_id;
+    IF NOT FOUND THEN
+        mensaje_resultado := 'ERROR: El usuario ' || User_id || ' no existe.';
+        RETURN;
+    END IF;
+
+    -- 3. Crear Tablas Temporales
+    CREATE TEMP TABLE IF NOT EXISTS Facturacion (
+		id INTEGER GENERATED ALWAYS AS IDENTITY,
+		id_factura INTEGER,
+		cd_fuente VARCHAR(2),
+		cd_serie VARCHAR(2),
+		cd_consecutivo VARCHAR(8),
+		cd_usuario INTEGER,  
+		cd_sucursal VARCHAR(25), 
+		cd_implante VARCHAR(25), 
+		dt_fechacont TIMESTAMP,
+		dt_vence TIMESTAMP,
+		cd_tercero_codigo VARCHAR(25),
+		ds_tercero_nombre VARCHAR(250),
+		cd_cliente_codigo VARCHAR(25), 
+		ds_cliente_nombre VARCHAR(250),
+		ds_cliente_dir VARCHAR(250),
+		ds_cliente_ciudad VARCHAR(40),
+		ds_cliente_tel VARCHAR(50),
+		ds_cliente_dirdesp VARCHAR(250),
+		ds_cliente_email VARCHAR(60),
+		ds_cliente_contacto VARCHAR(40),
+		ds_cliente_contacto_email VARCHAR(60),
+		cd_monedas_iata VARCHAR(25),
+		cd_vendedor VARCHAR(3),
+		cd_tiqueteador VARCHAR(25),
+		bn_anexo BYTEA,
+		Tcambio DECIMAL,
+		am_tcambiousd DECIMAL,
+		id_tipoventa INTEGER,
+		ds_num_resolucion VARCHAR(20), 
+		in_num_inicial NUMERIC(18,0), 
+		in_num_final NUMERIC(18,0), 
+		ds_numeracion_autorizada VARCHAR(50),
+		dt_fecha_resolucion TIMESTAMP,	
+		CodigoArchivoFisico VARCHAR(25),
+		ds_Observacion VARCHAR(8000),
+		ds_Campo_libre1 varchar(500),
+		ds_Campo_libre2 varchar(500),
+		cd_fuente_Reemplaza VARCHAR(2),
+		cd_serie_Reemplaza VARCHAR(2),
+		cd_consecutivo_Reemplaza VARCHAR(8),		
+		ds_Actividad_Economica VARCHAR(10),
+		ds_Tarifa_ICA VARCHAR(15),	
+		SqlStmt TEXT,
+		AnticiposSqlStmt TEXT,
+		TotalFactura DECIMAL,
+		TotalCupoCreditoCliente DECIMAL,
+		bl_BloqueoCupoCredito BIT(1),
+		bl_generadaauto BIT(1),
+		ds_CotizacionesId Varchar(500),
+		Id_Cierre INTEGER,
+		cd_TipoFact VARCHAR(2),
+		id_fac_remisionRelacionada INTEGER,
+		id_fac_facturaRelacionada INTEGER,
+		ds_DescripcionFac VARCHAR(500),
+		bl_nocont BIT(1),
+		ProductosSqlStmt TEXT,
+		cd_CF_TipoComprobante VARCHAR(15),
+		id_Licitacion INTEGER,
+		ValorFactura DECIMAL,
+		id_Especialista INTEGER,
+		cd_tiqueteador_Facturador VARCHAR(25),
+		id_TipoFormaPagoProveedor INTEGER,
+		id_MedioReservacion INTEGER,
+		bl_refacturacion BIT(1),
+		bl_comisiona BIT(1),
+		cd_fuente_factura VARCHAR(2),
+		cd_serie_factura VARCHAR(2),
+		cd_consecutivo_factura VARCHAR(8),
+		id_NotasAerolinea INTEGER,
+		bl_interface INTEGER,
+		id_evento INTEGER,
+		bl_NoEnviarFacElectronica BIT(1),
+		bl_FacturaComision BIT(1),
+		bl_DescontarComisionCxP BIT(1),
+		ds_num_resolucion_Adicional VARCHAR(20),
+		id_fac_facturaRefacturacion VARCHAR(8000),
+		bl_refacturacion_contabilizar_saldos BIT(1),
+		ZML_VariablesXML TEXT,
+		bl_FormatoResumidoFactElectro BIT(1),
+		bl_ExigeAdjuntoFactElectro BIT(1),
+		bl_omitir_Validar_IVA_facturacion BIT(1),
+		ds_Respuesta TEXT
+    ) ON COMMIT DROP;
+
+    CREATE TEMP TABLE IF NOT EXISTS Item (
+		id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		tipo_item VARCHAR(10),
+		id_factura INTEGER,
+		id_item INTEGER,
+		in_tipoitem INTEGER,
+		id_referencia_origen INTEGER,             
+		cd_tiquete VARCHAR(50),
+		ds_descrip VARCHAR(500),
+		in_nacionalidad INTEGER,
+		cd_cencosto VARCHAR(50),
+		cd_auxiliar VARCHAR(50),
+		cd_item VARCHAR(50),
+		am_tarifa DECIMAL,
+		am_iva DECIMAL,
+		am_tua DECIMAL,
+		am_comb DECIMAL,
+		am_vat DECIMAL,
+		am_Comision DECIMAL,
+		ds_paxname VARCHAR(30),
+		ds_paxape VARCHAR(30),
+		ds_paxprefix VARCHAR(3),
+		cd_tourcode VARCHAR(25),
+		NumTktConj INTEGER,
+		cd_TipoTiquete VARCHAR(3),
+		id_air INTEGER,
+		ds_itinerario VARCHAR(250),
+		ds_itinerarioaerolinea VARCHAR(128),
+		ds_clases VARCHAR(61),
+		ds_Observaciones VARCHAR(8000),
+		am_highfare DECIMAL,
+		am_lowfare DECIMAL,
+		ds_solicita VARCHAR(200),
+		ds_lapsoviaje VARCHAR(50),
+		cd_tktrevisado VARCHAR(14),
+		cd_PasaportePax VARCHAR(25),
+		cd_pax_CC VARCHAR(20),
+		am_PorFacParcial DECIMAL,
+		in_cantpax INTEGER,
+		Id_Precompra INTEGER,
+		cd_FormaPagoTAO VARCHAR(3),
+		cd_TarjetaCreditoTAO VARCHAR(4),
+		cd_NumeroTarjetaTAO VARCHAR(25),
+		cd_VencimientoTarjetaTAO VARCHAR(6),
+		cd_NumeroPolizaTAO VARCHAR(50),
+		cd_AnexoPolizaTAO VARCHAR(50),
+		ds_AutorizacionTarjetaTAO VARCHAR(25),
+		in_cuotasTarjetaTAO INTEGER,
+		cd_FormasPago VARCHAR(25),
+		cd_TarjetasCredito VARCHAR(25),
+		am_fp1 DECIMAL,
+		ds_cc_code VARCHAR(2),
+		ds_cc_number VARCHAR(25),
+		ds_cc_vence VARCHAR(25),
+		ds_cc_autorizacion VARCHAR(25),
+		ds_cc_voucher VARCHAR(25),
+		in_cc_cuotas INTEGER,
+		am_fp2 DECIMAL,
+		ds_cc_code2 VARCHAR(2),
+		ds_cc_number2 VARCHAR(25),
+		ds_cc_vence2 VARCHAR(25),
+		ds_cc_autorizacion2 VARCHAR(25),
+		ds_cc_voucher2 VARCHAR(25),
+		in_cc_cuotas2 INTEGER,
+		cd_monedas_iata VARCHAR(25),
+		Tcambio DECIMAL,
+		cd_sucursal VARCHAR(25),
+		cd_implante VARCHAR(25),
+		bl_ahorro BIT(1),
+		cd_TipoTiqueteGDS VARCHAR(3),
+		cd_TiposDocumento VARCHAR(25),
+		cd_entdist VARCHAR(25),
+		cd_entvend VARCHAR(25),
+		cd_destino VARCHAR(3),
+		dt_fechaexped TIMESTAMP,
+		cd_tiqueteadores VARCHAR(25),
+		id_gds INTEGER,
+		iden_gds INTEGER,
+		am_comisionPNR DECIMAL,
+		ds_records VARCHAR(62),
+		bl_NoCalcComision BIT(1),
+		bl_NoCalcIvaComision BIT(1),
+		am_basecomisionable DECIMAL,
+		am_porcomision DECIMAL,
+		cd_tiposconceptfac VARCHAR(25),
+		cd_conceptofacturacion VARCHAR(25),
+		cd_tiposservicio VARCHAR(25),
+		cd_proveedores VARCHAR(25),
+		ds_servicio VARCHAR(250),
+		am_valorprov DECIMAL,
+		cd_monedaprov VARCHAR(25),
+		dt_llegada TIMESTAMP,
+		dt_salida TIMESTAMP,
+		am_pordescuento NUMERIC(8,4),
+		am_basedescuento DECIMAL,
+		Fecha_Salida TIMESTAMP,
+		Fecha_Llegada TIMESTAMP,
+		ColId VARCHAR(25),
+		cd_Consecutivo_depende VARCHAR(50),
+		CodigoReserva VARCHAR(50),
+		cd_Consecutivo_variablesadicionales VARCHAR(50),
+		am_valor_total DECIMAL,
+		ds_proveedores VARCHAR(250),
+		id_FormasPagoAirPlus INTEGER,
+		cd_FormasPagoAirPlus VARCHAR(3),
+		ds_FormasPagoAirPlus VARCHAR(100),
+		id_TarjetasCreditoAirPlus INTEGER,
+		cd_TarjetasCreditoAirPlus VARCHAR(4),
+		ds_numerotarjetaAirPlus VARCHAR(25),
+		id_reserva INTEGER,
+		OrdenGrabacion INTEGER
+    ) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS itinerarios(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		id_factura INTEGER,
+		id_item INTEGER,
+		in_tipoitem INTEGER,
+		in_orden INTEGER,
+		ds_origen VARCHAR(25),
+		ds_destino VARCHAR(25),
+		ds_clase VARCHAR(25),
+		dt_llegada TIMESTAMP,
+		dt_salida TIMESTAMP,
+		ds_terminal VARCHAR(25),
+		cd_aerolinea VARCHAR(25),
+		cd_farebasis VARCHAR(25),
+		ds_numerovuelo VARCHAR(25),
+		ds_tipovuelo VARCHAR(25),
+		am_valor DECIMAL,
+		am_co2 DECIMAL
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS Pasajeros(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		id_factura INTEGER,
+		id_item INTEGER,
+		in_tipoitem INTEGER,
+		ds_paxape VARCHAR(30),
+		ds_paxname VARCHAR(30),
+		ds_paxprefix VARCHAR(3),
+		ds_paxClasificacion VARCHAR(25),
+		cd_voucherpax VARCHAR(25),
+		cd_paxidentificacion VARCHAR(25),
+		in_edad INT,
+		cd_tiquete VARCHAR(50)
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CargosImpuestos(
+		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		id_factura INTEGER,
+		id_item INTEGER,
+		in_tipoitem INTEGER,
+		cd_codigo VARCHAR(20),
+		ds_nombre VARCHAR(100),
+		cd_tipo VARCHAR(1),
+		am_porcentaje NUMERIC(8,4),
+		am_valor DECIMAL,
+		am_contado DECIMAL,
+		am_credito DECIMAL,
+		id_carg INTEGER,
+		id_imp INTEGER,
+		bl_iva BIT(1),
+		in_orden INTEGER
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS Formaspago(
+		id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		id_factura INTEGER,
+		id_item INTEGER,
+		in_tipoitem INTEGER,
+		id_formaspago INTEGER,
+		cd_codigo VARCHAR(10),
+		ds_nombre VARCHAR(50),
+		id_tarjetascredito INTEGER,
+		cd_tipotarjeta VARCHAR(10),
+		ds_numerotarjeta VARCHAR(50),
+		ds_vouchertarjeta VARCHAR(50),
+		ds_expiraciontarjeta VARCHAR(10),
+		ds_autorizaciontarjeta VARCHAR(50),
+		in_cuotas INTEGER,
+		cd_banco VARCHAR(50),
+		ds_cheque VARCHAR(50),
+		ds_plaza VARCHAR(50),
+		ds_referencia VARCHAR(50),
+		ds_Poliza VARCHAR(50),
+		ds_PolizaAnexo VARCHAR(50),
+		am_valor DECIMAL
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS Variables(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		id_factura INTEGER,
+		id_item INTEGER,
+		in_tipoitem INTEGER,
+		ds_maestro VARCHAR(25), 
+		ds_VariableAdicional VARCHAR(25),
+		ds_valor VARCHAR(500),
+		cd_codigo CHAR(25)
+	) ON COMMIT DROP;
+
+    -- 4. Poblar Tabla Facturacion
+    INSERT INTO Facturacion (
+		id_factura, cd_fuente, cd_serie, cd_consecutivo, cd_usuario, cd_sucursal, cd_implante, 
+		dt_fechacont, dt_vence, cd_tercero_codigo, ds_tercero_nombre, cd_cliente_codigo, 
+		ds_cliente_nombre, ds_cliente_dir, ds_cliente_ciudad, ds_cliente_tel, ds_cliente_dirdesp, 
+		ds_cliente_email, ds_cliente_contacto, ds_cliente_contacto_email, cd_monedas_iata, 
+		cd_vendedor, cd_tiqueteador, bn_anexo, Tcambio, am_tcambiousd, id_tipoventa, 
+		ds_num_resolucion, in_num_inicial, in_num_final, ds_numeracion_autorizada, 
+		dt_fecha_resolucion, CodigoArchivoFisico, ds_Observacion, ds_Campo_libre1, 
+		ds_Campo_libre2, cd_fuente_Reemplaza, cd_serie_Reemplaza, cd_consecutivo_Reemplaza, 
+		ds_Actividad_Economica, ds_Tarifa_ICA, SqlStmt, AnticiposSqlStmt, TotalFactura, 
+		TotalCupoCreditoCliente, bl_BloqueoCupoCredito, bl_generadaauto, ds_CotizacionesId, 
+		Id_Cierre, cd_TipoFact, id_fac_remisionRelacionada, id_fac_facturaRelacionada, 
+		ds_DescripcionFac, bl_nocont, ProductosSqlStmt, cd_CF_TipoComprobante, id_Licitacion, 
+		ValorFactura, id_Especialista, cd_tiqueteador_Facturador, id_TipoFormaPagoProveedor, 
+		id_MedioReservacion, bl_refacturacion, bl_comisiona, cd_fuente_factura, cd_serie_factura, 
+		cd_consecutivo_factura, id_NotasAerolinea, bl_interface, id_evento, bl_NoEnviarFacElectronica, 
+		bl_FacturaComision, bl_DescontarComisionCxP, ds_num_resolucion_Adicional, 
+		id_fac_facturaRefacturacion, bl_refacturacion_contabilizar_saldos, ZML_VariablesXML, 
+		bl_FormatoResumidoFactElectro, bl_ExigeAdjuntoFactElectro, bl_omitir_Validar_IVA_facturacion, 
+		ds_Respuesta
+    )
+    SELECT
+		e.id AS id_factura,
+        SUBSTRING(COALESCE(e.fuente, '55'), 1, 2) AS cd_fuente,
+        SUBSTRING(COALESCE(e.serie, '00'), 1, 2) AS cd_serie,
+        SUBSTRING(COALESCE(e.consecutivo, 'I' || LPAD(e.id::text, 7, '0')), 1, 8) AS cd_consecutivo,
+        User_id AS cd_usuario,
+        SUBSTRING(COALESCE(b.code, 'OFP'), 1, 3) AS cd_sucursal,
+        SUBSTRING(COALESCE(i.code, ''), 1, 3) AS cd_implante,
+        e.date AS dt_fechacont,
+        e.date AS dt_vence,
+        SUBSTRING(COALESCE(c.document, ''), 1, 25) AS cd_tercero_codigo,
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(c.name, '')), 1, 250) AS ds_tercero_nombre,
+        SUBSTRING(COALESCE(c.document, ''), 1, 25) AS cd_cliente_codigo,
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(c.name, '')), 1, 250) AS ds_cliente_nombre,
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(c.address, '')), 1, 250) AS ds_cliente_dir,
+        '' AS ds_cliente_ciudad,
+        '' AS ds_cliente_tel,
+        '' AS ds_cliente_dirdesp,
+        SUBSTRING(COALESCE(u.email, ''), 1, 60) AS ds_cliente_email,
+        '' AS ds_cliente_contacto,
+        '' AS ds_cliente_contacto_email,
+        COALESCE(e."currency", 'COP') AS cd_monedas_iata,
+        SUBSTRING(COALESCE(s.code, ''), 1, 3)::char(3) AS cd_vendedor,
+        SUBSTRING(COALESCE(tp.code, ''), 1, 25) AS cd_tiqueteador,
+        NULL::bytea AS bn_anexo,
+        COALESCE(e."exchangeRate", 1.0) AS Tcambio,
+        1.0 AS am_tcambiousd,
+        NULL AS id_tipoventa,
+        '' AS ds_num_resolucion,
+        0 AS in_num_inicial,
+        0 AS in_num_final,
+        '' AS ds_numeracion_autorizada,
+        NULL AS dt_fecha_resolucion,
+        '' AS CodigoArchivoFisico,
+        '' AS ds_Observacion,
+        '' AS ds_Campo_libre1,
+        '' AS ds_Campo_libre2,
+        '' AS cd_fuente_Reemplaza,
+        '' AS cd_serie_Reemplaza,
+        '' AS cd_consecutivo_Reemplaza,
+        '' AS ds_Actividad_Economica,
+        '' AS ds_Tarifa_ICA,
+        '' AS SqlStmt,
+        NULL AS AnticiposSqlStmt,
+        COALESCE(e."totalAmount", 0) AS TotalFactura,
+        0 AS TotalCupoCreditoCliente,
+        B'0' AS bl_BloqueoCupoCredito,
+        B'0' AS bl_generadaauto,
+        NULL AS ds_CotizacionesId,
+        NULL AS Id_Cierre,
+        NULL AS cd_TipoFact,
+        NULL AS id_fac_remisionRelacionada,
+        NULL AS id_fac_facturaRelacionada,
+        NULL AS ds_DescripcionFac,
+        B'0' AS bl_nocont,
+        NULL AS ProductosSqlStmt,
+        NULL AS cd_CF_TipoComprobante,
+        NULL AS id_Licitacion,
+        COALESCE(e."totalAmount", 0) AS ValorFactura,
+        NULL AS id_Especialista,
+        NULL AS cd_tiqueteador_Facturador,
+        NULL AS id_TipoFormaPagoProveedor,
+        NULL AS id_MedioReservacion,
+        B'0' AS bl_refacturacion,
+        B'0' AS bl_comisiona,
+        NULL AS cd_fuente_factura,
+        NULL AS cd_serie_factura,
+        NULL AS cd_consecutivo_factura,
+        NULL AS id_NotasAerolinea,
+        0 AS bl_interface,
+        NULL AS id_evento,
+        B'0' AS bl_NoEnviarFacElectronica,
+        B'0' AS bl_FacturaComision,
+        B'0' AS bl_DescontarComisionCxP,
+        '' AS ds_num_resolucion_Adicional,
+        NULL AS id_fac_facturaRefacturacion,
+        B'0' AS bl_refacturacion_contabilizar_saldos,
+        NULL AS ZML_VariablesXML,
+        B'0' AS bl_FormatoResumidoFactElectro,
+        B'0' AS bl_ExigeAdjuntoFactElectro,
+        B'0' AS bl_omitir_Validar_IVA_facturacion,
+        NULL AS ds_Respuesta
+    FROM public."Invoices" e
+    JOIN public."Client" c ON e."clientId" = c.id
+    JOIN public."Branch" b ON e."branchId" = b.id
+    LEFT JOIN public."Implant" i ON e."implantId" = i.id
+    LEFT JOIN public."Seller" s ON e."sellerId" = s.id
+    LEFT JOIN public."User" u ON e."userId" = u.id
+    LEFT JOIN public."TicketPrinter" tp ON e."ticketPrinterId" = tp.id
+    WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[]);
+
+    -- 5. Poblar Tabla Item
+    INSERT INTO Item (
+		id_factura, id_item, tipo_item, in_tipoitem, id_referencia_origen, cd_tiquete, 
+		ds_descrip, in_nacionalidad, cd_cencosto, cd_auxiliar, cd_item, 
+		am_tarifa, am_iva, am_tua, am_comb, am_vat, am_Comision, 
+		ds_paxname, ds_paxape, ds_paxprefix, cd_tourcode, NumTktConj, 
+		cd_TipoTiquete, id_air, ds_itinerario, ds_itinerarioaerolinea, 
+		ds_clases, ds_Observaciones, am_highfare, am_lowfare, ds_solicita, 
+		ds_lapsoviaje, cd_tktrevisado, cd_PasaportePax, cd_pax_CC, 
+		am_PorFacParcial, in_cantpax, Id_Precompra, cd_FormaPagoTAO, 
+		cd_TarjetaCreditoTAO, cd_NumeroTarjetaTAO, cd_VencimientoTarjetaTAO, 
+		cd_NumeroPolizaTAO, cd_AnexoPolizaTAO, ds_AutorizacionTarjetaTAO, 
+		in_cuotasTarjetaTAO, cd_FormasPago, cd_TarjetasCredito, am_fp1, 
+		ds_cc_code, ds_cc_number, ds_cc_vence, ds_cc_autorizacion, 
+		ds_cc_voucher, in_cc_cuotas, am_fp2, ds_cc_code2, ds_cc_number2, 
+		ds_cc_vence2, ds_cc_autorizacion2, ds_cc_voucher2, in_cc_cuotas2, 
+		cd_monedas_iata, Tcambio, cd_sucursal, cd_implante, bl_ahorro, 
+		cd_TipoTiqueteGDS, cd_TiposDocumento, cd_entdist, cd_entvend, 
+		cd_destino, dt_fechaexped, cd_tiqueteadores, id_gds, iden_gds, 
+		am_comisionPNR, ds_records, bl_NoCalcComision, bl_NoCalcIvaComision, 
+		am_basecomisionable, am_porcomision, cd_tiposconceptfac, 
+		cd_conceptofacturacion, cd_tiposservicio, cd_proveedores, 
+		ds_servicio, am_valorprov, cd_monedaprov, dt_llegada, dt_salida, 
+		am_pordescuento, am_basedescuento, Fecha_Salida, Fecha_Llegada, 
+		ColId, cd_Consecutivo_depende, CodigoReserva, 
+		cd_Consecutivo_variablesadicionales, am_valor_total, ds_proveedores, 
+		id_FormasPagoAirPlus, cd_FormasPagoAirPlus, ds_FormasPagoAirPlus, 
+		id_TarjetasCreditoAirPlus, cd_TarjetasCreditoAirPlus, 
+		ds_numerotarjetaAirPlus, id_reserva, OrdenGrabacion
+    )
+    SELECT
+		e.id AS id_factura,
+		ep.id AS id_item,
+		CASE WHEN pr.type='Tiquete' THEN 'Aire' 
+			 WHEN pr.type='ALOJAMIENTO' THEN 'Hotel' 
+			 WHEN pr.type='ALQUILER' THEN 'Auto'
+			 WHEN pr.type='TAO' THEN 'TAO'
+			 ELSE 'SRV'
+		END AS tipo_item,
+		CASE WHEN pr.type='Tiquete' THEN 1 
+			 WHEN pr.type='ALOJAMIENTO' THEN 3
+			 WHEN pr.type='ALQUILER' THEN 3
+			 WHEN pr.type='TAO' THEN 2
+			 ELSE 3
+		END AS in_tipoitem,
+        ep.id AS id_referencia_origen,
+        CASE WHEN pr.type='Tiquete' THEN pr.code ELSE '' END AS cd_tiquete,
+        SUBSTRING(COALESCE(ep.descripcion, ''), 1, 500) AS ds_descrip,
+        COALESCE(ep."inNationality", 1) AS in_nacionalidad,
+        '' AS cd_cencosto,
+        '' AS cd_auxiliar,
+        '' AS cd_item,
+        COALESCE((
+            SELECT SUM(ipt."explicitAmount")
+            FROM public."InvoicesProductTax" ipt
+            LEFT JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId"
+            LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct."targetTaxId"
+            WHERE ipt."invoiceProductId" = ep.id
+              AND (
+                  ipt."isMain" = true OR
+                  (ipt."isMain" = false AND ct."targetTaxId" IS NOT NULL AND (
+                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = ep."mainTaxId"
+                  ))
+              )
+        ), 0) AS am_tarifa,
+        COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ct.code = 'IVA'), 0) AS am_iva,
+        COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ct.code = 'TUA'), 0) AS am_tua,
+        COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ct.code = 'CMB'), 0) AS am_comb,
+        COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ipt."isMain" = false AND ct.code NOT IN('CMB','TUA','IVA')), 0) AS am_vat,
+        COALESCE(ep."sellerCommission", 0) AS am_Comision,
+		CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN TRIM(epp.name) ELSE COALESCE(arr[1], '') END AS ds_paxname,
+		CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END AS ds_paxape,
+		CASE WHEN TRIM(epp.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)::char(3) ELSE ''::char(3) END AS ds_paxprefix,
+        '' AS cd_tourcode,
+        0 AS NumTktConj,
+        COALESCE(tt.code,'') AS cd_TipoTiquete,
+        CASE WHEN pr.type='Tiquete' THEN ep.id ELSE NULL END AS id_air,
+        SUBSTRING(COALESCE(ep.itinerary, ''), 1, 250) AS ds_itinerario,
+        SUBSTRING(COALESCE(ep.airline, ''), 1, 128) AS ds_itinerarioaerolinea,
+        SUBSTRING(COALESCE(ep.class, ''), 1, 61) AS ds_clases,
+        '' AS ds_Observaciones,
+        0 AS am_highfare,
+        0 AS am_lowfare,
+        '' AS ds_solicita,
+        '' AS ds_lapsoviaje,
+        '' AS cd_tktrevisado,
+        '' AS cd_PasaportePax,
+        '' AS cd_pax_CC,
+        0 AS am_PorFacParcial,
+        COALESCE(cardinality(arr), 1) AS in_cantpax,
+        NULL AS Id_Precompra,
+        '' AS cd_FormaPagoTAO,
+        '' AS cd_TarjetaCreditoTAO,
+        '' AS cd_NumeroTarjetaTAO,
+        '' AS cd_VencimientoTarjetaTAO,
+        '' AS cd_NumeroPolizaTAO,
+        '' AS cd_AnexoPolizaTAO,
+        '' AS ds_AutorizacionTarjetaTAO,
+        0 AS in_cuotasTarjetaTAO,
+        COALESCE((SELECT pp.code FROM public."InvoicesProductPayment" ipp JOIN public."Payment" pp ON LOWER(pp."name") = LOWER(ipp."paymentMethod") WHERE ipp."invoiceProductId" = ep.id LIMIT 1), '') AS cd_FormasPago,
+        COALESCE((SELECT cc.code FROM public."InvoicesProductPayment" ipp JOIN public."CreditCard" cc ON cc.id = ipp."creditCardId" WHERE ipp."invoiceProductId" = ep.id AND UPPER(ipp."paymentMethod") = 'TARJETA' LIMIT 1), '') AS cd_TarjetasCredito,
+        (ep.price * ep.quantity) AS am_fp1,
+		COALESCE((SELECT cc.code FROM public."InvoicesProductPayment" ipp JOIN public."CreditCard" cc ON cc.id = ipp."creditCardId" WHERE ipp."invoiceProductId" = ep.id AND UPPER(ipp."paymentMethod") = 'TARJETA' LIMIT 1), '') AS ds_cc_code,
+		COALESCE((SELECT ipp."cardNumber" FROM public."InvoicesProductPayment" ipp WHERE ipp."invoiceProductId" = ep.id AND UPPER(ipp."paymentMethod") = 'TARJETA' LIMIT 1), '') AS ds_cc_number,
+		COALESCE((SELECT ipp."expirationDate" FROM public."InvoicesProductPayment" ipp WHERE ipp."invoiceProductId" = ep.id AND ipp."paymentMethod" = 'TARJETA' LIMIT 1), '') AS ds_cc_vence,
+		COALESCE((SELECT ipp."authorizationCode" FROM public."InvoicesProductPayment" ipp WHERE ipp."invoiceProductId" = ep.id AND UPPER(ipp."paymentMethod") = 'TARJETA' LIMIT 1), '') AS ds_cc_autorizacion,
+		COALESCE((SELECT ipp."voucher" FROM public."InvoicesProductPayment" ipp WHERE ipp."invoiceProductId" = ep.id AND UPPER(ipp."paymentMethod") = 'TARJETA' LIMIT 1), '') AS ds_cc_voucher,
+        0 AS in_cc_cuotas,
+        0 AS am_fp2,
+        '' AS ds_cc_code2,
+        '' AS ds_cc_number2,
+        '' AS ds_cc_vence2,
+        '' AS ds_cc_autorizacion2,
+        '' AS ds_cc_voucher2,
+        0 AS in_cc_cuotas2,
+        COALESCE(e."currency", 'COP') AS cd_monedas_iata,
+        COALESCE(e."exchangeRate", 1.0) AS Tcambio,
+        b."code" AS cd_sucursal,
+        i."code" AS cd_implante,
+        B'0' AS bl_ahorro,
+        '' AS cd_TipoTiqueteGDS,
+        COALESCE(tt.code,'') AS cd_TiposDocumento,
+        CASE WHEN COALESCE(pre."nogds",'')<>'' THEN COALESCE(pre.code,'') ELSE 'BSP' END AS cd_entdist,
+        COALESCE(pre.code,'') AS cd_entvend,
+        SUBSTRING(COALESCE(ep.destination, ''), 1, 3) AS cd_destino,
+        COALESCE(ep."checkInDate", e.date) AS dt_fechaexped,
+        COALESCE(tp.code, '') AS cd_tiqueteadores,
+        NULL AS id_gds,
+        1 AS iden_gds,
+        0 AS am_comisionPNR,
+        COALESCE(ep."reservationCode", '') AS ds_records,
+        B'0' AS bl_NoCalcComision,
+        B'0' AS bl_NoCalcIvaComision,
+        0 AS am_basecomisionable,
+        0 AS am_porcomision,
+        '' AS cd_tiposconceptfac,
+        COALESCE(pr."billingConcept", '') AS cd_conceptofacturacion,
+        COALESCE(pr."serviceType", '') AS cd_tiposservicio,
+        SUBSTRING(COALESCE(prov.code, prov.name, ''), 1, 25) AS cd_proveedores,
+        SUBSTRING(COALESCE(ep."servicios", ''), 1, 250) AS ds_servicio,
+        (
+            COALESCE(ep.price, 0) +
+            COALESCE((
+                SELECT SUM(ipt2."explicitAmount")
+                FROM public."InvoicesProductTax" ipt2
+                JOIN public."ChargeAndTax" ct2 ON ct2.id = ipt2."chargeAndTaxId"
+                LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
+                WHERE ipt2."invoiceProductId" = ep.id
+                  AND ipt2."isMain" = false
+                  AND ct2."targetTaxId" IS NOT NULL
+                  AND (
+                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = ep."mainTaxId"
+                  )
+            ), 0)
+        ) AS am_valorprov,
+        '' AS cd_monedaprov,
+        COALESCE(ep."checkInDate", e.date) AS dt_llegada,
+        COALESCE(ep."checkOutDate", e.date) AS dt_salida,
+        0 AS am_pordescuento,
+        0 AS am_basedescuento,
+        COALESCE(ep."checkInDate", e.date) AS Fecha_Salida,
+        COALESCE(ep."checkOutDate", e.date) AS Fecha_Llegada,
+        '' AS ColId,
+        '' AS cd_Consecutivo_depende,
+        SUBSTRING(COALESCE(ep."reservationCode", ''), 1, 50) AS CodigoReserva,
+        'I' || LPAD(ep.id::text, 7, '0') AS cd_Consecutivo_variablesadicionales,
+        COALESCE(e."totalAmount", 0) AS am_valor_total,
+        SUBSTRING(COALESCE(prov.code, ''), 1, 250) AS ds_proveedores,
+        NULL AS id_FormasPagoAirPlus,
+        '' AS cd_FormasPagoAirPlus,
+        '' AS ds_FormasPagoAirPlus,
+        NULL AS id_TarjetasCreditoAirPlus,
+        '' AS cd_TarjetasCreditoAirPlus,
+        '' AS ds_numerotarjetaAirPlus,
+        NULL AS id_reserva,
+        NULL AS OrdenGrabacion
+    FROM public."InvoicesProduct" ep
+	JOIN public."Invoices" e ON ep."invoiceId" = e.id
+	JOIN public."Branch" b ON e."branchId" = b.id
+    LEFT JOIN public."Implant" i ON e."implantId" = i.id
+    JOIN public."Product" pr ON ep."productId" = pr.id
+	LEFT JOIN public."TicketType" tt ON tt.id = ep."ticketTypeId"
+    JOIN Facturacion f ON ep."invoiceId" = f.id_factura
+    LEFT JOIN public."Provider" prov ON ep."providerId" = prov."id"
+	LEFT JOIN public."Prestadora" pre ON pre."id" = ep."prestadoraId"
+	LEFT JOIN public."TicketPrinter" tp ON tp."id" = e."ticketPrinterId"
+	LEFT JOIN LATERAL ( SELECT  pp.*,
+		        				regexp_split_to_array(TRIM(pp.name), E'\\s+') AS arr
+		    			FROM public."InvoicesProductPasenger" pp 
+						WHERE pp."invoiceProductId" = ep.id
+    					ORDER BY pp.id
+    					LIMIT 1) epp ON true;
+
+    -- 6. Poblar Tabla itinerarios
+    INSERT INTO itinerarios (
+		id_factura,	id_item, in_tipoitem, in_orden, ds_origen, ds_destino, ds_clase, 
+		dt_llegada,	dt_salida, ds_terminal, cd_aerolinea, cd_farebasis,	ds_numerovuelo,	
+		ds_tipovuelo, am_valor, am_co2 
+    )
+    SELECT
+		ep."invoiceId" AS id_factura,	
+		ep."id" AS id_item, 
+		itm.in_tipoitem AS in_tipoitem,
+		COALESCE(epi."orden",0) AS in_orden,
+		COALESCE(epi."origin",'') AS ds_origen, 
+		COALESCE(epi."destination",'') AS ds_destino, 
+		COALESCE(epi."class",'') AS ds_clase,
+		COALESCE(epi."checkInDate", CURRENT_DATE) AS dt_llegada,
+		COALESCE(epi."checkOutDate",CURRENT_DATE) AS dt_salida,
+		COALESCE(epi."terminal",'') AS ds_terminal,
+		COALESCE(epi."prestadoraCode",'') AS cd_aerolinea,
+		COALESCE(epi."farebasis",'') AS cd_farebasis,
+		COALESCE(epi."Numflight",'') AS ds_numerovuelo,
+		COALESCE(epi."Typeflight",'') AS ds_tipovuelo,
+		COALESCE(epi."amount",0) AS am_valor,
+		COALESCE(epi."co2",0) AS am_co2
+    FROM public."InvoicesProduct" ep
+    JOIN public."InvoicesProductItinerary" epi ON epi."invoiceProductId" = ep.id
+	JOIN Item itm ON ep.id = itm.id_item
+    JOIN Facturacion f ON ep."invoiceId" = f.id_factura
+    WHERE ep.itinerary IS NOT NULL AND ep.itinerary <> '';
+
+    -- 7. Poblar Tabla Pasajeros
+    INSERT INTO Pasajeros (
+        id_factura, id_item, in_tipoitem, ds_paxape, ds_paxname, ds_paxprefix,
+        ds_paxClasificacion, cd_voucherpax, cd_paxidentificacion, in_edad, cd_tiquete
+    )
+    SELECT 
+        f.id_factura AS id_factura,
+        itm.id_item AS id_item,
+        itm.in_tipoitem AS in_tipoitem,
+	    CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END AS ds_paxape,
+	    CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name) ELSE COALESCE(arr[1], '') END AS ds_paxname,
+	    CASE WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)::char(3) ELSE ''::char(3) END AS ds_paxprefix,
+        '' AS ds_paxClasificacion,
+        '' AS cd_voucherpax,
+        COALESCE(p.document,'') AS cd_paxidentificacion, 
+        0 AS in_edad, 
+        '' AS cd_tiquete
+	FROM (
+	    SELECT 
+	        p.*,
+	        regexp_split_to_array(TRIM(p.name), E'\\s+') AS arr,
+	        ROW_NUMBER() OVER (
+	            PARTITION BY p."invoiceProductId"
+	            ORDER BY p.id
+	        ) AS rn
+	    FROM public."InvoicesProductPasenger" p
+	) p
+    JOIN Item itm ON p."invoiceProductId" = itm.id_referencia_origen
+    JOIN Facturacion f ON itm.id_factura = f.id_factura
+    WHERE p.rn > 1;
+
+    -- 8. Poblar Tabla CargosImpuestos
+    INSERT INTO CargosImpuestos (
+        id_factura, id_item, in_tipoitem, cd_codigo, ds_nombre, cd_tipo,
+        am_porcentaje, am_valor, am_contado, am_credito, id_carg, id_imp, bl_iva, in_orden
+    )
+    SELECT 
+        f.id_factura AS id_factura,
+        itm.id_item AS id_item,
+        itm.in_tipoitem AS in_tipoitem,
+        COALESCE(ct.code, 'TAR') AS cd_codigo,
+        COALESCE(ct.name, 'Tarifa') AS ds_nombre,
+        CASE WHEN t."isMain" = true THEN 'C' ELSE 'I' END AS cd_tipo,
+        COALESCE(ct.value, 0) AS am_porcentaje,
+        (
+            t."explicitAmount" +
+            CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                COALESCE((
+                    SELECT SUM(sub_t."explicitAmount")
+                    FROM public."InvoicesProductTax" sub_t
+                    JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                    WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                      AND sub_t."isMain" = false
+                      AND sub_ct."targetTaxId" = ct.id
+                ), 0)
+            ELSE 0 END
+        ) AS am_valor,
+        CASE WHEN itm.cd_FormasPago='EFE' THEN (
+            t."explicitAmount" +
+            CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                COALESCE((
+                    SELECT SUM(sub_t."explicitAmount")
+                    FROM public."InvoicesProductTax" sub_t
+                    JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                    WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                      AND sub_t."isMain" = false
+                      AND sub_ct."targetTaxId" = ct.id
+                ), 0)
+            ELSE 0 END
+        ) ELSE 0 END AS am_contado,
+        CASE WHEN itm.cd_FormasPago='TC' THEN (
+            t."explicitAmount" +
+            CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                COALESCE((
+                    SELECT SUM(sub_t."explicitAmount")
+                    FROM public."InvoicesProductTax" sub_t
+                    JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                    WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                      AND sub_t."isMain" = false
+                      AND sub_ct."targetTaxId" = ct.id
+                ), 0)
+            ELSE 0 END
+        ) ELSE 0 END AS am_credito,
+        ct.id AS id_carg,
+        ct.id AS id_imp,
+        CASE WHEN ct.code = 'IVA' THEN B'1' ELSE B'0' END AS bl_iva,
+        1 AS in_orden
+    FROM public."InvoicesProductTax" t
+    JOIN public."ChargeAndTax" ct ON t."chargeAndTaxId" = ct.id
+    LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct."targetTaxId"
+    JOIN Item itm ON t."invoiceProductId" = itm.id_referencia_origen
+    JOIN Facturacion f ON itm.id_factura = f.id_factura
+    WHERE NOT (
+        t."isMain" = false AND ct."targetTaxId" IS NOT NULL AND (
+            target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = (SELECT ep."mainTaxId" FROM public."InvoicesProduct" ep WHERE ep.id = t."invoiceProductId")
+        )
+    );
+
+    -- 9. Poblar Tabla Formaspago
+    INSERT INTO Formaspago (
+        id_factura, id_item, in_tipoitem, id_formaspago, cd_codigo, ds_nombre,
+        id_tarjetascredito, cd_tipotarjeta, ds_numerotarjeta, ds_vouchertarjeta,
+        ds_expiraciontarjeta, ds_autorizaciontarjeta, in_cuotas, cd_banco,
+        ds_cheque, ds_plaza, ds_referencia, ds_Poliza, ds_PolizaAnexo, am_valor
+    )
+    SELECT 
+        f.id_factura AS id_factura,
+        itm.id_item AS id_item,
+        itm.in_tipoitem AS in_tipoitem,
+        COALESCE(pp.id,ipp.id) AS id_formaspago,
+        COALESCE(pp.code, '') AS cd_codigo,
+        ipp."paymentMethod" AS ds_nombre,
+        ipp."creditCardId" AS id_tarjetascredito,
+        COALESCE(cc.code, '') AS cd_tipotarjeta,
+        COALESCE(ipp."cardNumber", '') AS ds_numerotarjeta,
+        COALESCE(ipp.voucher, '') AS ds_vouchertarjeta,
+        COALESCE(ipp."expirationDate", '') AS ds_expiraciontarjeta,
+        COALESCE(ipp."authorizationCode", '') AS ds_autorizaciontarjeta,
+        0 AS in_cuotas,
+        '' AS cd_banco,
+        '' AS ds_cheque,
+        '' AS ds_plaza,
+        COALESCE(ipp.reference, '') AS ds_referencia,
+        '' AS ds_Poliza,
+        '' AS ds_PolizaAnexo,
+        ipp.amount AS am_valor
+    FROM public."InvoicesProductPayment" ipp
+    JOIN Item itm ON ipp."invoiceProductId" = itm.id_item
+    JOIN Facturacion f ON itm.id_factura = f.id_factura
+    LEFT JOIN public."Payment" pp ON LOWER(pp."name") LIKE ('%' || LOWER(ipp."paymentMethod") || '%') 
+	LEFT JOIN public."CreditCard" cc ON ipp."creditCardId" = cc.id;
+
+    -- 10. Poblar Tabla Variables
+    INSERT INTO Variables (
+        id_factura, id_item, in_tipoitem, ds_maestro, ds_VariableAdicional, ds_valor, cd_codigo
+    )
+    SELECT 
+        f.id_factura AS id_factura,
+        itm.id_item AS id_item,
+        itm.in_tipoitem AS in_tipoitem,
+        CASE WHEN itm.in_tipoitem=1 THEN itm.cd_tiquete ELSE itm.cd_Consecutivo_variablesadicionales END AS ds_maestro,
+        COALESCE(mv.name, '') AS ds_VariableAdicional,
+        COALESCE(v.value, '') AS ds_valor,
+        COALESCE(mv.code, '') AS cd_codigo
+    FROM public."InvoicesProductVariable" v
+    JOIN public."MasterVariable" mv ON v."masterVariableId" = mv.id
+    JOIN Item itm ON v."invoiceProductId" = itm.id_referencia_origen
+    JOIN Facturacion f ON itm.id_factura = f.id_factura;
+
+    -- 11. Generar XML
+    SELECT xmlroot(
+        xmlelement(name "Facturaciones",
+            xmlagg(
+                xmlelement(name "Facturacion",
+                    xmlforest(
+                        f.id,f.id_factura, f.cd_fuente, f.cd_serie, f.cd_consecutivo, f.cd_usuario, f.cd_sucursal, f.cd_implante, 
+						f.dt_fechacont, f.dt_vence, f.cd_tercero_codigo, f.ds_tercero_nombre, f.cd_cliente_codigo, 
+						f.ds_cliente_nombre, f.ds_cliente_dir, f.ds_cliente_ciudad, f.ds_cliente_tel, f.ds_cliente_dirdesp, 
+						f.ds_cliente_email, f.ds_cliente_contacto, f.ds_cliente_contacto_email, f.cd_monedas_iata, 
+						f.cd_vendedor, f.cd_tiqueteador, f.bn_anexo, f.Tcambio, f.am_tcambiousd, f.id_tipoventa, 
+						f.ds_num_resolucion, f.in_num_inicial, f.in_num_final, f.ds_numeracion_autorizada, 
+						f.dt_fecha_resolucion, f.CodigoArchivoFisico, f.ds_Observacion, f.ds_Campo_libre1, 
+						f.ds_Campo_libre2, f.cd_fuente_Reemplaza, f.cd_serie_Reemplaza, f.cd_consecutivo_Reemplaza, 
+						f.ds_Actividad_Economica, f.ds_Tarifa_ICA, f.SqlStmt, f.AnticiposSqlStmt, f.TotalFactura, 
+						f.TotalCupoCreditoCliente, f.bl_BloqueoCupoCredito, f.bl_generadaauto, f.ds_CotizacionesId, 
+						f.Id_Cierre, f.cd_TipoFact, f.id_fac_remisionRelacionada, f.id_fac_facturaRelacionada, 
+						f.ds_DescripcionFac, f.bl_nocont, f.ProductosSqlStmt, f.cd_CF_TipoComprobante, f.id_Licitacion, 
+						f.ValorFactura, f.id_Especialista, f.cd_tiqueteador_Facturador, f.id_TipoFormaPagoProveedor, 
+						f.id_MedioReservacion, f.bl_refacturacion, f.bl_comisiona, f.cd_fuente_factura, f.cd_serie_factura, 
+						f.cd_consecutivo_factura, f.id_NotasAerolinea, f.bl_interface, f.id_evento, f.bl_NoEnviarFacElectronica, 
+						f.bl_FacturaComision, f.bl_DescontarComisionCxP, f.ds_num_resolucion_Adicional, 
+						f.id_fac_facturaRefacturacion, f.bl_refacturacion_contabilizar_saldos, f.ZML_VariablesXML, 
+						f.bl_FormatoResumidoFactElectro, f.bl_ExigeAdjuntoFactElectro, f.bl_omitir_Validar_IVA_facturacion, 
+						f.ds_Respuesta
+                    ),
+                    (
+                        SELECT xmlagg(
+                            xmlelement(name "Item",
+                                xmlforest(
+									s.tipo_item, s.id_factura, s.id_item, s.in_tipoitem, s.id_referencia_origen, s.cd_tiquete, 
+									s.ds_descrip, s.in_nacionalidad, s.cd_cencosto, s.cd_auxiliar, s.cd_item, 
+									s.am_tarifa, s.am_iva, s.am_tua, s.am_comb, s.am_vat, s.am_Comision, 
+									s.ds_paxname, s.ds_paxape, s.ds_paxprefix, s.cd_tourcode, s.NumTktConj, 
+									s.cd_TipoTiquete, s.id_air, s.ds_itinerario, s.ds_itinerarioaerolinea, 
+									s.ds_clases, s.ds_Observaciones, s.am_highfare, s.am_lowfare, s.ds_solicita, 
+									s.ds_lapsoviaje, s.cd_tktrevisado, s.cd_PasaportePax, s.cd_pax_CC, 
+									s.am_PorFacParcial, s.in_cantpax, s.Id_Precompra, s.cd_FormaPagoTAO, 
+									s.cd_TarjetaCreditoTAO, s.cd_NumeroTarjetaTAO, s.cd_VencimientoTarjetaTAO, 
+									s.cd_NumeroPolizaTAO, s.cd_AnexoPolizaTAO, s.ds_AutorizacionTarjetaTAO, 
+									s.in_cuotasTarjetaTAO, s.cd_FormasPago, s.cd_TarjetasCredito, s.am_fp1, 
+									s.ds_cc_code, s.ds_cc_number, s.ds_cc_vence, s.ds_cc_autorizacion, 
+									s.ds_cc_voucher, s.in_cc_cuotas, s.am_fp2, s.ds_cc_code2, s.ds_cc_number2, 
+									s.ds_cc_vence2, s.ds_cc_autorizacion2, s.ds_cc_voucher2, s.in_cc_cuotas2, 
+									s.cd_monedas_iata, s.Tcambio, s.cd_sucursal, s.cd_implante, s.bl_ahorro, 
+									s.cd_TipoTiqueteGDS, s.cd_TiposDocumento, s.cd_entdist, s.cd_entvend, 
+									s.cd_destino, s.dt_fechaexped, s.cd_tiqueteadores, s.id_gds, s.iden_gds, 
+									s.am_comisionPNR, s.ds_records, s.bl_NoCalcComision, s.bl_NoCalcIvaComision, 
+									s.am_basecomisionable, s.am_porcomision, s.cd_tiposconceptfac, 
+									s.cd_conceptofacturacion, s.cd_tiposservicio, s.cd_proveedores, 
+									s.ds_servicio, s.am_valorprov, s.cd_monedaprov, s.dt_llegada, s.dt_salida, 
+									s.am_pordescuento, s.am_basedescuento, s.Fecha_Salida, s.Fecha_Llegada, 
+									s.ColId, s.cd_Consecutivo_depende, s.CodigoReserva, 
+									s.cd_Consecutivo_variablesadicionales, s.am_valor_total, s.ds_proveedores, 
+									s.id_FormasPagoAirPlus, s.cd_FormasPagoAirPlus, s.ds_FormasPagoAirPlus, 
+									s.id_TarjetasCreditoAirPlus, s.cd_TarjetasCreditoAirPlus, 
+									s.ds_numerotarjetaAirPlus, s.id_reserva, s.OrdenGrabacion
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "itinerarios",
+                                            xmlforest(
+                                                id_factura,	id_item, in_tipoitem, ds_origen, ds_destino, ds_clase, 
+												dt_llegada,	dt_salida, ds_terminal, cd_aerolinea, cd_farebasis,	ds_numerovuelo,	
+												ds_tipovuelo, am_valor, am_co2 
+                                            )
+                                        )
+                                    )
+                                    FROM itinerarios iti
+                                    WHERE iti.id_item = s.id_item
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "Pasajeros",
+                                            xmlforest(
+                                                p.id_factura, p.id_item, p.in_tipoitem, p.ds_paxape, p.ds_paxname, p.ds_paxprefix,
+                                                p.ds_paxClasificacion, p.cd_voucherpax, p.cd_paxidentificacion, p.in_edad, p.cd_tiquete
+                                            )
+                                        )
+                                    )
+                                    FROM Pasajeros p
+                                    WHERE p.id_item = s.id_item
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "CargosImpuestos",
+                                            xmlforest(
+                                                ci.id_factura, ci.id_item, ci.in_tipoitem, ci.cd_codigo, ci.ds_nombre, ci.cd_tipo,
+                                                ci.am_porcentaje, ci.am_valor, ci.am_contado, ci.am_credito, ci.id_carg, ci.id_imp,
+                                                ci.bl_iva, ci.in_orden
+                                            )
+                                        )
+                                    )
+                                    FROM CargosImpuestos ci
+                                    WHERE ci.id_item = s.id_item
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "Formaspago",
+                                            xmlforest(
+                                                fp.id_factura, fp.id_item, fp.in_tipoitem, fp.id_formaspago, fp.cd_codigo, fp.ds_nombre,
+                                                fp.id_tarjetascredito, fp.cd_tipotarjeta, fp.ds_numerotarjeta, fp.ds_vouchertarjeta,
+                                                fp.ds_expiraciontarjeta, fp.ds_autorizaciontarjeta, fp.in_cuotas, fp.cd_banco,
+                                                fp.ds_cheque, fp.ds_plaza, fp.ds_referencia, fp.ds_Poliza, fp.ds_PolizaAnexo, fp.am_valor
+                                            )
+                                        )
+                                    )
+                                    FROM Formaspago fp
+                                    WHERE fp.id_item = s.id_item AND fp.in_tipoitem = s.in_tipoitem
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "Variables",
+                                            xmlforest(
+                                                v.id_factura, v.id_item, v.in_tipoitem, v.ds_maestro, v.ds_VariableAdicional, v.ds_valor, v.cd_codigo
+                                            )
+                                        )
+                                    )
+                                    FROM Variables v
+                                    WHERE v.id_item = s.id_item AND v.in_tipoitem = s.in_tipoitem
+                                )
+                            )
+                        )
+                        FROM Item s
+                        WHERE s.id_factura = f.id_factura 
+                    )
+                )
+            )
+        ),
+        version '1.0', standalone yes
+    )::text INTO v_xml
+    FROM Facturacion f;
+
+    mensaje_resultado := COALESCE(v_xml, '<?xml version="1.0" standalone="yes"?><Facturaciones />');
+
+EXCEPTION
+    WHEN OTHERS THEN
+        GET STACKED DIAGNOSTICS 
+            v_state   = RETURNED_SQLSTATE,
+            v_msg     = MESSAGE_TEXT,
+            v_context = PG_EXCEPTION_CONTEXT;
+		v_line := substring(v_context from 'line ([0-9]+)')::TEXT;
+        mensaje_resultado := format('ERROR: %s | EN LÍNEA: %s | ESTADO: %s', v_msg, v_line, v_state);
+END;
+$$;;
+
+-- Inyectado automáticamente: spExportQuotation.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spExportQuotation'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spExportQuotation(
+    Quotation_id TEXT,
+	User_id INT,
+	INOUT mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+/*
+    AUTOR: Rubiel Gelis Guzman
+    DESCRIPCIÓN: Generación de XML poblando TODAS las columnas de las tablas temporales con nombres explícitos en los SELECT.
+*/
+DECLARE
+    v_xml TEXT;
+    v_nombre_usuario TEXT;
+	v_state   TEXT;
+    v_msg     TEXT;
+    v_context TEXT;
+    v_line    TEXT;
+BEGIN
+    -- 1. Inicializar
+    mensaje_resultado := '';
+
+    Quotation_id := TRIM(BOTH ',' FROM TRIM(COALESCE(Quotation_id, '')));
+    IF Quotation_id = '' THEN
+        mensaje_resultado := 'ERROR: No se han proporcionado IDs de cotización válidos.';
+        RETURN;
+    END IF;
+
+    -- 2. Validación de usuario
+    SELECT "name" INTO v_nombre_usuario FROM public."User" WHERE id = User_id;
+    IF NOT FOUND THEN
+        mensaje_resultado := 'ERROR: El usuario ' || User_id || ' no existe.';
+        RETURN;
+    END IF;
+
+    -- 3. Crear Tablas Temporales (ESQUEMA COMPLETO)
+    CREATE TEMP TABLE IF NOT EXISTS Cotizacion (
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_sucursal VARCHAR(25),
+		cd_implante VARCHAR(25),
+		cd_consecutivo VARCHAR(25),
+		cd_usuario VARCHAR(25),
+		dt_fechacont TIMESTAMP ,
+		dt_fecha TIMESTAMP ,
+		cd_usuarioAct VARCHAR(25),
+		dt_fechaAct TIMESTAMP ,
+		cd_tercero_codigo VARCHAR(25) ,
+		ds_tercero_nombre VARCHAR(250) ,
+		cd_cliente_codigo VARCHAR(25) ,
+		ds_cliente_nombre VARCHAR(250) ,
+		ds_cliente_dir VARCHAR(250) ,
+		ds_cliente_ciudad VARCHAR(100) ,
+		ds_cliente_tel VARCHAR(25) ,
+		ds_cliente_dirdesp VARCHAR(250) ,
+		ds_cliente_email VARCHAR(60) ,
+		ds_cliente_contacto VARCHAR(100) ,
+		ds_cliente_contacto_email VARCHAR(60) ,
+		cd_monedas_IATA VARCHAR(25),
+		cd_vendedor VARCHAR(25) ,
+		cd_tiqueteador VARCHAR(25) ,
+		bn_anexo BYTEA ,
+		am_tcambio DECIMAL ,
+		am_tcambiousd DECIMAL ,
+		cd_cencosto VARCHAR(16) ,
+		ds_observacion VARCHAR(8000) ,
+		ds_Campo_libre1 VARCHAR(500) ,
+		ds_Campo_libre2 VARCHAR(500) ,
+		cd_tipoventa VARCHAR(25),
+		in_estado INT ,
+		dt_vence TIMESTAMP ,
+		cd_Etapa VARCHAR(25),
+		ds_seguimiento_etapa VARCHAR(500) ,
+		bl_ManejaOpciones BIT(1) DEFAULT B'0',
+		in_NumeroOpciones INT ,
+		bl_CerrarCotizacion BIT(1) DEFAULT B'0',
+		in_OpcionSeleccionada INT ,
+		bl_grupos BIT(1) DEFAULT B'0',
+		gk_sabre VARCHAR(25) ,
+		cd_Especialista VARCHAR(25),
+		cd_TipoFormaPagoProveedor VARCHAR(25),
+		cd_MedioReservacion VARCHAR(25),
+		bl_bloqueada BIT(1) DEFAULT B'0',
+		cd_usuario_Bloqueo VARCHAR(25),
+		ds_AlertaSolicitud VARCHAR(8000) ,
+		bl_comisiona BIT(1) DEFAULT B'0',
+		ds_FormaDePago VARCHAR(250) ,
+		ds_records VARCHAR(25) ,
+		bl_entregadoCliente BIT(1) DEFAULT B'0',
+		dt_entregadoCliente TIMESTAMP ,
+		id_sys_entidades INT ,
+		cd_MonedaPagoDestino VARCHAR(25) ,
+		cd_FormaPagoDestino VARCHAR(25) ,
+		ds_DocumentoPagoDestino VARCHAR(50) ,
+		dt_CheckInPagoDestino TIMESTAMP ,
+		dt_CheckOutPagoDestino TIMESTAMP ,
+		bl_fechaPagoDestino BIT(1) DEFAULT B'0',
+		ds_hotelTieneTiquete VARCHAR(2),
+		ds_GDS VARCHAR(2),
+		cd_Evento VARCHAR(25),
+        orig_id_ref INT
+    ) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CotizacionServicios(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_TiposConceptFac VARCHAR(25),
+		cd_ConceptoFacturacion VARCHAR(25),
+		cd_TiposServicio VARCHAR(25) ,
+		cd_Cotizacion VARCHAR(25) ,
+		cd_fac_factura VARCHAR(25) ,
+		cd_fac_remision VARCHAR(25) ,
+		cd_proveedores VARCHAR(25) ,
+		ds_tiposervnm VARCHAR(50) ,
+		cd_prov_hotel VARCHAR(10) ,
+		cd_prov_car VARCHAR(10) ,
+		cd_prov_air VARCHAR(10) ,
+		ds_destino VARCHAR(30) ,
+		ds_servicio VARCHAR(250) ,
+		ds_descrip VARCHAR(4000) ,
+		ds_paxname VARCHAR(20) ,
+		ds_paxape VARCHAR(20) ,
+		cd_paxtype VARCHAR(25) ,
+		in_nacionalidad INT ,
+		cd_voucher VARCHAR(20) ,
+		in_cantpax INT ,
+		dt_llegada TIMESTAMP ,
+		dt_salida TIMESTAMP ,
+		cd_cencosto VARCHAR(16) ,
+		cd_auxiliar VARCHAR(16) ,
+		cd_item VARCHAR(16) ,
+		am_valorprov DECIMAL ,
+		cd_monedaprov VARCHAR(25) ,
+		ds_InfoAdicional VARCHAR(8000) ,
+		cd_carrental VARCHAR(25) ,
+		cd_hoteles VARCHAR(25) ,
+		bl_anulado BIT(1) DEFAULT B'0' ,
+		cd_tiquete VARCHAR(11) ,
+		cd_fuente_anul VARCHAR(2) ,
+		cd_serie_anul VARCHAR(2) ,
+		cd_consecutivo_anul VARCHAR(8) ,
+		cd_usuario_anul VARCHAR(25),
+		cd_sucursal_anul VARCHAR(25) ,
+		cd_implante_anul VARCHAR(25) ,
+		am_basecomisionable DECIMAL ,
+		am_porcomision NUMERIC(8, 4) ,
+		cd_voucherPrefijo VARCHAR(25) ,
+		bl_notdomicilionacional BIT(1) DEFAULT B'0' ,
+		Valor_Comision DECIMAL ,
+		Valor_Recaudo DECIMAL ,
+		dias_recaudo INT ,
+		ds_paxClasificacion VARCHAR(7) ,
+		cd_tipoplan VARCHAR(25) ,
+		cd_acomodacion VARCHAR(25) ,
+		in_dias INT ,
+		in_noches INT ,
+		ds_records VARCHAR(25) ,
+		cd_GrConcepto VARCHAR(25) ,
+		in_diasSrv INT ,
+		in_nochesSrv INT ,
+		cd_Especialista VARCHAR(25),
+		am_porcentaje_descuento NUMERIC(8, 4) ,
+		am_valor_descuento DECIMAL ,
+		ds_motivo_descuento VARCHAR(1000) ,
+		cd_cargosdesc_descuento VARCHAR(25) ,
+		in_NumeroOpcion INT ,
+		dt_FechaSalidaSrv TIMESTAMP ,
+		dt_FechaLlegadaSrv TIMESTAMP ,
+		cd_localizador VARCHAR(25) ,
+		cd_voucherpax VARCHAR(25) ,
+		am_basecomisionableprov DECIMAL ,
+		am_porcomisionprov NUMERIC(8, 4) ,
+		cd_NumeFac VARCHAR(15) ,
+		dt_VenceFac TIMESTAMP ,
+		cd_AcomodacionSrv VARCHAR(25) ,
+		cd_TipoPlanSrv VARCHAR(25) ,
+		in_habitaciones INT ,
+		in_habitacionesSrv INT ,
+		cd_Consecutivo_VARiablesAdicionales VARCHAR(8) ,
+		cd_confirmacion VARCHAR(25) ,
+		ds_confirmadopor VARCHAR(250) ,
+		cd_paxidentificacion VARCHAR(25) ,
+		bl_politicaCancelacion BIT(1) DEFAULT B'0' ,
+		dt_politicaCancelacion TIMESTAMP ,
+		cd_tipoHabitacionacion VARCHAR(25) ,
+		cd_fac_facturaComision VARCHAR(25) ,
+		cd_fac_remisionComision VARCHAR(25) ,
+		cd_TarjetaAsistencia VARCHAR(25) ,
+		cd_Regiones VARCHAR(25) ,
+		Iden_GDS INT ,
+		id_sys_entidades INT ,
+		ds_TipoAuto VARCHAR(50) ,
+		ds_Origen VARCHAR(30) ,
+		ds_DirOrigen VARCHAR(250) ,
+		ds_DirDestino VARCHAR(250) ,
+		ds_TipoTarifa VARCHAR(50) ,
+		am_ValorUSD DECIMAL ,
+		ds_NoVuelo VARCHAR(25) ,
+		ds_Vehiculo VARCHAR(250) ,
+		ds_Placa VARCHAR(25) ,
+		ds_CategoriaVehiculo VARCHAR(250) ,
+		ds_NombreConductor VARCHAR(50) ,
+		ds_telefono VARCHAR(25) ,
+		ds_IdiomaConductor VARCHAR(25) ,
+		cd_MonedaSrv VARCHAR(25) ,
+		cd_TipoServicio VARCHAR(25) ,
+		cd_Aerolinea VARCHAR(25) ,
+		in_EdadPax INT ,
+		am_PorFacParcial NUMERIC(8, 4) ,
+		ds_GDS VARCHAR(25) ,
+		dt_fechaficheroBBVA TIMESTAMP ,
+		bl_tiquete BIT(1) DEFAULT B'0' ,
+		am_basedescuento DECIMAL ,
+		am_pordescuento NUMERIC(18, 4) ,
+		cd_CotizacionServicios_Depende VARCHAR(25),
+        orig_id_ref INT,
+		orig_id_quotationref INT,
+		mainTaxId INT
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CotizacionServicios_PaxAdicional(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_Cotizacion VARCHAR(25),
+		cd_CotizacionServicios VARCHAR(25),
+		ds_paxape VARCHAR(30),
+		ds_paxname VARCHAR(30),
+		ds_paxprefix CHAR(25),
+		ds_paxClasificacion CHAR(25),
+		cd_voucherpax VARCHAR(25),
+		cd_paxidentificacion VARCHAR(25),
+		in_edad INT,
+		cd_tiquete CHAR(50)
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CotizacionServicios_VariableAdicional(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_Cotizacion VARCHAR(25),
+		cd_CotizacionServicios VARCHAR(25),
+		ds_maestro VARCHAR(25), 
+		ds_VariableAdicional VARCHAR(25),
+		ds_valor VARCHAR(500),
+		cd_codigo CHAR(25)
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CotizacionCargos(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_CotizacionServicios VARCHAR(25) ,
+		cd_CotizacionCargos VARCHAR(25),
+		cd_cargosdesc VARCHAR(25) ,
+		ds_cargonm VARCHAR(50) ,
+		bl_noshow BIT(1) DEFAULT B'0' ,
+		am_contado DECIMAL ,
+		am_credito DECIMAL ,
+		am_valor DECIMAL GENERATED ALWAYS AS (am_contado + am_credito) STORED,
+		am_contado_ME DECIMAL ,
+		am_credito_ME DECIMAL ,
+		am_valor_ME DECIMAL GENERATED ALWAYS AS (am_contado_ME + am_credito_ME) STORED,
+        orig_id_ref INT,
+		cd_Cotizacion VARCHAR(25) 
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CotizacionImpuestos(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_CotizacionCargos VARCHAR(25),
+		cd_CotizacionImpuestos VARCHAR(25),
+		cd_ImpRet VARCHAR(25),
+		ds_Impas VARCHAR(50),
+		cd_impcta VARCHAR(16),
+		am_porcentaje DECIMAL,
+		bl_contabilizar BIT(1) DEFAULT B'0' ,
+		am_contado DECIMAL,
+		am_credito DECIMAL,
+		am_valor DECIMAL GENERATED ALWAYS AS (am_contado + am_credito) STORED,
+		am_contado_ME DECIMAL,
+		am_credito_ME DECIMAL,
+		am_valor_ME DECIMAL GENERATED ALWAYS AS (am_contado_ME + am_credito_ME) STORED,
+		cd_CotizacionServicios VARCHAR(25),
+		cd_Cotizacion VARCHAR(25)
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS Fac_Servicios_TiposFacturacionHoteles(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_Cotizacion varchar(25),
+		cd_CotizacionServicios varchar(25),
+		cd_TiposFacturacionHoteles varchar(25),
+		cd_cargosdesc varchar(25),
+		in_cantidad INT,
+		am_contado DECIMAL,
+		am_credito DECIMAL,
+		am_valor DECIMAL GENERATED ALWAYS AS (am_contado + am_credito) STORED,
+		ds_cargonm varchar(50) NULL
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CotizacionServicios_TipoProv(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_Cotizacion varchar(25),
+		cd_CotizacionServicios varchar(25),
+		cd_TipoProveedores varchar(25),
+		ds_TipoProveedores varchar(60),
+		cd_proveedores varchar(25),
+		ds_proveedores varchar(250)
+	) ON COMMIT DROP;
+
+	CREATE TEMP TABLE IF NOT EXISTS CotizacionServiciosFormasPago(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		cd_Cotizacion VARCHAR(25),
+		cd_CotizacionServicios VARCHAR(25),
+		cd_codigo VARCHAR(3),
+		ds_FPnm VARCHAR(100),
+		bl_FPrepresenta BIT(1) DEFAULT B'0',
+		id_TarjetasCredito INT,
+		cd_tccode VARCHAR(10),
+		ds_tcnumber VARCHAR(16),
+		ds_tcvoucher VARCHAR(25),
+		cd_idbanco VARCHAR(3),
+		ds_cheque VARCHAR(30),
+		ds_referencia VARCHAR(50),
+		am_valor DECIMAL,
+		ds_tcexp VARCHAR(7),
+		ds_plaza VARCHAR(3),
+		ds_Poliza VARCHAR(20),
+		ds_PolAnexo VARCHAR(20),
+		am_valor_ME DECIMAL DEFAULT 0,
+		ds_tcautorizacion VARCHAR(25),
+		in_tccuotas INT
+	) ON COMMIT DROP;
+
+    -- 4. Poblar Tablas Temporales (POBLANDO TODAS LAS COLUMNAS CON NOMBRES EXPLÍCITOS)
+    
+    INSERT INTO Cotizacion (
+        cd_sucursal, cd_implante, cd_consecutivo, cd_usuario, dt_fechacont, dt_fecha, 
+        cd_usuarioAct, dt_fechaAct, cd_tercero_codigo, ds_tercero_nombre, cd_cliente_codigo, 
+        ds_cliente_nombre, ds_cliente_dir, ds_cliente_ciudad, ds_cliente_tel, ds_cliente_dirdesp, 
+        ds_cliente_email, ds_cliente_contacto, ds_cliente_contacto_email, cd_monedas_IATA, 
+        cd_vendedor, cd_tiqueteador, bn_anexo, am_tcambio, am_tcambiousd, cd_cencosto, 
+        ds_observacion, ds_Campo_libre1, ds_Campo_libre2, cd_tipoventa, in_estado, 
+        dt_vence, cd_Etapa, ds_seguimiento_etapa, bl_ManejaOpciones, in_NumeroOpciones, 
+        bl_CerrarCotizacion, in_OpcionSeleccionada, bl_grupos, gk_sabre, cd_Especialista, 
+        cd_TipoFormaPagoProveedor, cd_MedioReservacion, bl_bloqueada, cd_usuario_Bloqueo, 
+        ds_AlertaSolicitud, bl_comisiona, ds_FormaDePago, ds_records, bl_entregadoCliente, 
+        dt_entregadoCliente, id_sys_entidades, cd_MonedaPagoDestino, cd_FormaPagoDestino, 
+        ds_DocumentoPagoDestino, dt_CheckInPagoDestino, dt_CheckOutPagoDestino, 
+        bl_fechaPagoDestino, ds_hotelTieneTiquete, ds_GDS, cd_Evento, orig_id_ref
+    )
+    SELECT 
+        COALESCE(b.code, '') as cd_sucursal, 
+        COALESCE(i.code, '') as cd_implante, 
+        COALESCE(NULLIF(TRIM(q."internalNumber"), ''), 'Q' || LPAD(q."id"::text, 7, '0')) as cd_consecutivo, 
+        public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuario, 
+        q.date as dt_fechacont, 
+        q.date as dt_fecha,
+        public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuarioAct, 
+        q.date as dt_fechaAct, 
+        COALESCE(c.document, '') as cd_tercero_codigo, 
+        public."fnQuitarEspeciales"(c.name) as ds_tercero_nombre, 
+        COALESCE(c.document, '') as cd_cliente_codigo,
+        public."fnQuitarEspeciales"(c.name) as ds_cliente_nombre, 
+        public."fnQuitarEspeciales"(COALESCE(c.address, '')) as ds_cliente_dir, 
+        '' as ds_cliente_ciudad, 
+        '' as ds_cliente_tel, 
+        '' as ds_cliente_dirdesp, 
+        COALESCE(u.email, '') as ds_cliente_email, 
+        public."fnQuitarEspeciales"(c.name) as ds_cliente_contacto, 
+        '' as ds_cliente_contacto_email, 
+        q.currency as cd_monedas_IATA,
+        COALESCE(s.code, '') as cd_vendedor, 
+        public."fnQuitarEspeciales"(COALESCE(t.code, '')) as cd_tiqueteador, 
+        NULL as bn_anexo, 
+        q."exchangeRate" as am_tcambio, 
+        q."exchangeRate" as am_tcambiousd, 
+        '' as cd_cencosto,
+        '' as ds_observacion, 
+        '' as ds_Campo_libre1, 
+        '' as ds_Campo_libre2, 
+        '' as cd_tipoventa, 
+        1 as in_estado, 
+        q.date as dt_vence, 
+        '' as cd_Etapa, 
+        '' as ds_seguimiento_etapa, 
+        B'0' as bl_ManejaOpciones, 
+        0 as in_NumeroOpciones, 
+        B'0' as bl_CerrarCotizacion, 
+        0 as in_OpcionSeleccionada, 
+        B'0' as bl_grupos, 
+        '' as gk_sabre, 
+        '' as cd_Especialista, 
+        '' as cd_TipoFormaPagoProveedor, 
+        '' as cd_MedioReservacion, 
+        B'0' as bl_bloqueada, 
+        '' as cd_usuario_Bloqueo, 
+        '' as ds_AlertaSolicitud, 
+        B'0' as bl_comisiona, 
+        COALESCE((
+            SELECT string_agg(DISTINCT qpmt."paymentMethod", ', ' ORDER BY qpmt."paymentMethod")
+            FROM public."QuotationProduct" qp2
+            JOIN public."QuotationProductPayment" qpmt ON qpmt."quotationProductId" = qp2.id
+            WHERE qp2."quotationId" = q.id
+              AND qpmt."paymentMethod" IS NOT NULL
+              AND qpmt."paymentMethod" <> ''
+        ), '') as ds_FormaDePago, 
+        '' as ds_records, 
+        B'0' as bl_entregadoCliente, 
+        q.date as dt_entregadoCliente, 
+        0 as id_sys_entidades, 
+        '' as cd_MonedaPagoDestino, 
+        '' as cd_FormaPagoDestino, 
+        '' as ds_DocumentoPagoDestino, 
+        q.date as dt_CheckInPagoDestino, 
+        q.date as dt_CheckOutPagoDestino, 
+        B'0' as bl_fechaPagoDestino, 
+        '' as ds_hotelTieneTiquete, 
+        '' as ds_GDS, 
+        '' as cd_Evento, 
+        q.id as orig_id_ref
+    FROM public."Quotation" q
+    LEFT JOIN public."Client" c ON q."clientId" = c.id
+    LEFT JOIN public."Branch" b ON q."branchId" = b.id
+    LEFT JOIN public."Implant" i ON q."implantId" = i.id
+    LEFT JOIN public."Seller" s ON q."sellerId" = s.id
+    LEFT JOIN public."TicketPrinter" t ON q."ticketPrinterId" = t.id
+    LEFT JOIN public."User" u ON q."userId" = u.id -- Traer email del usuario creador
+    WHERE q.id = ANY(string_to_array(Quotation_id, ',')::int[]);
+
+    INSERT INTO CotizacionServicios (
+        cd_TiposConceptFac, cd_ConceptoFacturacion, cd_TiposServicio, cd_Cotizacion,
+        cd_fac_factura, cd_fac_remision, cd_proveedores, ds_tiposervnm, cd_prov_hotel,
+        cd_prov_car, cd_prov_air, ds_destino, ds_servicio, ds_descrip, ds_paxname,
+        ds_paxape, cd_paxtype, in_nacionalidad, cd_voucher, in_cantpax, dt_llegada,
+        dt_salida, cd_cencosto, cd_auxiliar, cd_item, am_valorprov, cd_monedaprov,
+        ds_InfoAdicional, cd_carrental, cd_hoteles, bl_anulado, cd_tiquete,
+        cd_fuente_anul, cd_serie_anul, cd_consecutivo_anul, cd_usuario_anul,
+        cd_sucursal_anul, cd_implante_anul, am_basecomisionable, am_porcomision,
+        cd_voucherPrefijo, bl_notdomicilionacional, Valor_Comision, Valor_Recaudo,
+        dias_recaudo, ds_paxClasificacion, cd_tipoplan, cd_acomodacion, in_dias,
+        in_noches, ds_records, cd_GrConcepto, in_diasSrv, in_nochesSrv, cd_Especialista,
+        am_porcentaje_descuento, am_valor_descuento, ds_motivo_descuento,
+        cd_cargosdesc_descuento, in_NumeroOpcion, dt_FechaSalidaSrv, dt_FechaLlegadaSrv,
+        cd_localizador, cd_voucherpax, am_basecomisionableprov, am_porcomisionprov,
+        cd_NumeFac, dt_VenceFac, cd_AcomodacionSrv, cd_TipoPlanSrv, in_habitaciones,
+        in_habitacionesSrv, cd_Consecutivo_VARiablesAdicionales, cd_confirmacion,
+        ds_confirmadopor, cd_paxidentificacion, bl_politicaCancelacion,
+        dt_politicaCancelacion, cd_tipoHabitacionacion, cd_fac_facturaComision,
+        cd_fac_remisionComision, cd_TarjetaAsistencia, cd_Regiones, Iden_GDS, id_sys_entidades,
+        ds_TipoAuto, ds_Origen, ds_DirOrigen, ds_DirDestino, ds_TipoTarifa, am_ValorUSD,
+        ds_NoVuelo, ds_Vehiculo, ds_Placa, ds_CategoriaVehiculo, ds_NombreConductor,
+        ds_telefono, ds_IdiomaConductor, cd_MonedaSrv, cd_TipoServicio, cd_Aerolinea,
+        in_EdadPax, am_PorFacParcial, ds_GDS, dt_fechaficheroBBVA, bl_tiquete,
+        am_basedescuento, am_pordescuento, cd_CotizacionServicios_Depende, 
+		orig_id_ref, orig_id_quotationref, mainTaxId
+    )
+    SELECT 
+        COALESCE(pr."type", '') as cd_TiposConceptFac, 
+        COALESCE(pr."billingConcept", pr."code", '') as cd_ConceptoFacturacion, 
+        COALESCE(pr."serviceType", qp."serviceType", '') as cd_TiposServicio, 
+        q.cd_consecutivo as cd_Cotizacion,
+        '' as cd_fac_factura, 
+        '' as cd_fac_remision, 
+        COALESCE(prov.code, prov.name, '') as cd_proveedores, 
+        COALESCE(qp."serviceType", '') as ds_tiposervnm, 
+        '' as cd_prov_hotel,
+        '' as cd_prov_car, 
+        '' as cd_prov_air, 
+        COALESCE(qp.destination, '') as ds_destino, 
+        COALESCE(pr.description, '') as ds_servicio, 
+        COALESCE(pr.description, '') as ds_descrip, 
+		CASE 
+	        WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
+	        WHEN TRIM(qpp.name) NOT LIKE '% %' THEN TRIM(qpp.name)
+	        ELSE COALESCE(arr[1], '')
+	    END AS ds_paxname,
+	    CASE 
+	        WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
+	        WHEN TRIM(qpp.name) NOT LIKE '% %' THEN ''
+	        ELSE COALESCE(arr[2], '')
+	    END AS ds_paxape,
+        CASE 
+	        WHEN TRIM(qpp.name) LIKE '% %' THEN COALESCE(arr[3], '')
+	        ELSE ''
+	    END as cd_paxtype, 
+        COALESCE(qp."inNationality", 1) as in_nacionalidad, 
+        '' as cd_voucher, 
+        qp.quantity as in_cantpax, 
+        COALESCE(qp."checkInDate", q.dt_fecha) as dt_llegada,
+        COALESCE(qp."checkOutDate", q.dt_fecha) as dt_salida, 
+        '' as cd_cencosto, 
+        '' as cd_auxiliar, 
+        '' as cd_item, 
+        (
+            COALESCE(qp.price, 0) +
+            COALESCE((
+                SELECT SUM(qpt2."explicitAmount")
+                FROM public."QuotationProductTax" qpt2
+                JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
+                LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
+                WHERE qpt2."quotationProductId" = qp.id
+                  AND qpt2."isMain" = false
+                  AND ct2."targetTaxId" IS NOT NULL
+                  AND (
+                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
+                  )
+            ), 0)
+        ) as am_valorprov, 
+        qt.currency as cd_monedaprov,
+        '' as ds_InfoAdicional, 
+        '' as cd_carrental, 
+        COALESCE(pre."code",'') as cd_hoteles, 
+        B'0' as bl_anulado, 
+        '' as cd_tiquete,
+        '' as cd_fuente_anul, 
+        '' as cd_serie_anul, 
+        '' as cd_consecutivo_anul, 
+        '' as cd_usuario_anul,
+        '' as cd_sucursal_anul, 
+        '' as cd_implante_anul, 
+        0 as am_basecomisionable, 
+        0 as am_porcomision,
+        '' as cd_voucherPrefijo, 
+        B'0' as bl_notdomicilionacional, 
+        0 as Valor_Comision, 
+        0 as Valor_Recaudo,
+        0 as dias_recaudo, 
+        CASE 
+	        WHEN TRIM(qpp.name) LIKE '% %' THEN COALESCE(arr[4], '')
+	        ELSE ''
+	    END  as ds_paxClasificacion, 
+        '' as cd_tipoplan, 
+        '' as cd_acomodacion, 
+        0 as in_dias,
+        COALESCE(qp.nights, 0) as in_noches, 
+        '' as ds_records, 
+        '' as cd_GrConcepto, 
+        0 as in_diasSrv, 
+        0 as in_nochesSrv, 
+        '' as cd_Especialista,
+        0 as am_porcentaje_descuento, 
+        0 as am_valor_descuento, 
+        '' as ds_motivo_descuento,
+        '' as cd_cargosdesc_descuento, 
+        0 as in_NumeroOpcion, 
+        q.dt_fecha as dt_FechaSalidaSrv, 
+        q.dt_fecha as dt_FechaLlegadaSrv,
+        '' as cd_localizador, 
+        '' as cd_voucherpax, 
+        0 as am_basecomisionableprov, 
+        0 as am_porcomisionprov,
+        '' as cd_NumeFac, 
+        q.dt_fecha as dt_VenceFac, 
+        '' as cd_AcomodacionSrv, 
+        '' as cd_TipoPlanSrv, 
+        0 as in_habitaciones,
+        0 as in_habitacionesSrv, 
+        'Q' || LPAD(qp."id"::text, 7, '0') as cd_Consecutivo_VARiablesAdicionales, 
+        '' as cd_confirmacion,
+        '' as ds_confirmadopor, 
+        COALESCE(qpp.document,'') as cd_paxidentificacion, 
+        B'0' as bl_politicaCancelacion,
+        q.dt_fecha as dt_politicaCancelacion, 
+        '' as cd_tipoHabitacionacion, 
+        '' as cd_fac_facturaComision,
+        '' as cd_fac_remisionComision, 
+        '' as cd_TarjetaAsistencia, 
+        '' as cd_Regiones, 
+        0 as Iden_GDS, 
+        0 as id_sys_entidades,
+        '' as ds_TipoAuto, 
+        '' as ds_Origen, 
+        '' as ds_DirOrigen, 
+        '' as ds_DirDestino, 
+        '' as ds_TipoTarifa, 
+        0 as am_ValorUSD,
+        '' as ds_NoVuelo, 
+        '' as ds_Vehiculo, 
+        '' as ds_Placa, 
+        '' as ds_CategoriaVehiculo, 
+        '' as ds_NombreConductor,
+        '' as ds_telefono, 
+        '' as ds_IdiomaConductor, 
+        qt.currency as cd_MonedaSrv, 
+        '' as cd_TipoServicio, 
+        '' as cd_Aerolinea,
+        0 as in_EdadPax, 
+        0 as am_PorFacParcial, 
+        '' as ds_GDS, 
+        q.dt_fecha as dt_fechaficheroBBVA, 
+        B'0' as bl_tiquete,
+        0 as am_basedescuento, 
+        0 as am_pordescuento, 
+        '' as cd_CotizacionServicios_Depende, 
+        qp.id as orig_id_ref,
+		q.orig_id_ref as orig_id_quotationref,
+		qp."mainTaxId" as mainTaxId
+    FROM public."QuotationProduct" qp
+	JOIN public."Quotation" qt ON qp."quotationId" = qt.id
+    JOIN public."Product" pr ON qp."productId" = pr.id
+    JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
+    LEFT JOIN public."Provider" prov ON qp."providerId" = prov."id"
+	LEFT JOIN public."Prestadora" pre ON pre."id" = qp."prestadoraId"
+	LEFT JOIN LATERAL ( 
+        SELECT 
+            COALESCE(pp.id, 999999) as id,
+            COALESCE(pp.name, qp.passenger, '') as name,
+            COALESCE(pp.document, '') as document,
+            regexp_split_to_array(TRIM(COALESCE(pp.name, qp.passenger, '')), '\s+') AS arr
+        FROM (SELECT 1) dummy
+        LEFT JOIN public."QuotationProductPassenger" pp ON pp."quotationProductId" = qp.id
+        ORDER BY pp.id NULLS LAST
+        LIMIT 1
+    ) qpp ON true;
+
+    --INSERT INTO CotizacionServicios_PaxAdicional (
+    --    cd_Cotizacion, cd_CotizacionServicios, ds_paxape, ds_paxname, ds_paxprefix,
+    --    ds_paxClasificacion, cd_voucherpax, cd_paxidentificacion, in_edad, cd_tiquete
+    --)
+    --SELECT 
+    --    cs.cd_Cotizacion, 
+    --    cs.cd_Consecutivo_VARiablesAdicionales as cd_CotizacionServicios, 
+    --    '' as ds_paxape, 
+    --    p.name as ds_paxname, 
+    --    '' as ds_paxprefix, 
+    --    '' as ds_paxClasificacion, 
+    --    '' as cd_voucherpax, 
+    --    p.document as cd_paxidentificacion, 
+    --    0 as in_edad, 
+    --    '' as cd_tiquete
+    --FROM public."QuotationProductPassenger" p
+    --JOIN CotizacionServicios cs ON p."quotationProductId" = cs.orig_id_ref;
+
+	INSERT INTO CotizacionServicios_PaxAdicional (
+				cd_Cotizacion,cd_CotizacionServicios, ds_paxape, ds_paxname, ds_paxprefix,
+				ds_paxClasificacion, cd_voucherpax, cd_paxidentificacion,in_edad, cd_tiquete
+	)
+	SELECT 
+	    cs.cd_Cotizacion, 
+	    cs.cd_Consecutivo_VARiablesAdicionales AS cd_CotizacionServicios, 
+	    CASE 
+	        WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
+	        WHEN TRIM(p.name) NOT LIKE '% %' THEN ''
+	        ELSE COALESCE(arr[2], '')
+	    END AS ds_paxape,
+	    CASE 
+	        WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
+	        WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name)
+	        ELSE COALESCE(arr[1], '')
+	    END AS ds_paxname,
+	    CASE 
+	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[3], '')
+	        ELSE ''
+	    END AS ds_paxprefix,
+	    CASE 
+	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[4], '')
+	        ELSE ''
+	    END AS ds_paxClasificacion,
+	    CASE 
+	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[5], '')
+	        ELSE ''
+	    END AS cd_voucherpax,
+	    p.document AS cd_paxidentificacion, 
+	    0 AS in_edad, 
+	    '' AS cd_tiquete
+		FROM (
+		    SELECT 
+		        p.*,
+		        regexp_split_to_array(TRIM(p.name), '\s+') AS arr,
+		        ROW_NUMBER() OVER (
+		            PARTITION BY p."quotationProductId"
+		            ORDER BY p.id
+		        ) AS rn
+		    FROM public."QuotationProductPassenger" p
+		) p
+		JOIN CotizacionServicios cs 
+		    ON p."quotationProductId" = cs.orig_id_ref
+		WHERE p.rn > 1;
+
+    INSERT INTO CotizacionServicios_VariableAdicional (
+        cd_Cotizacion, cd_CotizacionServicios, ds_maestro, ds_VariableAdicional, ds_valor, cd_codigo
+    )
+    SELECT 
+        cs.cd_Cotizacion, 
+        cs.cd_Consecutivo_VARiablesAdicionales as cd_CotizacionServicios, 
+        'CotizacionServicios' as ds_maestro, 
+        mv.name as ds_VariableAdicional, 
+        v.value as ds_valor, 
+        mv.code as cd_codigo
+    FROM public."QuotationProductVariable" v
+    JOIN public."MasterVariable" mv ON v."masterVariableId" = mv."id"
+    JOIN CotizacionServicios cs ON v."quotationProductId" = cs.orig_id_ref;
+
+    -- SEPARACIÓN CARGOS vs IMPUESTOS (respetando targetTaxId si está configurado)
+    INSERT INTO CotizacionCargos (
+        cd_CotizacionServicios, cd_CotizacionCargos, cd_cargosdesc, ds_cargonm, bl_noshow, am_contado,
+        am_credito, am_contado_ME, am_credito_ME, orig_id_ref, cd_Cotizacion
+    )
+    SELECT 
+        cs.cd_Consecutivo_VARiablesAdicionales as cd_CotizacionServicios,
+		t."id"::text as cd_CotizacionCargos,
+        COALESCE(target_ct.code, ct.code, '') as cd_cargosdesc, 
+        COALESCE(target_ct.name, ct.name, '') as ds_cargonm, 
+        B'0' as bl_noshow, 
+        (
+            t."explicitAmount" +
+            CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%' OR ct.id = cs.mainTaxId) THEN
+                COALESCE((
+                    SELECT SUM(sub_t."explicitAmount")
+                    FROM public."QuotationProductTax" sub_t
+                    JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                    WHERE sub_t."quotationProductId" = t."quotationProductId"
+                      AND sub_t."isMain" = false
+                      AND sub_ct."targetTaxId" = ct.id
+                ), 0)
+            ELSE 0 END
+        ) as am_contado, 
+        0 as am_credito, 
+        0 as am_contado_ME, 
+        0 as am_credito_ME, 
+        t.id as orig_id_ref,
+		cs.cd_Cotizacion as cd_Cotizacion 
+    FROM public."QuotationProductTax" t
+    JOIN public."ChargeAndTax" ct ON t."chargeAndTaxId" = ct.id
+    LEFT JOIN public."ChargeAndTax" target_ct ON ct."targetTaxId" = target_ct.id
+    JOIN CotizacionServicios cs ON t."quotationProductId" = cs.orig_id_ref
+    WHERE COALESCE(target_ct.type, ct.type) <> 'TAX'
+      AND NOT (
+          t."isMain" = false AND ct."targetTaxId" IS NOT NULL AND (
+              target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = cs.mainTaxId
+          )
+      );
+
+    INSERT INTO CotizacionImpuestos (
+        cd_CotizacionCargos, cd_CotizacionImpuestos, cd_ImpRet, ds_Impas, cd_impcta, am_porcentaje,
+        bl_contabilizar, am_contado, am_credito, am_contado_ME, am_credito_ME,
+		cd_CotizacionServicios, cd_Cotizacion
+    )
+    SELECT 
+        COALESCE(tp."id", 1)::text  as cd_CotizacionCargos,
+		t."id"::text as cd_CotizacionImpuestos,
+        COALESCE(target_ct.code, ct.code, '') as cd_ImpRet, 
+        COALESCE(target_ct.name, ct.name, '') as ds_Impas, 
+        '' as cd_impcta, 
+        COALESCE(t."valueSnapshot", 0) as am_porcentaje,
+        B'0' as bl_contabilizar, 
+        COALESCE(t."explicitAmount", 0) as am_contado, 
+        0 as am_credito, 
+        0 as am_contado_ME, 
+        0 as am_credito_ME,
+		cs.cd_Consecutivo_VARiablesAdicionales as cd_CotizacionServicios,
+		cs.cd_Cotizacion as cd_Cotizacion
+    FROM public."QuotationProductTax" t
+    JOIN public."ChargeAndTax" ct ON t."chargeAndTaxId" = ct.id
+    LEFT JOIN public."ChargeAndTax" target_ct ON ct."targetTaxId" = target_ct.id
+    JOIN CotizacionServicios cs ON t."quotationProductId" = cs.orig_id_ref
+	LEFT JOIN public."QuotationProduct" qp ON qp.id = cs.orig_id_ref
+	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = cs.orig_id_ref and tp."chargeAndTaxId" = qp."mainTaxId"
+    WHERE COALESCE(target_ct.type, ct.type) = 'TAX';
+
+	INSERT INTO Fac_Servicios_TiposFacturacionHoteles(
+		cd_Cotizacion,
+		cd_CotizacionServicios,
+		cd_TiposFacturacionHoteles,
+		cd_cargosdesc,
+		in_cantidad,
+		am_contado,
+		am_credito,
+		ds_cargonm
+	)	
+	SELECT 
+		'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
+		'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
+		'NCH' AS cd_TiposFacturacionHoteles, --ADT Adulto,CHD Niño,HAB Habitacion,CAN Cantidad,NCH Noches
+		COALESCE(ct."code",'TAR') AS cd_cargosdesc,
+		COALESCE(qp."quantity",0) AS in_cantidad,
+		COALESCE(tp."explicitAmount",0)/COALESCE(qp."quantity",1) AS am_contado,
+		0 AS am_credito,
+		COALESCE(ct."name",'Tarifa') AS ds_cargonm
+	FROM public."QuotationProduct" qp
+	JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
+	LEFT JOIN public."ChargeAndTax" ct ON ct.id = qp."mainTaxId"
+	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = qp."id" and tp."chargeAndTaxId" = qp."mainTaxId";
+
+	INSERT INTO CotizacionServicios_TipoProv(
+		cd_Cotizacion,
+		cd_CotizacionServicios,
+		cd_TipoProveedores,
+		ds_TipoProveedores,
+		cd_proveedores,
+		ds_proveedores
+	)
+	SELECT 
+		'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
+		'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
+		'HTL' as cd_TipoProveedores,
+		'HOTEL' as ds_TipoProveedores,
+		COALESCE(pre."code",'') as cd_proveedores,
+		COALESCE(pre."name",'') as ds_proveedores
+	FROM public."QuotationProduct" qp
+	JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
+	LEFT JOIN public."Prestadora" pre ON pre."id" = qp."prestadoraId";
+
+	-- Poblar formas de pago por servicio desde QuotationProductPayment
+	INSERT INTO CotizacionServiciosFormasPago(
+		cd_Cotizacion,
+		cd_CotizacionServicios,
+		cd_codigo,
+		ds_FPnm,
+		bl_FPrepresenta,
+		ds_tcnumber,
+		ds_tcvoucher,
+		ds_referencia,
+		am_valor,
+		ds_tcexp,
+		am_valor_ME,
+		ds_tcautorizacion
+	)
+	SELECT
+		cs.cd_Cotizacion,
+		cs.cd_Consecutivo_VARiablesAdicionales AS cd_CotizacionServicios,
+		COALESCE(p.code,'') AS cd_codigo,
+		COALESCE(qpmt."paymentMethod", '') AS ds_FPnm,
+		B'0' AS bl_FPrepresenta,
+		COALESCE(qpmt."cardNumber", '') AS ds_tcnumber,
+		COALESCE(qpmt."voucher", '') AS ds_tcvoucher,
+		COALESCE(qpmt."reference", '') AS ds_referencia,
+		COALESCE(qpmt."amount", 0) AS am_valor,
+		COALESCE(qpmt."expirationDate", '') AS ds_tcexp,
+		0 AS am_valor_ME,
+		COALESCE(qpmt."authorizationCode", '') AS ds_tcautorizacion
+	FROM CotizacionServicios cs
+	JOIN public."QuotationProductPayment" qpmt ON qpmt."quotationProductId" = cs.orig_id_ref
+	LEFT JOIN public."Payment" p ON LOWER(p.name)=LOWER(qpmt."paymentMethod")  
+	WHERE qpmt."paymentMethod" IS NOT NULL AND qpmt."paymentMethod" <> '';
+
+    -- 5. Generar XML
+    SELECT xmlroot(
+        xmlelement(name "Cotizaciones",
+            xmlagg(
+                xmlelement(name "Cotizacion",
+                    xmlforest(
+                        q.cd_sucursal, q.cd_implante, q.cd_consecutivo, q.cd_usuario,
+                        q.dt_fechacont, q.dt_fecha, q.cd_usuarioAct, q.dt_fechaAct,
+                        q.cd_tercero_codigo, q.ds_tercero_nombre, q.cd_cliente_codigo,
+                        q.ds_cliente_nombre, q.ds_cliente_dir, q.ds_cliente_ciudad,
+                        q.ds_cliente_tel, q.ds_cliente_dirdesp, q.ds_cliente_email,
+                        q.ds_cliente_contacto, q.ds_cliente_contacto_email, q.cd_monedas_IATA,
+                        q.cd_vendedor, q.cd_tiqueteador, q.bn_anexo, q.am_tcambio,
+                        q.am_tcambiousd, q.cd_cencosto, q.ds_observacion, q.ds_Campo_libre1,
+                        q.ds_Campo_libre2, q.cd_tipoventa, q.in_estado, q.dt_vence,
+                        q.cd_Etapa, q.ds_seguimiento_etapa, q.bl_ManejaOpciones,
+                        q.in_NumeroOpciones, q.bl_CerrarCotizacion, q.in_OpcionSeleccionada,
+                        q.bl_grupos, q.gk_sabre, q.cd_Especialista, q.cd_TipoFormaPagoProveedor,
+                        q.cd_MedioReservacion, q.bl_bloqueada, q.cd_usuario_Bloqueo,
+                        q.ds_AlertaSolicitud, q.bl_comisiona, q.ds_FormaDePago, q.ds_records,
+                        q.bl_entregadoCliente, q.dt_entregadoCliente, q.id_sys_entidades,
+                        q.cd_MonedaPagoDestino, q.cd_FormaPagoDestino, q.ds_DocumentoPagoDestino,
+                        q.dt_CheckInPagoDestino, q.dt_CheckOutPagoDestino, q.bl_fechaPagoDestino,
+                        q.ds_hotelTieneTiquete, q.ds_GDS, q.cd_Evento
+                    ),
+                    (
+                        SELECT xmlagg(
+                            xmlelement(name "CotizacionServicios",
+                                xmlforest(
+                                    s.cd_TiposConceptFac, s.cd_ConceptoFacturacion, s.cd_TiposServicio,
+                                    s.cd_Cotizacion, s.cd_fac_factura, s.cd_fac_remision,
+                                    s.cd_proveedores, s.ds_tiposervnm, s.cd_prov_hotel,
+                                    s.cd_prov_car, s.cd_prov_air, s.ds_destino, s.ds_servicio,
+                                    s.ds_descrip, s.ds_paxname, s.ds_paxape, s.cd_paxtype,
+                                    s.in_nacionalidad, s.cd_voucher, s.in_cantpax, s.dt_llegada,
+                                    s.dt_salida, s.cd_cencosto, s.cd_auxiliar, s.cd_item,
+                                    s.am_valorprov, s.cd_monedaprov, s.ds_InfoAdicional,
+                                    s.cd_carrental, s.cd_hoteles, s.bl_anulado, s.cd_tiquete,
+                                    s.cd_fuente_anul, s.cd_serie_anul, s.cd_consecutivo_anul,
+                                    s.cd_usuario_anul, s.cd_sucursal_anul, s.cd_implante_anul,
+                                    s.am_basecomisionable, s.am_porcomision, s.cd_voucherPrefijo,
+                                    s.bl_notdomicilionacional, s.Valor_Comision, s.Valor_Recaudo,
+                                    s.dias_recaudo, s.ds_paxClasificacion, s.cd_tipoplan,
+                                    s.cd_acomodacion, s.in_dias, s.in_noches, s.ds_records,
+                                    s.cd_GrConcepto, s.in_diasSrv, s.in_nochesSrv, s.cd_Especialista,
+                                    s.am_porcentaje_descuento, s.am_valor_descuento,
+                                    s.ds_motivo_descuento, s.cd_cargosdesc_descuento,
+                                    s.in_NumeroOpcion, s.dt_FechaSalidaSrv, s.dt_FechaLlegadaSrv,
+                                    s.cd_localizador, s.cd_voucherpax, s.am_basecomisionableprov,
+                                    s.am_porcomisionprov, s.cd_NumeFac, s.dt_VenceFac,
+                                    s.cd_AcomodacionSrv, s.cd_TipoPlanSrv, s.in_habitaciones,
+                                    s.in_habitacionesSrv, s.cd_Consecutivo_VARiablesAdicionales,
+                                    s.cd_confirmacion, s.ds_confirmadopor, s.cd_paxidentificacion,
+                                    s.bl_politicaCancelacion, s.dt_politicaCancelacion,
+                                    s.cd_tipoHabitacionacion, s.cd_fac_facturaComision,
+                                    s.cd_fac_remisionComision, s.cd_TarjetaAsistencia,
+                                    s.cd_Regiones, s.Iden_GDS, s.id_sys_entidades,
+                                    s.ds_TipoAuto, s.ds_Origen, s.ds_DirOrigen, s.ds_DirDestino, s.ds_TipoTarifa,
+                                    s.am_ValorUSD, s.ds_NoVuelo, s.ds_Vehiculo, s.ds_Placa,
+                                    s.ds_CategoriaVehiculo, s.ds_NombreConductor, s.ds_telefono,
+                                    s.ds_IdiomaConductor, s.cd_MonedaSrv, s.cd_TipoServicio,
+                                    s.cd_Aerolinea, s.in_EdadPax, s.am_PorFacParcial, s.ds_GDS,
+                                    s.dt_fechaficheroBBVA, s.bl_tiquete, s.am_basedescuento,
+                                    s.am_pordescuento, s.cd_CotizacionServicios_Depende
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "CotizacionServicios_PaxAdicional",
+                                            xmlforest(
+                                                p.cd_Cotizacion, p.cd_CotizacionServicios, p.ds_paxape,
+                                                p.ds_paxname, p.ds_paxprefix, p.ds_paxClasificacion,
+                                                p.cd_voucherpax, p.cd_paxidentificacion, p.in_edad,
+                                                p.cd_tiquete
+                                            )
+                                        )
+                                    )
+                                    FROM CotizacionServicios_PaxAdicional p
+                                    WHERE p.cd_CotizacionServicios = s.cd_Consecutivo_VARiablesAdicionales
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "CotizacionServicios_VariableAdicional",
+                                            xmlforest(
+                                                v.cd_Cotizacion, v.cd_CotizacionServicios, v.ds_maestro,
+                                                v.ds_VariableAdicional, v.ds_valor, v.cd_codigo
+                                            )
+                                        )
+                                    )
+                                    FROM CotizacionServicios_VariableAdicional v
+                                    WHERE v.cd_CotizacionServicios = s.cd_Consecutivo_VARiablesAdicionales
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "CotizacionCargos",
+                                            xmlforest(
+                                                cr.cd_CotizacionServicios, cr.cd_cargosdesc,
+                                                cr.ds_cargonm, cr.bl_noshow, cr.am_contado,
+                                                cr.am_credito, cr.am_valor, cr.am_contado_ME,
+                                                cr.am_credito_ME, cr.am_valor_ME,
+												cr.orig_id_ref::text AS cd_CotizacionCargos,
+												cr.cd_Cotizacion as cd_Cotizacion 
+                                            )
+                                        )
+                                    )
+                                    FROM CotizacionCargos cr
+                                    WHERE cr.cd_CotizacionServicios = s.cd_Consecutivo_VARiablesAdicionales
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "CotizacionImpuestos",
+                                            xmlforest(
+                                                imp.cd_CotizacionServicios, imp.cd_CotizacionCargos, imp.cd_ImpRet,
+                                                imp.ds_Impas, imp.cd_impcta, imp.am_porcentaje,
+                                                imp.bl_contabilizar, imp.am_contado,
+                                                imp.am_credito, imp.am_valor, imp.am_contado_ME,
+                                                imp.am_credito_ME, imp.am_valor_ME,
+												imp.cd_CotizacionImpuestos AS cd_CotizacionImpuestos,
+												imp.cd_Cotizacion as cd_Cotizacion 
+                                            )
+                                        )
+                                    )
+                                    FROM CotizacionImpuestos imp
+                                    WHERE imp.cd_CotizacionServicios = s.cd_Consecutivo_VARiablesAdicionales
+                                ),
+								(
+									SELECT xmlagg(
+                                        xmlelement(name "Fac_Servicios_TiposFacturacionHoteles",
+                                            xmlforest(
+													TF.cd_Cotizacion as cd_Cotizacion,
+													TF.cd_CotizacionServicios as cd_CotizacionServicios,
+													TF.cd_TiposFacturacionHoteles as cd_TiposFacturacionHoteles,
+													TF.cd_cargosdesc as cd_cargosdesc,
+													TF.in_cantidad as in_cantidad,
+													TF.am_contado as am_contado,
+													TF.am_credito as am_credito,
+													TF.am_valor as am_valor,
+													TF.ds_cargonm as ds_cargonm
+											)
+                                        )
+                                    )				
+									FROM Fac_Servicios_TiposFacturacionHoteles TF
+									WHERE TF.cd_CotizacionServicios = s.cd_Consecutivo_VARiablesAdicionales
+								),
+								(
+									SELECT xmlagg(
+                                        xmlelement(name "CotizacionServicios_TipoProv",
+                                            xmlforest(
+												PRE.cd_Cotizacion as cd_Cotizacion,
+												PRE.cd_CotizacionServicios as cd_CotizacionServicios,
+												PRE.cd_TipoProveedores as cd_TipoProveedores,
+												PRE.ds_TipoProveedores as ds_TipoProveedores,
+												PRE.cd_proveedores as cd_proveedores,
+												PRE.ds_proveedores as ds_proveedores
+											)
+                                        )
+                                    )				
+									FROM CotizacionServicios_TipoProv PRE
+									WHERE PRE.cd_CotizacionServicios = s.cd_Consecutivo_VARiablesAdicionales			
+								),
+								(
+									SELECT xmlagg(
+										xmlelement(name "CotizacionServiciosFormasPago",
+											xmlforest(
+												FP.cd_Cotizacion AS cd_Cotizacion,
+												FP.cd_CotizacionServicios AS cd_CotizacionServicios,
+												FP.cd_codigo AS cd_codigo,
+												FP.ds_FPnm AS ds_FPnm,
+												FP.bl_FPrepresenta::int AS bl_FPrepresenta,
+												FP.ds_tcnumber AS ds_tcnumber,
+												FP.ds_tcvoucher AS ds_tcvoucher,
+												FP.ds_referencia AS ds_referencia,
+												FP.am_valor AS am_valor,
+												FP.ds_tcexp AS ds_tcexp,
+												FP.am_valor_ME AS am_valor_ME,
+												FP.ds_tcautorizacion AS ds_tcautorizacion
+											)
+										)
+									)
+									FROM CotizacionServiciosFormasPago FP
+									WHERE FP.cd_CotizacionServicios = s.cd_Consecutivo_VARiablesAdicionales
+								)
+                            )
+                        )
+                        FROM CotizacionServicios s
+                        WHERE s.cd_Cotizacion = q.cd_consecutivo
+                    )
+                )
+            )
+        ),
+        version '1.0', standalone yes
+    )::text INTO v_xml
+    FROM Cotizacion q;
+
+    -- 6. Resultado Final
+    mensaje_resultado := coalesce(v_xml, '<?xml version="1.0" standalone="yes"?><Cotizaciones />');
+
+EXCEPTION
+    WHEN OTHERS THEN
+	
+		-- 1. Capturar los diagnósticos del error
+        GET STACKED DIAGNOSTICS 
+            v_state   = RETURNED_SQLSTATE,
+            v_msg     = MESSAGE_TEXT,
+            v_context = PG_EXCEPTION_CONTEXT;
+
+        -- 2. Extraer la línea del texto del contexto (usando Regex)
+		v_line :=substring(v_context from 'line ([0-9]+)')::TEXT;
+	
+
         mensaje_resultado := format('ERROR: %s | EN LÍNEA: %s | ESTADO: %s', v_msg, v_line, v_state);
 END;
 $$;;
@@ -5921,7 +11572,7 @@ BEGIN
 END
 GO;
 
--- Inyectado automáticamente: spImplantCrear.sql
+-- Inyectado automáticamente: spImplantActualizar.sql
 DO $$
 DECLARE
     r RECORD;
@@ -5929,13 +11580,14 @@ BEGIN
     FOR r IN 
         SELECT oid::regprocedure AS proc_name 
         FROM pg_proc 
-        WHERE proname ILIKE 'spImplantCrear'
+        WHERE proname ILIKE 'spImplantActualizar'
     LOOP
         EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spImplantCrear(
+CREATE OR REPLACE PROCEDURE public.spImplantActualizar(
+    p_id INT,
     p_code TEXT,
     p_name TEXT,
     p_logo BYTEA,
@@ -5949,23 +11601,32 @@ CREATE OR REPLACE PROCEDURE public.spImplantCrear(
     p_invoice_html_template TEXT DEFAULT NULL,
     p_is_active BOOLEAN DEFAULT true,
     p_acting_user_id INT DEFAULT 1,
-    INOUT p_implant_id INT DEFAULT 0,
     INOUT p_mensaje_resultado TEXT DEFAULT ''
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    INSERT INTO public."Implant" (
-        "code", "name", "logo", "template", "templateConfig", "htmlTemplate", "branchId",
-        "resolutionId", "invoiceTemplate", "invoiceTemplateConfig", "invoiceHtmlTemplate", "isActive"
-    )
-    VALUES (
-        p_code, p_name, p_logo, p_template, p_template_config, p_html_template, p_branch_id,
-        p_resolution_id, p_invoice_template, p_invoice_template_config, p_invoice_html_template, COALESCE(p_is_active, true)
-    )
-    RETURNING id INTO p_implant_id;
+    IF NOT EXISTS (SELECT 1 FROM public."Implant" WHERE id = p_id) THEN
+        p_mensaje_resultado := 'ERROR: Implant con ID ' || p_id || ' no encontrado.';
+        RETURN;
+    END IF;
 
-    p_mensaje_resultado := 'SUCCESS: Implant creado con ID ' || p_implant_id;
+    UPDATE public."Implant"
+    SET "code" = p_code,
+        "name" = p_name,
+        "logo" = COALESCE(p_logo, "logo"),
+        "template" = COALESCE(p_template, "template"),
+        "templateConfig" = COALESCE(p_template_config, "templateConfig"),
+        "htmlTemplate" = COALESCE(p_html_template, "htmlTemplate"),
+        "branchId" = p_branch_id,
+        "resolutionId" = p_resolution_id,
+        "invoiceTemplate" = COALESCE(p_invoice_template, "invoiceTemplate"),
+        "invoiceTemplateConfig" = COALESCE(p_invoice_template_config, "invoiceTemplateConfig"),
+        "invoiceHtmlTemplate" = COALESCE(p_invoice_html_template, "invoiceHtmlTemplate"),
+        "isActive" = COALESCE(p_is_active, true)
+    WHERE id = p_id;
+
+    p_mensaje_resultado := 'SUCCESS: Implant actualizado exitosamente.';
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
@@ -7013,7 +12674,7 @@ EXCEPTION
 END;
 $$;;
 
--- Inyectado automáticamente: spImpuestoCrear.sql
+-- Inyectado automáticamente: spImpuestoActualizar.sql
 DO $$
 DECLARE
     r RECORD;
@@ -7021,13 +12682,14 @@ BEGIN
     FOR r IN 
         SELECT oid::regprocedure AS proc_name 
         FROM pg_proc 
-        WHERE proname ILIKE 'spImpuestoCrear'
+        WHERE proname ILIKE 'spImpuestoActualizar'
     LOOP
         EXECUTE 'DROP PROCEDURE ' || r.proc_name;
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spImpuestoCrear(
+CREATE OR REPLACE PROCEDURE public.spImpuestoActualizar(
+    p_id INT,
     p_code TEXT,
     p_name TEXT,
     p_type TEXT,
@@ -7039,17 +12701,25 @@ CREATE OR REPLACE PROCEDURE public.spImpuestoCrear(
     p_target_tax_id INT DEFAULT NULL,
     p_is_active BOOLEAN DEFAULT true,
     p_acting_user_id INT DEFAULT 1,
-    INOUT p_tax_id INT DEFAULT 0,
     INOUT p_mensaje_resultado TEXT DEFAULT ''
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    INSERT INTO public."ChargeAndTax" ("code", "name", "type", "valueType", "value", "isEditable", "orden", "productIds", "targetTaxId", "isActive")
-    VALUES (p_code, p_name, p_type, p_value_type, p_value, p_is_editable, COALESCE(p_orden, 0), COALESCE(p_product_ids, '[]'::jsonb), p_target_tax_id, COALESCE(p_is_active, true))
-    RETURNING id INTO p_tax_id;
+    UPDATE public."ChargeAndTax" SET
+        "code" = p_code,
+        "name" = p_name,
+        "type" = p_type,
+        "valueType" = p_value_type,
+        "value" = p_value,
+        "isEditable" = p_is_editable,
+        "orden" = COALESCE(p_orden, 0),
+        "productIds" = COALESCE(p_product_ids, '[]'::jsonb),
+        "targetTaxId" = p_target_tax_id,
+        "isActive" = COALESCE(p_is_active, true)
+    WHERE id = p_id;
 
-    p_mensaje_resultado := 'SUCCESS: Cargo/Impuesto creado con ID ' || p_tax_id;
+    p_mensaje_resultado := 'SUCCESS: Cargo/Impuesto actualizado.';
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
@@ -7925,6 +13595,62 @@ EXCEPTION WHEN OTHERS THEN
     RAISE;
 END;
 $$;;
+
+-- Inyectado automáticamente: spInterfaceFile.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'spinterfacefile' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+-- Drop de sobrecargas previas para prevenir error 42883
+DO $$ 
+BEGIN
+    EXECUTE 'DROP PROCEDURE IF EXISTS public.spinterfacefile(text, text, text) CASCADE';
+    EXECUTE 'DROP PROCEDURE IF EXISTS public."spInterfaceFile"(text, text, text) CASCADE';
+    EXECUTE 'DROP PROCEDURE IF EXISTS public.spinterfacefile CASCADE';
+    EXECUTE 'DROP PROCEDURE IF EXISTS public."spInterfaceFile" CASCADE';
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Procedimiento Principal Case-Insensitive (para Npgsql / C#)
+CREATE OR REPLACE PROCEDURE public.spinterfacefile(
+    op TEXT,
+    booking TEXT,
+    file TEXT
+)
+LANGUAGE 'plpgsql'
+AS $BODY$
+DECLARE
+    file_extension TEXT;
+BEGIN
+    file_extension := lower(substring(file from '\.[^\.]*$'));
+
+    IF file_extension = '.fil' THEN
+        CALL public.spinterfacesabre(op, booking, file);
+    ELSE
+        CALL public.spinterfaceamadeus(op, booking, file);
+    END IF;
+END;
+$BODY$;
+
+-- Alias con comillas para retrocompatibilidad
+CREATE OR REPLACE PROCEDURE public."spInterfaceFile"(
+    op TEXT,
+    booking TEXT,
+    file TEXT
+)
+LANGUAGE 'plpgsql'
+AS $BODY$
+BEGIN
+    CALL public.spinterfacefile(op, booking, file);
+END;
+$BODY$;;
 
 -- Inyectado automáticamente: spInterfaceSabre.sql
 DO $$
@@ -9266,6 +14992,760 @@ BEGIN
 END;
 $BODY$;;
 
+-- Inyectado automáticamente: spInvoicesActualizar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInvoicesActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spInvoicesActualizar(
+    p_id INT,
+    p_data JSONB,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_item RECORD;
+    v_tax RECORD;
+    v_pax RECORD;
+    v_var RECORD;
+    v_combo RECORD;
+    v_payment RECORD;
+    v_itinerary RECORD;
+    v_invoice_product_id INT;
+    v_real_product_id INT;
+    v_existing_invoice_number TEXT;
+    v_temp_msg TEXT;
+    v_decimals INT;
+BEGIN
+    -- Validaciones
+    IF NOT EXISTS (SELECT 1 FROM public."Invoices" WHERE id = p_id) THEN
+        p_mensaje_resultado := 'ERROR: La factura con ID ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
+    IF NULLIF(p_data->>'clientId', '') IS NULL THEN
+        p_mensaje_resultado := 'ERROR: El campo Cliente es obligatorio.';
+        RETURN;
+    END IF;
+
+    IF p_data->'items' IS NULL OR jsonb_array_length(p_data->'items') = 0 THEN
+        p_mensaje_resultado := 'ERROR: La factura debe tener al menos un producto.';
+        RETURN;
+    END IF;
+
+    -- Obtener decimales de la moneda
+    v_decimals := public.fn_obtener_decimales_moneda(p_data->>'currency');
+
+    UPDATE public."Invoices" SET
+        "clientId" = NULLIF(p_data->>'clientId', '')::INT,
+        "currency" = p_data->>'currency',
+        "exchangeRate" = NULLIF(p_data->>'exchangeRate', '')::FLOAT,
+        "branchId" = NULLIF(p_data->>'branchId', '')::INT,
+        "implantId" = NULLIF(p_data->>'implantId', '')::INT,
+        "sellerId" = NULLIF(p_data->>'sellerId', '')::INT,
+        "ticketPrinterId" = NULLIF(p_data->>'ticketPrinterId', '')::INT,
+        "commissionPercentage" = NULLIF(p_data->>'commissionPercentage', '')::FLOAT,
+        "chargesAndTaxes" = ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision,
+        "totalAmount" = ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision,
+        "state" = COALESCE(p_data->>'state', 'Nuevo'),
+        "date" = CURRENT_TIMESTAMP,
+        "fuente" = NULLIF(p_data->>'fuente', ''),
+        "serie" = NULLIF(p_data->>'fuente', ''),
+        "consecutivo" = NULLIF(p_data->>'consecutivo', '')
+    WHERE id = p_id;
+
+    DELETE FROM public."InvoicesProductCombo" WHERE "invoiceId" = p_id;
+    FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
+    LOOP
+        INSERT INTO public."InvoicesProductCombo" ("invoiceId", "comboId")
+        VALUES (p_id, COALESCE(v_combo."comboId", v_combo.id));
+    END LOOP;
+
+    DELETE FROM public."InvoicesProductItinerary" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = p_id);
+    DELETE FROM public."InvoicesProductPayment" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = p_id);
+    DELETE FROM public."InvoicesProduct" WHERE "invoiceId" = p_id;
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_data->'items') AS x(
+                      "productId" INT, "ticketCode" TEXT, "type" TEXT, "description" TEXT,
+                      quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
+                      "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,
+                      "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
+                      "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
+                      "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "inNationality" INT,
+                      "servicios" TEXT, "itemDescription" TEXT, "itinerary" TEXT, "class" TEXT, "airline" TEXT, "ticketTypeId" TEXT, "payments" JSONB, "itinerariesItineraryList" JSONB
+                  )
+    LOOP
+        -- 1. Lógica de Producto Al Vuelo
+        IF v_item."productId" IS NULL AND v_item."ticketCode" IS NOT NULL THEN
+            SELECT id INTO v_real_product_id FROM public."Product" WHERE code = v_item."ticketCode";
+            
+            IF v_real_product_id IS NULL THEN
+                CALL public.spProductoCrear(
+                    v_item."ticketCode",
+                    COALESCE(v_item."type", 'Tiquete'),
+                    COALESCE(v_item."description", 'Tiquete ' || v_item."ticketCode"),
+                    COALESCE(v_item.price, 0),
+                    COALESCE(v_item.cost, 0),
+                    NULL, 
+                    COALESCE(v_item."serviceType", 'Aire'),
+                    p_acting_user_id,
+                    v_real_product_id,
+                    v_temp_msg
+                );
+                IF v_temp_msg LIKE 'ERROR%' THEN
+                    p_mensaje_resultado := v_temp_msg;
+                    RETURN;
+                END IF;
+            END IF;
+        ELSE
+            v_real_product_id := v_item."productId";
+        END IF;
+
+        IF v_real_product_id IS NULL THEN
+            p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto seleccionado o un ticketCode.';
+            RETURN;
+        END IF;
+
+        -- 2. Validación de Unicidad para Aire/Tiquete por número de tiquete (ticketCode)
+        IF v_item."ticketCode" IS NOT NULL AND TRIM(v_item."ticketCode") <> '' AND TRIM(v_item."ticketCode") <> 'TAN' THEN
+            SELECT inv."internalNumber" INTO v_existing_invoice_number
+            FROM public."InvoicesProduct" ip
+            JOIN public."Invoices" inv ON ip."invoiceId" = inv.id
+            WHERE ip."ticketCode" = TRIM(v_item."ticketCode") AND inv.id <> p_id
+            LIMIT 1;
+
+            IF v_existing_invoice_number IS NOT NULL THEN
+                p_mensaje_resultado := 'ERROR: El tiquete N° ' || TRIM(v_item."ticketCode") || ' ya está facturado en la factura ' || v_existing_invoice_number;
+                RETURN;
+            END IF;
+        END IF;
+
+        -- 3. Inserción de Producto
+        INSERT INTO public."InvoicesProduct" (
+            "invoiceId", "productId", "ticketCode", "quantity", "price", "cost", "providerId", "prestadoraId",
+            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
+            "serviceType", "destination", "reservationCode", "sellerCommission", 
+            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
+            "servicios", "descripcion", "itinerary", "class", "airline", "ticketTypeId"
+        ) VALUES (
+            p_id, v_real_product_id, NULLIF(TRIM(v_item."ticketCode"), ''), v_item.quantity, 
+            ROUND(v_item.price::numeric, v_decimals)::double precision, 
+            ROUND(v_item.cost::numeric, v_decimals)::double precision, 
+            NULLIF(v_item."providerId", '')::INT, NULLIF(v_item."prestadoraId", '')::INT,
+            CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
+            CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
+            v_item.nights, v_item."paxAdults", v_item."paxChildren",
+            v_item."serviceType", v_item."destination", v_item."reservationCode", 
+            ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
+            ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
+            NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
+            v_item."servicios", COALESCE(v_item."itemDescription", v_item."description"), v_item."itinerary", v_item."class", v_item."airline", NULLIF(v_item."ticketTypeId", '')::INT
+        ) RETURNING id INTO v_invoice_product_id;
+
+        IF v_item.passengers IS NOT NULL THEN
+            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
+            LOOP
+                INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "name", "document")
+                VALUES (v_invoice_product_id, v_pax.name, v_pax.document);
+            END LOOP;
+        END IF;
+
+        IF v_item."appliedTaxes" IS NOT NULL THEN
+            FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS x("chargeAndTaxId" INT, "explicitAmount" FLOAT)
+            LOOP
+                INSERT INTO public."InvoicesProductTax" (
+                    "invoiceProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
+                )
+                SELECT v_invoice_product_id, ct.id, ct.value, ct."valueType", 
+                       ROUND(v_tax."explicitAmount"::numeric, v_decimals)::double precision, 
+                       CASE WHEN NULLIF(v_item."mainTaxId", '')::INT = ct.id THEN TRUE ELSE FALSE END
+                FROM public."ChargeAndTax" ct
+                WHERE ct.id = v_tax."chargeAndTaxId";
+            END LOOP;
+        END IF;
+
+        IF v_item.variables IS NOT NULL THEN
+            FOR v_var IN SELECT * FROM jsonb_to_recordset(v_item.variables) AS x("masterVariableId" INT, value TEXT)
+            LOOP
+                INSERT INTO public."InvoicesProductVariable" ("invoiceProductId", "masterVariableId", "value")
+                VALUES (v_invoice_product_id, v_var."masterVariableId", v_var.value);
+            END LOOP;
+        END IF;
+
+        IF v_item.payments IS NOT NULL THEN
+            FOR v_payment IN SELECT * FROM jsonb_to_recordset(v_item.payments) AS x(amount FLOAT, "paymentMethod" TEXT, "reference" TEXT, "date" TEXT, "creditCardId" INT, "cardNumber" TEXT, "authorizationCode" TEXT, "voucher" TEXT, "expirationDate" TEXT)
+            LOOP
+                INSERT INTO public."InvoicesProductPayment" ("invoiceProductId", "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate")
+                VALUES (
+                    v_invoice_product_id, 
+                    ROUND(v_payment.amount::numeric, v_decimals)::double precision, 
+                    v_payment."paymentMethod", v_payment.reference, 
+                    CASE WHEN v_payment."date" IS NOT NULL AND v_payment."date" <> '' THEN v_payment."date"::TIMESTAMP ELSE CURRENT_TIMESTAMP END, 
+                    v_payment."creditCardId", v_payment."cardNumber", v_payment."authorizationCode", v_payment."voucher", v_payment."expirationDate"
+                );
+            END LOOP;
+        END IF;
+
+        IF v_item."itinerariesItineraryList" IS NOT NULL THEN
+            FOR v_itinerary IN SELECT * FROM jsonb_to_recordset(v_item."itinerariesItineraryList") AS x(origin TEXT, destination TEXT, class TEXT, "checkInDate" TEXT, "checkOutDate" TEXT, "prestadoraCode" TEXT, "farebasis" TEXT, "Numflight" TEXT, "Typeflight" TEXT, "amount" FLOAT, "co2" NUMERIC, orden INT)
+            LOOP
+                INSERT INTO public."InvoicesProductItinerary" ("invoiceProductId", "origin", "destination", "class", "checkInDate", "checkOutDate", "prestadoraCode", "farebasis", "Numflight", "Typeflight", "amount", "co2", "orden")
+                VALUES (
+                    v_invoice_product_id, v_itinerary.origin, v_itinerary.destination, v_itinerary.class, 
+                    CASE WHEN v_itinerary."checkInDate" IS NOT NULL AND v_itinerary."checkInDate" <> '' THEN v_itinerary."checkInDate"::TIMESTAMP ELSE NULL END, 
+                    CASE WHEN v_itinerary."checkOutDate" IS NOT NULL AND v_itinerary."checkOutDate" <> '' THEN v_itinerary."checkOutDate"::TIMESTAMP ELSE NULL END, 
+                    COALESCE(v_itinerary."prestadoraCode", ''), COALESCE(v_itinerary."farebasis", ''), v_itinerary."Numflight", v_itinerary."Typeflight", 
+                    ROUND(COALESCE(v_itinerary."amount", 0)::numeric, v_decimals)::double precision, 
+                    v_itinerary."co2", v_itinerary.orden
+                );
+            END LOOP;
+        END IF;
+
+    END LOOP;
+
+    -- Calcular y actualizar el totalAmount
+    UPDATE public."Invoices"
+    SET "totalAmount" = ROUND((COALESCE("chargesAndTaxes", 0) + (
+        SELECT COALESCE(SUM(ipt."explicitAmount"), 0)
+        FROM public."InvoicesProductTax" ipt
+        JOIN public."InvoicesProduct" ip ON ipt."invoiceProductId" = ip.id
+        WHERE ip."invoiceId" = p_id
+    ))::numeric, v_decimals)::double precision
+    WHERE id = p_id;
+
+    p_mensaje_resultado := 'SUCCESS: Factura ' || p_id || ' actualizada correctamente.';
+
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;;
+
+-- Inyectado automáticamente: spInvoicesCrear.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInvoicesCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spInvoicesCrear(
+    p_data JSONB,
+    p_acting_user_id INT,
+    INOUT p_invoice_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_internal_number TEXT;
+    v_invoice_id INT;
+    v_item RECORD;
+    v_tax RECORD;
+    v_pax RECORD;
+    v_var RECORD;
+    v_combo RECORD;
+    v_payment RECORD;
+    v_itinerary RECORD;
+    v_invoice_product_id INT;
+    v_real_product_id INT;
+    v_existing_invoice_number TEXT;
+    v_temp_msg TEXT;
+    v_decimals INT;
+    v_fuente TEXT;
+    v_serie TEXT;
+    v_consecutivo TEXT;
+    v_consec_id INT;
+    v_next_num BIGINT;
+    v_billing_code TEXT;
+    v_branch_id INT;
+    v_implant_id INT;
+    v_resolution_id INT;
+    v_res RECORD;
+    v_res_rec RECORD;
+    v_consec_json JSONB;
+    v_fuente_val TEXT;
+    v_serie_val TEXT;
+    v_consec_val TEXT;
+    v_consec_num BIGINT;
+    v_date TIMESTAMP;
+    v_due_date TIMESTAMP;
+    v_credit_days INT;
+    v_client_id INT;
+BEGIN
+    -- ----------------------------------------------------
+    -- FASE 1: PRE-VALIDACIONES OBLIGATORIAS (Síncrona sin modificar BD)
+    -- ----------------------------------------------------
+    IF NULLIF(p_data->>'clientId', '') IS NULL THEN
+        p_mensaje_resultado := 'ERROR: El campo Cliente es obligatorio.';
+        RETURN;
+    END IF;
+
+    IF p_data->'items' IS NULL OR jsonb_array_length(p_data->'items') = 0 THEN
+        p_mensaje_resultado := 'ERROR: La factura debe tener al menos un producto.';
+        RETURN;
+    END IF;
+
+    v_branch_id := NULLIF(p_data->>'branchId', '')::INT;
+    v_implant_id := NULLIF(p_data->>'implantId', '')::INT;
+
+    -- Obtener decimales de la moneda
+    v_decimals := public.fn_obtener_decimales_moneda(p_data->>'currency');
+
+    v_resolution_id := NULLIF(p_data->>'resolutionId', '')::INT;
+
+    v_internal_number := 'INV-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 1000)::text;
+
+    v_fuente := NULLIF(p_data->>'fuente', '');
+    v_serie := NULLIF(p_data->>'serie', '');
+    v_consecutivo := NULLIF(p_data->>'consecutivo', '');
+
+    -- Lógica de asignación de consecutivo automático desde SysConsecutivo si consecutivo es nulo o vacío
+    IF v_consecutivo IS NULL THEN
+        v_billing_code := COALESCE(
+            NULLIF(p_data->>'codigo', ''), 
+            NULLIF(p_data->>'codigoFacturacion', ''), 
+            NULLIF(p_data->>'billingCode', ''), 
+            v_fuente, 
+            'FACT'
+        );
+
+        SELECT id, NULLIF(fuente, ''), NULLIF(serie, '') 
+        INTO v_consec_id, v_fuente, v_serie
+        FROM public."SysConsecutivo"
+        WHERE LOWER(codigo) = LOWER(v_billing_code)
+           OR (v_branch_id IS NOT NULL AND "branchId" = v_branch_id AND ("implantId" IS NULL OR "implantId" = v_implant_id))
+        ORDER BY 
+            (CASE WHEN LOWER(codigo) = LOWER(v_billing_code) THEN 1 ELSE 2 END),
+            (CASE WHEN "implantId" IS NOT NULL THEN 1 WHEN "branchId" IS NOT NULL THEN 2 ELSE 3 END),
+            id DESC
+        LIMIT 1;
+
+        IF v_consec_id IS NOT NULL THEN
+            UPDATE public."SysConsecutivo"
+            SET consecutivo = consecutivo + 1,
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = v_consec_id
+            RETURNING consecutivo INTO v_next_num;
+
+            v_consecutivo := LPAD(v_next_num::TEXT, 8, '0');
+        ELSE
+            SELECT COALESCE(MAX(consecutivo::BIGINT), 0) + 1 INTO v_next_num 
+            FROM public."Invoices" 
+            WHERE consecutivo ~ '^[0-9]+$';
+
+            v_consecutivo := LPAD(v_next_num::TEXT, 8, '0');
+        END IF;
+    END IF;
+
+    -- Resolución y Validación de Rango de Numeración
+    IF v_resolution_id IS NULL AND v_implant_id IS NOT NULL THEN
+        SELECT "resolutionId" INTO v_resolution_id FROM public."Implant" WHERE id = v_implant_id;
+    END IF;
+
+    IF v_resolution_id IS NULL AND v_branch_id IS NOT NULL THEN
+        SELECT "resolutionId" INTO v_resolution_id FROM public."Branch" WHERE id = v_branch_id;
+    END IF;
+
+    IF v_resolution_id IS NULL AND v_serie IS NOT NULL THEN
+        SELECT id INTO v_resolution_id FROM public."Resolution" WHERE activo = TRUE AND prefijo ILIKE v_serie ORDER BY id DESC LIMIT 1;
+    END IF;
+
+    IF v_resolution_id IS NULL THEN
+        SELECT id INTO v_resolution_id FROM public."Resolution" WHERE activo = TRUE ORDER BY id DESC LIMIT 1;
+    END IF;
+
+    IF v_resolution_id IS NOT NULL THEN
+        SELECT * INTO v_res FROM public."Resolution" WHERE id = v_resolution_id;
+
+        IF v_res.id IS NOT NULL THEN
+            -- 1. Validar estado de la resolución
+            IF v_res.activo IS FALSE THEN
+                p_mensaje_resultado := 'ERROR: La resolución de facturación "' || v_res.name || '" (' || v_res.code || ') se encuentra inactiva.';
+                RETURN;
+            END IF;
+
+            -- 2. Validar vigencia / expiración de la resolución
+            IF v_res.expira IS NOT NULL AND v_res.expira::DATE < CURRENT_DATE THEN
+                IF COALESCE(v_res.permitir, FALSE) IS FALSE THEN
+                    p_mensaje_resultado := 'ERROR: La resolución de facturación "' || v_res.name || '" (' || v_res.code || ') se encuentra vencida desde el ' || to_char(v_res.expira, 'YYYY-MM-DD') || '.';
+                    RETURN;
+                END IF;
+            END IF;
+
+            -- 3. Validar rango numérico autorizado del consecutivo
+            IF v_consecutivo IS NOT NULL AND v_consecutivo ~ '^[0-9]+$' THEN
+                v_consec_num := v_consecutivo::BIGINT;
+
+                IF v_res.inicial IS NOT NULL AND v_consec_num < v_res.inicial THEN
+                    IF COALESCE(v_res.permitir, FALSE) IS FALSE THEN
+                        p_mensaje_resultado := 'ERROR: El consecutivo generado (' || v_consec_num || ') es menor al rango inicial autorizado (' || v_res.inicial || ') para la resolución "' || v_res.name || '".';
+                        RETURN;
+                    END IF;
+                END IF;
+
+                IF v_res."end" IS NOT NULL AND v_consec_num > v_res."end" THEN
+                    IF COALESCE(v_res.permitir, FALSE) IS FALSE THEN
+                        p_mensaje_resultado := 'ERROR: El consecutivo generado (' || v_consec_num || ') supera el rango final autorizado (' || v_res."end" || ') para la resolución "' || v_res.name || '".';
+                        RETURN;
+                    END IF;
+                END IF;
+            END IF;
+
+            -- 4. Asignar prefijo de resolución a la serie si no fue provisto
+            IF v_serie IS NULL AND NULLIF(v_res.prefijo, '') IS NOT NULL THEN
+                v_serie := v_res.prefijo;
+            END IF;
+        END IF;
+    END IF;
+
+    -- 5. Validar unicidad del consecutivo (evitar duplicidad)
+    IF v_consecutivo IS NOT NULL THEN
+        IF EXISTS (
+            SELECT 1 FROM public."Invoices"
+            WHERE consecutivo = v_consecutivo
+              AND COALESCE(serie, '') = COALESCE(v_serie, '')
+              AND COALESCE(fuente, '') = COALESCE(v_fuente, '')
+        ) THEN
+            p_mensaje_resultado := 'ERROR: Ya existe una factura emitida con la numeración ' || COALESCE(v_fuente || '-', '') || COALESCE(v_serie || '-', '') || v_consecutivo || '.';
+            RETURN;
+        END IF;
+    END IF;
+
+    -- Pre-validar items (Productos, tiquetes duplicados, productos al vuelo)
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_data->'items') AS x(
+                      "productId" INT, "ticketCode" TEXT, "type" TEXT, "description" TEXT,
+                      "serviceType" TEXT
+                  )
+    LOOP
+        v_real_product_id := NULL;
+        IF v_item."productId" IS NULL AND v_item."ticketCode" IS NOT NULL AND TRIM(v_item."ticketCode") <> '' THEN
+            SELECT id INTO v_real_product_id FROM public."Product" WHERE code = v_item."ticketCode";
+        ELSE
+            v_real_product_id := v_item."productId";
+        END IF;
+
+        -- Si no hay productId ni ticketCode válido
+        IF v_real_product_id IS NULL AND (v_item."ticketCode" IS NULL OR TRIM(v_item."ticketCode") = '') THEN
+            p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto seleccionado o un ticketCode.';
+            RETURN;
+        END IF;
+
+        -- Validación de Unicidad para Número de Tiquete / Voucher (ticketCode)
+        IF v_item."ticketCode" IS NOT NULL AND TRIM(v_item."ticketCode") <> '' AND TRIM(v_item."ticketCode") <> 'TAN' THEN
+            SELECT inv."internalNumber" INTO v_existing_invoice_number
+            FROM public."InvoicesProduct" ip
+            JOIN public."Invoices" inv ON ip."invoiceId" = inv.id
+            WHERE ip."ticketCode" = TRIM(v_item."ticketCode")
+            LIMIT 1;
+
+            IF v_existing_invoice_number IS NOT NULL THEN
+                p_mensaje_resultado := 'ERROR: El tiquete N° ' || TRIM(v_item."ticketCode") || ' ya está facturado en la factura ' || v_existing_invoice_number;
+                RETURN;
+            END IF;
+        END IF;
+    END LOOP;
+
+    -- Buscar Resolución de Documentos Activa para la Sucursal e Implante
+    SELECT * INTO v_res_rec
+    FROM public."DocumentResolution"
+    WHERE ("branchId" IS NULL OR "branchId" = v_branch_id)
+      AND (
+          (v_implant_id IS NOT NULL AND "implantId" = v_implant_id)
+          OR ("implantId" IS NULL)
+      )
+      AND "isActive" = true
+    ORDER BY CASE WHEN "branchId" = v_branch_id THEN 1 ELSE 2 END,
+             CASE WHEN "implantId" = v_implant_id THEN 1 ELSE 2 END
+    LIMIT 1
+    FOR UPDATE;
+
+    IF v_res_rec.id IS NOT NULL THEN
+        -- Validar Vencimiento de la Resolución
+        IF v_res_rec."expirationDate" IS NOT NULL AND v_res_rec."expirationDate" < CURRENT_DATE THEN
+            p_mensaje_resultado := 'ERROR: La resolución N° ' || COALESCE(v_res_rec."resolutionNumber", '') || ' asignada a la sucursal venció el ' || to_char(v_res_rec."expirationDate", 'DD/MM/YYYY') || '.';
+            RETURN;
+        END IF;
+
+        -- Validar Rango Final de Numeración
+        IF v_res_rec."currentNumber" > v_res_rec."finalNumber" THEN
+            p_mensaje_resultado := 'ERROR: La resolución N° ' || COALESCE(v_res_rec."resolutionNumber", '') || ' ha superado la numeración máxima autorizada (' || v_res_rec."finalNumber"::text || ').';
+            RETURN;
+        END IF;
+    END IF;
+
+    -- ----------------------------------------------------
+    -- FASE 2: EJECUCIÓN TRANSACCIONAL PROTEGIDA CON ROLLBACK AUTOMÁTICO
+    -- ----------------------------------------------------
+    BEGIN
+        IF v_res_rec.id IS NOT NULL THEN
+            v_serie_val := COALESCE(NULLIF(p_data->>'serie', ''), v_res_rec.prefix);
+            IF NULLIF(p_data->>'consecutivo', '') IS NOT NULL THEN
+                v_consec_val := p_data->>'consecutivo';
+            ELSE
+                v_consec_val := v_res_rec."currentNumber"::text;
+                -- Incrementar consecutivo actual en la resolución activa
+                UPDATE public."DocumentResolution"
+                SET "currentNumber" = "currentNumber" + 1
+                WHERE id = v_res_rec.id;
+            END IF;
+        ELSE
+            -- Fallback a Maestro de Consecutivos de Transacciones
+            IF NULLIF(p_data->>'consecutivo', '') IS NOT NULL THEN
+                v_consec_val := p_data->>'consecutivo';
+                v_serie_val := NULLIF(p_data->>'serie', '');
+            ELSE
+                v_consec_json := public."fnObtenerSiguienteConsecutivo"('INVOICE', v_branch_id, v_implant_id);
+                v_consec_val := v_consec_json->>'consecutivoNumber';
+                v_serie_val := COALESCE(NULLIF(p_data->>'serie', ''), NULLIF(v_consec_json->>'prefix', ''));
+            END IF;
+        END IF;
+
+        -- Construir internalNumber sin anteponer prefijo si este es nulo o vacío
+        v_internal_number := CASE 
+            WHEN v_serie_val IS NOT NULL AND TRIM(v_serie_val) <> '' THEN v_serie_val || '-' || v_consec_val 
+            ELSE v_consec_val 
+        END;
+
+        v_fuente_val := COALESCE(NULLIF(p_data->>'fuente', ''), 'FE');
+        v_client_id := NULLIF(p_data->>'clientId', '')::INT;
+
+        IF NULLIF(p_data->>'date', '') IS NOT NULL THEN
+            v_date := (p_data->>'date')::TIMESTAMP;
+        ELSE
+            v_date := CURRENT_TIMESTAMP;
+        END IF;
+
+        IF NULLIF(p_data->>'dueDate', '') IS NOT NULL THEN
+            v_due_date := (p_data->>'dueDate')::TIMESTAMP;
+        ELSE
+            SELECT COALESCE("creditDays", 0) INTO v_credit_days FROM public."Client" WHERE id = v_client_id;
+            IF v_credit_days IS NOT NULL AND v_credit_days > 0 THEN
+                v_due_date := v_date + (v_credit_days || ' days')::INTERVAL;
+            ELSE
+                v_due_date := v_date;
+            END IF;
+        END IF;
+
+        -- Inserción de la Factura Cabecera
+        INSERT INTO public."Invoices" (
+            "internalNumber", "date", "dueDate", "clientId", "currency", "exchangeRate", 
+            "branchId", "implantId", "sellerId", "ticketPrinterId", 
+            "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
+            "totalAmount", "userId", "state", "fuente", "serie", "consecutivo"
+        ) VALUES (
+            v_internal_number, v_date, v_due_date, v_client_id, p_data->>'currency', COALESCE(NULLIF(p_data->>'exchangeRate', '')::FLOAT, 1.0),
+            v_branch_id, v_implant_id, NULLIF(p_data->>'sellerId', '')::INT, NULLIF(p_data->>'ticketPrinterId', '')::INT,
+            0, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::FLOAT, 0.0), COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0.0),
+            COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0.0), p_acting_user_id, 'NUEVO',
+            v_fuente_val, v_serie_val, v_consec_val
+        ) RETURNING id INTO v_invoice_id;
+
+        FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
+        LOOP
+            INSERT INTO public."InvoicesProductCombo" ("invoiceId", "comboId")
+            VALUES (v_invoice_id, COALESCE(v_combo."comboId", v_combo.id));
+        END LOOP;
+
+        FOR v_item IN SELECT * FROM jsonb_to_recordset(p_data->'items') AS x(
+                          "productId" INT, "ticketCode" TEXT, "type" TEXT, "description" TEXT,
+                          quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
+                          "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,
+                          "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
+                          "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
+                          "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "inNationality" INT,
+                          "servicios" TEXT, "itemDescription" TEXT, "itinerary" TEXT, "class" TEXT, "airline" TEXT, "ticketTypeId" TEXT, "payments" JSONB, "itinerariesItineraryList" JSONB
+                      )
+        LOOP
+            -- 1. Lógica de Producto Al Vuelo
+            IF v_item."productId" IS NULL AND v_item."ticketCode" IS NOT NULL AND TRIM(v_item."ticketCode") <> '' THEN
+                SELECT id INTO v_real_product_id FROM public."Product" WHERE code = v_item."ticketCode";
+                
+                IF v_real_product_id IS NULL THEN
+                    CALL public.spProductoCrear(
+                        v_item."ticketCode",
+                        COALESCE(v_item."type", 'Tiquete'),
+                        COALESCE(v_item."description", 'Tiquete ' || v_item."ticketCode"),
+                        COALESCE(v_item.price, 0),
+                        COALESCE(v_item.cost, 0),
+                        NULL, 
+                        COALESCE(v_item."serviceType", 'Aire'),
+                        p_acting_user_id,
+                        v_real_product_id,
+                        v_temp_msg
+                    );
+                    IF v_temp_msg LIKE 'ERROR%' THEN
+                        RAISE EXCEPTION '%', v_temp_msg;
+                    END IF;
+                END IF;
+            ELSE
+                v_real_product_id := v_item."productId";
+            END IF;
+
+            IF v_real_product_id IS NULL THEN
+                RAISE EXCEPTION 'ERROR: Todos los productos deben tener un producto seleccionado o un ticketCode.';
+            END IF;
+
+            -- 1.5 Validación de Unicidad para Número de Tiquete / Voucher (ticketCode)
+            IF v_item."ticketCode" IS NOT NULL AND TRIM(v_item."ticketCode") <> '' AND TRIM(v_item."ticketCode") <> 'TAN' THEN
+                SELECT inv."internalNumber" INTO v_existing_invoice_number
+                FROM public."InvoicesProduct" ip
+                JOIN public."Invoices" inv ON ip."invoiceId" = inv.id
+                WHERE ip."ticketCode" = TRIM(v_item."ticketCode")
+                LIMIT 1;
+
+                IF v_existing_invoice_number IS NOT NULL THEN
+                    RAISE EXCEPTION 'ERROR: El tiquete N° % ya está facturado en la factura %', TRIM(v_item."ticketCode"), v_existing_invoice_number;
+                END IF;
+            END IF;
+
+            -- 2. Inserción de Producto
+            INSERT INTO public."InvoicesProduct" (
+                "invoiceId", "productId", "ticketCode", "quantity", "price", "cost", "providerId", "prestadoraId",
+                "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
+                "serviceType", "destination", "reservationCode", "sellerCommission", 
+                "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
+                "servicios", "descripcion", "itinerary", "class", "airline", "ticketTypeId"
+            ) VALUES (
+                v_invoice_id, v_real_product_id, NULLIF(TRIM(v_item."ticketCode"), ''), v_item.quantity, 
+                ROUND(v_item.price::numeric, v_decimals)::double precision, 
+                ROUND(v_item.cost::numeric, v_decimals)::double precision, 
+                NULLIF(v_item."providerId", '')::INT, NULLIF(v_item."prestadoraId", '')::INT,
+                CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
+                CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
+                v_item.nights, v_item."paxAdults", v_item."paxChildren",
+                v_item."serviceType", v_item."destination", v_item."reservationCode", 
+                ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
+                ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
+                NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
+                v_item."servicios", COALESCE(v_item."itemDescription", v_item."description"), v_item."itinerary", v_item."class", v_item."airline", NULLIF(v_item."ticketTypeId", '')::INT
+            ) RETURNING id INTO v_invoice_product_id;
+
+            IF v_item.passengers IS NOT NULL THEN
+                FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
+                LOOP
+                    INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "name", "document")
+                    VALUES (v_invoice_product_id, v_pax.name, v_pax.document);
+                END LOOP;
+            END IF;
+
+            IF v_item."appliedTaxes" IS NOT NULL THEN
+                FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS x("chargeAndTaxId" INT, "explicitAmount" FLOAT)
+                LOOP
+                    INSERT INTO public."InvoicesProductTax" (
+                        "invoiceProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
+                    )
+                    SELECT v_invoice_product_id, ct.id, ct.value, ct."valueType", 
+                           ROUND(v_tax."explicitAmount"::numeric, v_decimals)::double precision, 
+                           CASE WHEN NULLIF(v_item."mainTaxId", '')::INT = ct.id THEN TRUE ELSE FALSE END
+                    FROM public."ChargeAndTax" ct
+                    WHERE ct.id = v_tax."chargeAndTaxId";
+                END LOOP;
+            END IF;
+
+            IF v_item.variables IS NOT NULL THEN
+                FOR v_var IN SELECT * FROM jsonb_to_recordset(v_item.variables) AS x("masterVariableId" INT, value TEXT)
+                LOOP
+                    INSERT INTO public."InvoicesProductVariable" ("invoiceProductId", "masterVariableId", "value")
+                    VALUES (v_invoice_product_id, v_var."masterVariableId", v_var.value);
+                END LOOP;
+            END IF;
+
+            IF v_item.payments IS NOT NULL THEN
+                FOR v_payment IN SELECT * FROM jsonb_to_recordset(v_item.payments) AS x(amount FLOAT, "paymentMethod" TEXT, "reference" TEXT, "date" TEXT, "creditCardId" INT, "cardNumber" TEXT, "authorizationCode" TEXT, "voucher" TEXT, "expirationDate" TEXT)
+                LOOP
+                    INSERT INTO public."InvoicesProductPayment" ("invoiceProductId", "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate")
+                    VALUES (
+                        v_invoice_product_id, 
+                        ROUND(v_payment.amount::numeric, v_decimals)::double precision, 
+                        v_payment."paymentMethod", v_payment.reference, 
+                        CASE WHEN v_payment."date" IS NOT NULL AND v_payment."date" <> '' THEN v_payment."date"::TIMESTAMP ELSE CURRENT_TIMESTAMP END, 
+                        v_payment."creditCardId", v_payment."cardNumber", v_payment."authorizationCode", v_payment."voucher", v_payment."expirationDate"
+                    );
+                END LOOP;
+            END IF;
+
+            IF v_item."itinerariesItineraryList" IS NOT NULL THEN
+                FOR v_itinerary IN SELECT * FROM jsonb_to_recordset(v_item."itinerariesItineraryList") AS x(origin TEXT, destination TEXT, class TEXT, "checkInDate" TEXT, "checkOutDate" TEXT, "prestadoraCode" TEXT, "farebasis" TEXT, "Numflight" TEXT, "Typeflight" TEXT, "amount" FLOAT, "co2" NUMERIC, orden INT)
+                LOOP
+                    INSERT INTO public."InvoicesProductItinerary" ("invoiceProductId", "origin", "destination", "class", "checkInDate", "checkOutDate", "prestadoraCode", "farebasis", "Numflight", "Typeflight", "amount", "co2", "orden")
+                    VALUES (
+                        v_invoice_product_id, v_itinerary.origin, v_itinerary.destination, v_itinerary.class, 
+                        CASE WHEN v_itinerary."checkInDate" IS NOT NULL AND v_itinerary."checkInDate" <> '' THEN v_itinerary."checkInDate"::TIMESTAMP ELSE NULL END, 
+                        CASE WHEN v_itinerary."checkOutDate" IS NOT NULL AND v_itinerary."checkOutDate" <> '' THEN v_itinerary."checkOutDate"::TIMESTAMP ELSE NULL END, 
+                        COALESCE(v_itinerary."prestadoraCode", ''), COALESCE(v_itinerary."farebasis", ''), v_itinerary."Numflight", v_itinerary."Typeflight", 
+                        ROUND(COALESCE(v_itinerary."amount", 0)::numeric, v_decimals)::double precision, 
+                        v_itinerary."co2", v_itinerary.orden
+                    );
+                END LOOP;
+            END IF;
+
+        END LOOP;
+
+        -- Calcular y actualizar el totalAmount basado en impuestos si aplica
+        UPDATE public."Invoices"
+        SET "totalAmount" = ROUND((COALESCE("chargesAndTaxes", 0) + (
+            SELECT COALESCE(SUM(ipt."explicitAmount"), 0)
+            FROM public."InvoicesProductTax" ipt
+            JOIN public."InvoicesProduct" ip ON ipt."invoiceProductId" = ip.id
+            WHERE ip."invoiceId" = v_invoice_id
+        ))::numeric, v_decimals)::double precision
+        WHERE id = v_invoice_id;
+
+        p_invoice_id := v_invoice_id;
+        p_mensaje_resultado := 'SUCCESS: Factura creada correctamente con ID ' || v_invoice_id;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            p_invoice_id := NULL;
+            p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+    END;
+END;
+$$;;
+
+-- Inyectado automáticamente: spInvoicesEliminar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spInvoicesEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public.spInvoicesEliminar(
+    p_id INT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    p_mensaje_resultado := 'ERROR: Las facturas no se pueden eliminar del sistema. Solo pueden ser anuladas.';
+    RETURN;
+END;
+$$;;
+
 -- Inyectado automáticamente: spLimpiarMovimientosProduccion.sql
 DO $$
 DECLARE r RECORD;
@@ -9343,6 +15823,62 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;;
 
+-- Inyectado automáticamente: spLogListar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'sploglistar'
+    LOOP
+        EXECUTE 'DROP FUNCTION ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+-- sploglistar.sql
+-- RUTA: c:\Proyectos\AgenciasNew\SQL\SP\spLogListar.sql
+
+CREATE OR REPLACE FUNCTION public.sploglistar(
+    p_limit INT DEFAULT 100,
+    p_offset INT DEFAULT 0,
+    p_module TEXT DEFAULT NULL,
+    p_user_id INT DEFAULT NULL
+)
+RETURNS TABLE (
+    id INT,
+    "userId" INT,
+    "userName" TEXT,
+    "action" TEXT,
+    "module" TEXT,
+    "description" TEXT,
+    "metadata" JSON,
+    "createdAt" TIMESTAMP
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        l.id,
+        l."userId",
+        u.name AS "userName",
+        l.action AS "action",
+        l.module AS "module",
+        l.description AS "description",
+        l.metadata::JSON AS "metadata",
+        l."createdAt" AS "createdAt"
+    FROM public."SystemLog" l
+    LEFT JOIN public."User" u ON l."userId" = u.id
+    WHERE (p_module IS NULL OR l.module = UPPER(p_module))
+      AND (p_user_id IS NULL OR l."userId" = p_user_id)
+    ORDER BY l."createdAt" DESC
+    LIMIT p_limit
+    OFFSET p_offset;
+END;
+$$;;
+
 -- Inyectado automáticamente: spLogRegistrar.sql
 DO $$
 DECLARE r RECORD;
@@ -9384,234 +15920,6 @@ BEGIN
     ) VALUES (
         p_user_id, UPPER(p_module), UPPER(p_action), p_description, p_metadata, NOW()
     ) RETURNING id INTO p_temp_id;
-END;
-$$;;
-
--- Inyectado automáticamente: spMaestroImportar.sql
-DO $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN 
-        SELECT oid::regprocedure AS proc_name 
-        FROM pg_proc 
-        WHERE proname ILIKE 'spMaestroImportar'
-    LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
-    END LOOP;
-END $$;
-
-CREATE OR REPLACE PROCEDURE public.spMaestroImportar(
-    p_tipo TEXT,
-    p_text_data TEXT, -- Delimited text (Rows by \n, Cols by ^)
-    p_acting_user_id INT,
-    INOUT p_mensaje_resultado TEXT
-)
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_row_text TEXT;
-    v_cols TEXT[];
-    v_count INT := 0;
-    v_errors TEXT := '';
-    v_branch_id INT;
-    v_provider_id INT;
-    v_prov_type_id INT;
-    v_role_id INT;
-    v_hashed_password TEXT := '$2a$10$7zB.Y7S5y5y5y5y5y5y5y.y5y5y5y5y5y5y5y5y5y5y5y5y5y5y'; -- Placeholder hash
-BEGIN
-    FOR v_row_text IN SELECT unnest(string_to_array(p_text_data, E'\n')) LOOP
-        IF TRIM(v_row_text) = '' THEN CONTINUE; END IF;
-        
-        BEGIN
-            v_cols := string_to_array(v_row_text, '^');
-            
-            IF p_tipo = 'sucursales' THEN
-                -- Format: code^name
-                IF v_cols[1] IS NOT NULL AND v_cols[2] IS NOT NULL THEN
-                    INSERT INTO public."Branch" ("code", "name")
-                    VALUES (TRIM(v_cols[1]), TRIM(v_cols[2]))
-                    ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name";
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'implants' THEN
-                -- Format: code^name^branchCode
-                IF v_cols[1] IS NOT NULL AND v_cols[2] IS NOT NULL THEN
-                    v_branch_id := NULL;
-                    IF v_cols[3] IS NOT NULL AND TRIM(v_cols[3]) <> '' THEN
-                        SELECT id INTO v_branch_id FROM public."Branch" WHERE LOWER("code") = LOWER(TRIM(v_cols[3]));
-                    END IF;
-                    
-                    INSERT INTO public."Implant" ("code", "name", "branchId")
-                    VALUES (TRIM(v_cols[1]), TRIM(v_cols[2]), v_branch_id)
-                    ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name", "branchId" = EXCLUDED."branchId";
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'vendedores' THEN
-                -- Format: name^email^code
-                IF v_cols[1] IS NOT NULL THEN
-                    IF v_cols[3] IS NOT NULL AND TRIM(v_cols[3]) <> '' THEN
-                        INSERT INTO public."Seller" ("code", "name", "email")
-                        VALUES (TRIM(v_cols[3]), TRIM(v_cols[1]), NULLIF(TRIM(v_cols[2]), ''))
-                        ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email";
-                    ELSE
-                        INSERT INTO public."Seller" ("name", "email") VALUES (TRIM(v_cols[1]), NULLIF(TRIM(v_cols[2]), ''));
-                    END IF;
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'tiqueteadores' THEN
-                -- Format: name^email^code
-                IF v_cols[1] IS NOT NULL THEN
-                    IF v_cols[3] IS NOT NULL AND TRIM(v_cols[3]) <> '' THEN
-                        INSERT INTO public."TicketPrinter" ("code", "name", "email")
-                        VALUES (TRIM(v_cols[3]), TRIM(v_cols[1]), NULLIF(TRIM(v_cols[2]), ''))
-                        ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name", "email" = EXCLUDED."email";
-                    ELSE
-                        INSERT INTO public."TicketPrinter" ("name", "email") VALUES (TRIM(v_cols[1]), NULLIF(TRIM(v_cols[2]), ''));
-                    END IF;
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'impuestos' THEN
-                -- Format: code^name^type^valueType^value
-                IF v_cols[2] IS NOT NULL AND v_cols[3] IS NOT NULL THEN
-                    INSERT INTO public."ChargeAndTax" ("code", "name", "type", "valueType", "value", "isEditable", "inNationality")
-                    VALUES (TRIM(v_cols[1]), TRIM(v_cols[2]), TRIM(v_cols[3]), TRIM(v_cols[4]), NULLIF(TRIM(v_cols[5]), '')::DECIMAL, TRUE, COALESCE(NULLIF(TRIM(v_cols[6]), '')::INT, 1))
-                    ON CONFLICT ("code") DO UPDATE SET 
-                        "name" = EXCLUDED."name",
-                        "type" = EXCLUDED."type",
-                        "valueType" = EXCLUDED."valueType",
-                        "value" = EXCLUDED."value",
-                        "inNationality" = EXCLUDED."inNationality";
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'clientes' THEN
-                -- Format: document^name^contactInfo^address
-                IF v_cols[1] IS NOT NULL AND v_cols[2] IS NOT NULL THEN
-                    INSERT INTO public."Client" ("document", "name", "contactInfo", "address")
-                    VALUES (TRIM(v_cols[1]), TRIM(v_cols[2]), TRIM(v_cols[3]), TRIM(v_cols[4]))
-                    ON CONFLICT ("document") DO UPDATE SET 
-                        "name" = EXCLUDED."name", 
-                        "contactInfo" = EXCLUDED."contactInfo", 
-                        "address" = EXCLUDED."address";
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'proveedores' THEN
-                -- Format: code^name^contactInfo^providerTypeCode^airlineCode^sigla
-                IF v_cols[2] IS NOT NULL OR v_cols[1] IS NOT NULL THEN
-                    v_prov_type_id := NULL;
-                    IF array_length(v_cols, 1) >= 4 AND v_cols[4] IS NOT NULL AND TRIM(v_cols[4]) <> '' THEN
-                        SELECT id INTO v_prov_type_id FROM public."ProviderType" WHERE LOWER("code") = LOWER(TRIM(v_cols[4])) OR LOWER("name") = LOWER(TRIM(v_cols[4])) LIMIT 1;
-                    END IF;
-
-                    INSERT INTO public."Provider" ("code", "name", "contactInfo", "providerTypeId", "airlineCode", "sigla")
-                    VALUES (
-                        NULLIF(TRIM(v_cols[1]), ''), 
-                        TRIM(v_cols[2]), 
-                        NULLIF(TRIM(v_cols[3]), ''), 
-                        v_prov_type_id, 
-                        CASE WHEN array_length(v_cols, 1) >= 5 THEN NULLIF(TRIM(v_cols[5]), '') ELSE NULL END,
-                        CASE WHEN array_length(v_cols, 1) >= 6 THEN NULLIF(TRIM(v_cols[6]), '') ELSE NULL END
-                    )
-                    ON CONFLICT ("code") DO UPDATE SET 
-                        "name" = EXCLUDED."name", 
-                        "contactInfo" = EXCLUDED."contactInfo",
-                        "providerTypeId" = COALESCE(EXCLUDED."providerTypeId", public."Provider"."providerTypeId"),
-                        "airlineCode" = COALESCE(EXCLUDED."airlineCode", public."Provider"."airlineCode"),
-                        "sigla" = COALESCE(EXCLUDED."sigla", public."Provider"."sigla");
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'tipos-proveedores' THEN
-                -- Format: code^name^isAirline
-                IF v_cols[1] IS NOT NULL AND v_cols[2] IS NOT NULL THEN
-                    INSERT INTO public."ProviderType" ("code", "name", "isAirline", "active")
-                    VALUES (
-                        TRIM(v_cols[1]), 
-                        TRIM(v_cols[2]), 
-                        (UPPER(TRIM(v_cols[3])) IN ('SI', 'S', 'TRUE', '1')), 
-                        true
-                    )
-                    ON CONFLICT ("code") DO UPDATE SET 
-                        "name" = EXCLUDED."name",
-                        "isAirline" = EXCLUDED."isAirline";
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'productos' THEN
-                -- Format: description^basePrice^code^type^billingConcept^serviceType
-                IF v_cols[1] IS NOT NULL THEN
-                    IF v_cols[3] IS NOT NULL AND TRIM(v_cols[3]) <> '' THEN
-                        INSERT INTO public."Product" ("code", "type", "description", "basePrice", "billingConcept", "serviceType")
-                        VALUES (TRIM(v_cols[3]), COALESCE(TRIM(v_cols[4]), 'SERVICE'), TRIM(v_cols[1]), NULLIF(TRIM(v_cols[2]), '')::DECIMAL, TRIM(v_cols[5]), TRIM(v_cols[6]))
-                        ON CONFLICT ("code") DO UPDATE SET 
-                            "type" = EXCLUDED."type",
-                            "description" = EXCLUDED."description",
-                            "basePrice" = EXCLUDED."basePrice",
-                            "billingConcept" = EXCLUDED."billingConcept",
-                            "serviceType" = EXCLUDED."serviceType";
-                    ELSE
-                        INSERT INTO public."Product" ("type", "description", "basePrice", "billingConcept", "serviceType")
-                        VALUES (COALESCE(TRIM(v_cols[4]), 'SERVICE'), TRIM(v_cols[1]), NULLIF(TRIM(v_cols[2]), '')::DECIMAL, TRIM(v_cols[5]), TRIM(v_cols[6]));
-                    END IF;
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'prestadoras' THEN
-                -- Format: name^providerCode^code^category^location^type
-                IF v_cols[1] IS NOT NULL THEN
-                    v_provider_id := NULL;
-                    IF v_cols[2] IS NOT NULL AND TRIM(v_cols[2]) <> '' THEN
-                        SELECT id INTO v_provider_id FROM public."Provider" WHERE LOWER("code") = LOWER(TRIM(v_cols[2])) OR LOWER("name") = LOWER(TRIM(v_cols[2])) LIMIT 1;
-                    END IF;
-
-                    IF v_cols[3] IS NOT NULL AND TRIM(v_cols[3]) <> '' THEN
-                        INSERT INTO public."Prestadora" ("name", "providerId", "code", "category", "location", "type")
-                        VALUES (TRIM(v_cols[1]), v_provider_id, TRIM(v_cols[3]), TRIM(v_cols[4]), TRIM(v_cols[5]), COALESCE(TRIM(v_cols[6]), 'HOTEL'))
-                        ON CONFLICT ("code") DO UPDATE SET 
-                            "name" = EXCLUDED."name",
-                            "providerId" = EXCLUDED."providerId",
-                            "category" = EXCLUDED."category",
-                            "location" = EXCLUDED."location",
-                            "type" = EXCLUDED."type";
-                    ELSE
-                        INSERT INTO public."Prestadora" ("name", "providerId", "category", "location", "type")
-                        VALUES (TRIM(v_cols[1]), v_provider_id, TRIM(v_cols[4]), TRIM(v_cols[5]), COALESCE(TRIM(v_cols[6]), 'HOTEL'));
-                    END IF;
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'variables' THEN
-                -- Format: code^name
-                IF v_cols[1] IS NOT NULL AND v_cols[2] IS NOT NULL THEN
-                    INSERT INTO public."MasterVariable" ("code", "name")
-                    VALUES (TRIM(v_cols[1]), TRIM(v_cols[2]))
-                    ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name";
-                    v_count := v_count + 1;
-                END IF;
-
-            ELSIF p_tipo = 'parametros' THEN
-                -- Format: code^name^value
-                IF v_cols[1] IS NOT NULL AND v_cols[2] IS NOT NULL THEN
-                    INSERT INTO public."SystemParameter" ("code", "name", "value")
-                    VALUES (TRIM(v_cols[1]), TRIM(v_cols[2]), TRIM(v_cols[3]))
-                    ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name", "value" = EXCLUDED."value";
-                    v_count := v_count + 1;
-                END IF;
-
-            END IF;
-
-        EXCEPTION WHEN OTHERS THEN
-            v_errors := v_errors || 'Error en fila [' || v_row_text || ']: ' || SQLERRM || '; ';
-        END;
-    END LOOP;
-
-    p_mensaje_resultado := 'SUCCESS: Registros procesados: ' || v_count || '. ' || COALESCE(v_errors, '');
 END;
 $$;;
 
@@ -10147,7 +16455,18 @@ BEGIN
 END;
 $$;;
 
--- Inyectado automáticamente: spPrestadoraCrear.sql
+-- Inyectado automáticamente: spPreCotizacionEliminar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
 DO $$
 DECLARE
     r RECORD;
@@ -10155,13 +16474,58 @@ BEGIN
     FOR r IN 
         SELECT oid::regprocedure AS proc_name 
         FROM pg_proc 
-        WHERE proname ILIKE 'spPrestadoraCrear'
+        WHERE proname ILIKE 'spPreCotizacionEliminar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
+    END LOOP;
+END $$;
+
+-- =============================================
+-- Procedimiento Almacenado: spPreCotizacionEliminar
+-- Descripción: Elimina una pre-cotización y su historial en PostgreSQL.
+--              Resetea la secuencia si la tabla queda vacía.
+-- Base de Datos: PostgreSQL (Korex_colaereo)
+-- =============================================
+CREATE OR REPLACE PROCEDURE public."spPreCotizacionEliminar"(
+    IN p_id INT,
+    OUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public."PreQuotation" WHERE id = p_id) THEN
+        p_mensaje_resultado := 'ERROR: Pre-Cotización ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
+    DELETE FROM public."PreQuotationStateHistory" WHERE "preQuotationId" = p_id;
+    DELETE FROM public."PreQuotation" WHERE id = p_id;
+
+    -- Reseteo de secuencia si la tabla queda totalmente vacía
+    IF NOT EXISTS (SELECT 1 FROM public."PreQuotation") THEN
+        PERFORM setval('public."PreQuotation_id_seq"', 1, false);
+    END IF;
+
+    p_mensaje_resultado := 'SUCCESS: Pre-Cotización eliminada correctamente';
+END;
+$$;;
+
+-- Inyectado automáticamente: spPrestadoraActualizar.sql
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spPrestadoraActualizar'
     LOOP
         EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spPrestadoraCrear(
+CREATE OR REPLACE PROCEDURE public.spPrestadoraActualizar(
+    p_id INT,
     p_code TEXT,
     p_name TEXT,
     p_category TEXT,
@@ -10170,17 +16534,22 @@ CREATE OR REPLACE PROCEDURE public.spPrestadoraCrear(
     p_type TEXT,
     p_is_active BOOLEAN DEFAULT true,
     p_acting_user_id INT DEFAULT 1,
-    INOUT p_prestadora_id INT DEFAULT 0,
     INOUT p_mensaje_resultado TEXT DEFAULT ''
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    INSERT INTO public."Prestadora" ("code", "name", "category", "location", "providerId", "type", "isActive")
-    VALUES (p_code, p_name, p_category, p_location, p_provider_id, p_type, COALESCE(p_is_active, true))
-    RETURNING id INTO p_prestadora_id;
+    UPDATE public."Prestadora" SET
+        "code" = p_code,
+        "name" = p_name,
+        "category" = p_category,
+        "location" = p_location,
+        "providerId" = p_provider_id,
+        "type" = p_type,
+        "isActive" = COALESCE(p_is_active, true)
+    WHERE id = p_id;
 
-    p_mensaje_resultado := 'SUCCESS: Prestadora creado con ID ' || p_prestadora_id;
+    p_mensaje_resultado := 'SUCCESS: Prestadora actualizado.';
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
@@ -10954,7 +17323,7 @@ BEGIN
 END;
 $$;;
 
--- Inyectado automáticamente: spSellerCrear.sql
+-- Inyectado automáticamente: spSellerActualizar.sql
 DO $$
 DECLARE
     r RECORD;
@@ -10962,29 +17331,37 @@ BEGIN
     FOR r IN 
         SELECT oid::regprocedure AS proc_name 
         FROM pg_proc 
-        WHERE proname ILIKE 'spSellerCrear'
+        WHERE proname ILIKE 'spSellerActualizar'
     LOOP
         EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spSellerCrear(
+CREATE OR REPLACE PROCEDURE public.spSellerActualizar(
+    p_id INT,
     p_code TEXT,
     p_name TEXT,
     p_email TEXT,
     p_is_active BOOLEAN DEFAULT true,
     p_acting_user_id INT DEFAULT 1,
-    INOUT p_seller_id INT DEFAULT 0,
     INOUT p_mensaje_resultado TEXT DEFAULT ''
 )
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    INSERT INTO public."Seller" ("code", "name", "email", "isActive")
-    VALUES (p_code, p_name, p_email, COALESCE(p_is_active, true))
-    RETURNING id INTO p_seller_id;
+    IF NOT EXISTS (SELECT 1 FROM public."Seller" WHERE id = p_id) THEN
+        p_mensaje_resultado := 'ERROR: Vendedor con ID ' || p_id || ' no encontrado.';
+        RETURN;
+    END IF;
 
-    p_mensaje_resultado := 'SUCCESS: Vendedor creado exitosamente.';
+    UPDATE public."Seller"
+    SET "code" = p_code,
+        "name" = p_name,
+        "email" = p_email,
+        "isActive" = COALESCE(p_is_active, true)
+    WHERE id = p_id;
+
+    p_mensaje_resultado := 'SUCCESS: Vendedor actualizado exitosamente.';
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
@@ -11965,6 +18342,173 @@ EXCEPTION
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END;
 $$;;
+
+-- Inyectado automáticamente: spCotizacionDuplicar.sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT oid::regprocedure AS proc_name FROM pg_proc WHERE proname ILIKE 'public' LOOP
+        BEGIN
+            EXECUTE 'DROP PROCEDURE IF EXISTS ' || r.proc_name || ' CASCADE';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;
+
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionDuplicar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spCotizacionDuplicar"(
+    IN p_quotation_id INT,
+    IN p_acting_user_id INT,
+    INOUT p_new_quotation_id INT DEFAULT 0,
+    INOUT p_mensaje_resultado TEXT DEFAULT ''
+)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_internal_number TEXT;
+    v_new_id INT;
+    v_orig_quotation RECORD;
+    v_orig_qp RECORD;
+    v_new_qp_id INT;
+    v_user_id INT := NULL;
+BEGIN
+    -- Validar existencia de la cotización origen
+    SELECT * INTO v_orig_quotation 
+    FROM public."Quotation" 
+    WHERE id = p_quotation_id;
+
+    IF v_orig_quotation.id IS NULL THEN
+        p_mensaje_resultado := 'ERROR: Cotización origen no encontrada (ID ' || p_quotation_id || ').';
+        RETURN;
+    END IF;
+
+    -- Validar si p_acting_user_id existe en la tabla User, de lo contrario usar el de la cotización origen
+    IF p_acting_user_id IS NOT NULL THEN
+        SELECT id INTO v_user_id FROM public."User" WHERE id = p_acting_user_id;
+    END IF;
+
+    IF v_user_id IS NULL THEN
+        v_user_id := v_orig_quotation."userId";
+    END IF;
+
+    -- Generar consecutivo único interno
+    v_internal_number := 'QUO-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+
+    -- Insertar la cabecera duplicada de la cotización
+    INSERT INTO public."Quotation" (
+        "internalNumber", "date", "clientId", "currency", "exchangeRate",
+        "branchId", "implantId", "sellerId", "ticketPrinterId",
+        "baseCommissionable", "commissionPercentage", "chargesAndTaxes",
+        "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
+        "costoTotal", "valorBase", "utilidad", "comisionTotalPercentage",
+        "comisionFreelancePercentage", "comisionFreelanceValue",
+        "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
+        "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
+        "reservationCode", "copyFieldsToProducts", "manualDescription"
+    ) VALUES (
+        v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
+        v_orig_quotation."branchId", v_orig_quotation."implantId", v_orig_quotation."sellerId", v_orig_quotation."ticketPrinterId",
+        v_orig_quotation."baseCommissionable", v_orig_quotation."commissionPercentage", v_orig_quotation."chargesAndTaxes",
+        v_orig_quotation."totalAmount", v_user_id, 'NUEVO', 'Copia de cotización #' || p_quotation_id::text, CURRENT_TIMESTAMP,
+        v_orig_quotation."costoTotal", v_orig_quotation."valorBase", v_orig_quotation."utilidad", v_orig_quotation."comisionTotalPercentage",
+        v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
+        v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
+        v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
+        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription"
+    ) RETURNING id INTO v_new_id;
+
+    -- Insertar registro inicial en el historial de estados
+    INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
+    VALUES (v_new_id, 'NUEVO', 'Copia de cotización #' || p_quotation_id::text, CURRENT_TIMESTAMP, v_user_id);
+
+    -- Duplicar combos asociados
+    INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
+    SELECT v_new_id, "comboId"
+    FROM public."QuotationCombo"
+    WHERE "quotationId" = p_quotation_id;
+
+    -- Duplicar servicios manuales si la tabla existe
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationManualService') THEN
+        INSERT INTO public."QuotationManualService" ("quotationId", "providerName", "serviceName", "cost", "salePrice", "utility")
+        SELECT v_new_id, "providerName", "serviceName", "cost", "salePrice", "utility"
+        FROM public."QuotationManualService"
+        WHERE "quotationId" = p_quotation_id;
+    END IF;
+
+    -- Duplicar productos y sus detalles
+    FOR v_orig_qp IN 
+        SELECT * FROM public."QuotationProduct" WHERE "quotationId" = p_quotation_id
+    LOOP
+        INSERT INTO public."QuotationProduct" (
+            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
+            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
+            "serviceType", "destination", "reservationCode", "sellerCommission",
+            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
+            "service", "servicios", "descripcion", "passenger"
+        ) VALUES (
+            v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
+            v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
+            v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
+            v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
+            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
+        ) RETURNING id INTO v_new_qp_id;
+
+        -- Duplicar Pasajeros del producto
+        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
+        SELECT v_new_qp_id, "name", "document"
+        FROM public."QuotationProductPassenger"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+        -- Duplicar Impuestos del producto
+        INSERT INTO public."QuotationProductTax" ("quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain")
+        SELECT v_new_qp_id, "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
+        FROM public."QuotationProductTax"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+        -- Duplicar Variables del producto
+        INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
+        SELECT v_new_qp_id, "masterVariableId", "value"
+        FROM public."QuotationProductVariable"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+        -- Duplicar Pagos del producto
+        INSERT INTO public."QuotationProductPayment" ("quotationProductId", "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate")
+        SELECT v_new_qp_id, "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
+        FROM public."QuotationProductPayment"
+        WHERE "quotationProductId" = v_orig_qp.id;
+
+    END LOOP;
+
+    p_new_quotation_id := v_new_id;
+    p_mensaje_resultado := 'SUCCESS: Cotización duplicada correctamente con ID ' || v_new_id;
+
+    -- Registrar en auditoría
+    CALL public."spLogRegistrar"(
+        v_user_id, 
+        'QUOTATION', 
+        'DUPLICATE', 
+        'Se duplicó la cotización #' || p_quotation_id || ' generando la cotización #' || v_new_id || ' (' || v_internal_number || ')', 
+        jsonb_build_object('sourceQuotationId', p_quotation_id, 'newQuotationId', v_new_id), 
+        v_new_id
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$procedure$;;
 
 -- Inyectado automáticamente: spSiteModuleMasterToggle.sql
 DO $$

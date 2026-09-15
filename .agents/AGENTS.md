@@ -30,8 +30,8 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
     2. En `prisma/schema.prisma`: Declarar el campo en el modelo correspondiente.
     3. Executar `node deploy/gen_schema_json.js`: Aplicar la alteración a PostgreSQL local y regenerar Prisma ORM (`npx prisma generate`) **ANTES** de compilar o invocar SPs o endpoints que consuman esa columna.
 - **Garantía de Filtros y Datos Base (`base-data-integrity`)**: Toda actualización de base de datos o API base debe validar obligatoriamente las 4 capas del Skill [`base-data-integrity`](file:///f:/Proyectos/AgenciasNew/.agents/skills/base-data-integrity/SKILL.md), ejecutando `node deploy/gen_schema_json.js` y probando que `/api/quotations/base-data` devuelva HTTP 200 con todos sus arreglos poblados.
-- **Flujo Obligatorio al modificar Funciones SQL / SPs**:
-  1. **Compilación e Inyección Inmediata Local**: Ejecutar obligatoria e INMEDIATAMENTE en el mismo turno el validador y desplegador de base de datos: `node deploy/gen_schema_json.js`. NUNCA responder al usuario ni terminar el turno tras tocar un `.sql` sin haber ejecutado este comando.
+- **Flujo Obligatorio al modificar Funciones SQL / SPs (PostgreSQL + SQL Server)**:
+  1. **Compilación e Inyección Inmediata Local**: Ejecutar obligatoria e INMEDIATAMENTE en el mismo turno el desplegador e inyector de base de datos en los entornos locales de PostgreSQL (`node deploy/gen_schema_json.js`) y SQL Server activos. NUNCA responder al usuario ni terminar el turno tras tocar o corregir un `.sql` sin haber inyectado y verificado la compilación limpia en la base de datos local.
   2. Consultar al usuario en español si desea generar el instalador y actualizador automáticamente o si prefiere realizarlo manualmente (Skill [`installer-decision`](file:///f:/Proyectos/AgenciasNew/.agents/skills/installer-decision/SKILL.md)).
   3. Si aprueba automático: Generar el empaquetado standalone (`powershell.exe -ExecutionPolicy Bypass -File deploy/Generar_Empaquetado.ps1`) y compilar con `GenerarSetup.bat` / `GenerarActualizador.bat`.
   4. Si prefiere manual: Entregar instrucciones y scripts para compilación manual por parte del usuario.
@@ -42,10 +42,11 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
   - En `dbo.MAEVENDE`, usar `IDVENDE`, `NOMBVENDE`.
   - En `dbo.PROVEEDORES`, usar `IDPROVE`, `RAZONCIAL`, `CODICTA`.
 - **Sensibilidad a Mayúsculas en XML XPath**: Al procesar el XML importado en `spCotizacionesCrear`, utilizar exactamente las etiquetas generadas en Postgres (minúsculas como `cd_cotizacion`, `ds_fpnm`, `am_valor_me`, etc.) ya que la función `.value()` de SQL Server es strictly Case-Sensitive.
-- **Control de Transacciones**: 
-  - Evitar transacciones huérfanas o bloqueos. Las validaciones lógicas de llaves maestras (cliente, vendedor, sucursal o proveedor inexistente) deben realizarse **antes** de abrir el `BEGIN TRANSACTION` o asegurar un `ROLLBACK TRANSACTION` explícito antes de cualquier retorno con error (`RETURN 1`).
-  - Utilizar `SET XACT_ABORT ON;` al inicio de los SPs para abortar automáticamente la transacción ante cualquier error fatal.
 - **Sincronización del Actualizador**: Cualquier cambio realizado en los Procedimientos Almacenados (ej. `spCotizacionesCrear.sql` o `spFacturacionesCrear.sql`) **debe ser replicado obligatoriamente** en el archivo del script actualizador `SQL/Actualizador/ActualizadorSERVER.sql` y `SQL/Actualizador/Actualizador.sql`.
+- **Casteo y Binding Dinámico de Parámetros T-SQL (`src/lib/sqlserver.ts`)**: Todo parámetro pasado a `executeSQLServerProcedure` DEBE evaluar dinámicamente su tipo JavaScript: enteros a `mssql.Int`, flotantes a `mssql.Float`, booleanos a `mssql.Bit` y nulos a `null`. NUNCA enviar números enteros a ciegas como `mssql.VarChar(MAX)`.
+- **Resiliencia de Llaves Foráneas (FK) en SPs T-SQL**: Todo procedimiento de creación o edición (`spCotizacionCrear`, `spCotizacionActualizar`, etc.) DEBE validar la existencia de llaves foráneas optativas (`clientId`, `branchId`, `sellerId`, `implantId`, `ticketPrinterId`, `userId`) antes de insertar (`IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId) SET @clientId = NULL;`), evitando que inserciones fallen si las tablas maestras locales están vacías.
+- **Reseteo Universal de Consecutivos (IDs) al Vaciar Tablas**: Todo procedimiento de eliminación (`spCotizacionEliminar`, etc.) DEBE verificar si la tabla principal quedó totalmente vacía tras el borrado (`IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])`) y ejecutar `DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);` en SQL Server y reiniciar la secuencia correspondiente en PostgreSQL, garantizando que el siguiente registro inicie obligatoriamente en ID **#1**.
+- **Defectos Numéricos y Nulabilidad Resiliente en DDL**: Todos los campos numéricos o financieros en `SQL/SqlServer/01_Tables.sql` DEBEN definirse como `FLOAT NULL CONSTRAINT DF_... DEFAULT 0` o `INT NULL`, evitando errores de inserción nula cuando faltan parámetros opcionales.
 
 ---
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { executePostgresQuery } from '@/lib/postgres'
 import { executeSQLServerProcedure } from '@/lib/sqlserver'
 import { registerLog } from '@/lib/logger'
 
@@ -16,11 +16,9 @@ export async function POST(req: NextRequest) {
         const mssqlProcedure = exportType === 'INVOICE' ? 'spFacturacionesCrear' : 'spCotizacionesCrear';
 
         // 1. Obtener XML desde Postgres
-        const result = await prisma.$queryRawUnsafe<any[]>(
+        const result = await executePostgresQuery(
             `CALL public.${pgProcedure}($1, $2, $3)`,
-            idsStr,
-            userId ? Number(userId) : 0,
-            '' 
+            [idsStr, userId ? Number(userId) : 0, '']
         )
 
         const row = result && result.length > 0 ? result[0] : null;
@@ -50,19 +48,34 @@ export async function POST(req: NextRequest) {
                 spResult = [sqlResult];
             }
 
-            // Si el SP devolvió una fila con campo "Respuesta" es un error de validación
-            if (spResult.length > 0 && spResult[0]?.Respuesta) {
-                success = false;
-                sqlServerMsg = spResult[0].Respuesta;
+            // Evaluar el resultado del SP (Estado por cotización procesada)
+            if (spResult.length > 0) {
+                const hasError = spResult.some((r: any) => r.Respuesta && String(r.Respuesta).toLowerCase().includes('error'));
+                success = !hasError;
+                const summaryLines = spResult.map((row: any) => {
+                    const cotNum = row.Cotizacion || row.cd_consecutivo || row.IdProcesado || idsStr;
+                    const cotDisplay = String(cotNum).startsWith('#') ? String(cotNum) : `#${cotNum}`;
+                    const idZeus = row.IdProcesado || row.id_Cotizacion || row.id;
+                    const isAlreadyExisted = row.bl_existe === 1 || row.bl_existe === true || (row.Estado && String(row.Estado).toLowerCase().includes('ya existe'));
+
+                    if (row.Respuesta && String(row.Respuesta).toLowerCase().includes('error')) {
+                        return `❌ Cotización ${cotDisplay}: ${row.Respuesta}`;
+                    } else if (isAlreadyExisted) {
+                        return `⚠️ Cotización ${cotDisplay} ya existía en la base de datos de Zeus ERP (ID Zeus: ${idZeus || 'N/A'})`;
+                    } else {
+                        return `✅ Cotización ${cotDisplay} exportada exitosamente a Zeus ERP (ID Zeus: ${idZeus || 'N/A'})`;
+                    }
+                });
+                sqlServerMsg = summaryLines.join(' | ');
             }
 
             // 4. Actualizar Estado en Postgres (Nueva instrucción de usuario)
             if (success && spResult.length > 0) {
                 console.log(`[EXPORT_API] Actualizando estados en Postgres para: ${idsStr}`);
                 try {
-                    await prisma.$executeRawUnsafe(
+                    await executePostgresQuery(
                         `CALL public."spCotizacionActualizarEstado"($1::JSONB)`,
-                        JSON.stringify(spResult)
+                        [JSON.stringify(spResult)]
                     );
                 } catch (spPgError) {
                     console.error('[EXPORT_API] Error al actualizar estado en Postgres:', spPgError);

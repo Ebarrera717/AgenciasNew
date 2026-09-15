@@ -29,6 +29,12 @@ BEGIN
     END IF;
 
     DELETE FROM public."Quotation" WHERE id = p_quotation_id;
+
+    -- Si no quedan cotizaciones, reiniciar la secuencia a 1
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    END IF;
+
     p_mensaje_resultado := 'SUCCESS: Cotización ' || v_internal_number || ' eliminada con éxito.';
 EXCEPTION
     WHEN OTHERS THEN

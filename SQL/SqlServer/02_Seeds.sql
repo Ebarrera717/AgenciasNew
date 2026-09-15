@@ -207,6 +207,20 @@ BEGIN
     VALUES (N'USD', N'Dólar Estadounidense', 4200.0, 2, 1);
 END;
 
+-- 5.1 Estados de Cotización Iniciales
+IF NOT EXISTS (SELECT 1 FROM dbo.[QuotationState] WHERE [code] = N'NUEVO')
+BEGIN
+    INSERT INTO dbo.[QuotationState] ([code], [name], [color], [isActive])
+    VALUES (N'NUEVO', N'Nuevo', N'blue', 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[QuotationState] WHERE [code] = N'ENVIADO')
+BEGIN
+    INSERT INTO dbo.[QuotationState] ([code], [name], [color], [isActive])
+    VALUES (N'ENVIADO', N'ENVIADO', N'emerald', 1);
+END;
+
+
 
 -- 6. Usuarios Iniciales de Administración
 DECLARE @SuperAdminRoleId INT;
