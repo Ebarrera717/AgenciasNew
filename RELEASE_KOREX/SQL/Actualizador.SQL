@@ -7385,6 +7385,22 @@ BEGIN
         RETURN;
     END IF;
 
+    -- 2.0 Pre-validación: Cliente deshabilitado
+    SELECT 'ERROR: El cliente "' || COALESCE(c."name", 'DESCONOCIDO') || 
+           '" (NIT/Tercero ' || COALESCE(c."document", '') || 
+           ') se encuentra deshabilitado en Korex. Por favor habilítelo en el maestro de clientes antes de exportar la factura.'
+    INTO v_err_concept
+    FROM public."Invoices" e
+    JOIN public."Client" c ON e."clientId" = c.id
+    WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[])
+      AND c."isActive" = false
+    LIMIT 1;
+
+    IF v_err_concept IS NOT NULL AND v_err_concept <> '' THEN
+        mensaje_resultado := v_err_concept;
+        RETURN;
+    END IF;
+
     -- 2.1 Pre-validación en Korex: Conceptos de Facturación y Clasificación de Servicio
     SELECT 'ERROR: La factura ' || COALESCE(e."internalNumber", 'FAC-' || e.id::text) || 
            ' contiene el producto ''' || COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') || 
@@ -10772,9 +10788,9 @@ BEGIN
 			bl_NoCalcIvaComision = ISNULL(F.Item.value('bl_nocalcivacomision[1]','BIT'),0),
 			am_basecomisionable = ISNULL(F.Item.value('am_basecomisionable[1]','MONEY'),0),
 			am_porcomision = ISNULL(F.Item.value('am_porcomision[1]','MONEY'),0),
-			id_tiposconceptfac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion ORDER BY id), 2)),
-			id_conceptofacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE cd_codigo = 'SOP'), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion ORDER BY id), 1))),
-			id_tiposservicio = ISNULL(CASE WHEN TS.id IS NOT NULL THEN TS.id ELSE TSA.id_TipoServicio END, ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE cd_codigo IN ('htn','SOP')), ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios ORDER BY id), 1))),
+			id_tiposconceptfac = CF.id_TiposConceptoFacturacion,
+			id_conceptofacturacion = CF.id,
+			id_tiposservicio = CASE WHEN TS.id IS NOT NULL THEN TS.id ELSE TSA.id_TipoServicio END,
 			cd_proveedores = ISNULL(F.Item.value('cd_proveedores[1]','VARCHAR(25)'),''),
 			ds_servicio = ISNULL(F.Item.value('ds_servicio[1]','VARCHAR(250)'),''),
 			am_valorprov = ISNULL(F.Item.value('am_valorprov[1]','MONEY'),0),
