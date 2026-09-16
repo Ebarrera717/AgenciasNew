@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-09-16T20:35:16.215Z
+-- Fecha de Generación: 2026-09-16T20:46:53.221Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -1199,8 +1199,17 @@ BEGIN
     CREATE TABLE dbo.[tiposServicio_asignados] (
         [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [id_ConceptoFacturacion] INT NULL,
+        [id_TipoServicio] INT NULL,
         [id_TiposServicios] INT NULL
     );
+END;
+
+IF OBJECT_ID('dbo.tiposServicio_asignados', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tiposServicio_asignados') AND name = 'id_TipoServicio') 
+        ALTER TABLE dbo.tiposServicio_asignados ADD id_TipoServicio INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tiposServicio_asignados') AND name = 'id_TiposServicios') 
+        ALTER TABLE dbo.tiposServicio_asignados ADD id_TiposServicios INT NULL;
 END;
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TipoProveedores' AND schema_id = SCHEMA_ID('dbo'))

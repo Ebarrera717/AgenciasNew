@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { executePostgresQuery } from '@/lib/postgres'
-import { executeSQLServerProcedure } from '@/lib/sqlserver'
+import { isSQLServerMode, getSQLServerConnection, executeSQLServerProcedure } from '@/lib/sqlserver'
 import { registerLog } from '@/lib/logger'
 import { generateTraceCode, recordTraceEvent } from '@/lib/traceability'
 
@@ -44,6 +44,34 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'Error en generación de XML Postgres', traceCode }, { status: 500 })
         }
 
+        // Obtener mapa de números de factura (internalNumber / consecutivo)
+        const idArray = idsStr.split(',').map((id: string) => parseInt(id.trim(), 10)).filter((n: number) => !isNaN(n));
+        const invoiceNumberMap: Record<number, string> = {};
+
+        if (idArray.length > 0) {
+            try {
+                if (isSQLServerMode()) {
+                    const pool = await getSQLServerConnection();
+                    const res = await pool.request().query(`SELECT id, internalNumber, serie, consecutivo FROM dbo.[Invoices] WHERE id IN (${idArray.join(',')})`);
+                    await pool.close();
+                    for (const r of res.recordset) {
+                        const num = r.internalNumber || (r.consecutivo ? (r.serie ? `${r.serie}-${r.consecutivo}` : `FAC-${r.consecutivo}`) : `FAC-${r.id}`);
+                        invoiceNumberMap[r.id] = num;
+                    }
+                } else {
+                    const res = await executePostgresQuery(
+                        `SELECT id, "internalNumber", serie, consecutivo FROM public."Invoices" WHERE id IN (${idArray.join(',')})`
+                    );
+                    for (const r of res) {
+                        const num = r.internalNumber || (r.consecutivo ? (r.serie ? `${r.serie}-${r.consecutivo}` : `FAC-${r.consecutivo}`) : `FAC-${r.id}`);
+                        invoiceNumberMap[r.id] = num;
+                    }
+                }
+            } catch (e: any) {
+                console.warn('[EXPORT_API] No se pudieron consultar números de factura:', e.message);
+            }
+        }
+
         // 2. Integración Directa con SQL Server
         let sqlServerMsg = 'Enviado exitosamente a SQL Server';
         let success = true;
@@ -66,21 +94,37 @@ export async function POST(req: NextRequest) {
                 const hasFailure = spResult.some((item: any) => !(item.success === 1 || item.success === true || item.success === '1'));
                 if (hasFailure) {
                     success = false;
-                }
-                const formattedMsgs = spResult.map((item: any) => {
-                    const invId = item.invoiceId || item.Factura || item.id || idsStr;
-                    const isOk = item.success === 1 || item.success === true || item.success === '1';
-                    const rawMsg = item.message || '';
-                    const cleanMsg = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
-                    if (isOk) {
-                        return `✅ Factura #${invId}: Exportada correctamente a Zeus ERP`;
+                    const formattedMsgs = spResult.map((item: any) => {
+                        const invId = Number(item.invoiceId || item.Factura || item.id || 0);
+                        const invNum = invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : idsStr);
+                        const isOk = item.success === 1 || item.success === true || item.success === '1';
+                        const rawMsg = item.message || '';
+                        const cleanMsg = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
+                        if (isOk) {
+                            return `✅ Factura N° ${invNum}: Exportada correctamente a Zeus ERP`;
+                        } else {
+                            return `❌ Factura N° ${invNum}: ${cleanMsg || 'Error no especificado en Zeus ERP'}`;
+                        }
+                    });
+                    sqlServerMsg = formattedMsgs.join(' | ');
+                } else {
+                    const exportedNums = spResult.map((item: any) => {
+                        const invId = Number(item.invoiceId || item.Factura || item.id || 0);
+                        return invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : idsStr);
+                    });
+                    if (exportedNums.length === 1) {
+                        sqlServerMsg = `✅ Factura N° ${exportedNums[0]} exportada exitosamente a Zeus ERP`;
                     } else {
-                        return `❌ Factura #${invId}: ${cleanMsg || 'Error no especificado en Zeus ERP'}`;
+                        sqlServerMsg = `✅ Facturas N° ${exportedNums.join(', ')} exportadas exitosamente a Zeus ERP`;
                     }
-                });
-                sqlServerMsg = formattedMsgs.join(' | ');
+                }
             } else {
-                sqlServerMsg = 'Exportación procesada en SQL Server';
+                const exportedNums = idArray.map((id: number) => invoiceNumberMap[id] || `FAC-${id}`);
+                if (exportedNums.length === 1) {
+                    sqlServerMsg = `✅ Factura N° ${exportedNums[0]} exportada exitosamente a Zeus ERP`;
+                } else {
+                    sqlServerMsg = `✅ Facturas N° ${exportedNums.join(', ')} exportadas exitosamente a Zeus ERP`;
+                }
             }
 
             // Registrar traza detallada
