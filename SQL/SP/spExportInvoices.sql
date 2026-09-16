@@ -29,6 +29,7 @@ DECLARE
     v_msg     TEXT;
     v_context TEXT;
     v_line    TEXT;
+    v_err_concept TEXT := '';
 BEGIN
     -- 1. Inicializar
     mensaje_resultado := '';
@@ -43,6 +44,39 @@ BEGIN
     SELECT "name" INTO v_nombre_usuario FROM public."User" WHERE id = User_id;
     IF NOT FOUND THEN
         mensaje_resultado := 'ERROR: El usuario ' || User_id || ' no existe.';
+        RETURN;
+    END IF;
+
+    -- 2.1 Pre-validación en Korex: Conceptos de Facturación y Clasificación de Servicio
+    SELECT 'ERROR: La factura ' || COALESCE(e."internalNumber", 'FAC-' || e.id::text) || 
+           ' contiene el producto ''' || COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') || 
+           ''' que no tiene asignado un Concepto de Facturación en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
+    INTO v_err_concept
+    FROM public."InvoicesProduct" ep
+    JOIN public."Invoices" e ON ep."invoiceId" = e.id
+    LEFT JOIN public."Product" pr ON ep."productId" = pr.id
+    WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[])
+      AND COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), '') = ''
+    LIMIT 1;
+
+    IF v_err_concept IS NOT NULL AND v_err_concept <> '' THEN
+        mensaje_resultado := v_err_concept;
+        RETURN;
+    END IF;
+
+    SELECT 'ERROR: La factura ' || COALESCE(e."internalNumber", 'FAC-' || e.id::text) || 
+           ' contiene el producto ''' || COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') || 
+           ''' que no tiene asignada una Clasificación de Servicio en Korex. Por favor asígnela en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
+    INTO v_err_concept
+    FROM public."InvoicesProduct" ep
+    JOIN public."Invoices" e ON ep."invoiceId" = e.id
+    LEFT JOIN public."Product" pr ON ep."productId" = pr.id
+    WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[])
+      AND COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') = ''
+    LIMIT 1;
+
+    IF v_err_concept IS NOT NULL AND v_err_concept <> '' THEN
+        mensaje_resultado := v_err_concept;
         RETURN;
     END IF;
 
