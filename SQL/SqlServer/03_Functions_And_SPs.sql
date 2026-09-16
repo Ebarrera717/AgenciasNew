@@ -4704,6 +4704,49 @@ BEGIN
 					IF @ReturnCode = 0
 					BEGIN
 						SET @FacturaEstado = 0;
+
+						-- Consultar el último registro recién creado en Zeus ERP fac_factura
+						DECLARE @resFuente VARCHAR(10) = NULL;
+						DECLARE @resSerie VARCHAR(10) = NULL;
+						DECLARE @resConsecutivo VARCHAR(20) = NULL;
+
+						IF @cd_cliente IS NOT NULL AND TRIM(@cd_cliente) <> ''
+						BEGIN
+							SELECT TOP 1 
+								@resFuente = LTRIM(RTRIM(cd_fuente)),
+								@resSerie = LTRIM(RTRIM(cd_serie)),
+								@resConsecutivo = LTRIM(RTRIM(cd_consecutivo))
+							FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)
+							WHERE cd_tercero_codigo = LTRIM(RTRIM(@cd_cliente))
+							ORDER BY id DESC;
+						END
+
+						IF @resConsecutivo IS NULL
+						BEGIN
+							SELECT TOP 1 
+								@resFuente = LTRIM(RTRIM(cd_fuente)),
+								@resSerie = LTRIM(RTRIM(cd_serie)),
+								@resConsecutivo = LTRIM(RTRIM(cd_consecutivo))
+							FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)
+							ORDER BY id DESC;
+						END
+
+						IF @resFuente IS NULL SET @resFuente = ISNULL(NULLIF(LTRIM(RTRIM(@cd_fuente)), ''), '55');
+						IF @resSerie IS NULL SET @resSerie = ISNULL(NULLIF(LTRIM(RTRIM(@cd_serie)), ''), '33');
+						
+						-- Actualizar registro local de Invoices en la BD activa de Korex
+						UPDATE dbo.[Invoices]
+						SET 
+							fuente = @resFuente,
+							serie = @resSerie,
+							consecutivo = @resConsecutivo,
+							state = 'EXPORTED'
+						WHERE id = @id_facturacion;
+
+						DECLARE @numInterno VARCHAR(50) = NULL;
+						SELECT TOP 1 @numInterno = ISNULL(internalNumber, CAST(id AS VARCHAR)) FROM dbo.[Invoices] WHERE id = @id_facturacion;
+
+						SET @FacturaRespuesta = '✅ Factura ' + ISNULL(@numInterno, CAST(@id_facturacion AS VARCHAR)) + ' (Zeus ERP N° ' + ISNULL(@resFuente, '') + '-' + ISNULL(@resSerie, '') + '-' + ISNULL(@resConsecutivo, '') + '): Exportada e inyectada correctamente a Zeus ERP.';
 					END
 					ELSE
 					BEGIN
@@ -4765,341 +4808,6 @@ BEGIN
     END CATCH
 END
 GO
-
-GO
-
-
-IF OBJECT_ID('dbo.spExportInvoices', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spExportInvoices;
-GO
-
-CREATE PROCEDURE dbo.spExportInvoices
-(
-    @Envoices_id VARCHAR(MAX),
-    @User_id INT = 0,
-    @mensaje_resultado VARCHAR(MAX) = '' OUTPUT
-)
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @v_xml VARCHAR(MAX) = '';
-    DECLARE @v_nombre_usuario VARCHAR(250) = '';
-
-    SET @Envoices_id = LTRIM(RTRIM(ISNULL(@Envoices_id, '')));
-    IF @Envoices_id = ''
-    BEGIN
-        SET @mensaje_resultado = 'ERROR: No se han proporcionado IDs de Facturacion válidos.';
-        SELECT @mensaje_resultado AS mensaje_resultado;
-        RETURN;
-    END
-
-    DECLARE @idsTable TABLE (id INT);
-    INSERT INTO @idsTable (id)
-    SELECT CAST(value AS INT) 
-    FROM STRING_SPLIT(@Envoices_id, ',')
-    WHERE LTRIM(RTRIM(value)) <> '' AND ISNUMERIC(value) = 1;
-
-    -- 1. PRE-VALIDACIÓN 1: Verificar si la factura ya se encuentra exportada en Korex
-    DECLARE @v_err_exported VARCHAR(MAX) = '';
-    SELECT TOP 1 @v_err_exported = 'ERROR: La factura ' + COALESCE(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
-        ' ya se encuentra exportada a Zeus ERP (N° ' + ISNULL(e.fuente,'55') + '-' + ISNULL(e.serie,'33') + '-' + ISNULL(e.consecutivo,'') + ').'
-    FROM dbo.[Invoices] e
-    WHERE e.id IN (SELECT id FROM @idsTable)
-      AND e.state = 'EXPORTED';
-
-    IF @v_err_exported <> ''
-    BEGIN
-        SET @mensaje_resultado = @v_err_exported;
-        SELECT @mensaje_resultado AS mensaje_resultado;
-        RETURN;
-    END
-
-    -- 2. PRE-VALIDACIÓN 2: Conceptos de Facturación y Clasificación de Servicio
-    DECLARE @v_err_concept VARCHAR(MAX) = '';
-
-    SELECT TOP 1 @v_err_concept = 'ERROR: La factura ' + COALESCE(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
-        ' contiene el producto ''' + COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') + 
-        ''' que no tiene asignado un Concepto de Facturación en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
-    FROM dbo.[InvoicesProduct] ep
-    JOIN dbo.[Invoices] e ON ep.invoiceId = e.id
-    LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
-    WHERE e.id IN (SELECT id FROM @idsTable)
-      AND COALESCE(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), '') = '';
-
-    IF @v_err_concept <> ''
-    BEGIN
-        SET @mensaje_resultado = @v_err_concept;
-        SELECT @mensaje_resultado AS mensaje_resultado;
-        RETURN;
-    END
-
-    SELECT TOP 1 @v_err_concept = 'ERROR: La factura ' + COALESCE(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
-        ' contiene el producto ''' + COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') + 
-        ''' que no tiene asignada una Clasificación de Servicio en Korex. Por favor asígnela en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
-    FROM dbo.[InvoicesProduct] ep
-    JOIN dbo.[Invoices] e ON ep.invoiceId = e.id
-    LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
-    WHERE e.id IN (SELECT id FROM @idsTable)
-      AND COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), '') = '';
-
-    IF @v_err_concept <> ''
-    BEGIN
-        SET @mensaje_resultado = @v_err_concept;
-        SELECT @mensaje_resultado AS mensaje_resultado;
-        RETURN;
-    END
-
-    SELECT @v_nombre_usuario = name FROM dbo.[User] WHERE id = @User_id;
-    IF @v_nombre_usuario IS NULL OR @v_nombre_usuario = ''
-    BEGIN
-        SET @v_nombre_usuario = 'ADMINISTRADOR';
-    END
-
-    -- 3. GENERACIÓN DE ESTRUCTURA COMPLETA XML PARA ZEUS ERP
-    -- Nota: cd_consecutivo se envía como '' para consumirse dinámicamente desde Zeus ERP
-    DECLARE @xmlResult XML;
-
-    SET @xmlResult = (
-        SELECT 
-            e.id AS [id_factura],
-            '55' AS [cd_fuente],
-            '33' AS [cd_serie],
-            '' AS [cd_consecutivo],
-            @User_id AS [cd_usuario],
-            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-            SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
-            CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_fechacont],
-            CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_vence],
-            SUBSTRING(ISNULL(c.document, ''), 1, 25) AS [cd_tercero_codigo],
-            SUBSTRING(ISNULL(c.name, ''), 1, 250) AS [ds_tercero_nombre],
-            SUBSTRING(ISNULL(c.document, ''), 1, 25) AS [cd_cliente_codigo],
-            SUBSTRING(ISNULL(c.name, ''), 1, 250) AS [ds_cliente_nombre],
-            SUBSTRING(ISNULL(c.address, ''), 1, 250) AS [ds_cliente_dir],
-            '' AS [ds_cliente_ciudad],
-            '' AS [ds_cliente_tel],
-            '' AS [ds_cliente_dirdesp],
-            SUBSTRING(ISNULL(u.email, ''), 1, 60) AS [ds_cliente_email],
-            '' AS [ds_cliente_contacto],
-            '' AS [ds_cliente_contacto_email],
-            ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
-            SUBSTRING(ISNULL(s.code, '01'), 1, 3) AS [cd_vendedor],
-            SUBSTRING(ISNULL(tp.code, '01'), 1, 6) AS [cd_tiqueteador],
-            CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
-            CAST(1.0 AS DECIMAL(18,4)) AS [am_tcambiousd],
-            1 AS [id_tipoventa],
-            '' AS [ds_Observacion],
-            CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [TotalFactura],
-            CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [ValorFactura],
-            (
-                SELECT 
-                    ep.invoiceId AS [id_factura],
-                    ep.id AS [id_item],
-                    CASE 
-                        WHEN pr.type = 'Tiquete' THEN 'Aire' 
-                        WHEN pr.type = 'ALOJAMIENTO' THEN 'Hotel' 
-                        WHEN pr.type = 'ALQUILER' THEN 'Auto'
-                        WHEN pr.type = 'TAO' THEN 'TAO'
-                        ELSE 'SRV'
-                    END AS [tipo_item],
-                    CASE 
-                        WHEN pr.type = 'Tiquete' THEN 1 
-                        WHEN pr.type = 'ALOJAMIENTO' THEN 3
-                        WHEN pr.type = 'ALQUILER' THEN 3
-                        WHEN pr.type = 'TAO' THEN 2
-                        ELSE 3
-                    END AS [in_tipoitem],
-                    ep.id AS [id_referencia_origen],
-                    CASE WHEN pr.type = 'Tiquete' THEN ISNULL(pr.code, '') ELSE '' END AS [cd_tiquete],
-                    SUBSTRING(ISNULL(ep.descripcion, ISNULL(pr.description, '')), 1, 500) AS [ds_descrip],
-                    ISNULL(ep.inNationality, 1) AS [in_nacionalidad],
-                    '' AS [cd_cencosto],
-                    '' AS [cd_auxiliar],
-                    '' AS [cd_item],
-                    CAST(ISNULL(ep.price, 0) AS DECIMAL(18,2)) AS [am_tarifa],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_iva],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_tua],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_comb],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_vat],
-                    CAST(ISNULL(ep.sellerCommission, 0) AS DECIMAL(18,2)) AS [am_Comision],
-                    SUBSTRING(ISNULL((SELECT TOP 1 pp.name FROM dbo.[InvoicesProductPasenger] pp WHERE pp.invoiceProductId = ep.id), c.name), 1, 30) AS [ds_paxname],
-                    '' AS [ds_paxape],
-                    'SR' AS [ds_paxprefix],
-                    '' AS [cd_tourcode],
-                    0 AS [NumTktConj],
-                    'ACT' AS [cd_TipoTiquete],
-                    1 AS [id_air],
-                    ISNULL(ep.itinerary, '') AS [ds_itinerario],
-                    '' AS [ds_itinerarioaerolinea],
-                    ISNULL(ep.class, 'Y') AS [ds_clases],
-                    '' AS [ds_Observaciones],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_highfare],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_lowfare],
-                    '' AS [ds_solicita],
-                    '' AS [ds_lapsoviaje],
-                    '' AS [cd_tktrevisado],
-                    '' AS [cd_PasaportePax],
-                    '' AS [cd_pax_CC],
-                    CAST(100 AS DECIMAL(18,2)) AS [am_PorFacParcial],
-                    ISNULL(ep.quantity, 1) AS [in_cantpax],
-                    NULL AS [Id_Precompra],
-                    '' AS [cd_FormaPagoTAO],
-                    '' AS [cd_TarjetaCreditoTAO],
-                    '' AS [cd_NumeroTarjetaTAO],
-                    '' AS [cd_VencimientoTarjetaTAO],
-                    '' AS [cd_NumeroPolizaTAO],
-                    '' AS [cd_AnexoPolizaTAO],
-                    '' AS [ds_AutorizacionTarjetaTAO],
-                    0 AS [in_cuotasTarjetaTAO],
-                    ISNULL((SELECT TOP 1 p.code FROM dbo.[InvoicesProductPayment] ipp LEFT JOIN dbo.[Payment] p ON LOWER(p.name) = LOWER(ipp.paymentMethod) WHERE ipp.invoiceProductId = ep.id), 'CRE') AS [cd_FormasPago],
-                    '' AS [cd_TarjetasCredito],
-                    CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2)) AS [am_fp1],
-                    '' AS [ds_cc_code],
-                    '' AS [ds_cc_number],
-                    '' AS [ds_cc_vence],
-                    '' AS [ds_cc_autorizacion],
-                    '' AS [ds_cc_voucher],
-                    0 AS [in_cc_cuotas],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_fp2],
-                    '' AS [ds_cc_code2],
-                    '' AS [ds_cc_number2],
-                    '' AS [ds_cc_vence2],
-                    '' AS [ds_cc_autorizacion2],
-                    '' AS [ds_cc_voucher2],
-                    0 AS [in_cc_cuotas2],
-                    ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
-                    CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
-                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-                    SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
-                    0 AS [bl_ahorro],
-                    'ACT' AS [cd_TipoTiqueteGDS],
-                    '' AS [cd_TiposDocumento],
-                    '' AS [cd_entdist],
-                    '' AS [cd_entvend],
-                    'BOG' AS [cd_destino],
-                    CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_fechaexped],
-                    SUBSTRING(ISNULL(tp.code, '01'), 1, 6) AS [cd_tiqueteadores],
-                    1 AS [id_gds],
-                    1 AS [iden_gds],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_comisionPNR],
-                    '' AS [ds_records],
-                    0 AS [bl_NoCalcComision],
-                    0 AS [bl_NoCalcIvaComision],
-                    CAST(ISNULL(ep.price, 0) AS DECIMAL(18,2)) AS [am_basecomisionable],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_porcomision],
-                    '2' AS [cd_tiposconceptfac],
-                    LTRIM(RTRIM(pr.billingConcept)) AS [cd_conceptofacturacion],
-                    COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), '')) AS [cd_tiposservicio],
-                    SUBSTRING(ISNULL(prv.code, '01'), 1, 25) AS [cd_proveedores],
-                    SUBSTRING(ISNULL(ep.descripcion, ISNULL(pr.description, '')), 1, 250) AS [ds_servicio],
-                    CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2)) AS [am_valorprov],
-                    ISNULL(e.currency, 'COP') AS [cd_monedaprov],
-                    CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_llegada],
-                    CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_salida],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_pordescuento],
-                    CAST(0 AS DECIMAL(18,2)) AS [am_basedescuento],
-                    CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [Fecha_Salida],
-                    CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [Fecha_Llegada],
-                    '1' AS [id_tipoproveedor],
-                    '1' AS [cd_tipoproveedor],
-                    'GENERAL' AS [ds_tipoproveedor],
-                    -- Sub-nodo: Pasajeros (Garantiza al menos 1 pasajero registrado)
-                    (
-                        SELECT 
-                            e.id AS [id_factura],
-                            ep.id AS [id_item],
-                            3 AS [in_tipoitem],
-                            SUBSTRING(ISNULL(pp.name, c.name), 1, 50) AS [ds_paxname],
-                            '' AS [ds_paxape],
-                            'SR' AS [ds_paxprefix],
-                            '' AS [ds_paxclasificacion],
-                            '' AS [cd_voucherpax],
-                            SUBSTRING(ISNULL(pp.document, c.document), 1, 50) AS [cd_paxidentificacion],
-                            0 AS [in_edad],
-                            '' AS [cd_tiquete]
-                        FROM (SELECT 1 AS dummy) d
-                        LEFT JOIN dbo.[InvoicesProductPasenger] pp ON pp.invoiceProductId = ep.id
-                        FOR XML PATH('Pasajeros'), TYPE
-                    ),
-                    -- Sub-nodo: Formaspago (Garantiza al menos CRE / CREDITO)
-                    (
-                        SELECT 
-                            e.id AS [id_factura],
-                            ep.id AS [id_item],
-                            3 AS [in_tipoitem],
-                            ISNULL(p.code, 'CRE') AS [cd_codigo],
-                            ISNULL(ipp.paymentMethod, 'CREDITO') AS [ds_nombre],
-                            CAST(ISNULL(ipp.amount, ep.price * ep.quantity) AS DECIMAL(18,2)) AS [am_valor]
-                        FROM (SELECT 1 AS dummy) d
-                        LEFT JOIN dbo.[InvoicesProductPayment] ipp ON ipp.invoiceProductId = ep.id
-                        LEFT JOIN dbo.[Payment] p ON LOWER(p.name) = LOWER(ipp.paymentMethod)
-                        FOR XML PATH('Formaspago'), TYPE
-                    ),
-                    -- Sub-nodo: CargosImpuestos (Garantiza tarifa e impuestos)
-                    (
-                        SELECT 
-                            e.id AS [id_factura],
-                            ep.id AS [id_item],
-                            3 AS [in_tipoitem],
-                            ISNULL(ct.code, 'TAR') AS [cd_codigo],
-                            ISNULL(ct.name, 'Tarifa') AS [ds_nombre],
-                            CASE WHEN ipt.isMain = 1 THEN 'C' ELSE 'I' END AS [cd_tipo],
-                            CAST(ISNULL(ct.value, 0) AS DECIMAL(18,4)) AS [am_porcentaje],
-                            CAST(ISNULL(ipt.explicitAmount, ep.price * ep.quantity) AS DECIMAL(18,2)) AS [am_valor],
-                            CAST(0 AS DECIMAL(18,2)) AS [am_contado],
-                            CAST(ISNULL(ipt.explicitAmount, ep.price * ep.quantity) AS DECIMAL(18,2)) AS [am_credito],
-                            ISNULL(ct.id, 1) AS [id_carg],
-                            ISNULL(ct.id, 1) AS [id_imp],
-                            CASE WHEN ct.code = 'IVA' THEN 1 ELSE 0 END AS [bl_iva],
-                            1 AS [in_orden]
-                        FROM (SELECT 1 AS dummy) d
-                        LEFT JOIN dbo.[InvoicesProductTax] ipt ON ipt.invoiceProductId = ep.id
-                        LEFT JOIN dbo.[ChargeAndTax] ct ON ipt.chargeAndTaxId = ct.id
-                        FOR XML PATH('CargosImpuestos'), TYPE
-                    ),
-                    -- Sub-nodo: Variables
-                    (
-                        SELECT 
-                            e.id AS [id_factura],
-                            ep.id AS [id_item],
-                            3 AS [in_tipoitem],
-                            'FacturacionServicios' AS [ds_maestro],
-                            'ACTIVITY' AS [ds_VariableAdicional],
-                            'GENERAL' AS [ds_valor],
-                            '' AS [cd_codigo]
-                        FOR XML PATH('Variables'), TYPE
-                    )
-                FROM dbo.[InvoicesProduct] ep
-                LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
-                LEFT JOIN dbo.[Provider] prv ON ep.providerId = prv.id
-                WHERE ep.invoiceId = e.id
-                FOR XML PATH('Item'), TYPE
-            )
-        FROM dbo.[Invoices] e
-        JOIN dbo.[Client] c ON e.clientId = c.id
-        JOIN dbo.[Branch] b ON e.branchId = b.id
-        LEFT JOIN dbo.[Implant] imp ON e.implantId = imp.id
-        LEFT JOIN dbo.[Seller] s ON e.sellerId = s.id
-        LEFT JOIN dbo.[User] u ON e.userId = u.id
-        LEFT JOIN dbo.[TicketPrinter] tp ON e.ticketPrinterId = tp.id
-        WHERE e.id IN (SELECT id FROM @idsTable)
-        FOR XML PATH('Facturacion'), ROOT('Facturaciones'), TYPE
-    );
-
-    SET @v_xml = CAST(@xmlResult AS VARCHAR(MAX));
-
-    IF @v_xml IS NULL OR @v_xml = ''
-    BEGIN
-        SET @mensaje_resultado = 'ERROR: No se pudo construir la estructura XML para las facturas.';
-    END
-    ELSE
-    BEGIN
-        SET @mensaje_resultado = @v_xml;
-    END
-
-    SELECT @mensaje_resultado AS mensaje_resultado;
-END;
-
 
 GO
 

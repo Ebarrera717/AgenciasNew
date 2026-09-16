@@ -10249,6 +10249,49 @@ BEGIN
 					IF @ReturnCode = 0
 					BEGIN
 						SET @FacturaEstado = 0;
+
+						-- Consultar el último registro recién creado en Zeus ERP fac_factura
+						DECLARE @resFuente VARCHAR(10) = NULL;
+						DECLARE @resSerie VARCHAR(10) = NULL;
+						DECLARE @resConsecutivo VARCHAR(20) = NULL;
+
+						IF @cd_cliente IS NOT NULL AND TRIM(@cd_cliente) <> ''
+						BEGIN
+							SELECT TOP 1 
+								@resFuente = LTRIM(RTRIM(cd_fuente)),
+								@resSerie = LTRIM(RTRIM(cd_serie)),
+								@resConsecutivo = LTRIM(RTRIM(cd_consecutivo))
+							FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)
+							WHERE cd_tercero_codigo = LTRIM(RTRIM(@cd_cliente))
+							ORDER BY id DESC;
+						END
+
+						IF @resConsecutivo IS NULL
+						BEGIN
+							SELECT TOP 1 
+								@resFuente = LTRIM(RTRIM(cd_fuente)),
+								@resSerie = LTRIM(RTRIM(cd_serie)),
+								@resConsecutivo = LTRIM(RTRIM(cd_consecutivo))
+							FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)
+							ORDER BY id DESC;
+						END
+
+						IF @resFuente IS NULL SET @resFuente = ISNULL(NULLIF(LTRIM(RTRIM(@cd_fuente)), ''), '55');
+						IF @resSerie IS NULL SET @resSerie = ISNULL(NULLIF(LTRIM(RTRIM(@cd_serie)), ''), '33');
+						
+						-- Actualizar registro local de Invoices en la BD activa de Korex
+						UPDATE dbo.[Invoices]
+						SET 
+							fuente = @resFuente,
+							serie = @resSerie,
+							consecutivo = @resConsecutivo,
+							state = 'EXPORTED'
+						WHERE id = @id_facturacion;
+
+						DECLARE @numInterno VARCHAR(50) = NULL;
+						SELECT TOP 1 @numInterno = ISNULL(internalNumber, CAST(id AS VARCHAR)) FROM dbo.[Invoices] WHERE id = @id_facturacion;
+
+						SET @FacturaRespuesta = '✅ Factura ' + ISNULL(@numInterno, CAST(@id_facturacion AS VARCHAR)) + ' (Zeus ERP N° ' + ISNULL(@resFuente, '') + '-' + ISNULL(@resSerie, '') + '-' + ISNULL(@resConsecutivo, '') + '): Exportada e inyectada correctamente a Zeus ERP.';
 					END
 					ELSE
 					BEGIN
