@@ -424,16 +424,7 @@ CREATE PROCEDURE dbo.spProductListar
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT 
-        pr.[id], 
-        pr.[code], 
-        pr.[type], 
-        pr.[description], 
-        pr.[basePrice], 
-        pr.[cost], 
-        pr.[billingConcept], 
-        pr.[serviceType], 
-        ISNULL(pr.[isActive], 1) AS [isActive]
+    SELECT pr.[id], pr.[code], pr.[type], pr.[description], pr.[basePrice], pr.[cost], ISNULL(pr.[isActive], 1) AS [isActive]
     FROM dbo.[Product] pr
     WHERE (@p_type IS NULL OR pr.[type] = @p_type)
     ORDER BY pr.[description] ASC;
@@ -4809,7 +4800,22 @@ BEGIN
     FROM STRING_SPLIT(@Envoices_id, ',')
     WHERE LTRIM(RTRIM(value)) <> '' AND ISNUMERIC(value) = 1;
 
-    -- 1. PRE-VALIDACIÓN RIGUROSA EN KOREX: Conceptos de Facturación y Clasificación de Servicio
+    -- 1. PRE-VALIDACIÓN 1: Verificar si la factura ya se encuentra exportada en Korex
+    DECLARE @v_err_exported VARCHAR(MAX) = '';
+    SELECT TOP 1 @v_err_exported = 'ERROR: La factura ' + COALESCE(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
+        ' ya se encuentra exportada a Zeus ERP (N° ' + ISNULL(e.fuente,'55') + '-' + ISNULL(e.serie,'33') + '-' + ISNULL(e.consecutivo,'') + ').'
+    FROM dbo.[Invoices] e
+    WHERE e.id IN (SELECT id FROM @idsTable)
+      AND e.state = 'EXPORTED';
+
+    IF @v_err_exported <> ''
+    BEGIN
+        SET @mensaje_resultado = @v_err_exported;
+        SELECT @mensaje_resultado AS mensaje_resultado;
+        RETURN;
+    END
+
+    -- 2. PRE-VALIDACIÓN 2: Conceptos de Facturación y Clasificación de Servicio
     DECLARE @v_err_concept VARCHAR(MAX) = '';
 
     SELECT TOP 1 @v_err_concept = 'ERROR: La factura ' + COALESCE(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
@@ -4850,15 +4856,16 @@ BEGIN
         SET @v_nombre_usuario = 'ADMINISTRADOR';
     END
 
-    -- 2. GENERACIÓN DE ESTRUCTURA COMPLETA XML PARA ZEUS ERP
+    -- 3. GENERACIÓN DE ESTRUCTURA COMPLETA XML PARA ZEUS ERP
+    -- Nota: cd_consecutivo se envía como '' para consumirse dinámicamente desde Zeus ERP
     DECLARE @xmlResult XML;
 
     SET @xmlResult = (
         SELECT 
             e.id AS [id_factura],
-            SUBSTRING(ISNULL(e.fuente, '55'), 1, 2) AS [cd_fuente],
-            SUBSTRING(ISNULL(e.serie, '00'), 1, 2) AS [cd_serie],
-            SUBSTRING(ISNULL(e.consecutivo, RIGHT('00000000' + CAST(e.id AS VARCHAR(8)), 8)), 1, 8) AS [cd_consecutivo],
+            '55' AS [cd_fuente],
+            '33' AS [cd_serie],
+            '' AS [cd_consecutivo],
             @User_id AS [cd_usuario],
             SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
             SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
