@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
                 pool = await getSQLServerConnection();
                 const res = await pool.request().execute('dbo.spProductListar');
                 await pool.close();
-                return NextResponse.json(paginateArray(req, res.recordset || [], (p: any) => [p.code, p.type, p.description]));
+                return NextResponse.json(paginateArray(req, res.recordset || [], (p: any) => [p.code, p.type, p.description, p.billingConcept, p.serviceType]));
             } catch (err: any) {
                 if (pool) await pool.close();
                 throw err;
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
         const results = await prisma.product.findMany({
             orderBy: { id: 'desc' }
         });
-        return NextResponse.json(paginateArray(req, results, p => [p.code, p.type, p.description]))
+        return NextResponse.json(paginateArray(req, results, p => [p.code, p.type, p.description, p.billingConcept, p.serviceType]))
     } catch (error) {
         return NextResponse.json({ message: 'Error retrieving products' }, { status: 500 })
     }
@@ -36,10 +36,13 @@ export async function POST(req: NextRequest) {
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
 
+        const parsedTaxIds = taxIds ? (Array.isArray(taxIds) ? taxIds : JSON.parse(taxIds)) : [];
+
         if (isSQLServerMode()) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                const taxIdsStr = JSON.stringify(parsedTaxIds);
                 const res = await pool.request()
                     .input('code', code || null)
                     .input('type', type || '')
@@ -48,14 +51,26 @@ export async function POST(req: NextRequest) {
                     .input('cost', parseFloat(cost?.toString() || '0'))
                     .input('billingConcept', billingConcept || null)
                     .input('serviceType', serviceType || null)
+                    .input('taxIds', taxIdsStr)
                     .input('isActive', isAct ? 1 : 0)
                     .query(`
-                        INSERT INTO dbo.[Product] ([code], [type], [description], [basePrice], [cost], [billingConcept], [serviceType], [isActive])
+                        INSERT INTO dbo.[Product] ([code], [type], [description], [basePrice], [cost], [billingConcept], [serviceType], [taxIds], [isActive])
                         OUTPUT INSERTED.id
-                        VALUES (@code, @type, @description, @basePrice, @cost, @billingConcept, @serviceType, @isActive)
+                        VALUES (@code, @type, @description, @basePrice, @cost, @billingConcept, @serviceType, @taxIds, @isActive)
                     `);
                 await pool.close();
-                const product = { id: res.recordset[0]?.id, code, type, description, basePrice, cost, isActive: isAct };
+                const product = {
+                    id: res.recordset[0]?.id,
+                    code: code || null,
+                    type,
+                    description,
+                    basePrice: parseFloat(basePrice?.toString() || '0'),
+                    cost: parseFloat(cost?.toString() || '0'),
+                    billingConcept: billingConcept || null,
+                    serviceType: serviceType || null,
+                    taxIds: parsedTaxIds,
+                    isActive: isAct
+                };
                 return NextResponse.json({ message: 'Producto creado', product });
             } catch (err: any) {
                 if (pool) await pool.close();
@@ -76,7 +91,7 @@ export async function POST(req: NextRequest) {
                 classItinerary: classItinerary || null,
                 airlineItinerary: airlineItinerary || null,
                 ticketTypeId: ticketTypeId ? parseInt(ticketTypeId) : null,
-                taxIds: taxIds ? (Array.isArray(taxIds) ? taxIds : JSON.parse(taxIds)) : [],
+                taxIds: parsedTaxIds,
                 isActive: isAct
             } as any
         });
@@ -100,10 +115,13 @@ export async function PUT(req: NextRequest) {
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         const isAct = isActive !== undefined ? isActive : (body.inactive !== undefined ? !body.inactive : true);
 
+        const parsedTaxIds = taxIds ? (Array.isArray(taxIds) ? taxIds : JSON.parse(taxIds)) : [];
+
         if (isSQLServerMode()) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                const taxIdsStr = JSON.stringify(parsedTaxIds);
                 await pool.request()
                     .input('id', parseInt(id))
                     .input('code', code || null)
@@ -113,14 +131,26 @@ export async function PUT(req: NextRequest) {
                     .input('cost', parseFloat(cost?.toString() || '0'))
                     .input('billingConcept', billingConcept || null)
                     .input('serviceType', serviceType || null)
+                    .input('taxIds', taxIdsStr)
                     .input('isActive', isAct ? 1 : 0)
                     .query(`
                         UPDATE dbo.[Product]
-                        SET [code] = @code, [type] = @type, [description] = @description, [basePrice] = @basePrice, [cost] = @cost, [billingConcept] = @billingConcept, [serviceType] = @serviceType, [isActive] = @isActive
+                        SET [code] = @code, [type] = @type, [description] = @description, [basePrice] = @basePrice, [cost] = @cost, [billingConcept] = @billingConcept, [serviceType] = @serviceType, [taxIds] = @taxIds, [isActive] = @isActive
                         WHERE [id] = @id
                     `);
                 await pool.close();
-                const product = { id, code, type, description, basePrice, cost, isActive: isAct };
+                const product = {
+                    id: parseInt(id),
+                    code: code || null,
+                    type,
+                    description,
+                    basePrice: parseFloat(basePrice?.toString() || '0'),
+                    cost: parseFloat(cost?.toString() || '0'),
+                    billingConcept: billingConcept || null,
+                    serviceType: serviceType || null,
+                    taxIds: parsedTaxIds,
+                    isActive: isAct
+                };
                 return NextResponse.json({ message: 'Producto actualizado', product });
             } catch (err: any) {
                 if (pool) await pool.close();
@@ -142,7 +172,7 @@ export async function PUT(req: NextRequest) {
                 classItinerary: classItinerary || null,
                 airlineItinerary: airlineItinerary || null,
                 ticketTypeId: ticketTypeId ? parseInt(ticketTypeId) : null,
-                taxIds: taxIds ? (Array.isArray(taxIds) ? taxIds : JSON.parse(taxIds)) : [],
+                taxIds: parsedTaxIds,
                 isActive: isAct
             } as any
         });

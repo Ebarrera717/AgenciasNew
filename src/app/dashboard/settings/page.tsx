@@ -1181,7 +1181,13 @@ export default function SettingsPage() {
                     try { tIds = JSON.parse(tIds); } catch (e) { tIds = []; }
                 }
                 if (!Array.isArray(tIds)) tIds = [];
-                setFormData({ ...item, mandatoryFields: mandatory, taxIds: tIds })
+                setFormData({
+                    ...item,
+                    billingConcept: item.billingConcept || '',
+                    serviceType: item.serviceType || '',
+                    mandatoryFields: mandatory,
+                    taxIds: tIds
+                })
             } else if (activeTab === 'impuestos') {
                 setFormData({ ...item, orden: item.orden ?? 0 })
             } else {
@@ -1194,7 +1200,7 @@ export default function SettingsPage() {
             } else if (activeTab === 'impuestos') {
                 setFormData({ code: '', name: '', type: 'TAX', valueType: 'PERCENTAGE', value: '', isEditable: true, orden: 0 })
             } else if (activeTab === 'productos') {
-                setFormData({ code: '', type: 'SERVICE', description: '', basePrice: '', cost: '', mandatoryFields: [], taxIds: [] })
+                setFormData({ code: '', type: 'Servicio', description: '', basePrice: '', cost: '', billingConcept: '', serviceType: '', mandatoryFields: [], taxIds: [] })
             } else if (activeTab === 'vendedores' || activeTab === 'tiqueteadores') {
                 setFormData({ code: '', name: '', email: '' })
             } else if (activeTab === 'prestadoras') {
@@ -2027,6 +2033,7 @@ export default function SettingsPage() {
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Tipo</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Descripción</th>
+                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Concepto / Clasif.</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Costo</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Precio Base</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Cargos Asignados</th>
@@ -2370,9 +2377,11 @@ export default function SettingsPage() {
                                     </tr>
                                 ))}
                                 {activeTab === 'productos' && sortAndFilterMasterItems((products || []).filter(item => 
-                                    item.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                    item.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                    item.type?.toLowerCase().includes(searchTerm.toLowerCase())
+                                    (item.description || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                    (item.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    (item.type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    (item.billingConcept || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    (item.serviceType || '').toLowerCase().includes(searchTerm.toLowerCase())
                                 )).map((item: any) => (
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code || '-'}</td>
@@ -2382,6 +2391,12 @@ export default function SettingsPage() {
                                             </span>
                                         </td>
                                         <td className="px-8 py-6 font-bold text-zinc-700 dark:text-zinc-300">{item.description}</td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex flex-col text-xs font-medium">
+                                                <span className="text-zinc-700 dark:text-zinc-300 font-bold">{item.billingConcept || '-'}</span>
+                                                <span className="text-zinc-400 text-[10px]">{item.serviceType ? `Clasif: ${item.serviceType}` : '-'}</span>
+                                            </div>
+                                        </td>
                                         <td className="px-8 py-6 font-medium text-zinc-500">
                                             {item.cost != null ? `$${item.cost.toLocaleString()}` : '-'}
                                         </td>

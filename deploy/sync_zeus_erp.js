@@ -101,47 +101,66 @@ async function syncToZeusERP(silentSuccess = false) {
     }
 
     const config = getSqlServerConfig();
-    let pool = null;
-    let batchCount = 0;
-    let successCount = 0;
+    const dbsToSync = [config.database];
 
-    try {
-        console.log(`  -> Conectando a Zeus ERP [${config.database}] en ${config.server}:${config.port || 1433}...`);
-        pool = await mssql.connect(config);
-        console.log('  -> ¡Conexión con Zeus ERP establecida!');
-
-        const batches = sqlContent
-            .split(/^GO\s*$/mi)
-            .map(b => b.trim())
-            .filter(b => b.length > 0);
-
-        console.log(`  -> Aplicando ${batches.length} lotes de actualización en Zeus ERP...`);
-
-        for (const batch of batches) {
-            batchCount++;
-            try {
-                await pool.request().batch(batch);
-                successCount++;
-            } catch (bErr) {
-                console.warn(`  [WARN Batch #${batchCount}]: ${bErr.message.slice(0, 150)}...`);
-            }
-        }
-
-        const logMsg = `[${new Date().toISOString()}] Sincronización completada: ${successCount}/${batches.length} lotes aplicados exitosamente en Zeus ERP (${config.database} en ${config.server}).\n`;
-        console.log(`  -> ${logMsg.trim()}`);
-        const logFilePath = path.join(rootDir, 'SQL', 'Zeus_Sync.log');
-        fs.appendFileSync(logFilePath, logMsg, 'utf8');
-
-        await pool.close();
-        return true;
-    } catch (err) {
-        const errorLog = `[${new Date().toISOString()}] ERROR CONEXIÓN ZEUS ERP: ${err.message}\n`;
-        console.error(`  ${errorLog.trim()}`);
-        const logFilePath = path.join(rootDir, 'SQL', 'Zeus_Sync.log');
-        fs.appendFileSync(logFilePath, errorLog, 'utf8');
-        if (pool) await pool.close().catch(() => {});
-        return false;
+    // También sincronizar en la BD principal de Korex SQL Server si es diferente a Zeus ERP
+    let envDbName = null;
+    const envUrl = process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL;
+    if (envUrl && (envUrl.startsWith('sqlserver://') || envUrl.startsWith('mssql://'))) {
+        const match = envUrl.match(/database=([^;]+)/i);
+        if (match && match[1]) envDbName = match[1].trim();
     }
+    if (envDbName && !dbsToSync.includes(envDbName)) {
+        dbsToSync.unshift(envDbName);
+    }
+
+    let overallSuccess = true;
+
+    for (const targetDb of dbsToSync) {
+        let pool = null;
+        let batchCount = 0;
+        let successCount = 0;
+
+        try {
+            const dbConfig = { ...config, database: targetDb };
+            console.log(`  -> Conectando a BD SQL Server [${targetDb}] en ${dbConfig.server}:${dbConfig.port || 1433}...`);
+            pool = await mssql.connect(dbConfig);
+            console.log(`  -> ¡Conexión con SQL Server [${targetDb}] establecida!`);
+
+            const batches = sqlContent
+                .split(/^GO\s*$/mi)
+                .map(b => b.trim())
+                .filter(b => b.length > 0);
+
+            console.log(`  -> Aplicando ${batches.length} lotes de actualización en [${targetDb}]...`);
+
+            for (const batch of batches) {
+                batchCount++;
+                try {
+                    await pool.request().batch(batch);
+                    successCount++;
+                } catch (bErr) {
+                    console.warn(`  [WARN Batch #${batchCount} en ${targetDb}]: ${bErr.message.slice(0, 150)}...`);
+                }
+            }
+
+            const logMsg = `[${new Date().toISOString()}] Sincronización completada: ${successCount}/${batches.length} lotes aplicados exitosamente en [${targetDb}] (${dbConfig.server}).\n`;
+            console.log(`  -> ${logMsg.trim()}`);
+            const logFilePath = path.join(rootDir, 'SQL', 'Zeus_Sync.log');
+            fs.appendFileSync(logFilePath, logMsg, 'utf8');
+
+            await pool.close();
+        } catch (err) {
+            const errorLog = `[${new Date().toISOString()}] ERROR CONEXIÓN SQL SERVER [${targetDb}]: ${err.message}\n`;
+            console.error(`  ${errorLog.trim()}`);
+            const logFilePath = path.join(rootDir, 'SQL', 'Zeus_Sync.log');
+            fs.appendFileSync(logFilePath, errorLog, 'utf8');
+            if (pool) await pool.close().catch(() => {});
+            overallSuccess = false;
+        }
+    }
+
+    return overallSuccess;
 }
 
 // Modo Watcher (Observador en tiempo real)
