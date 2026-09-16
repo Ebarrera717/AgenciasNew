@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
                             const consecutivo = match ? match[3] : null;
                             const pool = await getSQLServerConnection();
                             await pool.request().query(
-                                `UPDATE dbo.[Invoices] SET status = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}'` : ''} WHERE id = ${invId}`
+                                `UPDATE dbo.[Invoices] SET [state] = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}'` : ''} WHERE id = ${invId}`
                             );
                             await pool.close();
                         }
