@@ -111,13 +111,27 @@ export async function POST(req: NextRequest) {
                 spResult = [sqlResult];
             }
 
+            const checkItemSuccess = (item: any): boolean => {
+                if (!item) return false;
+                if (item.success === 1 || item.success === true || item.success === '1') return true;
+                if (item.Estado === 0 || item.Estado === '0' || item.estado === 0 || item.estado === '0') return true;
+                const msg = String(item.message || item.Respuesta || item.respuesta || '').trim();
+                if (/^[A-Z0-9]{2}-[A-Z0-9]{2}-?[0-9]{8}/i.test(msg)) return true;
+                return false;
+            };
+
+            const getItemMessage = (item: any): string => {
+                if (!item) return '';
+                return item.message || item.Respuesta || item.respuesta || (typeof item === 'string' ? item : '');
+            };
+
             if (spResult.length > 0) {
-                const hasFailure = spResult.some((item: any) => !(item.success === 1 || item.success === true || item.success === '1'));
+                const hasFailure = spResult.some((item: any) => !checkItemSuccess(item));
                 const formattedMsgs = spResult.map((item: any) => {
-                    const invId = Number(item.invoiceId || item.Factura || item.id || 0);
+                    const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray.length === 1 ? idArray[0] : 0));
                     const invNum = invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : idsStr);
-                    const isOk = item.success === 1 || item.success === true || item.success === '1';
-                    const rawMsg = item.message || '';
+                    const isOk = checkItemSuccess(item);
+                    const rawMsg = getItemMessage(item);
                     const zeusConsec = formatZeusConsecutive(rawMsg);
                     const zeusStr = zeusConsec ? ` (Zeus ERP N° ${zeusConsec})` : '';
                     if (isOk) {
@@ -132,6 +146,7 @@ export async function POST(req: NextRequest) {
                     success = false;
                     sqlServerMsg = formattedMsgs.join(' | ');
                 } else {
+                    success = true;
                     sqlServerMsg = formattedMsgs.join(' | ');
                 }
             } else {
@@ -161,9 +176,9 @@ export async function POST(req: NextRequest) {
 
             // Registrar log detallado por cada factura
             for (const item of spResult) {
-                const invId = item.invoiceId || 0;
-                const itemSuccess = item.success === 1 || item.success === true || item.success === '1';
-                const itemMsg = item.message || '';
+                const invId = item.invoiceId || (idArray.length === 1 ? idArray[0] : 0);
+                const itemSuccess = checkItemSuccess(item);
+                const itemMsg = getItemMessage(item);
                 await registerLog(
                     userId ? Number(userId) : null,
                     'INVOICE_EXPORT_DETAIL',
@@ -178,10 +193,10 @@ export async function POST(req: NextRequest) {
                 console.log(`[EXPORT_API] Actualizando estados de facturas para: ${idsStr}`);
                 if (isSQLServerMode()) {
                     for (const item of spResult) {
-                        const invId = Number(item.invoiceId || 0);
-                        const isOk = item.success === 1 || item.success === true || item.success === '1';
+                        const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray.length === 1 ? idArray[0] : 0));
+                        const isOk = checkItemSuccess(item);
                         if (isOk && invId > 0) {
-                            const rawMsg = item.message || '';
+                            const rawMsg = getItemMessage(item);
                             const match = rawMsg.match(/^([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})/i);
                             const fuente = match ? match[1] : '55';
                             const serie = match ? match[2] : '33';
