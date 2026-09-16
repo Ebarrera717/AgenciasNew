@@ -19,6 +19,12 @@ IF OBJECT_ID('dbo.TipoProveedores', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FR
 GO
 IF OBJECT_ID('dbo.ConceptoFacturacion', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ConceptoFacturacion') AND name = 'id_TiposConceptoFacturacion') ALTER TABLE dbo.ConceptoFacturacion ADD id_TiposConceptoFacturacion INT NULL DEFAULT 2;
 GO
+IF OBJECT_ID('dbo.tiposServicio_asignados', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tiposServicio_asignados') AND name = 'id_TipoServicio') ALTER TABLE dbo.tiposServicio_asignados ADD id_TipoServicio INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tiposServicio_asignados') AND name = 'id_TiposServicios') ALTER TABLE dbo.tiposServicio_asignados ADD id_TiposServicios INT NULL;
+END;
+GO
 IF OBJECT_ID('dbo.VariableDefinicionMaestro', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicionMaestro') AND name = 'IDEN') ALTER TABLE dbo.VariableDefinicionMaestro ADD IDEN INT NULL;

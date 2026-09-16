@@ -1185,8 +1185,17 @@ BEGIN
     CREATE TABLE dbo.[tiposServicio_asignados] (
         [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [id_ConceptoFacturacion] INT NULL,
+        [id_TipoServicio] INT NULL,
         [id_TiposServicios] INT NULL
     );
+END;
+
+IF OBJECT_ID('dbo.tiposServicio_asignados', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tiposServicio_asignados') AND name = 'id_TipoServicio') 
+        ALTER TABLE dbo.tiposServicio_asignados ADD id_TipoServicio INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.tiposServicio_asignados') AND name = 'id_TiposServicios') 
+        ALTER TABLE dbo.tiposServicio_asignados ADD id_TiposServicios INT NULL;
 END;
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TipoProveedores' AND schema_id = SCHEMA_ID('dbo'))
