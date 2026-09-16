@@ -76,47 +76,71 @@ BEGIN
 
     v_resolution_id := NULLIF(p_data->>'resolutionId', '')::INT;
 
-    v_internal_number := 'INV-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 1000)::text;
+    v_internal_number := NULL;
 
     v_fuente := NULLIF(p_data->>'fuente', '');
     v_serie := NULLIF(p_data->>'serie', '');
     v_consecutivo := NULLIF(p_data->>'consecutivo', '');
 
-    -- Lógica de asignación de consecutivo automático desde SysConsecutivo si consecutivo es nulo o vacío
+    -- Lógica de asignación de consecutivo automático desde TransactionConsecutive / SysConsecutivo
     IF v_consecutivo IS NULL THEN
-        v_billing_code := COALESCE(
-            NULLIF(p_data->>'codigo', ''), 
-            NULLIF(p_data->>'codigoFacturacion', ''), 
-            NULLIF(p_data->>'billingCode', ''), 
-            v_fuente, 
-            'FACT'
-        );
-
-        SELECT id, NULLIF(fuente, ''), NULLIF(serie, '') 
-        INTO v_consec_id, v_fuente, v_serie
-        FROM public."SysConsecutivo"
-        WHERE LOWER(codigo) = LOWER(v_billing_code)
-           OR (v_branch_id IS NOT NULL AND "branchId" = v_branch_id AND ("implantId" IS NULL OR "implantId" = v_implant_id))
+        SELECT id, NULLIF(NULLIF(TRIM(prefix), '-'), ''), COALESCE("currentNumber", COALESCE("initialNumber", 1)), COALESCE(padding, 4)
+        INTO v_consec_id, v_serie_val, v_consec_num, v_decimals
+        FROM public."TransactionConsecutive"
+        WHERE UPPER("transactionType") IN ('INVOICE', 'FACTURA', 'FACTURACION')
+          AND "isActive" = true
+          AND (v_branch_id IS NULL OR "branchId" = v_branch_id)
+          AND (v_implant_id IS NULL OR "implantId" = v_implant_id)
         ORDER BY 
-            (CASE WHEN LOWER(codigo) = LOWER(v_billing_code) THEN 1 ELSE 2 END),
             (CASE WHEN "implantId" IS NOT NULL THEN 1 WHEN "branchId" IS NOT NULL THEN 2 ELSE 3 END),
             id DESC
         LIMIT 1;
 
         IF v_consec_id IS NOT NULL THEN
-            UPDATE public."SysConsecutivo"
-            SET consecutivo = consecutivo + 1,
+            v_consecutivo := LPAD(v_consec_num::TEXT, v_decimals, '0');
+            IF v_serie IS NULL AND v_serie_val IS NOT NULL THEN
+                v_serie := v_serie_val;
+            END IF;
+
+            UPDATE public."TransactionConsecutive"
+            SET "currentNumber" = "currentNumber" + 1,
                 "updatedAt" = CURRENT_TIMESTAMP
-            WHERE id = v_consec_id
-            RETURNING consecutivo INTO v_next_num;
-
-            v_consecutivo := LPAD(v_next_num::TEXT, 8, '0');
+            WHERE id = v_consec_id;
         ELSE
-            SELECT COALESCE(MAX(consecutivo::BIGINT), 0) + 1 INTO v_next_num 
-            FROM public."Invoices" 
-            WHERE consecutivo ~ '^[0-9]+$';
+            v_billing_code := COALESCE(
+                NULLIF(p_data->>'codigo', ''), 
+                NULLIF(p_data->>'codigoFacturacion', ''), 
+                NULLIF(p_data->>'billingCode', ''), 
+                v_fuente, 
+                'FACT'
+            );
 
-            v_consecutivo := LPAD(v_next_num::TEXT, 8, '0');
+            SELECT id, NULLIF(fuente, ''), NULLIF(serie, '') 
+            INTO v_consec_id, v_fuente, v_serie
+            FROM public."SysConsecutivo"
+            WHERE LOWER(codigo) = LOWER(v_billing_code)
+               OR (v_branch_id IS NOT NULL AND "branchId" = v_branch_id AND ("implantId" IS NULL OR "implantId" = v_implant_id))
+            ORDER BY 
+                (CASE WHEN LOWER(codigo) = LOWER(v_billing_code) THEN 1 ELSE 2 END),
+                (CASE WHEN "implantId" IS NOT NULL THEN 1 WHEN "branchId" IS NOT NULL THEN 2 ELSE 3 END),
+                id DESC
+            LIMIT 1;
+
+            IF v_consec_id IS NOT NULL THEN
+                UPDATE public."SysConsecutivo"
+                SET consecutivo = consecutivo + 1,
+                    "updatedAt" = CURRENT_TIMESTAMP
+                WHERE id = v_consec_id
+                RETURNING consecutivo INTO v_next_num;
+
+                v_consecutivo := LPAD(v_next_num::TEXT, 8, '0');
+            ELSE
+                SELECT COALESCE(MAX(consecutivo::BIGINT), 0) + 1 INTO v_next_num 
+                FROM public."Invoices" 
+                WHERE consecutivo ~ '^[0-9]+$';
+
+                v_consecutivo := LPAD(v_next_num::TEXT, 8, '0');
+            END IF;
         END IF;
     END IF;
 
@@ -464,14 +488,24 @@ BEGIN
 
         END LOOP;
 
-        -- Calcular y actualizar el totalAmount basado en impuestos si aplica
+        -- Calcular y actualizar el totalAmount basado en productos, impuestos y cargos
         UPDATE public."Invoices"
-        SET "totalAmount" = ROUND((COALESCE("chargesAndTaxes", 0) + (
-            SELECT COALESCE(SUM(ipt."explicitAmount"), 0)
-            FROM public."InvoicesProductTax" ipt
-            JOIN public."InvoicesProduct" ip ON ipt."invoiceProductId" = ip.id
-            WHERE ip."invoiceId" = v_invoice_id
-        ))::numeric, v_decimals)::double precision
+        SET "totalAmount" = ROUND(
+            (
+                COALESCE((
+                    SELECT SUM(COALESCE(ip."totalPrice", ip."price" * ip."quantity", 0))
+                    FROM public."InvoicesProduct" ip
+                    WHERE ip."invoiceId" = v_invoice_id
+                ), 0)
+                + COALESCE("chargesAndTaxes", 0)
+                + COALESCE((
+                    SELECT SUM(ipt."explicitAmount")
+                    FROM public."InvoicesProductTax" ipt
+                    JOIN public."InvoicesProduct" ip ON ipt."invoiceProductId" = ip.id
+                    WHERE ip."invoiceId" = v_invoice_id
+                ), 0)
+            )::numeric, v_decimals
+        )::double precision
         WHERE id = v_invoice_id;
 
         p_invoice_id := v_invoice_id;

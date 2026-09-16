@@ -131,14 +131,14 @@ BEGIN
             v_cols := string_to_array(v_row_text, '^');
 
             -- Validar formato de Check-In (Acepta YYYY-MM-DD y opcionalmente YYYY-MM-DD HH:MM:SS)
-            IF TRIM(v_cols[20]) <> '' AND TRIM(v_cols[20]) !~ '^\d{4}-\d{2}-\d{2}' THEN
-                p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ': Formato incorrecto en la fecha de Check-In. Se esperaba YYYY-MM-DD. Valor: ' || TRIM(v_cols[20]);
+            IF TRIM(v_cols[20]) <> '' AND REPLACE(TRIM(v_cols[20]), '/', '-') !~ '^\d{4}-\d{2}-\d{2}' THEN
+                p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Columna [CheckIn]): Formato de fecha incorrecto. Valor recibido: "' || TRIM(v_cols[20]) || '". Ejemplo de formato correcto: 2026-10-01 (o 2026/10/01)';
                 RETURN;
             END IF;
 
             -- Validar formato de Check-Out (Acepta YYYY-MM-DD y opcionalmente YYYY-MM-DD HH:MM:SS)
-            IF TRIM(v_cols[21]) <> '' AND TRIM(v_cols[21]) !~ '^\d{4}-\d{2}-\d{2}' THEN
-                p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ': Formato incorrecto en la fecha de Check-Out. Se esperaba YYYY-MM-DD. Valor: ' || TRIM(v_cols[21]);
+            IF TRIM(v_cols[21]) <> '' AND REPLACE(TRIM(v_cols[21]), '/', '-') !~ '^\d{4}-\d{2}-\d{2}' THEN
+                p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Columna [CheckOut]): Formato de fecha incorrecto. Valor recibido: "' || TRIM(v_cols[21]) || '". Ejemplo de formato correcto: 2026-10-10 (o 2026/10/10)';
                 RETURN;
             END IF;
             
@@ -159,31 +159,31 @@ BEGIN
                 TRIM(v_cols[5]), -- vendedor_cd
                 TRIM(v_cols[6]), -- tiqueteador_cd
                 TRIM(v_cols[7]), -- moneda
-                NULLIF(TRIM(v_cols[8]), '')::DECIMAL, -- tasa_cambio
-                NULLIF(TRIM(v_cols[9]), '')::DECIMAL, -- comision_global
-                NULLIF(TRIM(v_cols[10]), '')::DECIMAL, -- cargos_global
+                CASE WHEN TRIM(v_cols[8]) = '' THEN NULL WHEN POSITION(':' IN v_cols[8]) > 0 THEN NULLIF(REGEXP_REPLACE(SPLIT_PART(TRIM(v_cols[8]), ':', 2), '[^0-9.-]', '', 'g'), '')::DECIMAL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[8]), '[^0-9.-]', '', 'g'), '')::DECIMAL END, -- tasa_cambio
+                CASE WHEN TRIM(v_cols[9]) = '' THEN NULL WHEN POSITION(':' IN v_cols[9]) > 0 THEN NULLIF(REGEXP_REPLACE(SPLIT_PART(TRIM(v_cols[9]), ':', 2), '[^0-9.-]', '', 'g'), '')::DECIMAL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[9]), '[^0-9.-]', '', 'g'), '')::DECIMAL END, -- comision_global
+                CASE WHEN TRIM(v_cols[10]) = '' THEN NULL WHEN POSITION(':' IN v_cols[10]) > 0 THEN NULLIF(REGEXP_REPLACE(SPLIT_PART(TRIM(v_cols[10]), ':', 2), '[^0-9.-]', '', 'g'), '')::DECIMAL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[10]), '[^0-9.-]', '', 'g'), '')::DECIMAL END, -- cargos_global
                 TRIM(v_cols[11]), -- Producto Codigo
                 TRIM(v_cols[12]), -- Prov Nombre
                 TRIM(v_cols[13]), -- Prov Codigo
                 TRIM(v_cols[14]), -- Prestadora Codigo
-                TRIM(v_cols[15]), -- Impuestos
+                COALESCE(NULLIF(TRIM(v_cols[15]), ''), CASE WHEN POSITION(':' IN v_cols[10]) > 0 THEN TRIM(v_cols[10]) ELSE '' END), -- Impuestos
                 TRIM(v_cols[16]), -- Variables
                 TRIM(v_cols[17]), -- Pasajeros
-                NULLIF(TRIM(v_cols[18]), '')::DECIMAL, -- precio
-                NULLIF(TRIM(v_cols[19]), '')::INT, -- cantidad
-                CASE WHEN TRIM(v_cols[20]) <> '' THEN TRIM(v_cols[20])::TIMESTAMP ELSE NULL END, -- check_in
-                CASE WHEN TRIM(v_cols[21]) <> '' THEN TRIM(v_cols[21])::TIMESTAMP ELSE NULL END, -- check_out
-                NULLIF(TRIM(v_cols[22]), '')::INT, -- pax_adultos
-                NULLIF(TRIM(v_cols[23]), '')::INT, -- pax_ninos
+                CASE WHEN TRIM(v_cols[18]) = '' THEN NULL WHEN POSITION(':' IN v_cols[18]) > 0 THEN NULLIF(REGEXP_REPLACE(SPLIT_PART(TRIM(v_cols[18]), ':', 2), '[^0-9.-]', '', 'g'), '')::DECIMAL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[18]), '[^0-9.-]', '', 'g'), '')::DECIMAL END, -- precio
+                CASE WHEN TRIM(v_cols[19]) = '' THEN NULL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[19]), '[^0-9]', '', 'g'), '')::INT END, -- cantidad
+                CASE WHEN TRIM(v_cols[20]) <> '' THEN REPLACE(TRIM(v_cols[20]), '/', '-')::TIMESTAMP ELSE NULL END, -- check_in
+                CASE WHEN TRIM(v_cols[21]) <> '' THEN REPLACE(TRIM(v_cols[21]), '/', '-')::TIMESTAMP ELSE NULL END, -- check_out
+                CASE WHEN TRIM(v_cols[22]) = '' THEN NULL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[22]), '[^0-9]', '', 'g'), '')::INT END, -- pax_adultos
+                CASE WHEN TRIM(v_cols[23]) = '' THEN NULL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[23]), '[^0-9]', '', 'g'), '')::INT END, -- pax_ninos
                 TRIM(v_cols[24]), -- destino
                 TRIM(v_cols[25]), -- tipo_servicio
                 TRIM(v_cols[26]), -- reserva 
-                NULLIF(TRIM(v_cols[27]), '')::DECIMAL, -- comision vendedor
-                NULLIF(TRIM(v_cols[28]), '')::DECIMAL, -- comision tiqueteador
+                CASE WHEN TRIM(v_cols[27]) = '' THEN NULL WHEN POSITION(':' IN v_cols[27]) > 0 THEN NULLIF(REGEXP_REPLACE(SPLIT_PART(TRIM(v_cols[27]), ':', 2), '[^0-9.-]', '', 'g'), '')::DECIMAL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[27]), '[^0-9.-]', '', 'g'), '')::DECIMAL END, -- comision vendedor
+                CASE WHEN TRIM(v_cols[28]) = '' THEN NULL WHEN POSITION(':' IN v_cols[28]) > 0 THEN NULLIF(REGEXP_REPLACE(SPLIT_PART(TRIM(v_cols[28]), ':', 2), '[^0-9.-]', '', 'g'), '')::DECIMAL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[28]), '[^0-9.-]', '', 'g'), '')::DECIMAL END, -- comision tiqueteador
                 TRIM(v_cols[29]), -- codigo combos
-                COALESCE(NULLIF(TRIM(v_cols[30]), '')::INT, 1), -- nacionalidad
+                COALESCE(NULLIF(REGEXP_REPLACE(TRIM(v_cols[30]), '[^0-9]', '', 'g'), '')::INT, 1), -- nacionalidad
                 TRIM(v_cols[31]), -- cargo_principal_cd
-                NULLIF(TRIM(v_cols[32]), '')::DECIMAL, -- costo
+                CASE WHEN TRIM(v_cols[32]) = '' THEN NULL WHEN POSITION(':' IN v_cols[32]) > 0 THEN NULLIF(REGEXP_REPLACE(SPLIT_PART(TRIM(v_cols[32]), ':', 2), '[^0-9.-]', '', 'g'), '')::DECIMAL ELSE NULLIF(REGEXP_REPLACE(TRIM(v_cols[32]), '[^0-9.-]', '', 'g'), '')::DECIMAL END, -- costo
                 TRIM(v_cols[33]), -- servicios
                 TRIM(v_cols[34]), -- descripcion
                 TRIM(v_cols[35]), -- itinerary
@@ -197,8 +197,36 @@ BEGIN
                 TRIM(v_cols[43])   -- consecutivo
             );
         EXCEPTION WHEN OTHERS THEN
-            p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ': ' || SQLERRM || ' (Valor: ' || v_row_text || ')';
-            RETURN;
+            DECLARE
+                v_err_col TEXT := '';
+                v_example TEXT := '';
+            BEGIN
+                IF SQLERRM LIKE '%numeric%' OR SQLERRM LIKE '%numérico%' THEN
+                    IF TRIM(v_cols[8]) <> '' AND TRIM(v_cols[8]) !~ '^-?\d+(\.\d+)?$' THEN 
+                        v_err_col := ' (Columna [Tasa_Cambio])'; v_example := '. Ejemplo de formato correcto: 4000 o 1';
+                    ELSIF TRIM(v_cols[9]) <> '' AND TRIM(v_cols[9]) !~ '^-?\d+(\.\d+)?$' THEN 
+                        v_err_col := ' (Columna [Comision_Global_Pct])'; v_example := '. Ejemplo de formato correcto: 10 o 0';
+                    ELSIF TRIM(v_cols[10]) <> '' AND TRIM(v_cols[10]) !~ '^-?\d+(\.\d+)?$' THEN 
+                        v_err_col := ' (Columna [Cargos_A_Factura])'; v_example := '. Ejemplo de formato correcto: 20000 o TAR:20000';
+                    ELSIF TRIM(v_cols[18]) <> '' AND TRIM(v_cols[18]) !~ '^-?\d+(\.\d+)?$' THEN 
+                        v_err_col := ' (Columna [Precio_Unitario])'; v_example := '. Ejemplo de formato correcto: 100000 o 100000.50';
+                    ELSIF TRIM(v_cols[19]) <> '' AND TRIM(v_cols[19]) !~ '^\d+$' THEN 
+                        v_err_col := ' (Columna [Cantidad])'; v_example := '. Ejemplo de formato correcto: 1 o 2';
+                    ELSIF TRIM(v_cols[22]) <> '' AND TRIM(v_cols[22]) !~ '^\d+$' THEN 
+                        v_err_col := ' (Columna [Pax_Adultos])'; v_example := '. Ejemplo de formato correcto: 1 o 2';
+                    ELSIF TRIM(v_cols[23]) <> '' AND TRIM(v_cols[23]) !~ '^\d+$' THEN 
+                        v_err_col := ' (Columna [Pax_Ninos])'; v_example := '. Ejemplo de formato correcto: 0 o 1';
+                    ELSIF TRIM(v_cols[27]) <> '' AND TRIM(v_cols[27]) !~ '^-?\d+(\.\d+)?$' THEN 
+                        v_err_col := ' (Columna [Comision_Vendedor_Producto])'; v_example := '. Ejemplo de formato correcto: 5.0 o 0';
+                    ELSIF TRIM(v_cols[28]) <> '' AND TRIM(v_cols[28]) !~ '^-?\d+(\.\d+)?$' THEN 
+                        v_err_col := ' (Columna [Comision_Tiqueteador_Producto])'; v_example := '. Ejemplo de formato correcto: 2.0 o 0';
+                    ELSIF TRIM(v_cols[32]) <> '' AND TRIM(v_cols[32]) !~ '^-?\d+(\.\d+)?$' THEN 
+                        v_err_col := ' (Columna [Costo])'; v_example := '. Ejemplo de formato correcto: 80000 u 80000.0';
+                    END IF;
+                END IF;
+                p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || v_err_col || ': ' || SQLERRM || v_example || ' (Valor: ' || v_row_text || ')';
+                RETURN;
+            END;
         END;
     END LOOP;
 
@@ -224,15 +252,19 @@ BEGIN
         GROUP BY grupo
     ) LOOP
         -- Resolución de Maestros
-        SELECT id INTO v_client_id FROM public."Client" WHERE document = v_invoice_record.cliente_doc;
+        SELECT id INTO v_client_id FROM public."Client" WHERE document = v_invoice_record.cliente_doc OR LOWER(code) = LOWER(v_invoice_record.cliente_doc);
         IF v_client_id IS NULL THEN 
-            p_mensaje_resultado := 'ERROR: Cliente con documento o código "' || v_invoice_record.cliente_doc || '" no encontrado en el sistema.';
+            IF EXISTS (SELECT 1 FROM public."Provider" WHERE document = v_invoice_record.cliente_doc OR LOWER(code) = LOWER(v_invoice_record.cliente_doc) OR LOWER(name) = LOWER(v_invoice_record.cliente_doc)) THEN
+                p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Columna [Cliente_Documento]): El valor "' || v_invoice_record.cliente_doc || '" corresponde a un PROVEEDOR (ej: NIT Avianca/Aerolínea), no a un Cliente. Por favor especifique un documento o código de Cliente en esta columna (ej: 79898456 o CLI-001).';
+            ELSE
+                p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Columna [Cliente_Documento]): Cliente con documento o código "' || v_invoice_record.cliente_doc || '" no encontrado en el sistema. Ejemplo de valor correcto: Cédula o NIT registrado en Maestros -> Clientes (ej: 79898456 o CLI-001)';
+            END IF;
             RETURN;
         END IF;
 
         SELECT id INTO v_branch_id FROM public."Branch" WHERE LOWER(code) = LOWER(v_invoice_record.sucursal_cd);
         IF v_branch_id IS NULL THEN 
-            p_mensaje_resultado := 'ERROR: Sucursal con código "' || v_invoice_record.sucursal_cd || '" no encontrada en el sistema.';
+            p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Columna [Sucursal_Codigo]): Sucursal con código "' || v_invoice_record.sucursal_cd || '" no encontrada en el sistema. Ejemplo de valor correcto: Código registrado en Maestros -> Sucursales (ej: BOG01 o MED01)';
             RETURN;
         END IF;
 
@@ -240,10 +272,17 @@ BEGIN
         SELECT id INTO v_seller_id FROM public."Seller" WHERE LOWER(code) = LOWER(v_invoice_record.vendedor_cd);
         SELECT id INTO v_ticket_printer_id FROM public."TicketPrinter" WHERE LOWER(code) = LOWER(v_invoice_record.tiqueteador_cd);
 
-        -- Obtener decimales de la moneda
-        v_decimals := public.fn_obtener_decimales_moneda(COALESCE(v_invoice_record.moneda, 'COP'));
+        -- Asignar número consecutivo interno
+        IF v_invoice_record.consecutivo IS NOT NULL AND TRIM(v_invoice_record.consecutivo) <> '' THEN
+            v_internal_number := COALESCE(NULLIF(TRIM(COALESCE(v_invoice_record.serie, '') || '-' || v_invoice_record.consecutivo), '-'), v_invoice_record.consecutivo);
+        ELSE
+            SELECT x.v_consec_json->>'formattedConsecutive' INTO v_internal_number
+            FROM (SELECT public."fnObtenerSiguienteConsecutivo"('INVOICE', v_branch_id, v_implant_id) AS v_consec_json) x;
 
-        v_internal_number := 'INV-SP-' || to_char(now(), 'YYYYMMDD') || '-' || floor(random() * 10000)::TEXT;
+            IF v_internal_number IS NULL OR v_internal_number = '' THEN
+                v_internal_number := 'FAC-' || to_char(now(), 'YYYYMMDD') || '-' || floor(random() * 10000)::TEXT;
+            END IF;
+        END IF;
 
         INSERT INTO public."Invoices" (
             "internalNumber", "date", "clientId", "currency", "exchangeRate", 
@@ -258,7 +297,7 @@ BEGIN
             v_invoice_record.fuente, v_invoice_record.serie, v_invoice_record.consecutivo
         ) RETURNING id INTO v_invoice_id;
 
-        v_created_ids := v_created_ids || v_invoice_id || ',';
+        v_created_ids := v_created_ids || v_internal_number || ', ';
 
         v_total_amount := COALESCE(v_invoice_record.cargos_global, 0);
 
@@ -548,7 +587,7 @@ BEGIN
         v_imported_count := v_imported_count + 1;
     END LOOP;
 
-    p_mensaje_resultado := 'SUCCESS: ' || v_imported_count || ' facturas importadas. [' || RTRIM(v_created_ids, ',') || ']';
+    p_mensaje_resultado := 'SUCCESS: ' || v_imported_count || ' facturas importadas. [' || RTRIM(v_created_ids, ', ') || ']';
 
 EXCEPTION
     WHEN OTHERS THEN

@@ -163,3 +163,16 @@ CLIENTE - INSTALADOR SQL SERVER
    - Al eliminar registros en SPs (`sp...Eliminar`), se valida si la tabla quedó vacía (`IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])`). De ser así, se ejecuta `DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);` en SQL Server y se reinicia la secuencia en PostgreSQL para garantizar que el siguiente registro inicie en **ID #1**.
 4. **Resiliencia de DDL y Defectos Numéricos**:
    - Todos los campos numéricos en DDL T-SQL (`01_Tables.sql`) deben declarar `FLOAT NULL CONSTRAINT DF_... DEFAULT 0` e `INT NULL` en llaves foráneas optativas.
+
+---
+
+## 12. Regla Crítica de Aislamiento de Motores y Protección Absoluta de Bases de Datos
+
+1. **Aislamiento Estricto de Motor Activo**:
+   - Cuando el sistema opera en un motor seleccionado (`isSQLServerMode()`), el 100% de las operaciones, transacciones, SPs, mutaciones, consultas y reportes DEBEN ejecutarse exclusivamente en ese motor activo.
+   - Queda **estrictamente PROHIBIDO** conectarse, consultar, modificar, inyectar o alterar el motor que no se encuentra activo (siguiendo el Skill [`motor-engine-isolation`](file:///f:/Proyectos/AgenciasNew/.agents/skills/motor-engine-isolation/SKILL.md)).
+
+2. **Protección Absoluta Contra Operaciones Destructivas**:
+   - Queda estrictamente **PROHIBIDO** ejecutar `DROP DATABASE`, `DROP SCHEMA`, `DROP TABLE` con datos existentes, `TRUNCATE` masivo o scripts de reinicialización destructivos sobre la **Base Principal de Korex (`.env`)** o sobre la **Base Externa Protegida (`ZeusAgencias_23`)**.
+   - Todo cambio de esquema o migración debe ser incremental y no destructivo (`ALTER TABLE`, `ADD COLUMN`, `CREATE INDEX`, `CREATE PROCEDURE`, `CREATE FUNCTION`), preservando el 100% de la información operativa existente (siguiendo las directivas del Skill [`db-protection-security`](file:///f:/Proyectos/AgenciasNew/.agents/skills/db-protection-security/SKILL.md)).
+

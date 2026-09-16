@@ -34,21 +34,28 @@ export default function ExcelImportInvoices({ onImportSuccess }: { onImportSucce
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-User-Id': loggedUser.id?.toString() || ''
+                        'X-User-Id': loggedUser.id?.toString() || '',
+                        'X-Origin': 'EXCEL'
                     },
                     body: JSON.stringify(data)
                 })
 
+                const resText = await res.text();
+                let result: any = {};
+                try {
+                    result = JSON.parse(resText);
+                } catch {
+                    result = { message: resText || `Error HTTP ${res.status}` };
+                }
+
                 if (res.ok) {
-                    const result = await res.json();
-                    const successMsg = result.detail || `Se importaron ${result.importedCount} facturas exitosamente.`;
+                    const successMsg = result.detail || `Se importaron ${result.importedCount || 0} facturas exitosamente.`;
                     
                     setStatus({ type: 'success', message: successMsg })
                     if (fileInputRef.current) fileInputRef.current.value = ''
                     if (onImportSuccess) onImportSuccess()
                 } else {
-                    const error = await res.json();
-                    const errorMsg = error.detail || error.message || 'Error al procesar el archivo Excel.';
+                    const errorMsg = result.detail || result.error || result.message || `Error HTTP ${res.status}: ${resText.substring(0, 200)}`;
                     setStatus({ type: 'error', message: errorMsg })
                 }
             } catch (err: any) {

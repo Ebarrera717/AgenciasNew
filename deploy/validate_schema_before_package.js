@@ -604,6 +604,15 @@ async function validateAndPrepareSchema(customConnStr) {
   }
   console.log("  [OK] Sincronización de actualizadores finalizada.");
 
+  // 4.5 Sincronización autónoma con Zeus ERP si SQL Server está configurado
+  console.log("\n[PASO 4.5/5] Sincronización autónoma con la base de datos de Zeus ERP...");
+  try {
+    const { syncToZeusERP } = require('./sync_zeus_erp');
+    await syncToZeusERP(true);
+  } catch (zErr) {
+    console.warn("  [NOTE] Sincronización Zeus ERP omitida o servidor no alcanzable:", zErr.message);
+  }
+
   await client.end();
   console.log("\n================================================================");
   console.log("  VALIDACION EXITOSA: La base de datos está lista para empaquetar.");

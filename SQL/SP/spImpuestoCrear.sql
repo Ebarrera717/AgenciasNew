@@ -29,6 +29,13 @@ CREATE OR REPLACE PROCEDURE public.spImpuestoCrear(
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    IF p_code IS NOT NULL AND TRIM(p_code) <> '' THEN
+        IF EXISTS (SELECT 1 FROM public."ChargeAndTax" WHERE LOWER("code") = LOWER(TRIM(p_code))) THEN
+            p_mensaje_resultado := 'ERROR: Ya existe un cargo o impuesto registrado con el código ' || quote_literal(p_code);
+            RETURN;
+        END IF;
+    END IF;
+
     INSERT INTO public."ChargeAndTax" ("code", "name", "type", "valueType", "value", "isEditable", "orden", "productIds", "targetTaxId", "isActive")
     VALUES (p_code, p_name, p_type, p_value_type, p_value, p_is_editable, COALESCE(p_orden, 0), COALESCE(p_product_ids, '[]'::jsonb), p_target_tax_id, COALESCE(p_is_active, true))
     RETURNING id INTO p_tax_id;

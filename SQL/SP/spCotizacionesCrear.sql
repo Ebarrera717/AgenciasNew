@@ -12,6 +12,40 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
+    IF OBJECT_ID('dbo.ImpRet', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.ImpRet (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL,
+            cd_cuenta VARCHAR(20) NULL,
+            am_porcentaje NUMERIC(5,2) NULL DEFAULT 0,
+            in_tipo CHAR(1) NULL DEFAULT 'I',
+            Id_cargo_dep INT NULL,
+            bl_IVA BIT NULL DEFAULT 0
+        );
+        IF NOT EXISTS (SELECT 1 FROM dbo.ImpRet WHERE id = 1)
+        BEGIN
+            SET IDENTITY_INSERT dbo.ImpRet ON;
+            INSERT INTO dbo.ImpRet (id, cd_codigo, ds_nombre, cd_cuenta, am_porcentaje, in_tipo, bl_IVA)
+            VALUES (1, '01', 'IVA 19%', '240805', 19.00, 'I', 1);
+            SET IDENTITY_INSERT dbo.ImpRet OFF;
+        END
+    END
+    ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo')
+    BEGIN
+        ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+    END;
+
+    IF OBJECT_ID('dbo.CargosDesc', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.CargosDesc (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL
+        );
+    END;
+
     BEGIN TRY
         DECLARE @xmlData XML;
 

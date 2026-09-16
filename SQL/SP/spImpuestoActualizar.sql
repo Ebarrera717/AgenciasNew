@@ -29,6 +29,13 @@ CREATE OR REPLACE PROCEDURE public.spImpuestoActualizar(
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    IF p_code IS NOT NULL AND TRIM(p_code) <> '' THEN
+        IF EXISTS (SELECT 1 FROM public."ChargeAndTax" WHERE LOWER("code") = LOWER(TRIM(p_code)) AND id <> p_id) THEN
+            p_mensaje_resultado := 'ERROR: Ya existe otro cargo o impuesto registrado con el código ' || quote_literal(p_code);
+            RETURN;
+        END IF;
+    END IF;
+
     UPDATE public."ChargeAndTax" SET
         "code" = p_code,
         "name" = p_name,

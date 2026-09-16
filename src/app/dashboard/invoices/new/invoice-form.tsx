@@ -542,14 +542,14 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
     
     const getItemTotal = (item: any) => {
         const base = (item.price * item.quantity) || 0;
-        const mainTaxIdNum = item.mainTaxId != null ? Number(item.mainTaxId) : null;
+        const mainTaxIdNum = item.mainTaxId != null ? Number(item.mainTaxId) : (item.appliedTaxes?.[0]?.chargeAndTaxId != null ? Number(item.appliedTaxes[0].chargeAndTaxId) : null);
         const secondaryTaxes = (item.appliedTaxes || [])
             .filter((t: any) => {
                 const rawTaxId = t.id ?? t.chargeAndTaxId;
                 const taxId = rawTaxId != null ? Number(rawTaxId) : null;
-                return taxId !== mainTaxIdNum;
+                return taxId !== mainTaxIdNum && !t.isMain;
             })
-            .reduce((acc: number, t: any) => acc + (t.amount || 0), 0);
+            .reduce((acc: number, t: any) => acc + (t.amount || t.explicitAmount || 0), 0);
         return base + secondaryTaxes;
     };
 

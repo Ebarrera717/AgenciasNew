@@ -24,10 +24,22 @@ export async function GET() {
                     document: r.clientDocument || ''
                 },
                 clientName: r.clientName || 'Consumidor Final',
-                totalAmount: r.totalAmount || 0,
+                totalAmount: Number(r.totalAmount) || 0,
                 currency: r.currency || 'COP',
                 state: r.state || 'NUEVO',
-                products: []
+                paxName: r.paxName,
+                providerName: r.providerName,
+                checkInDate: r.checkInDate,
+                checkOutDate: r.checkOutDate,
+                products: [
+                    {
+                        passengerName: r.paxName,
+                        checkInDate: r.checkInDate,
+                        checkOutDate: r.checkOutDate,
+                        prestadora: { name: r.providerName || 'Varios/Ninguno' },
+                        passengers: r.paxName ? [{ name: r.paxName }] : []
+                    }
+                ]
             }));
 
             return NextResponse.json(invoices);

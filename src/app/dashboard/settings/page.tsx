@@ -828,27 +828,28 @@ export default function SettingsPage() {
     }
 
     const fetchLookupData = async (tab: Tab) => {
+        const safeFetch = (url: string) => fetch(url).then(res => (res.ok ? res.json() : [])).catch(() => []);
         try {
             if (tab === 'aeropuertos') {
-                const res = await fetch('/api/config/cities').then(res => res.json());
+                const res = await safeFetch('/api/config/cities');
                 setCities(Array.isArray(res) ? res : []);
             } else if (tab === 'prestadoras' || tab === 'proveedores') {
                 const [pRes, ptRes] = await Promise.all([
-                    fetch('/api/providers').then(res => res.json()),
-                    fetch('/api/provider-types').then(res => res.json())
+                    safeFetch('/api/providers'),
+                    safeFetch('/api/provider-types')
                 ]);
                 setProviders(Array.isArray(pRes) ? pRes : []);
                 setProviderTypes(Array.isArray(ptRes) ? ptRes : []);
             } else if (tab === 'ciudades') {
-                const res = await fetch('/api/config/countries').then(res => res.json());
+                const res = await safeFetch('/api/config/countries');
                 setCountries(Array.isArray(res) ? res : []);
             } else if (tab === 'paises') {
-                const res = await fetch('/api/config/currencies').then(res => res.json());
+                const res = await safeFetch('/api/config/currencies');
                 setCurrencies(Array.isArray(res) ? res : []);
             } else if (tab === 'productos') {
                 const [ttRes, taxRes] = await Promise.all([
-                    fetch('/api/config/ticket-types').then(res => res.json()).catch(() => []),
-                    fetch('/api/config/taxes').then(res => res.json()).catch(() => [])
+                    safeFetch('/api/config/ticket-types'),
+                    safeFetch('/api/config/taxes')
                 ]);
                 setTicketTypes(Array.isArray(ttRes) ? ttRes : (ttRes?.data || []));
                 const list = Array.isArray(taxRes) ? taxRes : (taxRes?.data || []);
@@ -856,10 +857,10 @@ export default function SettingsPage() {
                 setAllTaxes(list);
             } else if (tab === 'combos') {
                 const [prodRes, taxRes, provRes, prestRes] = await Promise.all([
-                    fetch('/api/products').then(res => res.json()).catch(() => []),
-                    fetch('/api/config/taxes').then(res => res.json()).catch(() => []),
-                    fetch('/api/providers').then(res => res.json()).catch(() => []),
-                    fetch('/api/config/prestadoras').then(res => res.json()).catch(() => [])
+                    safeFetch('/api/products'),
+                    safeFetch('/api/config/taxes'),
+                    safeFetch('/api/providers'),
+                    safeFetch('/api/config/prestadoras')
                 ]);
                 setProducts(Array.isArray(prodRes) ? prodRes : (prodRes?.data || []));
                 const list = Array.isArray(taxRes) ? taxRes : (taxRes?.data || []);
@@ -868,30 +869,30 @@ export default function SettingsPage() {
                 setProviders(Array.isArray(provRes) ? provRes : []);
                 setHotels(Array.isArray(prestRes) ? prestRes : []);
             } else if (tab === 'impuestos') {
-                const taxRes = await fetch('/api/config/taxes').then(res => res.json()).catch(() => []);
+                const taxRes = await safeFetch('/api/config/taxes');
                 const list = Array.isArray(taxRes) ? taxRes : (taxRes?.data || []);
                 setAllTaxes(list);
             } else if (tab === 'usuarios' || tab === 'resoluciones-documentos' || tab === 'consecutivos-transacciones') {
                 const [b, i, tp] = await Promise.all([
-                    fetch('/api/config/branches').then(res => res.json()),
-                    fetch('/api/config/implants').then(res => res.json()),
-                    fetch('/api/config/ticket-printers').then(res => res.json()).catch(() => []),
+                    safeFetch('/api/config/branches'),
+                    safeFetch('/api/config/implants'),
+                    safeFetch('/api/config/ticket-printers')
                 ]);
                 setBranches(Array.isArray(b) ? b : []);
                 setImplants(Array.isArray(i) ? i : []);
                 setTicketPrinters(Array.isArray(tp) ? tp : []);
             } else if (tab === 'clientes') {
                 const [vRes, sRes] = await Promise.all([
-                    fetch('/api/config/variables').then(res => res.json()).catch(() => []),
-                    fetch('/api/config/sellers').then(res => res.json()).catch(() => [])
+                    safeFetch('/api/config/variables'),
+                    safeFetch('/api/config/sellers')
                 ]);
                 setVariables(Array.isArray(vRes) ? vRes : []);
                 setSellers(Array.isArray(sRes) ? sRes : []);
             } else if (tab === 'sucursales' || tab === 'implants' || tab === 'extraccion-interfaces') {
-                const res = await fetch('/api/config/variables').then(res => res.json());
+                const res = await safeFetch('/api/config/variables');
                 setVariables(Array.isArray(res) ? res : []);
             } else if (tab === 'parametros') {
-                const res = await fetch('/api/products').then(res => res.json());
+                const res = await safeFetch('/api/products');
                 setProducts(Array.isArray(res) ? res : (res?.data || []));
             }
         } catch (err) {

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, Users, FileText, ShoppingCart, Settings, LogOut, Search, PlusCircle, PieChart, Receipt, Shield, Compass, Play, Database, BookOpen, FilePlus } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, ShoppingCart, Settings, LogOut, Search, PlusCircle, PieChart, Receipt, Shield, Compass, Play, Database, BookOpen, FilePlus, Activity } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 
@@ -89,6 +89,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { id: 4, code: 'MAESTROS', name: 'Maestros', parent: null, action: '/dashboard/settings', activo: true },
         { id: 5, code: 'REPORTES', name: 'Reportes', parent: null, action: '/dashboard/reports', activo: true },
         { id: 6, code: 'EJECUCIONES', name: 'Ejecuciones', parent: null, action: '/dashboard/executions', activo: true },
+        { id: 9, code: 'DIAGNOSTICS', name: 'Trazabilidad y Diagnóstico', parent: null, action: '/dashboard/diagnostics', activo: true },
         { id: 7, code: 'MANUAL', name: 'Manual Operativo', parent: null, action: '/dashboard/manual', activo: true }
     ]
 
@@ -107,6 +108,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (uCode.includes('MAESTRO') || uCode.includes('SETTING') || uAction.includes('settings')) return <Settings className="w-5 h-5" />
         if (uCode.includes('REPORTE') || uAction.includes('reports')) return <PieChart className="w-5 h-5" />
         if (uCode.includes('EJECUCION') || uAction.includes('executions')) return <Play className="w-5 h-5" />
+        if (uCode.includes('DIAGNOSTIC') || uCode.includes('TRAZABILIDAD') || uAction.includes('diagnostics')) return <Activity className="w-5 h-5" />
         if (uCode.includes('USER') || uCode.includes('CLIENT')) return <Users className="w-5 h-5" />
         return <Compass className="w-5 h-5" />
     }
@@ -119,6 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         if (action.includes('/settings')) return pathname.includes('/dashboard/settings')
         if (action.includes('/reports')) return pathname.includes('/dashboard/reports')
         if (action.includes('/executions')) return pathname.includes('/dashboard/executions')
+        if (action.includes('/diagnostics')) return pathname.includes('/dashboard/diagnostics')
         if (action.includes('/manual')) return pathname.includes('/dashboard/manual')
         return pathname === action
     }

@@ -931,6 +931,56 @@ export const MANUAL_MODULES: ManualModule[] = [
                 ]
             }
         ]
+    },
+    {
+        id: 'diagnostics',
+        title: 'Trazabilidad y Diagnóstico del Sistema',
+        iconName: 'Activity',
+        category: 'Administración y Soporte',
+        description: 'Módulo transversal de auditoría técnica, diagnóstico de errores e inspección paso a paso de transacciones y procedimientos almacenados.',
+        overview: 'El módulo de Trazabilidad y Diagnóstico permite registrar y reconstruir con precisión de milisegundos todo el recorrido de una transacción o proceso en el sistema (Usuario ➔ Pantalla ➔ Acción ➔ Proceso ➔ SP/API ➔ Parámetros Enmascarados ➔ Resultado/Error). Genera un código único por transacción (TRC-YYYYMMDD-XXXXXX) para agilizar el soporte técnico y la resolución de incidencias.',
+        procedures: [
+            {
+                code: 'TRC-01',
+                name: 'Configuración del Nivel de Trazabilidad Activo',
+                summary: 'Activación y selección del nivel de detalle de auditoría sin reiniciar la aplicación.',
+                concept: 'Permite configurar dinámicamente el nivel de registro (OFF, BASIC, DETAILED, DIAGNOSTIC) para controlar el volumen de I/O y profundizar el diagnóstico en casos de soporte.',
+                fields: [
+                    { name: 'OFF (Desactivado)', type: 'Modo por Defecto', description: 'Desactiva el registro detallado para garantizar 0 sobrecarga en producción.' },
+                    { name: 'BASIC', type: 'Modo Básico', description: 'Registra únicamente errores no capturados y transacciones fallidas.' },
+                    { name: 'DETAILED', type: 'Modo Detallado', description: 'Registra acciones de usuario, llamadas a APIs y SPs principales.' },
+                    { name: 'DIAGNOSTIC', type: 'Modo Diagnóstico Profundo', description: 'Registra la traza interna paso a paso con duraciones en ms y metadatos.' }
+                ],
+                businessRules: [
+                    'El enmascaramiento automático protege contraseñas, tokens y datos sensibles sustituyéndolos por ***MASKED***.',
+                    'El soporte multibase garantiza el mismo comportamiento en PostgreSQL y SQL Server.'
+                ],
+                steps: [
+                    { number: 1, title: 'Acceder a Trazabilidad y Diagnóstico', description: 'Ingrese al menú lateral -> Trazabilidad y Diagnóstico.' },
+                    { number: 2, title: 'Seleccionar Nivel de Trazabilidad', description: 'Haga clic en la tarjeta del nivel deseado (ej. DIAGNOSTIC para investigar una falla).' }
+                ]
+            },
+            {
+                code: 'TRC-02',
+                name: 'Inspección de Línea de Tiempo e Informe de Diagnóstico',
+                summary: 'Búsqueda por código TRC-..., reconstrucción cronológica e inspección técnica de eventos.',
+                concept: 'Permite consultar el recorrido completo de una transacción paso a paso e inspeccionar los parámetros de entrada, mensajes de error y stack traces.',
+                fields: [
+                    { name: 'Código de Traza (TRC-...)', type: 'Texto / Identificador', description: 'Identificador único entregado por el sistema o reporte de error.' },
+                    { name: 'Filtro por Módulo', type: 'Texto', description: 'Filtra sesiones por módulo (ej. Cotizaciones, Facturación).' },
+                    { name: 'Exportar Informe (.json)', type: 'Archivo Descargable', description: 'Genera un reporte técnico de diagnóstico en formato JSON para el equipo de soporte.' }
+                ],
+                businessRules: [
+                    'La vista de línea de tiempo muestra la hora exacta y duración en milisegundos de cada paso del proceso.',
+                    'Al presionar Exportar Informe, se descargará un archivo JSON consolidado con el resumen y todos los eventos técnicos.'
+                ],
+                steps: [
+                    { number: 1, title: 'Buscar Código de Traza', description: 'Ingrese el código TRC-... en el buscador superior y presione Enter.' },
+                    { number: 2, title: 'Abrir Inspección Técnica', description: 'Haga clic en el botón Inspeccionar de la sesión deseada para abrir la línea de tiempo.' },
+                    { number: 3, title: 'Descargar Informe', description: 'Haga clic en Exportar Informe (.json) para adjuntar la evidencia técnica al ticket de soporte.' }
+                ]
+            }
+        ]
     }
 ];
 

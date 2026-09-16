@@ -154,6 +154,11 @@ BEGIN
     INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'manual', N'Manual Operativo', N'/dashboard/manual', 1);
 END;
 
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'DIAGNOSTICS')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'DIAGNOSTICS', N'Trazabilidad y Diagnóstico', N'/dashboard/diagnostics', 1);
+END;
+
 
 -- 4. Tablas Maestras del Sitio (Master)
 DECLARE @masters TABLE (code NVARCHAR(100), name NVARCHAR(255));
@@ -242,6 +247,12 @@ IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE [email] = N'rubiel1985@msn.com')
 BEGIN
     INSERT INTO dbo.[User] ([name], [email], [passwordHash], [roleId], [isActive])
     VALUES (N'Rubiel', N'rubiel1985@msn.com', N'$2b$10$e1v0/9V8ZPVqejcqarQfq.hDLlKuva.M/mNsSUxOTefeyuUTqoaW2', 1, 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'TRACEABILITY_MODE')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value])
+    VALUES (N'TRACEABILITY_MODE', N'Modo de Trazabilidad y Diagnóstico', N'OFF');
 END;
 
 PRINT 'Semillas iniciales inyectadas exitosamente.';

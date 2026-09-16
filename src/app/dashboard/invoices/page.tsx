@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Filter, FileText, Download, Trash2, Eye, Edit2, MoreVertical, Printer, FileCode, Upload } from 'lucide-react'
+import { Search, Plus, Filter, FileText, Download, Trash2, Eye, Edit2, MoreVertical, Printer, FileCode, Upload, Send } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
@@ -12,6 +12,7 @@ export default function InvoicesListPage() {
     const [invoices, setInvoices] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
+    const [selectedIds, setSelectedIds] = useState<number[]>([])
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
     const [isImportOpen, setIsImportOpen] = useState(false)
     const [idIni, setIdIni] = useState('')
@@ -21,7 +22,7 @@ export default function InvoicesListPage() {
     const loadInvoices = () => {
         setLoading(true)
         fetch('/api/invoices/list')
-            .then(res => res.json())
+            .then(res => (res.ok ? res.json() : []))
             .then(data => {
                 if (Array.isArray(data)) {
                     setInvoices(data)
@@ -42,18 +43,84 @@ export default function InvoicesListPage() {
         loadInvoices()
     }, [])
 
+    const filteredInvoices = invoices.filter(q => {
+        const mainProd = q.products?.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
+        const firstProd = mainProd;
+        const firstPaxName = q.paxName || (firstProd?.passengers && Array.isArray(firstProd.passengers) && firstProd.passengers.length > 0 ? firstProd.passengers[0].name : (firstProd?.passengerName || ''));
+        const providerNameStr = q.providerName || firstProd?.prestadora?.name || '';
+        const searchLower = search.toLowerCase();
+        return q.id.toString().includes(searchLower) ||
+            (q.internalNumber || '').toLowerCase().includes(searchLower) ||
+            (q.client?.name || q.clientName || '').toLowerCase().includes(searchLower) ||
+            (firstPaxName && firstPaxName.toLowerCase().includes(searchLower)) ||
+            (providerNameStr && providerNameStr.toLowerCase().includes(searchLower))
+    });
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredInvoices.length && filteredInvoices.length > 0) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredInvoices.map(q => q.id));
+        }
+    };
+
+    const toggleSelectOne = (id: number) => {
+        if (selectedIds.includes(id)) {
+            setSelectedIds(selectedIds.filter(item => item !== id));
+        } else {
+            setSelectedIds([...selectedIds, id]);
+        }
+    };
+
+    const handleExportSelectedToZeus = async () => {
+        if (selectedIds.length === 0) {
+            alert("Por favor seleccione al menos una factura para enviar a Zeus ERP.");
+            return;
+        }
+
+        try {
+            const loggedUser = JSON.parse(localStorage.getItem('user') || '{"id": 1}');
+            const res = await fetch('/api/invoices/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ids: selectedIds,
+                    userId: loggedUser.id
+                })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert("ERROR DE SERVIDOR: " + (data.message || "Error desconocido") + (data.details ? "\nDetalles: " + data.details : ""));
+                return;
+            }
+
+            if (data.success) {
+                alert("EXPORTACIÓN EXITOSA A ZEUS ERP:\n" + data.message);
+                setSelectedIds([]);
+                loadInvoices();
+            } else {
+                alert("ATENCIÓN: " + data.message);
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("Error al exportar a Zeus ERP: " + err.message);
+        }
+    };
+
     const handleDownloadPdf = (q: any) => {
         const firstProd = q.products && q.products.length > 0 ? q.products[0] : null;
 
         const pdfData = {
             ...q,
-            clientName: q.client?.name || 'Cliente sin nombre',
+            clientName: q.client?.name || q.clientName || 'Cliente sin nombre',
             clientDocument: q.client?.document || '',
-            providerName: firstProd?.provider?.name || 'Varios/Ninguno',
-            prestadoraName: firstProd?.prestadora?.name || 'Varios/Ninguno',
-            checkIn: firstProd?.checkInDate ? format(new Date(firstProd.checkInDate), 'yyyy-MM-dd') : '',
-            checkOut: firstProd?.checkOutDate ? format(new Date(firstProd.checkOutDate), 'yyyy-MM-dd') : '',
-            paxName: firstProd?.passengers?.[0]?.name || 'N/A',
+            providerName: q.providerName || firstProd?.provider?.name || 'Varios/Ninguno',
+            prestadoraName: firstProd?.prestadora?.name || q.providerName || 'Varios/Ninguno',
+            checkIn: (q.checkInDate || firstProd?.checkInDate) ? format(new Date(q.checkInDate || firstProd.checkInDate), 'yyyy-MM-dd') : '',
+            checkOut: (q.checkOutDate || firstProd?.checkOutDate) ? format(new Date(q.checkOutDate || firstProd.checkOutDate), 'yyyy-MM-dd') : '',
+            paxName: q.paxName || firstProd?.passengers?.[0]?.name || firstProd?.passengerName || 'N/A',
             paxDocument: firstProd?.passengers?.[0]?.document || 'N/A',
             paxAdults: firstProd?.paxAdults || 1,
             paxChildren: firstProd?.paxChildren || 0,
@@ -73,7 +140,7 @@ export default function InvoicesListPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ids: [q.id], // Enviamos como arreglo para consistencia
+                    ids: [q.id],
                     userId: loggedUser.id
                 })
             });
@@ -81,19 +148,17 @@ export default function InvoicesListPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                // Si el servidor devolvió un error (400, 500), mostramos el mensaje detallado
                 alert("ERROR DE SERVIDOR: " + (data.message || "Error desconocido") + (data.details ? "\nDetalles: " + data.details : ""));
                 return;
             }
 
-            // Mostrar resultado de SQL Server si existe
             if (data.success) {
-                alert("EXPORTACIÓN EXITOSA A SQL SERVER:\n" + data.message);
+                alert("EXPORTACIÓN EXITOSA A ZEUS ERP:\n" + data.message);
+                loadInvoices();
             } else {
                 alert("ATENCIÓN: Se generó el XML pero hubo un problema con SQL Server.\nMensaje: " + data.message);
             }
 
-            // Descargar el XML localmente
             if (data.xml) {
                 const blob = new Blob([data.xml], { type: 'application/xml' });
                 const url = window.URL.createObjectURL(blob);
@@ -119,6 +184,21 @@ export default function InvoicesListPage() {
                     <p className="text-zinc-500 dark:text-zinc-400 font-medium">Gestión y seguimiento de tus ofertas</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleExportSelectedToZeus}
+                        disabled={selectedIds.length === 0}
+                        className={`px-5 h-12 rounded-xl flex items-center gap-2 text-sm font-bold transition-all cursor-pointer active:scale-95 ${
+                            selectedIds.length > 0
+                            ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"
+                            : "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed"
+                        }`}
+                        title="Enviar facturas seleccionadas a Zeus ERP / SQL Server"
+                    >
+                        <Send className="w-5 h-5" />
+                        Enviar a Zeus ERP {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                    </motion.button>
                     <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -168,7 +248,7 @@ export default function InvoicesListPage() {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 w-5 h-5" />
                     <input
                         type="text"
-                        placeholder="Buscar por cliente, ID o prestadora..."
+                        placeholder="Buscar por cliente, ID, pasajero o prestadora..."
                         className="w-full h-12 pl-12 pr-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -184,6 +264,14 @@ export default function InvoicesListPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
+                            <th className="px-4 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider text-center w-12">
+                                <input
+                                    type="checkbox"
+                                    checked={filteredInvoices.length > 0 && selectedIds.length === filteredInvoices.length}
+                                    onChange={toggleSelectAll}
+                                    className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                            </th>
                             <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Referencia</th>
                             <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Cliente</th>
                             <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Fechas</th>
@@ -194,40 +282,46 @@ export default function InvoicesListPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                         {loading ? (
-                            <tr><td colSpan={5} className="p-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600 mx-auto"></div></td></tr>
+                            <tr><td colSpan={7} className="p-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600 mx-auto"></div></td></tr>
                         ) : invoices.length === 0 ? (
-                            <tr><td colSpan={5} className="p-20 text-center text-zinc-500 font-medium">No se encontraron facturas.</td></tr>
+                            <tr><td colSpan={7} className="p-20 text-center text-zinc-500 font-medium">No se encontraron facturas.</td></tr>
                         ) : (
-                            invoices.filter(q => {
-                                const mainProd = q.products.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
+                            filteredInvoices.map((q) => {
+                                const mainProd = q.products?.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
                                 const firstProd = mainProd;
-                                const firstPaxName = firstProd?.passengers && Array.isArray(firstProd.passengers) && firstProd.passengers.length > 0 ? firstProd.passengers[0].name : '';
-                                return q.id.toString().includes(search) ||
-                                    (q.client?.name || '').toLowerCase().includes(search.toLowerCase()) ||
-                                    (firstPaxName && firstPaxName.toLowerCase().includes(search.toLowerCase())) ||
-                                    (firstProd?.prestadora?.name && firstProd.prestadora.name.toLowerCase().includes(search.toLowerCase()))
-                            }).map((q) => {
-                                const mainProd = q.products.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
-                                const firstProd = mainProd;
+                                const paxNameDisplay = q.paxName || (firstProd?.passengers && Array.isArray(firstProd.passengers) && firstProd.passengers.length > 0 ? firstProd.passengers[0].name : (firstProd?.passengerName || 'Mismo titular'));
+                                const providerNameDisplay = q.providerName || firstProd?.prestadora?.name || 'Varios/Ninguno';
+                                const checkInDisplay = q.checkInDate || firstProd?.checkInDate;
+                                const checkOutDisplay = q.checkOutDate || firstProd?.checkOutDate;
+                                const isSelected = selectedIds.includes(q.id);
+
                                 return (
-                                    <tr key={q.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-blue-600">#{q.id}</div>
-                                            <div className="text-[10px] text-zinc-400 mt-0.5">{format(new Date(q.date), 'dd MMM, yyyy')}</div>
+                                    <tr key={q.id} className={`hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all ${isSelected ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}>
+                                        <td className="px-4 py-4 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelectOne(q.id)}
+                                                className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            />
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-zinc-900 dark:text-white">{q.client?.name}</div>
-                                            <div className="text-[10px] text-zinc-500 font-medium">Pax: {(firstProd?.passengers && Array.isArray(firstProd.passengers) && firstProd.passengers.length > 0) ? firstProd.passengers[0].name : 'Mismo titular'}</div>
-                                            <div className="text-xs text-zinc-400 mt-1">{firstProd?.prestadora?.name || 'Varios/Ninguno'}</div>
+                                            <div className="font-bold text-blue-600">{q.internalNumber || `#${q.id}`}</div>
+                                            <div className="text-[10px] text-zinc-400 mt-0.5">ID #{q.id} • {q.date ? format(new Date(q.date), 'dd MMM, yyyy') : '-'}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-zinc-900 dark:text-white">{q.client?.name || q.clientName || 'Consumidor Final'}</div>
+                                            <div className="text-[10px] text-zinc-500 font-medium">Pax: {paxNameDisplay}</div>
+                                            <div className="text-xs text-zinc-400 mt-1">{providerNameDisplay}</div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                                                {firstProd?.checkInDate ? format(new Date(firstProd.checkInDate), 'dd/MM/yy') : '-'} - {firstProd?.checkOutDate ? format(new Date(firstProd.checkOutDate), 'dd/MM/yy') : '-'}
+                                                {checkInDisplay ? format(new Date(checkInDisplay), 'dd/MM/yy') : '-'} - {checkOutDisplay ? format(new Date(checkOutDisplay), 'dd/MM/yy') : '-'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-black text-zinc-900 dark:text-white">
-                                                ${q.totalAmount.toLocaleString()} <span className="text-[10px] text-zinc-500 uppercase">{q.currency}</span>
+                                                ${(Number(q.totalAmount) || 0).toLocaleString()} <span className="text-[10px] text-zinc-500 uppercase">{q.currency || 'COP'}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -244,7 +338,7 @@ export default function InvoicesListPage() {
                                                 <button
                                                     onClick={() => handleExportXml(q)}
                                                     className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-all"
-                                                    title="Descargar XML (Integración)"
+                                                    title="Enviar a Zeus ERP / Descargar XML"
                                                 >
                                                     <FileCode className="w-5 h-5" />
                                                 </button>

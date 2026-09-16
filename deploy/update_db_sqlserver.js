@@ -20,16 +20,59 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
 
     const sqlContent = fs.readFileSync(updaterSqlPath, 'utf8');
 
-    let serverVal = host || '127.0.0.1';
+    let defaultUser = 'zeusagencias';
+    let defaultPass = 'zzeusagencias';
+    let defaultHost = 'ZEUSAGENCIAS10';
+    let defaultDb = 'Korex_Pruebas';
+    let defaultPort = 1433;
+
+    try {
+        const envPath = path.join(__dirname, '..', '.env');
+        if (fs.existsSync(envPath)) {
+            const envContent = fs.readFileSync(envPath, 'utf8');
+            const match = envContent.match(/^DATABASE_URL_SQLSERVER\s*=\s*["']?([^"'\r\n]+)/m) || envContent.match(/^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)/m);
+            if (match && match[1]) {
+                const cleanUrl = match[1].replace(/["']/g, '').trim();
+                if (cleanUrl.startsWith('sqlserver://') || cleanUrl.startsWith('mssql://')) {
+                    const clean = cleanUrl.replace(/^(sqlserver|mssql):\/\//i, '');
+                    const hostPortPart = clean.split(';')[0];
+                    defaultHost = hostPortPart.split(':')[0] || 'ZEUSAGENCIAS10';
+                    if (defaultHost.toLowerCase() === 'localhost') defaultHost = '127.0.0.1';
+                    const pStr = hostPortPart.split(':')[1];
+                    if (pStr) defaultPort = parseInt(pStr, 10);
+
+                    const params = clean.split(';');
+                    for (const p of params) {
+                        const eqIdx = p.indexOf('=');
+                        if (eqIdx > 0) {
+                            const k = p.substring(0, eqIdx).trim().toLowerCase();
+                            const v = decodeURIComponent(p.substring(eqIdx + 1).trim());
+                            if (k === 'database') defaultDb = v;
+                            else if (k === 'user' || k === 'user id' || k === 'uid') defaultUser = v;
+                            else if (k === 'password' || k === 'pwd') defaultPass = v;
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+
+    let targetHost = host || process.env.SQLSERVER_HOST || defaultHost;
+    let targetUser = user || process.env.SQLSERVER_USER || defaultUser;
+    let targetPass = password || process.env.SQLSERVER_PASSWORD || defaultPass;
+    let targetDb = database || process.env.SQLSERVER_DB || defaultDb;
+    let targetPort = port ? parseInt(port, 10) : defaultPort;
+
+    let serverVal = targetHost;
     if (instance && instance.trim() !== '') {
         serverVal = `${serverVal}\\${instance.trim()}`;
     }
 
     const sqlConfig = {
-        user: user || process.env.SQLSERVER_USER || 'sa',
-        password: password || process.env.SQLSERVER_PASSWORD || 'zzeusagencias',
-        server: host || process.env.SQLSERVER_HOST || '127.0.0.1',
-        database: database || process.env.SQLSERVER_DB || 'Korex_colaereo',
+        user: targetUser,
+        password: targetPass,
+        server: targetHost,
+        database: targetDb,
         options: {
             encrypt: false,
             trustServerCertificate: true
@@ -38,8 +81,8 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
         requestTimeout: 60000
     };
 
-    if (port && parseInt(port) > 0) {
-        sqlConfig.port = parseInt(port);
+    if (targetPort && targetPort > 0) {
+        sqlConfig.port = targetPort;
     } else if (instance) {
         sqlConfig.options.instanceName = instance;
     } else {
@@ -49,6 +92,8 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
     console.log(`[PASO 1] Conectando a la base de datos de producción [${sqlConfig.database}] en ${serverVal}...`);
 
     let pool = null;
+    let batchCount = 0;
+    let currentBatchText = '';
     try {
         pool = await mssql.connect(sqlConfig);
         console.log(' -> ¡Conexión establecida!');
@@ -63,9 +108,9 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
 
         console.log(` -> Total de lotes (batches) a ejecutar: ${batches.length}`);
 
-        let batchCount = 0;
         for (const batch of batches) {
             batchCount++;
+            currentBatchText = batch;
             await pool.request().batch(batch);
         }
 
@@ -91,7 +136,9 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
 
     } catch (err) {
         console.error('\n❌ ERROR DURANTE LA ACTUALIZACIÓN EN SQL SERVER:');
-        console.error(`  ${err.message}`);
+        console.error(`  En batch #${batchCount}:`);
+        console.error(`  ${currentBatchText.slice(0, 300)}`);
+        console.error(`  Mensaje: ${err.message}`);
         if (pool) await pool.close().catch(() => {});
         return false;
     }

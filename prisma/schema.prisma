@@ -1211,3 +1211,51 @@ model NotasCreditoNoRef {
   @@index([consecutivo], map: "idx_notas_credito_no_ref_consecutivo")
   @@index([factura_fuente, factura_serie, factura_numero], map: "idx_notas_credito_no_ref_factura")
 }
+
+model TraceabilitySession {
+  id              Int               @id @default(autoincrement())
+  code            String            @unique
+  userId          Int?
+  origin          String?           @default("WEB")
+  module          String
+  screen          String?
+  action          String
+  process         String?
+  status          String            @default("IN_PROGRESS")
+  totalDurationMs Float?            @default(0)
+  errorMessage    String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
+  logs            TraceabilityLog[]
+
+  @@index([code], map: "idx_trace_session_code")
+  @@index([userId], map: "idx_trace_session_user")
+  @@index([createdAt], map: "idx_trace_session_created")
+}
+
+model TraceabilityLog {
+  id                Int                 @id @default(autoincrement())
+  sessionId         Int
+  code              String
+  userId            Int?
+  origin            String?             @default("WEB")
+  eventType         String
+  stepName          String
+  spName            String?
+  endpoint          String?
+  durationMs        Float?              @default(0)
+  status            String              @default("SUCCESS")
+  inputData         Json?
+  outputData        Json?
+  techMessage       String?
+  functionalMessage String?
+  stackTrace        String?
+  affectedId        String?
+  createdAt         DateTime            @default(now())
+  session           TraceabilitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId], map: "idx_trace_log_session")
+  @@index([code], map: "idx_trace_log_code")
+  @@index([eventType], map: "idx_trace_log_type")
+  @@index([createdAt], map: "idx_trace_log_created")
+}

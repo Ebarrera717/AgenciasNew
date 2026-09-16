@@ -3363,3 +3363,59 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Payment_code_key" ON public."Payment"(code);
 INSERT INTO public."Payment" (code, name, "isActive") VALUES ('CONTADO', 'Contado', true) ON CONFLICT (code) DO NOTHING;
 INSERT INTO public."Payment" (code, name, "isActive") VALUES ('CREDITO', 'Crédito', true) ON CONFLICT (code) DO NOTHING;
 SELECT setval('public."Payment_id_seq"', COALESCE((SELECT MAX(id) FROM public."Payment"), 1));
+
+CREATE SEQUENCE IF NOT EXISTS public."TraceabilitySession_id_seq" START WITH 1;
+CREATE SEQUENCE IF NOT EXISTS public."TraceabilityLog_id_seq" START WITH 1;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'TraceabilitySession') THEN
+        CREATE TABLE public."TraceabilitySession" (
+            "id" integer DEFAULT nextval('"TraceabilitySession_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+            "code" text NOT NULL UNIQUE,
+            "userId" integer,
+            "origin" text DEFAULT 'WEB',
+            "module" text NOT NULL,
+            "screen" text,
+            "action" text NOT NULL,
+            "process" text,
+            "status" text DEFAULT 'IN_PROGRESS' NOT NULL,
+            "totalDurationMs" double precision DEFAULT 0,
+            "errorMessage" text,
+            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            "updatedAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+    ELSE
+        ALTER TABLE public."TraceabilitySession" ADD COLUMN IF NOT EXISTS "origin" text DEFAULT 'WEB';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'TraceabilityLog') THEN
+        CREATE TABLE public."TraceabilityLog" (
+            "id" integer DEFAULT nextval('"TraceabilityLog_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+            "sessionId" integer NOT NULL,
+            "code" text NOT NULL,
+            "userId" integer,
+            "origin" text DEFAULT 'WEB',
+            "eventType" text NOT NULL,
+            "stepName" text NOT NULL,
+            "spName" text,
+            "endpoint" text,
+            "durationMs" double precision DEFAULT 0,
+            "status" text DEFAULT 'SUCCESS' NOT NULL,
+            "inputData" jsonb,
+            "outputData" jsonb,
+            "techMessage" text,
+            "functionalMessage" text,
+            "stackTrace" text,
+            "affectedId" text,
+            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+    ELSE
+        ALTER TABLE public."TraceabilityLog" ADD COLUMN IF NOT EXISTS "origin" text DEFAULT 'WEB';
+    END IF;
+END $$;
+
+INSERT INTO public."Menu" (code, name, action, activo) VALUES ('DIAGNOSTICS', 'Trazabilidad y Diagnóstico', '/dashboard/diagnostics', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
+INSERT INTO public."Master" (code, name, "inactivo") VALUES ('Diagnostics', 'diagnostico', false) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" ("code", "name", "value") VALUES ('TRACEABILITY_MODE', 'Modo de Trazabilidad y Diagnóstico', 'OFF') ON CONFLICT ("code") DO NOTHING;
+

@@ -99,9 +99,9 @@ export default function QuotationsListPage() {
             const url = `/api/quotations/history?${params.toString()}`
 
             const [quoRes, statesRes, dbRes] = await Promise.all([
-                fetch(url).then(res => res.json()),
-                fetch('/api/config/quotation-states').then(res => res.json()).catch(() => []),
-                fetch('/api/config/db-provider').then(res => res.json()).catch(() => null)
+                fetch(url).then(res => (res.ok ? res.json() : [])).catch(() => []),
+                fetch('/api/config/quotation-states').then(res => (res.ok ? res.json() : [])).catch(() => []),
+                fetch('/api/config/db-provider').then(res => (res.ok ? res.json() : null)).catch(() => null)
             ])
 
             if (dbRes) setDbInfo(dbRes)

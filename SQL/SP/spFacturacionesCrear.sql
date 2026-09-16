@@ -16,6 +16,69 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT OFF;
 
+    IF OBJECT_ID('dbo.ImpRet', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.ImpRet (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL,
+            cd_cuenta VARCHAR(20) NULL,
+            am_porcentaje NUMERIC(5,2) NULL DEFAULT 0,
+            in_tipo CHAR(1) NULL DEFAULT 'I',
+            Id_cargo_dep INT NULL,
+            bl_IVA BIT NULL DEFAULT 0
+        );
+        IF NOT EXISTS (SELECT 1 FROM dbo.ImpRet WHERE id = 1)
+        BEGIN
+            SET IDENTITY_INSERT dbo.ImpRet ON;
+            INSERT INTO dbo.ImpRet (id, cd_codigo, ds_nombre, cd_cuenta, am_porcentaje, in_tipo, bl_IVA)
+            VALUES (1, '01', 'IVA 19%', '240805', 19.00, 'I', 1);
+            SET IDENTITY_INSERT dbo.ImpRet OFF;
+        END
+    END
+    ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo')
+    BEGIN
+        ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+    END;
+
+    IF OBJECT_ID('dbo.CargosDesc', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.CargosDesc (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL
+        );
+    END;
+
+    IF OBJECT_ID('dbo.parametros', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.parametros (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            nombre VARCHAR(250) NULL,
+            valor VARCHAR(MAX) NULL
+        );
+        IF NOT EXISTS (SELECT 1 FROM dbo.parametros WHERE id = 33)
+        BEGIN
+            SET IDENTITY_INSERT dbo.parametros ON;
+            INSERT INTO dbo.parametros (id, nombre, valor) VALUES (33, 'NumeroDecimales', '2');
+            SET IDENTITY_INSERT dbo.parametros OFF;
+        END;
+        IF NOT EXISTS (SELECT 1 FROM dbo.parametros WHERE id = 326)
+        BEGIN
+            SET IDENTITY_INSERT dbo.parametros ON;
+            INSERT INTO dbo.parametros (id, nombre, valor) VALUES (326, 'CalcularAutoValoresItemFac', 'N');
+            SET IDENTITY_INSERT dbo.parametros OFF;
+        END;
+    END;
+
+    IF OBJECT_ID('dbo.Parametr', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.Parametr (
+            PARAMETRO VARCHAR(50) PRIMARY KEY,
+            VALOPAR VARCHAR(250) NULL
+        );
+    END;
+
     BEGIN TRY
         -- BEGIN TRANSACTION; -- Comentado para permitir transacciones individuales por factura
 
@@ -731,21 +794,28 @@ BEGIN
 		);
 
 
-		-- Fetch tax details for standard IVA (id=1)
-		SELECT TOP 1 
-			@ds_impas_iva = ds_nombre, 
-			@cd_impcta_iva = cd_cuenta, 
-			@am_porcentaje_iva = am_porcentaje,
-			@c_PorIva = am_porcentaje,
-			@c_codigoimpiva = cd_codigo,
-			@c_nombreimpiva = ds_nombre
-		FROM dbo.ImpRet 
-		WHERE id = 1;
+		IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL
+		BEGIN
+			SELECT TOP 1 
+				@ds_impas_iva = ds_nombre, 
+				@cd_impcta_iva = cd_cuenta, 
+				@am_porcentaje_iva = am_porcentaje,
+				@c_PorIva = am_porcentaje,
+				@c_codigoimpiva = cd_codigo,
+				@c_nombreimpiva = ds_nombre
+			FROM dbo.ImpRet 
+			WHERE id = 1;
+		END
+		IF @am_porcentaje_iva IS NULL SET @am_porcentaje_iva = 19.00;
+		IF @c_PorIva IS NULL SET @c_PorIva = 19.00;
 
-		SELECT @NumDecimales = CONVERT(INT,LTRIM(RTRIM(valor))) from dbo.parametros where id = 33;
+		IF OBJECT_ID('dbo.parametros', 'U') IS NOT NULL
+		BEGIN
+			SELECT TOP 1 @NumDecimales = TRY_CAST(LTRIM(RTRIM(valor)) AS INT) FROM dbo.parametros WHERE id = 33;
+			SELECT TOP 1 @CalcularAutoValoresItemFac = ISNULL(LTRIM(RTRIM(valor)), 'N') FROM dbo.parametros WHERE id = 326;
+		END
 		IF @NumDecimales IS NULL SET @NumDecimales = 2;
-
-		SELECT @CalcularAutoValoresItemFac = ISNULL(LTRIM(RTRIM(valor)), 'N') FROM dbo.Parametros WHERE id = 326;
+		IF @CalcularAutoValoresItemFac IS NULL SET @CalcularAutoValoresItemFac = 'N';
 
         -- Validar que el XML sea correcto
         IF @xml IS NULL OR LTRIM(RTRIM(@xml)) = ''
@@ -1405,7 +1475,11 @@ BEGIN
 	--While 1 = 1
 	--Begin
 		SET @Fecha = GETDATE();
-		SELECT @FechaCont=REPLACE(VALOPAR,'/','') FROM dbo.Parametr WHERE PARAMETRO = 'FECHACT'
+		IF OBJECT_ID('dbo.Parametr', 'U') IS NOT NULL
+		BEGIN
+			SELECT TOP 1 @FechaCont = REPLACE(VALOPAR, '/', '') FROM dbo.Parametr WHERE PARAMETRO = 'FECHACT';
+		END
+		IF @FechaCont IS NULL SET @FechaCont = GETDATE();
 		
 
 			-- Cursor over unique ReservaFactura in this query result
@@ -2149,9 +2223,9 @@ BEGIN
 							'@id_MedioReservacion = NULL,' + CHAR(13) + CHAR(10) +
 							'@bl_refacturacion = 0,' + CHAR(13) + CHAR(10) +
 							'@bl_comisiona = 0,' + CHAR(13) + CHAR(10) +
-							'@cd_fuente_factura = ' + ISNULL(@cd_fuente, 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_serie_factura = ' + ISNULL(@cd_serie, 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_consecutivo_factura = ' + ISNULL(@cd_consecutivo, 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@cd_fuente_factura = NULL,' + CHAR(13) + CHAR(10) +
+							'@cd_serie_factura = NULL,' + CHAR(13) + CHAR(10) +
+							'@cd_consecutivo_factura = NULL,' + CHAR(13) + CHAR(10) +
 							'@id_NotasAerolinea = NULL,' + CHAR(13) + CHAR(10) +
 							'@bl_interface = 0,' + CHAR(13) + CHAR(10) +
 							'@id_evento = NULL,' + CHAR(13) + CHAR(10) +
@@ -2182,12 +2256,20 @@ BEGIN
 					ELSE
 					BEGIN
 						SET @FacturaEstado = 1;
-						SET @FacturaRespuesta = ISNULL(@FacturaRespuesta, '') + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
+						IF @FacturaRespuesta IS NULL OR LTRIM(RTRIM(@FacturaRespuesta)) = ''
+						BEGIN
+							SET @FacturaRespuesta = 'Error en spFacturaCrear (Código de retorno: ' + CAST(ISNULL(@ReturnCode, 1) AS VARCHAR) + ')';
+						END;
+						SET @FacturaRespuesta = @FacturaRespuesta + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
 					END
 				END TRY
 				BEGIN CATCH
 					SET @FacturaEstado = 1;
-					SET @FacturaRespuesta = ERROR_MESSAGE() + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
+					DECLARE @ErrNum INT = ERROR_NUMBER();
+					DECLARE @ErrLine INT = ERROR_LINE();
+					DECLARE @ErrMsg NVARCHAR(4000) = ERROR_MESSAGE();
+					DECLARE @ErrProc NVARCHAR(128) = ERROR_PROCEDURE();
+					SET @FacturaRespuesta = '❌ Error ' + CAST(@ErrNum AS VARCHAR) + ' (Línea ' + CAST(@ErrLine AS VARCHAR) + ' en ' + ISNULL(@ErrProc, 'spFacturaCrear') + '): ' + ISNULL(@ErrMsg, 'Error no especificado') + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
 				END CATCH
 				-- Collect log result
 				INSERT INTO @LogResults (invoiceId, success, message)
@@ -2212,14 +2294,22 @@ BEGIN
         DECLARE 
             @ErrorMessage NVARCHAR(4000),
             @ErrorSeverity INT,
-            @ErrorState INT;
+            @ErrorState INT,
+            @ErrorLine INT,
+            @ErrorNumber INT,
+            @ErrorProc NVARCHAR(128);
 
         SELECT 
             @ErrorMessage = ERROR_MESSAGE(),
             @ErrorSeverity = ERROR_SEVERITY(),
-            @ErrorState = ERROR_STATE();
+            @ErrorState = ERROR_STATE(),
+            @ErrorLine = ERROR_LINE(),
+            @ErrorNumber = ERROR_NUMBER(),
+            @ErrorProc = ERROR_PROCEDURE();
 
-        RAISERROR (@ErrorMessage, @ErrorSeverity, @ErrorState);
+        DECLARE @FullErrorMsg NVARCHAR(4000) = '❌ Error ' + CAST(ISNULL(@ErrorNumber,0) AS NVARCHAR) + ' (Línea ' + CAST(ISNULL(@ErrorLine,0) AS NVARCHAR) + ' de ' + ISNULL(@ErrorProc, 'spFacturacionesCrear') + '): ' + ISNULL(@ErrorMessage, 'Error no especificado');
+
+        RAISERROR (@FullErrorMsg, @ErrorSeverity, @ErrorState);
     END CATCH
 END
 GO

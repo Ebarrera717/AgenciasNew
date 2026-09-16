@@ -89,6 +89,16 @@ export async function POST(req: NextRequest) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                if (code) {
+                    const checkDup = await pool.request()
+                        .input('code', code.trim())
+                        .query(`SELECT TOP 1 [id] FROM dbo.[ChargeAndTax] WHERE UPPER([code]) = UPPER(@code)`);
+                    if (checkDup.recordset && checkDup.recordset.length > 0) {
+                        await pool.close();
+                        return NextResponse.json({ message: `Ya existe un cargo o impuesto registrado con el código '${code.trim().toUpperCase()}'. Por favor utilice un código único.` }, { status: 400 });
+                    }
+                }
+
                 const res = await pool.request()
                     .input('code', code || null)
                     .input('name', name || '')
@@ -111,6 +121,9 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json(tax);
             } catch (err: any) {
                 if (pool) await pool.close();
+                if (err?.message?.includes('UQ_ChargeAndTax_Code') || err?.number === 2627 || err?.number === 2601) {
+                    return NextResponse.json({ message: `Ya existe un cargo o impuesto registrado con el código '${code?.toUpperCase()}'.` }, { status: 400 });
+                }
                 throw err;
             }
         }
@@ -136,7 +149,8 @@ export async function POST(req: NextRequest) {
         const message = results[0]?.p_mensaje_resultado || '';
 
         if (!dbId || message.startsWith('ERROR')) {
-            throw new Error(message || 'Error creating tax');
+            const cleanMsg = message.replace(/^ERROR:\s*/, '');
+            return NextResponse.json({ message: cleanMsg || 'Error al crear el cargo o impuesto' }, { status: 400 });
         }
 
         if (code && gdsEquivalences !== undefined) {
@@ -152,7 +166,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(tax)
     } catch (error: any) {
         console.error('Error creating tax:', error);
-        return NextResponse.json({ message: 'Error al crear el cargo o impuesto: ' + error.message }, { status: 500 })
+        return NextResponse.json({ message: 'Error al crear el cargo o impuesto: ' + error.message }, { status: 400 })
     }
 }
 
@@ -173,6 +187,17 @@ export async function PUT(req: NextRequest) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                if (code) {
+                    const checkDup = await pool.request()
+                        .input('id', parseInt(id))
+                        .input('code', code.trim())
+                        .query(`SELECT TOP 1 [id] FROM dbo.[ChargeAndTax] WHERE UPPER([code]) = UPPER(@code) AND [id] <> @id`);
+                    if (checkDup.recordset && checkDup.recordset.length > 0) {
+                        await pool.close();
+                        return NextResponse.json({ message: `Ya existe otro cargo o impuesto registrado con el código '${code.trim().toUpperCase()}'.` }, { status: 400 });
+                    }
+                }
+
                 await pool.request()
                     .input('id', parseInt(id))
                     .input('code', code || null)
@@ -196,6 +221,9 @@ export async function PUT(req: NextRequest) {
                 return NextResponse.json(tax);
             } catch (err: any) {
                 if (pool) await pool.close();
+                if (err?.message?.includes('UQ_ChargeAndTax_Code') || err?.number === 2627 || err?.number === 2601) {
+                    return NextResponse.json({ message: `Ya existe otro cargo o impuesto registrado con el código '${code?.toUpperCase()}'.` }, { status: 400 });
+                }
                 throw err;
             }
         }
@@ -219,7 +247,8 @@ export async function PUT(req: NextRequest) {
 
         const message = results[0]?.p_mensaje_resultado || '';
         if (message.startsWith('ERROR')) {
-            throw new Error(message);
+            const cleanMsg = message.replace(/^ERROR:\s*/, '');
+            return NextResponse.json({ message: cleanMsg || 'Error al actualizar el cargo o impuesto' }, { status: 400 });
         }
 
         if (code && gdsEquivalences !== undefined) {
@@ -235,7 +264,7 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json(tax)
     } catch (error: any) {
         console.error('Error updating tax:', error);
-        return NextResponse.json({ message: 'Error al actualizar el cargo o impuesto: ' + error.message }, { status: 500 })
+        return NextResponse.json({ message: 'Error al actualizar el cargo o impuesto: ' + error.message }, { status: 400 })
     }
 }
 

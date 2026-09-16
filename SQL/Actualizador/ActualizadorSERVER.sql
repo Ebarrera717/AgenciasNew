@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-09-14T23:06:41.397Z
+-- Fecha de Generación: 2026-09-16T20:35:16.215Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -498,6 +498,168 @@ BEGIN
     );
 END;
 
+-- 20a. InvoicesProduct
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProduct' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InvoicesProduct] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProduct PRIMARY KEY,
+        [invoiceId] INT NOT NULL,
+        [productId] INT NOT NULL,
+        [quantity] INT NOT NULL,
+        [price] FLOAT NOT NULL,
+        [cost] FLOAT NULL CONSTRAINT DF_InvoicesProduct_Cost DEFAULT 0,
+        [providerId] INT NULL,
+        [prestadoraId] INT NULL,
+        [checkInDate] DATETIME2 NULL,
+        [checkOutDate] DATETIME2 NULL,
+        [nights] INT NULL,
+        [paxAdults] INT NULL,
+        [paxChildren] INT NULL,
+        [serviceType] NVARCHAR(255) NULL,
+        [destination] NVARCHAR(255) NULL,
+        [reservationCode] NVARCHAR(255) NULL,
+        [sellerCommission] FLOAT NULL,
+        [ticketPrinterCommission] FLOAT NULL,
+        [comboId] INT NULL,
+        [mainTaxId] INT NULL,
+        [inNationality] INT NULL CONSTRAINT DF_InvoicesProduct_InNationality DEFAULT 1,
+        [servicios] NVARCHAR(MAX) NULL,
+        [descripcion] NVARCHAR(MAX) NULL,
+        [itinerary] NVARCHAR(MAX) NULL,
+        [class] NVARCHAR(100) NULL,
+        [ticketTypeId] INT NULL,
+        [airline] NVARCHAR(100) NULL,
+        [ticketCode] NVARCHAR(255) NULL
+    );
+END;
+
+-- 20b. InvoicesProductTax
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProductTax' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InvoicesProductTax] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductTax PRIMARY KEY,
+        [invoiceProductId] INT NOT NULL,
+        [chargeAndTaxId] INT NOT NULL,
+        [valueSnapshot] FLOAT NOT NULL,
+        [valueTypeSnapshot] NVARCHAR(50) NOT NULL,
+        [explicitAmount] FLOAT NULL,
+        [isMain] BIT NULL CONSTRAINT DF_InvoicesProductTax_IsMain DEFAULT 0
+    );
+END;
+
+-- 20c. InvoicesProductPasenger
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProductPasenger' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InvoicesProductPasenger] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductPasenger PRIMARY KEY,
+        [invoiceProductId] INT NOT NULL,
+        [name] NVARCHAR(255) NOT NULL,
+        [document] NVARCHAR(255) NOT NULL
+    );
+END;
+
+-- 20d. InvoicesProductVariable
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProductVariable' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InvoicesProductVariable] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductVariable PRIMARY KEY,
+        [invoiceProductId] INT NOT NULL,
+        [masterVariableId] INT NOT NULL,
+        [value] NVARCHAR(255) NOT NULL
+    );
+END;
+
+-- 20e. InvoicesProductPayment
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProductPayment' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InvoicesProductPayment] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductPayment PRIMARY KEY,
+        [invoiceProductId] INT NOT NULL,
+        [amount] FLOAT NOT NULL,
+        [paymentMethod] NVARCHAR(100) NULL,
+        [date] DATETIME2 NULL CONSTRAINT DF_InvoicesProductPayment_Date DEFAULT GETDATE(),
+        [reference] NVARCHAR(255) NULL
+    );
+END;
+
+-- 20f. InvoicesProductItinerary
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProductItinerary' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InvoicesProductItinerary] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductItinerary PRIMARY KEY,
+        [invoiceProductId] INT NOT NULL,
+        [orden] INT NULL,
+        [origin] NVARCHAR(255) NOT NULL,
+        [destination] NVARCHAR(255) NOT NULL,
+        [class] NVARCHAR(255) NULL,
+        [checkInDate] DATETIME2 NULL,
+        [checkOutDate] DATETIME2 NULL,
+        [terminal] NVARCHAR(255) NULL,
+        [prestadoraCode] NVARCHAR(255) NULL,
+        [farebasis] NVARCHAR(255) NULL,
+        [Numflight] NVARCHAR(25) NULL,
+        [Typeflight] NVARCHAR(1) NULL,
+        [amount] FLOAT NULL,
+        [co2] FLOAT NULL
+    );
+END;
+
+-- 20g. InvoicesProductCombo
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProductCombo' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InvoicesProductCombo] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductCombo PRIMARY KEY,
+        [invoiceId] INT NOT NULL,
+        [comboId] INT NOT NULL
+    );
+END;
+
+
+-- 20h. TraceabilitySession
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TraceabilitySession' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TraceabilitySession] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TraceabilitySession PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_TraceabilitySession_Code UNIQUE,
+        [userId] INT NULL,
+        [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceabilitySession_Origin DEFAULT 'WEB',
+        [module] NVARCHAR(100) NOT NULL,
+        [screen] NVARCHAR(100) NULL,
+        [action] NVARCHAR(100) NOT NULL,
+        [process] NVARCHAR(100) NULL,
+        [status] NVARCHAR(50) NOT NULL CONSTRAINT DF_TraceabilitySession_Status DEFAULT 'IN_PROGRESS',
+        [totalDurationMs] FLOAT NULL CONSTRAINT DF_TraceabilitySession_TotalDurationMs DEFAULT 0,
+        [errorMessage] NVARCHAR(MAX) NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceabilitySession_CreatedAt DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceabilitySession_UpdatedAt DEFAULT GETDATE()
+    );
+END;
+
+-- 20i. TraceabilityLog
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TraceabilityLog' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TraceabilityLog] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TraceabilityLog PRIMARY KEY,
+        [sessionId] INT NOT NULL,
+        [code] NVARCHAR(50) NOT NULL,
+        [userId] INT NULL,
+        [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceabilityLog_Origin DEFAULT 'WEB',
+        [eventType] NVARCHAR(50) NOT NULL,
+        [stepName] NVARCHAR(255) NOT NULL,
+        [spName] NVARCHAR(255) NULL,
+        [endpoint] NVARCHAR(500) NULL,
+        [durationMs] FLOAT NULL CONSTRAINT DF_TraceabilityLog_DurationMs DEFAULT 0,
+        [status] NVARCHAR(50) NOT NULL CONSTRAINT DF_TraceabilityLog_Status DEFAULT 'SUCCESS',
+        [inputData] NVARCHAR(MAX) NULL,
+        [outputData] NVARCHAR(MAX) NULL,
+        [techMessage] NVARCHAR(MAX) NULL,
+        [functionalMessage] NVARCHAR(MAX) NULL,
+        [stackTrace] NVARCHAR(MAX) NULL,
+        [affectedId] NVARCHAR(255) NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceabilityLog_CreatedAt DEFAULT GETDATE()
+    );
+END;
+
 -- 21. Countries
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Countries' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -626,7 +788,67 @@ BEGIN
         [currentNumber] INT NOT NULL CONSTRAINT DF_TxCons_Curr DEFAULT 1,
         [branchId] INT NULL,
         [implantId] INT NULL,
-        [isActive] BIT NOT NULL CONSTRAINT DF_TransactionConsecutive_IsActive DEFAULT 1
+        [padding] INT NULL CONSTRAINT DF_TxCons_Padding DEFAULT 4,
+        [isActive] BIT NOT NULL CONSTRAINT DF_TransactionConsecutive_IsActive DEFAULT 1,
+        [updatedAt] DATETIME2 NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TransactionConsecutive') AND name = 'padding')
+BEGIN
+    ALTER TABLE dbo.[TransactionConsecutive] ADD [padding] INT NULL CONSTRAINT DF_TxCons_Padding DEFAULT 4;
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TransactionConsecutive') AND name = 'updatedAt')
+BEGIN
+    ALTER TABLE dbo.[TransactionConsecutive] ADD [updatedAt] DATETIME2 NULL;
+END;
+
+-- 29.1 TraceabilitySession
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TraceabilitySession' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TraceabilitySession] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TraceabilitySession PRIMARY KEY,
+        [code] NVARCHAR(100) NOT NULL,
+        [userId] INT NULL,
+        [userName] NVARCHAR(150) NULL,
+        [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceSession_Origin DEFAULT N'WEB',
+        [module] NVARCHAR(100) NOT NULL,
+        [screen] NVARCHAR(100) NULL,
+        [action] NVARCHAR(100) NOT NULL,
+        [process] NVARCHAR(250) NULL,
+        [status] NVARCHAR(50) NOT NULL CONSTRAINT DF_TraceSession_Status DEFAULT N'IN_PROGRESS',
+        [totalDurationMs] FLOAT NOT NULL CONSTRAINT DF_TraceSession_Dur DEFAULT 0,
+        [errorMessage] NVARCHAR(MAX) NULL,
+        [eventCount] INT NOT NULL CONSTRAINT DF_TraceSession_Events DEFAULT 1,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceSession_Created DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceSession_Updated DEFAULT GETDATE()
+    );
+END;
+
+-- 29.2 TraceabilityLog
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TraceabilityLog' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TraceabilityLog] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TraceabilityLog PRIMARY KEY,
+        [sessionId] INT NULL,
+        [code] NVARCHAR(100) NOT NULL,
+        [userId] INT NULL,
+        [userName] NVARCHAR(150) NULL,
+        [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceLog_Origin DEFAULT N'WEB',
+        [eventType] NVARCHAR(50) NOT NULL,
+        [stepName] NVARCHAR(250) NOT NULL,
+        [spName] NVARCHAR(150) NULL,
+        [endpoint] NVARCHAR(250) NULL,
+        [durationMs] FLOAT NOT NULL CONSTRAINT DF_TraceLog_Dur DEFAULT 0,
+        [status] NVARCHAR(50) NOT NULL CONSTRAINT DF_TraceLog_Status DEFAULT N'SUCCESS',
+        [inputData] NVARCHAR(MAX) NULL,
+        [outputData] NVARCHAR(MAX) NULL,
+        [techMessage] NVARCHAR(MAX) NULL,
+        [functionalMessage] NVARCHAR(MAX) NULL,
+        [stackTrace] NVARCHAR(MAX) NULL,
+        [affectedId] NVARCHAR(100) NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceLog_Created DEFAULT GETDATE()
     );
 END;
 
@@ -740,7 +962,1572 @@ BEGIN
     );
 END;
 
+-- 37. TraceabilitySession
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TraceabilitySession' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TraceabilitySession] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TraceabilitySession PRIMARY KEY,
+        [code] NVARCHAR(100) NOT NULL CONSTRAINT UQ_TraceabilitySession_Code UNIQUE,
+        [userId] INT NULL,
+        [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceabilitySession_Origin DEFAULT N'WEB',
+        [module] NVARCHAR(100) NOT NULL,
+        [screen] NVARCHAR(150) NULL,
+        [action] NVARCHAR(150) NOT NULL,
+        [process] NVARCHAR(150) NULL,
+        [status] NVARCHAR(50) NOT NULL CONSTRAINT DF_TraceabilitySession_Status DEFAULT N'IN_PROGRESS',
+        [totalDurationMs] FLOAT NULL CONSTRAINT DF_TraceabilitySession_TotalDuration DEFAULT 0,
+        [errorMessage] NVARCHAR(MAX) NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceabilitySession_CreatedAt DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceabilitySession_UpdatedAt DEFAULT GETDATE()
+    );
+END;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TraceabilitySession') AND name = 'origin')
+BEGIN
+    ALTER TABLE dbo.[TraceabilitySession] ADD [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceabilitySession_Origin DEFAULT N'WEB';
+END;
+
+-- 38. TraceabilityLog
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TraceabilityLog' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TraceabilityLog] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TraceabilityLog PRIMARY KEY,
+        [sessionId] INT NOT NULL,
+        [code] NVARCHAR(100) NOT NULL,
+        [userId] INT NULL,
+        [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceabilityLog_Origin DEFAULT N'WEB',
+        [eventType] NVARCHAR(100) NOT NULL,
+        [stepName] NVARCHAR(200) NOT NULL,
+        [spName] NVARCHAR(200) NULL,
+        [endpoint] NVARCHAR(255) NULL,
+        [durationMs] FLOAT NULL CONSTRAINT DF_TraceabilityLog_Duration DEFAULT 0,
+        [status] NVARCHAR(50) NOT NULL CONSTRAINT DF_TraceabilityLog_Status DEFAULT N'SUCCESS',
+        [inputData] NVARCHAR(MAX) NULL,
+        [outputData] NVARCHAR(MAX) NULL,
+        [techMessage] NVARCHAR(MAX) NULL,
+        [functionalMessage] NVARCHAR(MAX) NULL,
+        [stackTrace] NVARCHAR(MAX) NULL,
+        [affectedId] NVARCHAR(100) NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_TraceabilityLog_CreatedAt DEFAULT GETDATE()
+    );
+END;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TraceabilityLog') AND name = 'origin')
+BEGIN
+    ALTER TABLE dbo.[TraceabilityLog] ADD [origin] NVARCHAR(50) NULL CONSTRAINT DF_TraceabilityLog_Origin DEFAULT N'WEB';
+END;
+
+-- 39. ImpRet
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ImpRet' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ImpRet] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ImpRet PRIMARY KEY,
+        [cd_codigo] VARCHAR(20) NOT NULL CONSTRAINT UQ_ImpRet_Code UNIQUE,
+        [ds_nombre] VARCHAR(250) NULL,
+        [cd_cuenta] VARCHAR(20) NULL,
+        [am_porcentaje] NUMERIC(5,2) NULL CONSTRAINT DF_ImpRet_Porcentaje DEFAULT 0,
+        [in_tipo] CHAR(1) NULL CONSTRAINT DF_ImpRet_Tipo DEFAULT 'I',
+        [Id_cargo_dep] INT NULL,
+        [bl_IVA] BIT NULL CONSTRAINT DF_ImpRet_BlIva DEFAULT 0
+    );
+    IF NOT EXISTS (SELECT 1 FROM dbo.[ImpRet] WHERE id = 1)
+    BEGIN
+        SET IDENTITY_INSERT dbo.[ImpRet] ON;
+        INSERT INTO dbo.[ImpRet] (id, cd_codigo, ds_nombre, cd_cuenta, am_porcentaje, in_tipo, bl_IVA)
+        VALUES (1, '01', 'IVA 19%', '240805', 19.00, 'I', 1);
+        SET IDENTITY_INSERT dbo.[ImpRet] OFF;
+    END;
+END;
+
+-- 40. CargosDesc
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CargosDesc' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CargosDesc] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CargosDesc PRIMARY KEY,
+        [cd_codigo] VARCHAR(20) NOT NULL CONSTRAINT UQ_CargosDesc_Code UNIQUE,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+-- 41. parametros
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'parametros' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[parametros] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_parametros PRIMARY KEY,
+        [nombre] VARCHAR(250) NULL,
+        [valor] VARCHAR(MAX) NULL
+    );
+    IF NOT EXISTS (SELECT 1 FROM dbo.[parametros] WHERE id = 33)
+    BEGIN
+        SET IDENTITY_INSERT dbo.[parametros] ON;
+        INSERT INTO dbo.[parametros] (id, nombre, valor) VALUES (33, 'NumeroDecimales', '2');
+        SET IDENTITY_INSERT dbo.[parametros] OFF;
+    END;
+    IF NOT EXISTS (SELECT 1 FROM dbo.[parametros] WHERE id = 326)
+    BEGIN
+        SET IDENTITY_INSERT dbo.[parametros] ON;
+        INSERT INTO dbo.[parametros] (id, nombre, valor) VALUES (326, 'CalcularAutoValoresItemFac', 'N');
+        SET IDENTITY_INSERT dbo.[parametros] OFF;
+    END;
+END;
+
+-- 42. Parametr
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Parametr' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Parametr] (
+        [PARAMETRO] VARCHAR(50) NOT NULL CONSTRAINT PK_Parametr PRIMARY KEY,
+        [VALOPAR] VARCHAR(250) NULL
+    );
+END;
+
+
+
+-- ============================================================================
+-- TABLAS MAESTRAS Y COMPLEMENTARIAS DE ZEUS ERP (AUTOGENERADAS POR AUDITORÍA)
+-- ============================================================================
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Monedas_IATA' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Monedas_IATA] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Monedas_IATA PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NOT NULL CONSTRAINT UQ_Monedas_IATA_Code UNIQUE,
+        [ds_nombre] VARCHAR(250) NULL,
+        [am_tasa_cambio] MONEY NULL DEFAULT 1
+    );
+    IF NOT EXISTS (SELECT 1 FROM dbo.[Monedas_IATA] WHERE cd_codigo = 'COP')
+        INSERT INTO dbo.[Monedas_IATA] (cd_codigo, ds_nombre, am_tasa_cambio) VALUES ('COP', 'PESOS COLOMBIANOS', 1);
+    IF NOT EXISTS (SELECT 1 FROM dbo.[Monedas_IATA] WHERE cd_codigo = 'USD')
+        INSERT INTO dbo.[Monedas_IATA] (cd_codigo, ds_nombre, am_tasa_cambio) VALUES ('USD', 'DOLARES AMERICANOS', 4000);
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Sucursales' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Sucursales] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Sucursales PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NOT NULL CONSTRAINT UQ_Sucursales_Code UNIQUE,
+        [ds_nombre] VARCHAR(250) NULL,
+        [cd_bu] VARCHAR(25) NULL
+    );
+    IF NOT EXISTS (SELECT 1 FROM dbo.[Sucursales] WHERE id = 1)
+        INSERT INTO dbo.[Sucursales] (cd_codigo, ds_nombre, cd_bu) VALUES ('01', 'PRINCIPAL', 'MAIN');
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Implantes' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Implantes] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Implantes PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NOT NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [id_sucursal] INT NULL,
+        [cd_bu] VARCHAR(25) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'FormasPago' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[FormasPago] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_FormasPago PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NOT NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TarjetasCredito' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TarjetasCredito] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TarjetasCredito PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NOT NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'tarjetascredito' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[tarjetascredito] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TiposDocumento' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TiposDocumento] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Entidades' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Entidades] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Tiqueteadores' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Tiqueteadores] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [id_tipoventa] INT NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TiposServicios' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TiposServicios] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConceptoFacturacion' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ConceptoFacturacion] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'tiposServicio_asignados' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[tiposServicio_asignados] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [id_ConceptoFacturacion] INT NULL,
+        [id_TiposServicios] INT NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TipoProveedores' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TipoProveedores] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TipoVenta' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TipoVenta] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Hoteles' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Hoteles] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CLIENTES' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CLIENTES] (
+        [IDCLIENTE] VARCHAR(25) NOT NULL PRIMARY KEY,
+        [RAZONCIAL] VARCHAR(250) NULL,
+        [DIRECCION] VARCHAR(250) NULL,
+        [TELEFONO] VARCHAR(50) NULL,
+        [CIUDAD] VARCHAR(100) NULL,
+        [EMAIL] VARCHAR(150) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PROVEEDORES' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[PROVEEDORES] (
+        [IDPROVE] VARCHAR(25) NOT NULL PRIMARY KEY,
+        [RAZONCIAL] VARCHAR(250) NULL,
+        [CODICTA] VARCHAR(25) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'MAEVENDE' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[MAEVENDE] (
+        [IDVENDE] VARCHAR(25) NOT NULL PRIMARY KEY,
+        [NOMBVENDE] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TERCEROS' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TERCEROS] (
+        [IDTERCERO] VARCHAR(25) NOT NULL PRIMARY KEY,
+        [RAZONCIAL] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Terceros' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Terceros] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'FACTURAS' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[FACTURAS] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_fuente] VARCHAR(10) NULL,
+        [cd_serie] VARCHAR(10) NULL,
+        [cd_consecutivo] VARCHAR(25) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'FUENTES' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[FUENTES] (
+        [cd_fuente] VARCHAR(10) NOT NULL PRIMARY KEY,
+        [ds_fuente] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Fac_Factura' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Fac_Factura] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_fuente] VARCHAR(10) NULL,
+        [cd_serie] VARCHAR(10) NULL,
+        [cd_consecutivo] VARCHAR(25) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'fac_factura' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[fac_factura] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_fuente] VARCHAR(10) NULL,
+        [cd_serie] VARCHAR(10) NULL,
+        [cd_consecutivo] VARCHAR(25) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'resoluciones' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[resoluciones] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [ds_num_resolucion] VARCHAR(50) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'NotasAerolinea' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[NotasAerolinea] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(25) NULL,
+        [ds_nombre] VARCHAR(250) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CargosAsignados' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CargosAsignados] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CargosAsignados_ConceptoFac' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CargosAsignados_ConceptoFac] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CargosAsignados_Configuracion_ImpCategoriaFiscal' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CargosAsignados_Configuracion_ImpCategoriaFiscal] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Categorias' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Categorias] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Cierres' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Cierres] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Cliente_ConfiguracionVariables' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Cliente_ConfiguracionVariables] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Cliente_FP_AirPlus' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Cliente_FP_AirPlus] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Clientes_Descuentos' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Clientes_Descuentos] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ColaImpresion_Documentos' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ColaImpresion_Documentos] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConfiguracioFacturaTarjetasPropias_NumerosTC' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ConfiguracioFacturaTarjetasPropias_NumerosTC] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConfiguracionClientesConceptos' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ConfiguracionClientesConceptos] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConfiguracionConceptosAutoClientes' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ConfiguracionConceptosAutoClientes] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConfiguracionConceptosAutoClientes_Conceptos' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ConfiguracionConceptosAutoClientes_Conceptos] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConfiguracionTransacciones_Adicionales' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ConfiguracionTransacciones_Adicionales] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConfiguracionVariables' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ConfiguracionVariables] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Configuracion_ImpCategoriaFiscal' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Configuracion_ImpCategoriaFiscal] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Configuracion_remisiones' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Configuracion_remisiones] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Cotizacion' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Cotizacion] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CotizacionCargos' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CotizacionCargos] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CotizacionImpuestos' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CotizacionImpuestos] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CotizacionServicios' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CotizacionServicios] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CotizacionServiciosFormasPago' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CotizacionServiciosFormasPago] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CotizacionServicios_PaxAdicional' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CotizacionServicios_PaxAdicional] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CotizacionServicios_TipoProv' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[CotizacionServicios_TipoProv] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Cotizacion_facturas' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Cotizacion_facturas] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EquivalencesInterfaces' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[EquivalencesInterfaces] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Etapas' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Etapas] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Fac_RecibosCaja' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Fac_RecibosCaja] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Fac_Servicios' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Fac_Servicios] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Fac_Servicios_TiposFacturacionHoteles' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Fac_Tao' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Fac_Tao] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'fac_TAO' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[fac_TAO] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'GREmpresarial' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[GREmpresarial] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ImpAsignados' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ImpAsignados] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ImpAsignados_ConceptoFac' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ImpAsignados_ConceptoFac] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ImpAsignados_Configuracion_ImpCategoriaFiscal' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ImpAsignados_Configuracion_ImpCategoriaFiscal] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Impuestos_bu' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Impuestos_bu] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Interfaces' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Interfaces] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ReservaGDS_Detalles' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ReservaGDS_Detalles] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ReservaGDS_Servicios' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ReservaGDS_Servicios] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ReservaGDS_VariableAdicional' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ReservaGDS_VariableAdicional] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ReservasGDS' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[ReservasGDS] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Segmento' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Segmento] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TiposFacturacionHoteles' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[TiposFacturacionHoteles] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Tiquetes' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Tiquetes] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Usuario' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Usuario] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDatosMaestro' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[VariableDatosMaestro] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDefinicion' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[VariableDefinicion] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDefinicionMaestro' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[VariableDefinicionMaestro] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [cd_codigo] VARCHAR(50) NULL,
+        [ds_nombre] VARCHAR(250) NULL,
+        [created_at] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
+
+
+
+-- ============================================================================
+-- GARANTÍA DE COLUMNAS USADAS EN SPs T-SQL
+-- ============================================================================
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_consecutivo')
+    ALTER TABLE dbo.[Cotizacion] ADD [cd_consecutivo] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_Cotizacion')
+    ALTER TABLE dbo.[Cotizacion] ADD [cd_Cotizacion] VARCHAR(50) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_consecutivo')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [cd_consecutivo] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_Cotizacion')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [cd_Cotizacion] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_consecutivo_anul')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [cd_consecutivo_anul] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_Consecutivo_VariablesAdicionales')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [cd_Consecutivo_VariablesAdicionales] VARCHAR(50) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'cd_Cotizacion')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [cd_Cotizacion] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'id_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [id_CotizacionServicios] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'id_cargosdesc')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [id_cargosdesc] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'cd_Cotizacion')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [cd_Cotizacion] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'id_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [id_CotizacionServicios] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'id_impret')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [id_impret] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'cd_Cotizacion')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [cd_Cotizacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'cd_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [cd_CotizacionServicios] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'id_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [id_CotizacionServicios] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'Id_Cotizacion')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [Id_Cotizacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'id_FormasPago')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [id_FormasPago] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'cd_codigo')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [cd_codigo] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_FPnm')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_FPnm] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'bl_FPrepresenta')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [bl_FPrepresenta] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'id_TarjetasCredito')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [id_TarjetasCredito] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'cd_tccode')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [cd_tccode] NCHAR(10) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_tcnumber')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_tcnumber] CHAR(16) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_tcvoucher')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_tcvoucher] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'cd_idbanco')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [cd_idbanco] CHAR(3) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_cheque')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_cheque] VARCHAR(30) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_referencia')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_referencia] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'am_valor')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [am_valor] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_tcexp')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_tcexp] VARCHAR(7) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_plaza')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_plaza] CHAR(3) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_Poliza')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_Poliza] VARCHAR(20) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_PolAnexo')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_PolAnexo] VARCHAR(20) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'am_valor_ME')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [am_valor_ME] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'ds_tcautorizacion')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [ds_tcautorizacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServiciosFormasPago') AND name = 'in_tccuotas')
+    ALTER TABLE dbo.[CotizacionServiciosFormasPago] ADD [in_tccuotas] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'Id_Cotizacion')
+    ALTER TABLE dbo.[Cotizacion] ADD [Id_Cotizacion] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'Id_Cotizacion')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [Id_Cotizacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'Id_Cotizacion_Solicitud')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [Id_Cotizacion_Solicitud] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_proveedores')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [ds_proveedores] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_proveedores')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [cd_proveedores] VARCHAR(50) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'ds_cargonm')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [ds_cargonm] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'bl_noshow')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [bl_noshow] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'am_contado')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [am_contado] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'am_credito')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [am_credito] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'am_valor')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [am_valor] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'am_contado_ME')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [am_contado_ME] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'am_credito_ME')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [am_credito_ME] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'am_valor_ME')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [am_valor_ME] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'id_CotizacionCargos')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [id_CotizacionCargos] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'cd_CotizacionCargos')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [cd_CotizacionCargos] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionCargos') AND name = 'cd_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionCargos] ADD [cd_CotizacionServicios] VARCHAR(50) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'id_CotizacionCargos')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [id_CotizacionCargos] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'ds_Impas')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [ds_Impas] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'cd_impcta')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [cd_impcta] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'am_porcentaje')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [am_porcentaje] NUMERIC(5,2) NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'bl_contabilizar')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [bl_contabilizar] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'am_contado')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [am_contado] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'am_credito')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [am_credito] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'am_valor')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [am_valor] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'am_contado_ME')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [am_contado_ME] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'am_credito_ME')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [am_credito_ME] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'am_valor_ME')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [am_valor_ME] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'cd_CotizacionImpuestos')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [cd_CotizacionImpuestos] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'cd_CotizacionCargos')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [cd_CotizacionCargos] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionImpuestos') AND name = 'cd_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionImpuestos] ADD [cd_CotizacionServicios] VARCHAR(50) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'cd_Cotizacion')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [cd_Cotizacion] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'cd_CotizacionServicios')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [cd_CotizacionServicios] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'cd_TiposFacturacionHoteles')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [cd_TiposFacturacionHoteles] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'cd_cargosdesc')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [cd_cargosdesc] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'id_Fac_Servicios')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [id_Fac_Servicios] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'id_CotizacionServicios')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [id_CotizacionServicios] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'Id_TiposFacturacionHoteles')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [Id_TiposFacturacionHoteles] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'in_cantidad')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [in_cantidad] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'am_valor')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [am_valor] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'am_contado')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [am_contado] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'am_credito')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [am_credito] MONEY NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'Id_Cotizacion_Solicitud')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [Id_Cotizacion_Solicitud] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'id_cargosdesc')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [id_cargosdesc] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') AND name = 'ds_cargonm')
+    ALTER TABLE dbo.[Fac_Servicios_TiposFacturacionHoteles] ADD [ds_cargonm] VARCHAR(100) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'id_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [id_CotizacionServicios] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'Id_Cotizacion')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [Id_Cotizacion] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_TipoProv') AND name = 'id_CotizacionServicios')
+    ALTER TABLE dbo.[CotizacionServicios_TipoProv] ADD [id_CotizacionServicios] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_TipoProv') AND name = 'Id_Cotizacion')
+    ALTER TABLE dbo.[CotizacionServicios_TipoProv] ADD [Id_Cotizacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_TipoProv') AND name = 'ds_proveedores')
+    ALTER TABLE dbo.[CotizacionServicios_TipoProv] ADD [ds_proveedores] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_TipoProv') AND name = 'cd_proveedores')
+    ALTER TABLE dbo.[CotizacionServicios_TipoProv] ADD [cd_proveedores] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_TipoProv') AND name = 'id_tipoproveedores')
+    ALTER TABLE dbo.[CotizacionServicios_TipoProv] ADD [id_tipoproveedores] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_TipoProv') AND name = 'cd_TipoProveedores')
+    ALTER TABLE dbo.[CotizacionServicios_TipoProv] ADD [cd_TipoProveedores] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_TipoProv') AND name = 'ds_TipoProveedores')
+    ALTER TABLE dbo.[CotizacionServicios_TipoProv] ADD [ds_TipoProveedores] VARCHAR(250) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion_facturas') AND name = 'cd_Cotizacion')
+    ALTER TABLE dbo.[Cotizacion_facturas] ADD [cd_Cotizacion] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion_facturas') AND name = 'id_CotizacionServicios')
+    ALTER TABLE dbo.[Cotizacion_facturas] ADD [id_CotizacionServicios] INT NULL;
+
+-- 21. VariableDefinicion, VariableDefinicionMaestro, VariableDatosMaestro
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDefinicion' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[VariableDefinicion] (
+        [IDEN] NUMERIC(18,0) IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [Nombre] VARCHAR(50) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDefinicionMaestro' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[VariableDefinicionMaestro] (
+        [IDEN] NUMERIC(18,0) IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [Codigo] VARCHAR(50) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDatosMaestro' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[VariableDatosMaestro] (
+        [IDEN] NUMERIC(18,0) IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [IDEN_Maestro] NUMERIC(18,0) NULL,
+        [IDEN_Variable] NUMERIC(18,0) NULL,
+        [CodigoMaestro] VARCHAR(50) NULL,
+        [ValorNumerico] NUMERIC(18,6) NULL,
+        [ValorFecha] SMALLDATETIME NULL,
+        [ValorVarchar] VARCHAR(500) NULL,
+        [cd_VariableDatosMaestro] VARCHAR(25) NULL,
+        [cd_Cotizacion] VARCHAR(25) NULL,
+        [cd_CotizacionServicios] VARCHAR(25) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDatosMaestro') AND name = 'IDEN_Maestro')
+    ALTER TABLE dbo.[VariableDatosMaestro] ADD [IDEN_Maestro] NUMERIC(18,0) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDatosMaestro') AND name = 'IDEN_Variable')
+    ALTER TABLE dbo.[VariableDatosMaestro] ADD [IDEN_Variable] NUMERIC(18,0) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDatosMaestro') AND name = 'CodigoMaestro')
+    ALTER TABLE dbo.[VariableDatosMaestro] ADD [CodigoMaestro] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDatosMaestro') AND name = 'ValorNumerico')
+    ALTER TABLE dbo.[VariableDatosMaestro] ADD [ValorNumerico] NUMERIC(18,6) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDatosMaestro') AND name = 'ValorFecha')
+    ALTER TABLE dbo.[VariableDatosMaestro] ADD [ValorFecha] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDatosMaestro') AND name = 'ValorVarchar')
+    ALTER TABLE dbo.[VariableDatosMaestro] ADD [ValorVarchar] VARCHAR(500) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'cd_tiquete')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [cd_tiquete] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_tiquete')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [cd_tiquete] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_tiquete')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [cd_tiquete] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'ds_paxname')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [ds_paxname] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'ds_paxape')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [ds_paxape] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'ds_paxprefix')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [ds_paxprefix] VARCHAR(10) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'ds_paxClasificacion')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [ds_paxClasificacion] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'cd_voucherpax')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [cd_voucherpax] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'cd_paxidentificacion')
+    ALTER TABLE dbo.[CotizacionServicios_PaxAdicional] ADD [cd_paxidentificacion] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_pordescuento')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [am_pordescuento] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_basedescuento')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [am_basedescuento] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_CotizacionServicios_Depende')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [id_CotizacionServicios_Depende] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'bl_tiquete')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [bl_tiquete] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TiposServicios') AND name = 'bl_tiquete')
+    ALTER TABLE dbo.[TiposServicios] ADD [bl_tiquete] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'bl_tiquete')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [bl_tiquete] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dt_fechaficheroBBVA')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [dt_fechaficheroBBVA] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dt_fechaficheroBBVA')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [dt_fechaficheroBBVA] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_GDS')
+    ALTER TABLE dbo.[Cotizacion] ADD [ds_GDS] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_GDS')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [ds_GDS] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_GDS')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [ds_GDS] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_PorFacParcial')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [am_PorFacParcial] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_EdadPax')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [in_EdadPax] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_PorFacParcial')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [am_PorFacParcial] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_EdadPax')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [in_EdadPax] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_Aerolinea')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [id_Aerolinea] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_Aerolinea')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [id_Aerolinea] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_TipoServicio')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [id_TipoServicio] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_TipoServicio')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [id_TipoServicio] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_MonedaSrv')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [id_MonedaSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_MonedaSrv')
+    ALTER TABLE dbo.[CotizacionServicios] ADD [cd_MonedaSrv] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_MonedaSrv')
+    ALTER TABLE dbo.[Fac_Servicios] ADD [id_MonedaSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_TipoAuto') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_TipoAuto] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_Origen') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_Origen] VARCHAR(30) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_DirOrigen') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_DirOrigen] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_DirDestino') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_DirDestino] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_TipoTarifa') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_TipoTarifa] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_ValorUSD') ALTER TABLE dbo.[CotizacionServicios] ADD [am_ValorUSD] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_NoVuelo') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_NoVuelo] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_Vehiculo') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_Vehiculo] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_Placa') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_Placa] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_CategoriaVehiculo') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_CategoriaVehiculo] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_NombreConductor') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_NombreConductor] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_telefono') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_telefono] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_IdiomaConductor') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_IdiomaConductor] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_TipoAuto') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_TipoAuto] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_Origen') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_Origen] VARCHAR(30) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_DirOrigen') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_DirOrigen] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_DirDestino') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_DirDestino] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_TipoTarifa') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_TipoTarifa] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_ValorUSD') ALTER TABLE dbo.[Fac_Servicios] ADD [am_ValorUSD] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_NoVuelo') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_NoVuelo] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_Vehiculo') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_Vehiculo] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_Placa') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_Placa] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_CategoriaVehiculo') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_CategoriaVehiculo] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_NombreConductor') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_NombreConductor] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_telefono') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_telefono] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_IdiomaConductor') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_IdiomaConductor] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_sys_entidades') ALTER TABLE dbo.[Cotizacion] ADD [id_sys_entidades] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_Evento') ALTER TABLE dbo.[Cotizacion] ADD [cd_Evento] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_sys_entidades') ALTER TABLE dbo.[CotizacionServicios] ADD [id_sys_entidades] INT NULL;
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'id_sys_entidades') ALTER TABLE dbo.[Fac_Cotizacion] ADD [id_sys_entidades] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_sys_entidades') ALTER TABLE dbo.[Fac_Servicios] ADD [id_sys_entidades] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'Iden_GDS') ALTER TABLE dbo.[CotizacionServicios] ADD [Iden_GDS] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'Iden_GDS') ALTER TABLE dbo.[Fac_Servicios] ADD [Iden_GDS] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_Regiones') ALTER TABLE dbo.[CotizacionServicios] ADD [id_Regiones] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_Regiones') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_Regiones] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_Regiones') ALTER TABLE dbo.[Fac_Servicios] ADD [id_Regiones] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_Regiones') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_Regiones] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_TarjetaAsistencia') ALTER TABLE dbo.[CotizacionServicios] ADD [id_TarjetaAsistencia] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_TarjetaAsistencia') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_TarjetaAsistencia] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_TarjetaAsistencia') ALTER TABLE dbo.[Fac_Servicios] ADD [id_TarjetaAsistencia] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_TarjetaAsistencia') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_TarjetaAsistencia] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_fac_remisionComision') ALTER TABLE dbo.[CotizacionServicios] ADD [id_fac_remisionComision] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_fac_facturaComision') ALTER TABLE dbo.[CotizacionServicios] ADD [id_fac_facturaComision] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_fac_remisionComision') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_fac_remisionComision] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_fac_facturaComision') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_fac_facturaComision] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_fac_remisionComision') ALTER TABLE dbo.[Fac_Servicios] ADD [id_fac_remisionComision] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_fac_facturaComision') ALTER TABLE dbo.[Fac_Servicios] ADD [id_fac_facturaComision] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_fac_remisionComision') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_fac_remisionComision] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_fac_facturaComision') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_fac_facturaComision] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_tipoHabitacion') ALTER TABLE dbo.[CotizacionServicios] ADD [id_tipoHabitacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_tipoHabitacionacion') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_tipoHabitacionacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_tipoHabitacion') ALTER TABLE dbo.[Fac_Servicios] ADD [id_tipoHabitacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_tipoHabitacionacion') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_tipoHabitacionacion] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dt_politicaCancelacion') ALTER TABLE dbo.[CotizacionServicios] ADD [dt_politicaCancelacion] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'bl_politicaCancelacion') ALTER TABLE dbo.[CotizacionServicios] ADD [bl_politicaCancelacion] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dt_politicaCancelacion') ALTER TABLE dbo.[Fac_Servicios] ADD [dt_politicaCancelacion] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'bl_politicaCancelacion') ALTER TABLE dbo.[Fac_Servicios] ADD [bl_politicaCancelacion] BIT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_paxidentificacion') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_paxidentificacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_confirmacion') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_confirmacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_confirmadopor') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_confirmadopor] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_paxidentificacion') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_paxidentificacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_confirmacion') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_confirmacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_confirmadopor') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_confirmadopor] VARCHAR(250) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_habitacionesSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [in_habitacionesSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_habitaciones') ALTER TABLE dbo.[CotizacionServicios] ADD [in_habitaciones] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_TipoPlanSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_TipoPlanSrv] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_AcomodacionSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_AcomodacionSrv] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_habitacionesSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [in_habitacionesSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_habitaciones') ALTER TABLE dbo.[Fac_Servicios] ADD [in_habitaciones] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_TipoPlanSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_TipoPlanSrv] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_AcomodacionSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_AcomodacionSrv] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_TipoPlanSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [id_TipoPlanSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_AcomodacionSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [id_AcomodacionSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_TipoPlanSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [id_TipoPlanSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_AcomodacionSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [id_AcomodacionSrv] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dt_VenceFac') ALTER TABLE dbo.[CotizacionServicios] ADD [dt_VenceFac] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_NumeFac') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_NumeFac] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_basecomisionableprov') ALTER TABLE dbo.[CotizacionServicios] ADD [am_basecomisionableprov] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_porcomisionprov') ALTER TABLE dbo.[CotizacionServicios] ADD [am_porcomisionprov] FLOAT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dt_VenceFac') ALTER TABLE dbo.[Fac_Servicios] ADD [dt_VenceFac] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_NumeFac') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_NumeFac] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_basecomisionableprov') ALTER TABLE dbo.[Fac_Servicios] ADD [am_basecomisionableprov] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_porcomisionprov') ALTER TABLE dbo.[Fac_Servicios] ADD [am_porcomisionprov] FLOAT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_voucherpax') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_voucherpax] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_localizador') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_localizador] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_voucherpax') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_voucherpax] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_localizador') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_localizador] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dt_FechaLlegadaSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [dt_FechaLlegadaSrv] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dt_FechaSalidaSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [dt_FechaSalidaSrv] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dt_FechaLlegadaSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [dt_FechaLlegadaSrv] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dt_FechaSalidaSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [dt_FechaSalidaSrv] SMALLDATETIME NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_NumeroOpcion') ALTER TABLE dbo.[CotizacionServicios] ADD [in_NumeroOpcion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_NumeroOpcion') ALTER TABLE dbo.[Fac_Servicios] ADD [in_NumeroOpcion] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_cargosdesc_descuento') ALTER TABLE dbo.[CotizacionServicios] ADD [id_cargosdesc_descuento] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_cargosdesc_descuento') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_cargosdesc_descuento] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_motivo_descuento') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_motivo_descuento] VARCHAR(1000) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_valor_descuento') ALTER TABLE dbo.[CotizacionServicios] ADD [am_valor_descuento] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_porcentaje_descuento') ALTER TABLE dbo.[CotizacionServicios] ADD [am_porcentaje_descuento] FLOAT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_cargosdesc_descuento') ALTER TABLE dbo.[Fac_Servicios] ADD [id_cargosdesc_descuento] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_cargosdesc_descuento') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_cargosdesc_descuento] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_motivo_descuento') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_motivo_descuento] VARCHAR(1000) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_valor_descuento') ALTER TABLE dbo.[Fac_Servicios] ADD [am_valor_descuento] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_porcentaje_descuento') ALTER TABLE dbo.[Fac_Servicios] ADD [am_porcentaje_descuento] FLOAT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'Id_Especialista') ALTER TABLE dbo.[Cotizacion] ADD [Id_Especialista] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_Especialista') ALTER TABLE dbo.[Cotizacion] ADD [cd_Especialista] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'Id_Especialista') ALTER TABLE dbo.[CotizacionServicios] ADD [Id_Especialista] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_Especialista') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_Especialista] VARCHAR(25) NULL;
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'Id_Especialista') ALTER TABLE dbo.[Fac_Cotizacion] ADD [Id_Especialista] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'Id_Especialista') ALTER TABLE dbo.[Fac_Servicios] ADD [Id_Especialista] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_Especialista') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_Especialista] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_nochesSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [in_nochesSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_diasSrv') ALTER TABLE dbo.[CotizacionServicios] ADD [in_diasSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_GrConcepto') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_GrConcepto] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_nochesSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [in_nochesSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_diasSrv') ALTER TABLE dbo.[Fac_Servicios] ADD [in_diasSrv] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_GrConcepto') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_GrConcepto] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_GrConcepto') ALTER TABLE dbo.[CotizacionServicios] ADD [id_GrConcepto] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_GrConcepto') ALTER TABLE dbo.[Fac_Servicios] ADD [id_GrConcepto] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_records') ALTER TABLE dbo.[Cotizacion] ADD [ds_records] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_records') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_records] VARCHAR(25) NULL;
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'ds_records') ALTER TABLE dbo.[Fac_Cotizacion] ADD [ds_records] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_records') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_records] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_noches') ALTER TABLE dbo.[CotizacionServicios] ADD [in_noches] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_dias') ALTER TABLE dbo.[CotizacionServicios] ADD [in_dias] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_acomodacion') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_acomodacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_tipoplan') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_tipoplan] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_noches') ALTER TABLE dbo.[Fac_Servicios] ADD [in_noches] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_dias') ALTER TABLE dbo.[Fac_Servicios] ADD [in_dias] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_acomodacion') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_acomodacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_tipoplan') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_tipoplan] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_acomodacion') ALTER TABLE dbo.[CotizacionServicios] ADD [id_acomodacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_tipoplan') ALTER TABLE dbo.[CotizacionServicios] ADD [id_tipoplan] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_acomodacion') ALTER TABLE dbo.[Fac_Servicios] ADD [id_acomodacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_tipoplan') ALTER TABLE dbo.[Fac_Servicios] ADD [id_tipoplan] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_paxClasificacion') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_paxClasificacion] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_paxClasificacion') ALTER TABLE dbo.[CotizacionServicios] ADD [id_paxClasificacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_paxClasificacion') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_paxClasificacion] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_paxClasificacion') ALTER TABLE dbo.[Fac_Servicios] ADD [id_paxClasificacion] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dias_recaudo') ALTER TABLE dbo.[CotizacionServicios] ADD [dias_recaudo] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'Valor_Recaudo') ALTER TABLE dbo.[CotizacionServicios] ADD [Valor_Recaudo] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'Valor_Comision') ALTER TABLE dbo.[CotizacionServicios] ADD [Valor_Comision] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'bl_notdomicilionacional') ALTER TABLE dbo.[CotizacionServicios] ADD [bl_notdomicilionacional] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_voucherPrefijo') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_voucherPrefijo] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dias_recaudo') ALTER TABLE dbo.[Fac_Servicios] ADD [dias_recaudo] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'Valor_Recaudo') ALTER TABLE dbo.[Fac_Servicios] ADD [Valor_Recaudo] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'Valor_Comision') ALTER TABLE dbo.[Fac_Servicios] ADD [Valor_Comision] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'bl_notdomicilionacional') ALTER TABLE dbo.[Fac_Servicios] ADD [bl_notdomicilionacional] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_voucherPrefijo') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_voucherPrefijo] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_porcomision') ALTER TABLE dbo.[CotizacionServicios] ADD [am_porcomision] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_basecomisionable') ALTER TABLE dbo.[CotizacionServicios] ADD [am_basecomisionable] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_porcomision') ALTER TABLE dbo.[Fac_Servicios] ADD [am_porcomision] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_basecomisionable') ALTER TABLE dbo.[Fac_Servicios] ADD [am_basecomisionable] FLOAT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_implante_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_implante_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_implante_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [id_implante_anul] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_sucursal_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_sucursal_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_sucursal_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [id_sucursal_anul] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_usuario_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_usuario_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_usuario_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [id_usuario_anul] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_consecutivo_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_consecutivo_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_serie_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_serie_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_fuente_anul') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_fuente_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'bl_anulado') ALTER TABLE dbo.[CotizacionServicios] ADD [bl_anulado] BIT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_implante_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_implante_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_implante_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [id_implante_anul] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_sucursal_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_sucursal_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_sucursal_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [id_sucursal_anul] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_usuario_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_usuario_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_usuario_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [id_usuario_anul] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_consecutivo_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_consecutivo_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_serie_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_serie_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_fuente_anul') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_fuente_anul] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'bl_anulado') ALTER TABLE dbo.[Fac_Servicios] ADD [bl_anulado] BIT NULL DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_hoteles') ALTER TABLE dbo.[CotizacionServicios] ADD [id_hoteles] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_hoteles') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_hoteles] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_carrental') ALTER TABLE dbo.[CotizacionServicios] ADD [id_carrental] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_carrental') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_carrental] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_hoteles') ALTER TABLE dbo.[Fac_Servicios] ADD [id_hoteles] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_hoteles') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_hoteles] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_carrental') ALTER TABLE dbo.[Fac_Servicios] ADD [id_carrental] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_carrental') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_carrental] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_InfoAdicional') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_InfoAdicional] VARCHAR(8000) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_InfoAdicional') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_InfoAdicional] VARCHAR(8000) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_monedaprov') ALTER TABLE dbo.[CotizacionServicios] ADD [id_monedaprov] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_monedaprov') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_monedaprov] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_monedaprov') ALTER TABLE dbo.[Fac_Servicios] ADD [id_monedaprov] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_monedaprov') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_monedaprov] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'am_valorprov') ALTER TABLE dbo.[CotizacionServicios] ADD [am_valorprov] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_item') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_item] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_item') ALTER TABLE dbo.[CotizacionServicios] ADD [id_item] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_auxiliar') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_auxiliar] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_auxiliar') ALTER TABLE dbo.[CotizacionServicios] ADD [id_auxiliar] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_cencosto') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_cencosto] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_cencosto') ALTER TABLE dbo.[CotizacionServicios] ADD [id_cencosto] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'am_valorprov') ALTER TABLE dbo.[Fac_Servicios] ADD [am_valorprov] FLOAT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_item') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_item] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_item') ALTER TABLE dbo.[Fac_Servicios] ADD [id_item] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_auxiliar') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_auxiliar] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_auxiliar') ALTER TABLE dbo.[Fac_Servicios] ADD [id_auxiliar] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_cencosto') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_cencosto] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_cencosto') ALTER TABLE dbo.[Fac_Servicios] ADD [id_cencosto] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dt_salida') ALTER TABLE dbo.[CotizacionServicios] ADD [dt_salida] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'dt_llegada') ALTER TABLE dbo.[CotizacionServicios] ADD [dt_llegada] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_cantpax') ALTER TABLE dbo.[CotizacionServicios] ADD [in_cantpax] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_voucher') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_voucher] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_nacionalidad') ALTER TABLE dbo.[CotizacionServicios] ADD [in_nacionalidad] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_paxtype') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_paxtype] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dt_salida') ALTER TABLE dbo.[Fac_Servicios] ADD [dt_salida] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'dt_llegada') ALTER TABLE dbo.[Fac_Servicios] ADD [dt_llegada] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_cantpax') ALTER TABLE dbo.[Fac_Servicios] ADD [in_cantpax] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_voucher') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_voucher] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_nacionalidad') ALTER TABLE dbo.[Fac_Servicios] ADD [in_nacionalidad] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_paxtype') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_paxtype] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_paxape') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_paxape] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_paxname') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_paxname] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_descrip') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_descrip] VARCHAR(4000) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_servicio') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_servicio] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_proveedores') ALTER TABLE dbo.[CotizacionServicios] ADD [id_proveedores] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_proveedores') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_proveedores] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_proveedores') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_proveedores] VARCHAR(250) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_paxape') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_paxape] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_paxname') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_paxname] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_descrip') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_descrip] VARCHAR(4000) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_servicio') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_servicio] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_proveedores') ALTER TABLE dbo.[Fac_Servicios] ADD [id_proveedores] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_proveedores') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_proveedores] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_proveedores') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_proveedores] VARCHAR(250) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_destino') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_destino] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_prov_air') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_prov_air] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_prov_car') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_prov_car] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_prov_hotel') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_prov_hotel] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_tiposervnm') ALTER TABLE dbo.[CotizacionServicios] ADD [ds_tiposervnm] VARCHAR(100) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_destino') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_destino] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_prov_air') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_prov_air] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_prov_car') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_prov_car] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_prov_hotel') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_prov_hotel] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'ds_tiposervnm') ALTER TABLE dbo.[Fac_Servicios] ADD [ds_tiposervnm] VARCHAR(100) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_fac_remision') ALTER TABLE dbo.[CotizacionServicios] ADD [id_fac_remision] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_fac_factura') ALTER TABLE dbo.[CotizacionServicios] ADD [id_fac_factura] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_fac_remision') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_fac_remision] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_fac_factura') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_fac_factura] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_fac_remision') ALTER TABLE dbo.[Fac_Servicios] ADD [id_fac_remision] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_fac_factura') ALTER TABLE dbo.[Fac_Servicios] ADD [id_fac_factura] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_fac_remision') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_fac_remision] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_fac_factura') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_fac_factura] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_TiposServicio') ALTER TABLE dbo.[CotizacionServicios] ADD [id_TiposServicio] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_TiposServicio') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_TiposServicio] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_ConceptoFacturacion') ALTER TABLE dbo.[CotizacionServicios] ADD [id_ConceptoFacturacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_ConceptoFacturacion') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_ConceptoFacturacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_TiposConceptFac') ALTER TABLE dbo.[CotizacionServicios] ADD [id_TiposConceptFac] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_TiposConceptFac') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_TiposConceptFac] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_TiposServicio') ALTER TABLE dbo.[Fac_Servicios] ADD [id_TiposServicio] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_TiposServicio') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_TiposServicio] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_ConceptoFacturacion') ALTER TABLE dbo.[Fac_Servicios] ADD [id_ConceptoFacturacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_ConceptoFacturacion') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_ConceptoFacturacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_TiposConceptFac') ALTER TABLE dbo.[Fac_Servicios] ADD [id_TiposConceptFac] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_TiposConceptFac') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_TiposConceptFac] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_evento') ALTER TABLE dbo.[Cotizacion] ADD [id_evento] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_evento') ALTER TABLE dbo.[Cotizacion] ADD [cd_evento] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'id_evento') ALTER TABLE dbo.[CotizacionServicios] ADD [id_evento] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'cd_evento') ALTER TABLE dbo.[CotizacionServicios] ADD [cd_evento] VARCHAR(25) NULL;
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'id_evento') ALTER TABLE dbo.[Fac_Cotizacion] ADD [id_evento] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'id_evento') ALTER TABLE dbo.[Fac_Servicios] ADD [id_evento] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'cd_evento') ALTER TABLE dbo.[Fac_Servicios] ADD [cd_evento] VARCHAR(25) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_hotelTieneTiquete') ALTER TABLE dbo.[Cotizacion] ADD [ds_hotelTieneTiquete] VARCHAR(2) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_fechaPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [bl_fechaPagoDestino] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_CheckOutPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [dt_CheckOutPagoDestino] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_CheckInPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [dt_CheckInPagoDestino] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_DocumentoPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [ds_DocumentoPagoDestino] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_FormaPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [cd_FormaPagoDestino] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_MonedaPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [cd_MonedaPagoDestino] VARCHAR(25) NULL;
+
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'ds_hotelTieneTiquete') ALTER TABLE dbo.[Fac_Cotizacion] ADD [ds_hotelTieneTiquete] VARCHAR(2) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_FormaPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [id_FormaPagoDestino] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_MonedaPagoDestino') ALTER TABLE dbo.[Cotizacion] ADD [id_MonedaPagoDestino] INT NULL;
+
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'id_FormaPagoDestino') ALTER TABLE dbo.[Fac_Cotizacion] ADD [id_FormaPagoDestino] INT NULL;
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'id_MonedaPagoDestino') ALTER TABLE dbo.[Fac_Cotizacion] ADD [id_MonedaPagoDestino] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_entregadoCliente') ALTER TABLE dbo.[Cotizacion] ADD [dt_entregadoCliente] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_entregadoCliente') ALTER TABLE dbo.[Cotizacion] ADD [bl_entregadoCliente] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_comisiona') ALTER TABLE dbo.[Cotizacion] ADD [bl_comisiona] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_AlertaSolicitud') ALTER TABLE dbo.[Cotizacion] ADD [ds_AlertaSolicitud] VARCHAR(8000) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_usuario_Bloqueo') ALTER TABLE dbo.[Cotizacion] ADD [cd_usuario_Bloqueo] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_bloqueada') ALTER TABLE dbo.[Cotizacion] ADD [bl_bloqueada] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_MedioReservacion') ALTER TABLE dbo.[Cotizacion] ADD [cd_MedioReservacion] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_TipoFormaPagoProveedor') ALTER TABLE dbo.[Cotizacion] ADD [cd_TipoFormaPagoProveedor] VARCHAR(25) NULL;
+
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'dt_entregadoCliente') ALTER TABLE dbo.[Fac_Cotizacion] ADD [dt_entregadoCliente] SMALLDATETIME NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_FormaDePago') ALTER TABLE dbo.[Cotizacion] ADD [ds_FormaDePago] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'gk_sabre') ALTER TABLE dbo.[Cotizacion] ADD [gk_sabre] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_grupos') ALTER TABLE dbo.[Cotizacion] ADD [bl_grupos] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'in_OpcionSeleccionada') ALTER TABLE dbo.[Cotizacion] ADD [in_OpcionSeleccionada] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_CerrarCotizacion') ALTER TABLE dbo.[Cotizacion] ADD [bl_CerrarCotizacion] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'in_NumeroOpciones') ALTER TABLE dbo.[Cotizacion] ADD [in_NumeroOpciones] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_ManejaOpciones') ALTER TABLE dbo.[Cotizacion] ADD [bl_ManejaOpciones] BIT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_seguimiento_etapa') ALTER TABLE dbo.[Cotizacion] ADD [ds_seguimiento_etapa] VARCHAR(500) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_Etapa') ALTER TABLE dbo.[Cotizacion] ADD [cd_Etapa] VARCHAR(25) NULL;
+
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'ds_FormaDePago') ALTER TABLE dbo.[Fac_Cotizacion] ADD [ds_FormaDePago] VARCHAR(250) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_MedioReservacion') ALTER TABLE dbo.[Cotizacion] ADD [id_MedioReservacion] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_TipoFormaPagoProveedor') ALTER TABLE dbo.[Cotizacion] ADD [id_TipoFormaPagoProveedor] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_Etapa') ALTER TABLE dbo.[Cotizacion] ADD [id_Etapa] INT NULL;
+
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'id_MedioReservacion') ALTER TABLE dbo.[Fac_Cotizacion] ADD [id_MedioReservacion] INT NULL;
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'id_TipoFormaPagoProveedor') ALTER TABLE dbo.[Fac_Cotizacion] ADD [id_TipoFormaPagoProveedor] INT NULL;
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'id_Etapa') ALTER TABLE dbo.[Fac_Cotizacion] ADD [id_Etapa] INT NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'in_estado') ALTER TABLE dbo.[Cotizacion] ADD [in_estado] INT NULL DEFAULT 1;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_vence') ALTER TABLE dbo.[Cotizacion] ADD [dt_vence] SMALLDATETIME NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_tipoventa') ALTER TABLE dbo.[Cotizacion] ADD [cd_tipoventa] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tipoventa') ALTER TABLE dbo.[Cotizacion] ADD [id_tipoventa] INT NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_Campo_libre2') ALTER TABLE dbo.[Cotizacion] ADD [ds_Campo_libre2] VARCHAR(500) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_Campo_libre1') ALTER TABLE dbo.[Cotizacion] ADD [ds_Campo_libre1] VARCHAR(500) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_observacion') ALTER TABLE dbo.[Cotizacion] ADD [ds_observacion] VARCHAR(8000) NULL;
+
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'in_estado') ALTER TABLE dbo.[Fac_Cotizacion] ADD [in_estado] INT NULL DEFAULT 1;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'am_tcambiousd') ALTER TABLE dbo.[Cotizacion] ADD [am_tcambiousd] FLOAT NULL DEFAULT 1;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'am_tcambio') ALTER TABLE dbo.[Cotizacion] ADD [am_tcambio] FLOAT NULL DEFAULT 1;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bn_anexo') ALTER TABLE dbo.[Cotizacion] ADD [bn_anexo] VARBINARY(MAX) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_contacto_email') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_contacto_email] VARCHAR(60) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_contacto') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_contacto] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_email') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_email] VARCHAR(60) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_dirdesp') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_dirdesp] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_tel') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_tel] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_ciudad') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_ciudad] VARCHAR(100) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_dir') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_dir] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_nombre') ALTER TABLE dbo.[Cotizacion] ADD [ds_cliente_nombre] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_cliente_codigo') ALTER TABLE dbo.[Cotizacion] ADD [cd_cliente_codigo] VARCHAR(25) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_tercero_nombre') ALTER TABLE dbo.[Cotizacion] ADD [ds_tercero_nombre] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_tercero_codigo') ALTER TABLE dbo.[Cotizacion] ADD [cd_tercero_codigo] VARCHAR(25) NULL;
+
+IF OBJECT_ID('dbo.Fac_Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Cotizacion') AND name = 'am_tcambiousd') ALTER TABLE dbo.[Fac_Cotizacion] ADD [am_tcambiousd] FLOAT NULL DEFAULT 1;
+
+IF OBJECT_ID('dbo.Facturas') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'cd_vendedor') ALTER TABLE dbo.[Facturas] ADD [cd_vendedor] VARCHAR(25) NULL;
+IF OBJECT_ID('dbo.Facturas') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'id_tiqueteador') ALTER TABLE dbo.[Facturas] ADD [id_tiqueteador] INT NULL;
+IF OBJECT_ID('dbo.Facturas') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'id_tiqueteador_Facturador') ALTER TABLE dbo.[Facturas] ADD [id_tiqueteador_Facturador] INT NULL;
+IF OBJECT_ID('dbo.Facturas') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'id_Especialista') ALTER TABLE dbo.[Facturas] ADD [id_Especialista] INT NULL;
+IF OBJECT_ID('dbo.Facturas') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'id_TipoFormaPagoProveedor') ALTER TABLE dbo.[Facturas] ADD [id_TipoFormaPagoProveedor] INT NULL;
+IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_vendedor') ALTER TABLE dbo.[Cotizacion] ADD [cd_vendedor] VARCHAR(25) NULL;
+IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_tiqueteador') ALTER TABLE dbo.[Cotizacion] ADD [cd_tiqueteador] VARCHAR(25) NULL;
+IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tiqueteador') ALTER TABLE dbo.[Cotizacion] ADD [id_tiqueteador] INT NULL;
+IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tiqueteador_Facturador') ALTER TABLE dbo.[Cotizacion] ADD [id_tiqueteador_Facturador] INT NULL;
+
 PRINT 'Tablas de la base de datos SQL Server estructuradas exitosamente.';
+
 
 
 GO
@@ -904,6 +2691,11 @@ BEGIN
     INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'manual', N'Manual Operativo', N'/dashboard/manual', 1);
 END;
 
+IF NOT EXISTS (SELECT 1 FROM dbo.[Menu] WHERE [code] = N'DIAGNOSTICS')
+BEGIN
+    INSERT INTO dbo.[Menu] ([code], [name], [action], [activo]) VALUES (N'DIAGNOSTICS', N'Trazabilidad y Diagnóstico', N'/dashboard/diagnostics', 1);
+END;
+
 
 -- 4. Tablas Maestras del Sitio (Master)
 DECLARE @masters TABLE (code NVARCHAR(100), name NVARCHAR(255));
@@ -992,6 +2784,12 @@ IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE [email] = N'rubiel1985@msn.com')
 BEGIN
     INSERT INTO dbo.[User] ([name], [email], [passwordHash], [roleId], [isActive])
     VALUES (N'Rubiel', N'rubiel1985@msn.com', N'$2b$10$e1v0/9V8ZPVqejcqarQfq.hDLlKuva.M/mNsSUxOTefeyuUTqoaW2', 1, 1);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'TRACEABILITY_MODE')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value])
+    VALUES (N'TRACEABILITY_MODE', N'Modo de Trazabilidad y Diagnóstico', N'OFF');
 END;
 
 PRINT 'Semillas iniciales inyectadas exitosamente.';
@@ -1950,6 +3748,109 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- Safeguards de Columnas para Tablas de Zeus ERP y Korex
+IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo') ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+GO
+IF OBJECT_ID('dbo.Facturas', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'cd_vendedor') ALTER TABLE dbo.Facturas ADD cd_vendedor VARCHAR(25) NULL;
+GO
+IF OBJECT_ID('dbo.Facturas', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'id_tiqueteador') ALTER TABLE dbo.Facturas ADD id_tiqueteador INT NULL;
+GO
+IF OBJECT_ID('dbo.TipoProveedores', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TipoProveedores') AND name = 'ds_descrip') ALTER TABLE dbo.TipoProveedores ADD ds_descrip VARCHAR(250) NULL;
+GO
+IF OBJECT_ID('dbo.ConceptoFacturacion', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ConceptoFacturacion') AND name = 'id_TiposConceptoFacturacion') ALTER TABLE dbo.ConceptoFacturacion ADD id_TiposConceptoFacturacion INT NULL DEFAULT 2;
+GO
+IF OBJECT_ID('dbo.VariableDefinicionMaestro', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicionMaestro') AND name = 'IDEN') ALTER TABLE dbo.VariableDefinicionMaestro ADD IDEN INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicionMaestro') AND name = 'Codigo') ALTER TABLE dbo.VariableDefinicionMaestro ADD Codigo VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicionMaestro') AND name = 'Nombre') ALTER TABLE dbo.VariableDefinicionMaestro ADD Nombre VARCHAR(250) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.VariableDefinicion', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'IDEN') ALTER TABLE dbo.VariableDefinicion ADD IDEN INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'Codigo') ALTER TABLE dbo.VariableDefinicion ADD Codigo VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'Nombre') ALTER TABLE dbo.VariableDefinicion ADD Nombre VARCHAR(250) NULL;
+END;
+GO
+
+-- Safeguards para dbo.Cotizacion
+IF OBJECT_ID('dbo.Cotizacion', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_sucursal') ALTER TABLE dbo.Cotizacion ADD id_sucursal INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_implante') ALTER TABLE dbo.Cotizacion ADD id_implante INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_consecutivo') ALTER TABLE dbo.Cotizacion ADD cd_consecutivo VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_usuario') ALTER TABLE dbo.Cotizacion ADD id_usuario INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_fechacont') ALTER TABLE dbo.Cotizacion ADD dt_fechacont SMALLDATETIME NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_fecha') ALTER TABLE dbo.Cotizacion ADD dt_fecha SMALLDATETIME NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_usuarioAct') ALTER TABLE dbo.Cotizacion ADD id_usuarioAct INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_fechaAct') ALTER TABLE dbo.Cotizacion ADD dt_fechaAct SMALLDATETIME NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_usuarioAct') ALTER TABLE dbo.Cotizacion ADD cd_usuarioAct VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_vence') ALTER TABLE dbo.Cotizacion ADD dt_vence SMALLDATETIME NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_tercero_codigo') ALTER TABLE dbo.Cotizacion ADD cd_tercero_codigo VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_tercero_nombre') ALTER TABLE dbo.Cotizacion ADD ds_tercero_nombre VARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_cliente_codigo') ALTER TABLE dbo.Cotizacion ADD cd_cliente_codigo VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_nombre') ALTER TABLE dbo.Cotizacion ADD ds_cliente_nombre VARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_dir') ALTER TABLE dbo.Cotizacion ADD ds_cliente_dir VARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_ciudad') ALTER TABLE dbo.Cotizacion ADD ds_cliente_ciudad VARCHAR(40) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_tel') ALTER TABLE dbo.Cotizacion ADD ds_cliente_tel VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_dirdesp') ALTER TABLE dbo.Cotizacion ADD ds_cliente_dirdesp VARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_email') ALTER TABLE dbo.Cotizacion ADD ds_cliente_email VARCHAR(60) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_contacto') ALTER TABLE dbo.Cotizacion ADD ds_cliente_contacto VARCHAR(40) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_cliente_contacto_email') ALTER TABLE dbo.Cotizacion ADD ds_cliente_contacto_email VARCHAR(60) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_monedas_IATA') ALTER TABLE dbo.Cotizacion ADD id_monedas_IATA INT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'am_tcambio') ALTER TABLE dbo.Cotizacion ADD am_tcambio FLOAT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_vendedor') ALTER TABLE dbo.Cotizacion ADD cd_vendedor VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_tiqueteador') ALTER TABLE dbo.Cotizacion ADD cd_tiqueteador VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tiqueteador') ALTER TABLE dbo.Cotizacion ADD id_tiqueteador INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tiqueteador_Facturador') ALTER TABLE dbo.Cotizacion ADD id_tiqueteador_Facturador INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'am_tcambiousd') ALTER TABLE dbo.Cotizacion ADD am_tcambiousd FLOAT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tipoventa') ALTER TABLE dbo.Cotizacion ADD id_tipoventa INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_tipoventa') ALTER TABLE dbo.Cotizacion ADD cd_tipoventa VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_observacion') ALTER TABLE dbo.Cotizacion ADD ds_observacion VARCHAR(8000) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_Campo_libre1') ALTER TABLE dbo.Cotizacion ADD ds_Campo_libre1 VARCHAR(500) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_Campo_libre2') ALTER TABLE dbo.Cotizacion ADD ds_Campo_libre2 VARCHAR(500) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'in_estado') ALTER TABLE dbo.Cotizacion ADD in_estado INT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_ManejaOpciones') ALTER TABLE dbo.Cotizacion ADD bl_ManejaOpciones BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'in_NumeroOpciones') ALTER TABLE dbo.Cotizacion ADD in_NumeroOpciones INT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_CerrarCotizacion') ALTER TABLE dbo.Cotizacion ADD bl_CerrarCotizacion BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'in_OpcionSeleccionada') ALTER TABLE dbo.Cotizacion ADD in_OpcionSeleccionada INT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_grupos') ALTER TABLE dbo.Cotizacion ADD bl_grupos BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'gk_sabre') ALTER TABLE dbo.Cotizacion ADD gk_sabre VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_Especialista') ALTER TABLE dbo.Cotizacion ADD id_Especialista INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_TipoFormaPagoProveedor') ALTER TABLE dbo.Cotizacion ADD id_TipoFormaPagoProveedor INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_MedioReservacion') ALTER TABLE dbo.Cotizacion ADD id_MedioReservacion INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_comisiona') ALTER TABLE dbo.Cotizacion ADD bl_comisiona BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_alertasolicitud') ALTER TABLE dbo.Cotizacion ADD ds_alertasolicitud VARCHAR(8000) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_FormaDePago') ALTER TABLE dbo.Cotizacion ADD ds_FormaDePago VARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_entregadoCliente') ALTER TABLE dbo.Cotizacion ADD bl_entregadoCliente BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_entregadoCliente') ALTER TABLE dbo.Cotizacion ADD dt_entregadoCliente SMALLDATETIME NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_sys_entidades') ALTER TABLE dbo.Cotizacion ADD id_sys_entidades INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_MonedaPagoDestino') ALTER TABLE dbo.Cotizacion ADD id_MonedaPagoDestino INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_FormaPagoDestino') ALTER TABLE dbo.Cotizacion ADD id_FormaPagoDestino INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_DocumentoPagoDestino') ALTER TABLE dbo.Cotizacion ADD ds_DocumentoPagoDestino VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'BL_fechaPagoDestino') ALTER TABLE dbo.Cotizacion ADD BL_fechaPagoDestino BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_CheckInPagoDestino') ALTER TABLE dbo.Cotizacion ADD dt_CheckInPagoDestino SMALLDATETIME NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'dt_CheckOutPagoDestino') ALTER TABLE dbo.Cotizacion ADD dt_CheckOutPagoDestino SMALLDATETIME NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_hotelTieneTiquete') ALTER TABLE dbo.Cotizacion ADD ds_hotelTieneTiquete VARCHAR(2) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'ds_GDS') ALTER TABLE dbo.Cotizacion ADD ds_GDS VARCHAR(2) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_evento') ALTER TABLE dbo.Cotizacion ADD id_evento INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_Etapa') ALTER TABLE dbo.Cotizacion ADD cd_Etapa VARCHAR(25) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_Etapa') ALTER TABLE dbo.Cotizacion ADD id_Etapa INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'bl_bloqueada') ALTER TABLE dbo.Cotizacion ADD bl_bloqueada BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_usuario_Bloqueo') ALTER TABLE dbo.Cotizacion ADD cd_usuario_Bloqueo VARCHAR(25) NULL;
+END;
+GO
+
+-- Safeguards para dbo.CotizacionServicios
+IF OBJECT_ID('dbo.CotizacionServicios', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_descrip') ALTER TABLE dbo.CotizacionServicios ADD ds_descrip VARCHAR(4000) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_servicio') ALTER TABLE dbo.CotizacionServicios ADD ds_servicio VARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_tiposervnm') ALTER TABLE dbo.CotizacionServicios ADD ds_tiposervnm VARCHAR(50) NULL;
+END;
+GO
+
 -- ============================================================================
 -- SECCIÓN 1: FUNCIONES ESCALARES Y DE TABLA (T-SQL)
 -- ============================================================================
@@ -2039,22 +3940,19 @@ IF OBJECT_ID('dbo.spMonedaListar', 'P') IS NOT NULL
 GO
 
 CREATE PROCEDURE dbo.spMonedaListar
-    @p_currency_id INT = NULL,
     @p_id INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @id INT = COALESCE(@p_currency_id, @p_id);
     SELECT
         c.[id],
         c.[code],
         c.[name],
         c.[exchangeRate],
         c.[decimals],
-        ISNULL(c.[isActive], 1) AS [isActive],
-        CASE WHEN ISNULL(c.[isActive], 1) = 1 THEN 0 ELSE 1 END AS [inactive]
+        ISNULL(c.[isActive], 1) AS [isActive]
     FROM dbo.[Currency] c
-    WHERE (@id IS NULL OR c.[id] = @id)
+    WHERE (@p_id IS NULL OR c.[id] = @p_id)
     ORDER BY c.[code] ASC;
 END;
 GO
@@ -2406,14 +4304,9 @@ CREATE PROCEDURE dbo.spMenuListar
 AS
 BEGIN
     SET NOCOUNT ON;
-    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Menu') AND name = 'code')
-    BEGIN
-        EXEC sp_executesql N'SELECT m.[id], m.[code], m.[name], m.[parent], m.[action], ISNULL(m.[activo], 1) AS [activo] FROM dbo.[Menu] m WHERE ISNULL(m.[activo], 1) = 1 ORDER BY m.[id] ASC';
-    END
-    ELSE
-    BEGIN
-        EXEC sp_executesql N'SELECT m.[IdMenu] AS [id], CAST(m.[IdMenu] AS NVARCHAR(50)) AS [code], m.[Nombre] AS [name], m.[Pariente] AS [parent], N'''' AS [action], 1 AS [activo] FROM dbo.[Menu] m ORDER BY m.[IdMenu] ASC';
-    END
+    SELECT m.[id], m.[code], m.[name], m.[parent], m.[action], ISNULL(m.[activo], 1) AS [activo]
+    FROM dbo.[Menu] m
+    ORDER BY m.[id] ASC;
 END;
 GO
 
@@ -2432,13 +4325,202 @@ BEGIN
 END;
 GO
 
+-- 2.21. spTraceabilityLog
+IF OBJECT_ID('dbo.spTraceabilityLog', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spTraceabilityLog;
+GO
+
+CREATE PROCEDURE dbo.spTraceabilityLog
+    @p_code NVARCHAR(50),
+    @p_user_id INT = NULL,
+    @p_origin NVARCHAR(50) = 'WEB',
+    @p_module NVARCHAR(100) = 'GENERAL',
+    @p_screen NVARCHAR(100) = NULL,
+    @p_action NVARCHAR(100) = 'EJECUCION',
+    @p_process NVARCHAR(100) = NULL,
+    @p_event_type NVARCHAR(50) = 'INFO',
+    @p_step_name NVARCHAR(255) = 'PASO',
+    @p_sp_name NVARCHAR(255) = NULL,
+    @p_endpoint NVARCHAR(500) = NULL,
+    @p_duration_ms FLOAT = 0,
+    @p_status NVARCHAR(50) = 'SUCCESS',
+    @p_input_data NVARCHAR(MAX) = NULL,
+    @p_output_data NVARCHAR(MAX) = NULL,
+    @p_tech_message NVARCHAR(MAX) = NULL,
+    @p_functional_message NVARCHAR(MAX) = NULL,
+    @p_stack_trace NVARCHAR(MAX) = NULL,
+    @p_affected_id NVARCHAR(255) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @v_session_id INT;
+    DECLARE @v_mode NVARCHAR(50) = 'OFF';
+    DECLARE @v_origin NVARCHAR(50) = ISNULL(NULLIF(TRIM(@p_origin), ''), 'WEB');
+
+    SELECT TOP 1 @v_mode = UPPER([value]) FROM dbo.[SystemParameter] WHERE UPPER([code]) = 'TRACEABILITY_MODE';
+    SET @v_mode = ISNULL(@v_mode, 'OFF');
+
+    IF @v_mode = 'OFF' AND UPPER(ISNULL(@p_event_type, '')) NOT IN ('ERROR', 'EXCEPCION')
+    BEGIN
+        RETURN;
+    END;
+
+    SELECT TOP 1 @v_session_id = id FROM dbo.[TraceabilitySession] WHERE code = @p_code;
+
+    IF @v_session_id IS NULL
+    BEGIN
+        INSERT INTO dbo.[TraceabilitySession] (
+            [code], [userId], [origin], [module], [screen], [action], [process], [status], [errorMessage]
+        ) VALUES (
+            @p_code, @p_user_id, @v_origin, ISNULL(@p_module, 'GENERAL'), @p_screen, ISNULL(@p_action, 'EJECUCION'), @p_process,
+            CASE 
+                WHEN UPPER(ISNULL(@p_event_type, '')) IN ('ERROR', 'EXCEPCION') OR UPPER(ISNULL(@p_status, '')) = 'ERROR' THEN 'ERROR'
+                WHEN UPPER(ISNULL(@p_status, '')) = 'SUCCESS' OR UPPER(ISNULL(@p_event_type, '')) IN ('FIN_PROCESO', 'API_RESPONSE', 'SP_FIN') THEN 'SUCCESS'
+                ELSE ISNULL(@p_status, 'IN_PROGRESS')
+            END,
+            CASE WHEN UPPER(ISNULL(@p_event_type, '')) IN ('ERROR', 'EXCEPCION') THEN ISNULL(@p_functional_message, @p_tech_message) ELSE NULL END
+        );
+        SET @v_session_id = SCOPE_IDENTITY();
+    END
+    ELSE
+    BEGIN
+        UPDATE dbo.[TraceabilitySession] SET
+            [updatedAt] = GETDATE(),
+            [origin] = ISNULL(@v_origin, [origin]),
+            [totalDurationMs] = ISNULL([totalDurationMs], 0) + ISNULL(@p_duration_ms, 0),
+            [status] = CASE 
+                WHEN UPPER(ISNULL(@p_event_type, '')) IN ('ERROR', 'EXCEPCION') OR UPPER(ISNULL(@p_status, '')) = 'ERROR' THEN 'ERROR'
+                WHEN UPPER(ISNULL(@p_status, '')) = 'SUCCESS' OR UPPER(ISNULL(@p_event_type, '')) IN ('FIN_PROCESO', 'API_RESPONSE', 'SP_FIN') THEN 'SUCCESS'
+                ELSE [status]
+            END,
+            [errorMessage] = CASE WHEN UPPER(ISNULL(@p_event_type, '')) IN ('ERROR', 'EXCEPCION') THEN ISNULL(@p_functional_message, ISNULL(@p_tech_message, [errorMessage])) ELSE [errorMessage] END
+        WHERE id = @v_session_id;
+    END;
+
+    INSERT INTO dbo.[TraceabilityLog] (
+        [sessionId], [code], [userId], [origin], [eventType], [stepName], [spName], [endpoint],
+        [durationMs], [status], [inputData], [outputData], [techMessage], [functionalMessage],
+        [stackTrace], [affectedId]
+    ) VALUES (
+        @v_session_id, @p_code, @p_user_id, @v_origin, ISNULL(@p_event_type, 'INFO'), ISNULL(@p_step_name, 'PASO'),
+        @p_sp_name, @p_endpoint, ISNULL(@p_duration_ms, 0), ISNULL(@p_status, 'SUCCESS'),
+        @p_input_data, @p_output_data, @p_tech_message, @p_functional_message,
+        @p_stack_trace, @p_affected_id
+    );
+END;
+GO
+
+-- 2.22. spTraceabilityList
+IF OBJECT_ID('dbo.spTraceabilityList', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spTraceabilityList;
+GO
+
+CREATE PROCEDURE dbo.spTraceabilityList
+    @p_code NVARCHAR(50) = NULL,
+    @p_user_id INT = NULL,
+    @p_module NVARCHAR(100) = NULL,
+    @p_status NVARCHAR(50) = NULL,
+    @p_start_date DATETIME2 = NULL,
+    @p_end_date DATETIME2 = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TOP 100
+        s.id,
+        s.code,
+        s.userId,
+        ISNULL(s.origin, 'WEB') AS origin,
+        ISNULL(u.name, 'Sistema / Anonimo') AS userName,
+        s.module,
+        s.screen,
+        s.action,
+        s.process,
+        s.status,
+        ISNULL(s.totalDurationMs, 0) AS totalDurationMs,
+        s.errorMessage,
+        (SELECT COUNT(*) FROM dbo.[TraceabilityLog] l WHERE l.sessionId = s.id) AS eventCount,
+        s.createdAt,
+        s.updatedAt
+    FROM dbo.[TraceabilitySession] s
+    LEFT JOIN dbo.[User] u ON s.userId = u.id
+    WHERE (@p_code IS NULL OR TRIM(@p_code) = '' OR s.code LIKE '%' + TRIM(@p_code) + '%')
+      AND (@p_user_id IS NULL OR @p_user_id = 0 OR s.userId = @p_user_id)
+      AND (@p_module IS NULL OR TRIM(@p_module) = '' OR s.module LIKE '%' + TRIM(@p_module) + '%')
+      AND (@p_status IS NULL OR TRIM(@p_status) = '' OR s.status = TRIM(@p_status))
+      AND (@p_start_date IS NULL OR s.createdAt >= @p_start_date)
+      AND (@p_end_date IS NULL OR s.createdAt <= @p_end_date)
+    ORDER BY s.createdAt DESC;
+END;
+GO
+
+-- 2.23. spTraceabilityGetDetails
+IF OBJECT_ID('dbo.spTraceabilityGetDetails', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spTraceabilityGetDetails;
+GO
+
+CREATE PROCEDURE dbo.spTraceabilityGetDetails
+    @p_code NVARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        l.id AS log_id,
+        l.code AS session_code,
+        l.userId,
+        ISNULL(l.origin, 'WEB') AS origin,
+        ISNULL(u.name, 'Sistema / Anonimo') AS userName,
+        l.eventType,
+        l.stepName,
+        l.spName,
+        l.endpoint,
+        ISNULL(l.durationMs, 0) AS durationMs,
+        l.status,
+        l.inputData,
+        l.outputData,
+        l.techMessage,
+        l.functionalMessage,
+        l.stackTrace,
+        l.affectedId,
+        l.createdAt
+    FROM dbo.[TraceabilityLog] l
+    LEFT JOIN dbo.[User] u ON l.userId = u.id
+    WHERE l.code = @p_code OR l.sessionId IN (SELECT id FROM dbo.[TraceabilitySession] WHERE code = @p_code)
+    ORDER BY l.id ASC;
+END;
+GO
+
+-- 2.24. spTraceabilityClean
+IF OBJECT_ID('dbo.spTraceabilityClean', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spTraceabilityClean;
+GO
+
+CREATE PROCEDURE dbo.spTraceabilityClean
+    @p_days INT = 30
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @cutoff DATETIME2 = DATEADD(day, -@p_days, GETDATE());
+    DECLARE @deleted_logs INT = 0;
+    DECLARE @deleted_sessions INT = 0;
+
+    DELETE FROM dbo.[TraceabilityLog] WHERE createdAt < @cutoff;
+    SET @deleted_logs = @@ROWCOUNT;
+
+    DELETE FROM dbo.[TraceabilitySession] WHERE createdAt < @cutoff;
+    SET @deleted_sessions = @@ROWCOUNT;
+
+    SELECT CONCAT('SUCCESS: ', CAST(@deleted_sessions AS NVARCHAR(20)), ' sesiones y ', CAST(@deleted_logs AS NVARCHAR(20)), ' eventos de trazabilidad depurados anteriores a ', CAST(@p_days AS NVARCHAR(20)), ' días.') AS p_mensaje_resultado;
+END;
+GO
+
 -- ============================================================================
 -- SECCIÓN 3: PROCEDIMIENTOS ALMACENADOS DE INTEGRACIÓN ERP (ZEUS / STANDALONE)
 -- ============================================================================
 
 
 
--- Eliminar si existe
+
+
 -- Eliminar si existe
 IF OBJECT_ID('dbo.spCotizacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spCotizacionesCrear;
@@ -2452,6 +4534,40 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
+
+    IF OBJECT_ID('dbo.ImpRet', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.ImpRet (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL,
+            cd_cuenta VARCHAR(20) NULL,
+            am_porcentaje NUMERIC(5,2) NULL DEFAULT 0,
+            in_tipo CHAR(1) NULL DEFAULT 'I',
+            Id_cargo_dep INT NULL,
+            bl_IVA BIT NULL DEFAULT 0
+        );
+        IF NOT EXISTS (SELECT 1 FROM dbo.ImpRet WHERE id = 1)
+        BEGIN
+            SET IDENTITY_INSERT dbo.ImpRet ON;
+            INSERT INTO dbo.ImpRet (id, cd_codigo, ds_nombre, cd_cuenta, am_porcentaje, in_tipo, bl_IVA)
+            VALUES (1, '01', 'IVA 19%', '240805', 19.00, 'I', 1);
+            SET IDENTITY_INSERT dbo.ImpRet OFF;
+        END
+    END
+    ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo')
+    BEGIN
+        ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+    END;
+
+    IF OBJECT_ID('dbo.CargosDesc', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.CargosDesc (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL
+        );
+    END;
 
     BEGIN TRY
         DECLARE @xmlData XML;
@@ -4068,6 +6184,11 @@ GO
 
 GO
 
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 IF OBJECT_ID('dbo.spFacturacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spFacturacionesCrear;
 GO
@@ -4080,6 +6201,69 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT OFF;
+
+    IF OBJECT_ID('dbo.ImpRet', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.ImpRet (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL,
+            cd_cuenta VARCHAR(20) NULL,
+            am_porcentaje NUMERIC(5,2) NULL DEFAULT 0,
+            in_tipo CHAR(1) NULL DEFAULT 'I',
+            Id_cargo_dep INT NULL,
+            bl_IVA BIT NULL DEFAULT 0
+        );
+        IF NOT EXISTS (SELECT 1 FROM dbo.ImpRet WHERE id = 1)
+        BEGIN
+            SET IDENTITY_INSERT dbo.ImpRet ON;
+            INSERT INTO dbo.ImpRet (id, cd_codigo, ds_nombre, cd_cuenta, am_porcentaje, in_tipo, bl_IVA)
+            VALUES (1, '01', 'IVA 19%', '240805', 19.00, 'I', 1);
+            SET IDENTITY_INSERT dbo.ImpRet OFF;
+        END
+    END
+    ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo')
+    BEGIN
+        ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+    END;
+
+    IF OBJECT_ID('dbo.CargosDesc', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.CargosDesc (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            cd_codigo VARCHAR(20) NOT NULL,
+            ds_nombre VARCHAR(250) NULL
+        );
+    END;
+
+    IF OBJECT_ID('dbo.parametros', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.parametros (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            nombre VARCHAR(250) NULL,
+            valor VARCHAR(MAX) NULL
+        );
+        IF NOT EXISTS (SELECT 1 FROM dbo.parametros WHERE id = 33)
+        BEGIN
+            SET IDENTITY_INSERT dbo.parametros ON;
+            INSERT INTO dbo.parametros (id, nombre, valor) VALUES (33, 'NumeroDecimales', '2');
+            SET IDENTITY_INSERT dbo.parametros OFF;
+        END;
+        IF NOT EXISTS (SELECT 1 FROM dbo.parametros WHERE id = 326)
+        BEGIN
+            SET IDENTITY_INSERT dbo.parametros ON;
+            INSERT INTO dbo.parametros (id, nombre, valor) VALUES (326, 'CalcularAutoValoresItemFac', 'N');
+            SET IDENTITY_INSERT dbo.parametros OFF;
+        END;
+    END;
+
+    IF OBJECT_ID('dbo.Parametr', 'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.Parametr (
+            PARAMETRO VARCHAR(50) PRIMARY KEY,
+            VALOPAR VARCHAR(250) NULL
+        );
+    END;
 
     BEGIN TRY
         -- BEGIN TRANSACTION; -- Comentado para permitir transacciones individuales por factura
@@ -4796,21 +6980,28 @@ BEGIN
 		);
 
 
-		-- Fetch tax details for standard IVA (id=1)
-		SELECT TOP 1 
-			@ds_impas_iva = ds_nombre, 
-			@cd_impcta_iva = cd_cuenta, 
-			@am_porcentaje_iva = am_porcentaje,
-			@c_PorIva = am_porcentaje,
-			@c_codigoimpiva = cd_codigo,
-			@c_nombreimpiva = ds_nombre
-		FROM dbo.ImpRet 
-		WHERE id = 1;
+		IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL
+		BEGIN
+			SELECT TOP 1 
+				@ds_impas_iva = ds_nombre, 
+				@cd_impcta_iva = cd_cuenta, 
+				@am_porcentaje_iva = am_porcentaje,
+				@c_PorIva = am_porcentaje,
+				@c_codigoimpiva = cd_codigo,
+				@c_nombreimpiva = ds_nombre
+			FROM dbo.ImpRet 
+			WHERE id = 1;
+		END
+		IF @am_porcentaje_iva IS NULL SET @am_porcentaje_iva = 19.00;
+		IF @c_PorIva IS NULL SET @c_PorIva = 19.00;
 
-		SELECT @NumDecimales = CONVERT(INT,LTRIM(RTRIM(valor))) from dbo.parametros where id = 33;
+		IF OBJECT_ID('dbo.parametros', 'U') IS NOT NULL
+		BEGIN
+			SELECT TOP 1 @NumDecimales = TRY_CAST(LTRIM(RTRIM(valor)) AS INT) FROM dbo.parametros WHERE id = 33;
+			SELECT TOP 1 @CalcularAutoValoresItemFac = ISNULL(LTRIM(RTRIM(valor)), 'N') FROM dbo.parametros WHERE id = 326;
+		END
 		IF @NumDecimales IS NULL SET @NumDecimales = 2;
-
-		SELECT @CalcularAutoValoresItemFac = ISNULL(LTRIM(RTRIM(valor)), 'N') FROM dbo.Parametros WHERE id = 326;
+		IF @CalcularAutoValoresItemFac IS NULL SET @CalcularAutoValoresItemFac = 'N';
 
         -- Validar que el XML sea correcto
         IF @xml IS NULL OR LTRIM(RTRIM(@xml)) = ''
@@ -5470,7 +7661,11 @@ BEGIN
 	--While 1 = 1
 	--Begin
 		SET @Fecha = GETDATE();
-		SELECT @FechaCont=REPLACE(VALOPAR,'/','') FROM dbo.Parametr WHERE PARAMETRO = 'FECHACT'
+		IF OBJECT_ID('dbo.Parametr', 'U') IS NOT NULL
+		BEGIN
+			SELECT TOP 1 @FechaCont = REPLACE(VALOPAR, '/', '') FROM dbo.Parametr WHERE PARAMETRO = 'FECHACT';
+		END
+		IF @FechaCont IS NULL SET @FechaCont = GETDATE();
 		
 
 			-- Cursor over unique ReservaFactura in this query result
@@ -6214,9 +8409,9 @@ BEGIN
 							'@id_MedioReservacion = NULL,' + CHAR(13) + CHAR(10) +
 							'@bl_refacturacion = 0,' + CHAR(13) + CHAR(10) +
 							'@bl_comisiona = 0,' + CHAR(13) + CHAR(10) +
-							'@cd_fuente_factura = ' + ISNULL(@cd_fuente, 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_serie_factura = ' + ISNULL(@cd_serie, 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_consecutivo_factura = ' + ISNULL(@cd_consecutivo, 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@cd_fuente_factura = NULL,' + CHAR(13) + CHAR(10) +
+							'@cd_serie_factura = NULL,' + CHAR(13) + CHAR(10) +
+							'@cd_consecutivo_factura = NULL,' + CHAR(13) + CHAR(10) +
 							'@id_NotasAerolinea = NULL,' + CHAR(13) + CHAR(10) +
 							'@bl_interface = 0,' + CHAR(13) + CHAR(10) +
 							'@id_evento = NULL,' + CHAR(13) + CHAR(10) +
@@ -6247,12 +8442,20 @@ BEGIN
 					ELSE
 					BEGIN
 						SET @FacturaEstado = 1;
-						SET @FacturaRespuesta = ISNULL(@FacturaRespuesta, '') + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
+						IF @FacturaRespuesta IS NULL OR LTRIM(RTRIM(@FacturaRespuesta)) = ''
+						BEGIN
+							SET @FacturaRespuesta = 'Error en spFacturaCrear (Código de retorno: ' + CAST(ISNULL(@ReturnCode, 1) AS VARCHAR) + ')';
+						END;
+						SET @FacturaRespuesta = @FacturaRespuesta + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
 					END
 				END TRY
 				BEGIN CATCH
 					SET @FacturaEstado = 1;
-					SET @FacturaRespuesta = ERROR_MESSAGE() + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
+					DECLARE @ErrNum INT = ERROR_NUMBER();
+					DECLARE @ErrLine INT = ERROR_LINE();
+					DECLARE @ErrMsg NVARCHAR(4000) = ERROR_MESSAGE();
+					DECLARE @ErrProc NVARCHAR(128) = ERROR_PROCEDURE();
+					SET @FacturaRespuesta = '❌ Error ' + CAST(@ErrNum AS VARCHAR) + ' (Línea ' + CAST(@ErrLine AS VARCHAR) + ' en ' + ISNULL(@ErrProc, 'spFacturaCrear') + '): ' + ISNULL(@ErrMsg, 'Error no especificado') + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
 				END CATCH
 				-- Collect log result
 				INSERT INTO @LogResults (invoiceId, success, message)
@@ -6277,1395 +8480,26 @@ BEGIN
         DECLARE 
             @ErrorMessage NVARCHAR(4000),
             @ErrorSeverity INT,
-            @ErrorState INT;
+            @ErrorState INT,
+            @ErrorLine INT,
+            @ErrorNumber INT,
+            @ErrorProc NVARCHAR(128);
 
         SELECT 
             @ErrorMessage = ERROR_MESSAGE(),
             @ErrorSeverity = ERROR_SEVERITY(),
-            @ErrorState = ERROR_STATE();
+            @ErrorState = ERROR_STATE(),
+            @ErrorLine = ERROR_LINE(),
+            @ErrorNumber = ERROR_NUMBER(),
+            @ErrorProc = ERROR_PROCEDURE();
 
-        RAISERROR (@ErrorMessage, @ErrorSeverity, @ErrorState);
+        DECLARE @FullErrorMsg NVARCHAR(4000) = '❌ Error ' + CAST(ISNULL(@ErrorNumber,0) AS NVARCHAR) + ' (Línea ' + CAST(ISNULL(@ErrorLine,0) AS NVARCHAR) + ' de ' + ISNULL(@ErrorProc, 'spFacturacionesCrear') + '): ' + ISNULL(@ErrorMessage, 'Error no especificado');
+
+        RAISERROR (@FullErrorMsg, @ErrorSeverity, @ErrorState);
     END CATCH
 END
 GO
 
-
--- ============================================================================
--- PROCEDIMIENTOS ALMACENADOS DE COTIZACIÓN PARA NATIVO SQL SERVER
--- ============================================================================
-
--- 2.16. spCotizacionListar (Actualizado con filtros y estructuras compuestas)
-IF OBJECT_ID('dbo.spCotizacionListar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionListar;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionListar
-    @p_referencia NVARCHAR(50) = NULL,
-    @p_fecha_desde DATETIME = NULL,
-    @p_fecha_hasta DATETIME = NULL,
-    @p_cliente NVARCHAR(250) = NULL,
-    @p_elaborado_por NVARCHAR(250) = NULL,
-    @p_monto_total FLOAT = NULL,
-    @p_estado NVARCHAR(50) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT
-        q.[id],
-        q.[internalNumber],
-        q.[date],
-        q.[clientId],
-        c.[name] AS [clientName],
-        c.[document] AS [clientDocument],
-        (
-            SELECT c2.[id], c2.[name], c2.[document]
-            FROM dbo.[Client] c2 WHERE c2.[id] = q.[clientId]
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) AS [clientJson],
-        q.[currency],
-        q.[exchangeRate],
-        q.[branchId],
-        b.[name] AS [branchName],
-        q.[totalAmount],
-        ISNULL(q.[state], N'Nuevo') AS [state],
-        q.[stateDescription],
-        q.[stateUpdatedAt],
-        q.[userId],
-        u.[name] AS [userName],
-        (
-            SELECT u2.[id], u2.[name]
-            FROM dbo.[User] u2 WHERE u2.[id] = q.[userId]
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) AS [userJson],
-        (
-            SELECT 
-                qp.[id],
-                qp.[productId],
-                (
-                    SELECT p.[id], p.[description], p.[code]
-                    FROM dbo.[Product] p WHERE p.[id] = qp.[productId]
-                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-                ) AS [productJson],
-                (
-                    SELECT pr.[id], pr.[name]
-                    FROM dbo.[Provider] pr WHERE pr.[id] = qp.[providerId]
-                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-                ) AS [providerJson],
-                (
-                    SELECT pres.[id], pres.[name]
-                    FROM dbo.[Prestadora] pres WHERE pres.[id] = qp.[prestadoraId]
-                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-                ) AS [prestadoraJson],
-                qp.[quantity],
-                qp.[price],
-                qp.[checkInDate],
-                qp.[checkOutDate],
-                ISNULL(qp.[inNationality], 1) AS [inNationality],
-                qp.[mainTaxId],
-                (
-                    SELECT qpax.[id], qpax.[name], qpax.[document]
-                    FROM dbo.[QuotationProductPassenger] qpax
-                    WHERE qpax.[quotationProductId] = qp.[id]
-                    FOR JSON PATH
-                ) AS [passengersJson],
-                (
-                    SELECT qv.[id], qv.[masterVariableId], qv.[value]
-                    FROM dbo.[QuotationProductVariable] qv
-                    WHERE qv.[quotationProductId] = qp.[id]
-                    FOR JSON PATH
-                ) AS [variablesJson],
-                (
-                    SELECT qpt.[chargeAndTaxId], qpt.[explicitAmount], qpt.[isMain]
-                    FROM dbo.[QuotationProductTax] qpt
-                    WHERE qpt.[quotationProductId] = qp.[id]
-                    FOR JSON PATH
-                ) AS [appliedTaxesJson]
-            FROM dbo.[QuotationProduct] qp
-            WHERE qp.[quotationId] = q.[id]
-            FOR JSON PATH
-        ) AS [productsJson]
-    FROM dbo.[Quotation] q
-    LEFT JOIN dbo.[Client] c ON q.[clientId] = c.[id]
-    LEFT JOIN dbo.[Branch] b ON q.[branchId] = b.[id]
-    LEFT JOIN dbo.[User] u ON q.[userId] = u.[id]
-    WHERE (@p_referencia IS NULL OR LTRIM(RTRIM(@p_referencia)) = '' OR CAST(q.[id] AS NVARCHAR(50)) LIKE '%' + TRIM(@p_referencia) + '%' OR q.[internalNumber] LIKE '%' + TRIM(@p_referencia) + '%')
-      AND (@p_fecha_desde IS NULL OR q.[date] >= @p_fecha_desde)
-      AND (@p_fecha_hasta IS NULL OR q.[date] <= DATEADD(day, 1, @p_fecha_hasta))
-      AND (@p_cliente IS NULL OR LTRIM(RTRIM(@p_cliente)) = '' OR (c.[name] IS NOT NULL AND c.[name] LIKE '%' + TRIM(@p_cliente) + '%'))
-      AND (@p_elaborado_por IS NULL OR LTRIM(RTRIM(@p_elaborado_por)) = '' OR (u.[name] IS NOT NULL AND u.[name] LIKE '%' + TRIM(@p_elaborado_por) + '%'))
-      AND (@p_monto_total IS NULL OR q.[totalAmount] = @p_monto_total)
-      AND (@p_estado IS NULL OR LTRIM(RTRIM(@p_estado)) = '' OR q.[state] LIKE '%' + TRIM(@p_estado) + '%')
-    ORDER BY q.[id] DESC;
-END;
-GO
-
--- 2.16b. spCotizacionObtener
-IF OBJECT_ID('dbo.spCotizacionObtener', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionObtener;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionObtener
-    @p_id INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE [id] = @p_id)
-    BEGIN
-        SELECT N'ERROR: Cotización no encontrada' AS [mensaje];
-        RETURN;
-    END
-
-    SELECT
-        q.[id],
-        q.[internalNumber],
-        q.[date],
-        q.[clientId],
-        q.[currency],
-        q.[exchangeRate],
-        q.[branchId],
-        q.[implantId],
-        q.[sellerId],
-        q.[ticketPrinterId],
-        q.[baseCommissionable],
-        ISNULL(q.[commissionPercentage], 0) AS [commissionPercentage],
-        ISNULL(q.[comisionTotalPercentage], 0) AS [comisionTotalPercentage],
-        ISNULL(q.[comisionFreelancePercentage], 0) AS [comisionFreelancePercentage],
-        ISNULL(q.[comisionPropiaPercentage], 0) AS [comisionPropiaPercentage],
-        ISNULL(q.[comisionFreelanceValue], 0) AS [comisionFreelanceValue],
-        ISNULL(q.[comisionPropiaValue], 0) AS [comisionPropiaValue],
-        ISNULL(q.[costoTotal], 0) AS [costoTotal],
-        ISNULL(q.[valorBase], 0) AS [valorBase],
-        ISNULL(q.[utilidad], 0) AS [utilidad],
-        ISNULL(q.[comisionUtilidadPercentage], 0) AS [comisionUtilidadPercentage],
-        ISNULL(q.[chargesAndTaxes], 0) AS [chargesAndTaxes],
-        ISNULL(q.[totalAmount], 0) AS [totalAmount],
-        ISNULL(q.[state], N'NUEVO') AS [state],
-        q.[stateDescription],
-        q.[stateUpdatedAt],
-        q.[destination],
-        q.[startDate],
-        q.[endDate],
-        q.[passenger],
-        q.[paxAdults],
-        q.[paxChildren],
-        q.[reservationCode],
-        ISNULL(q.[copyFieldsToProducts], 1) AS [copyFieldsToProducts],
-        q.[manualDescription],
-        (
-            SELECT c.[id], c.[name], c.[document]
-            FROM dbo.[Client] c WHERE c.[id] = q.[clientId]
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) AS [clientJson],
-        (
-            SELECT s.[id], s.[name], s.[code]
-            FROM dbo.[Seller] s WHERE s.[id] = q.[sellerId]
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) AS [sellerJson],
-        (
-            SELECT b.[id], b.[name], b.[code]
-            FROM dbo.[Branch] b WHERE b.[id] = q.[branchId]
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) AS [branchJson],
-        (
-            SELECT i.[id], i.[name], i.[code]
-            FROM dbo.[Implant] i WHERE i.[id] = q.[implantId]
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) AS [implantJson],
-        (
-            SELECT tp.[id], tp.[name], tp.[code]
-            FROM dbo.[TicketPrinter] tp WHERE tp.[id] = q.[ticketPrinterId]
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        ) AS [ticketPrinterJson],
-        (
-            SELECT 
-                qp.[id],
-                qp.[productId],
-                qp.[quantity],
-                qp.[price],
-                qp.[cost],
-                qp.[providerId],
-                qp.[prestadoraId],
-                qp.[checkInDate],
-                qp.[checkOutDate],
-                qp.[nights],
-                qp.[paxAdults],
-                qp.[paxChildren],
-                qp.[serviceType],
-                qp.[destination],
-                qp.[reservationCode],
-                qp.[sellerCommission],
-                qp.[ticketPrinterCommission],
-                qp.[comboId],
-                qp.[mainTaxId],
-                ISNULL(qp.[inNationality], 1) AS [inNationality],
-                qp.[service],
-                qp.[servicios],
-                qp.[descripcion],
-                qp.[passenger],
-                (
-                    SELECT p.[id], p.[code], p.[description]
-                    FROM dbo.[Product] p WHERE p.[id] = qp.[productId]
-                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-                ) AS [productJson],
-                (
-                    SELECT pr.[id], pr.[name], pr.[code]
-                    FROM dbo.[Provider] pr WHERE pr.[id] = qp.[providerId]
-                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-                ) AS [providerJson],
-                (
-                    SELECT pres.[id], pres.[name], pres.[code]
-                    FROM dbo.[Prestadora] pres WHERE pres.[id] = qp.[prestadoraId]
-                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-                ) AS [prestadoraJson],
-                (
-                    SELECT qpax.[id], qpax.[name], qpax.[document]
-                    FROM dbo.[QuotationProductPassenger] qpax
-                    WHERE qpax.[quotationProductId] = qp.[id]
-                    FOR JSON PATH
-                ) AS [passengersJson],
-                (
-                    SELECT qv.[id], qv.[masterVariableId], qv.[value]
-                    FROM dbo.[QuotationProductVariable] qv
-                    WHERE qv.[quotationProductId] = qp.[id]
-                    FOR JSON PATH
-                ) AS [variablesJson],
-                (
-                    SELECT qpt.[id], qpt.[chargeAndTaxId], qpt.[explicitAmount], qpt.[valueSnapshot], qpt.[valueTypeSnapshot], qpt.[isMain]
-                    FROM dbo.[QuotationProductTax] qpt
-                    WHERE qpt.[quotationProductId] = qp.[id]
-                    FOR JSON PATH
-                ) AS [appliedTaxesJson],
-                (
-                    SELECT qpmt.[id], qpmt.[amount], qpmt.[paymentMethod], qpmt.[date], qpmt.[reference], qpmt.[creditCardId], qpmt.[cardNumber], qpmt.[authorizationCode], qpmt.[voucher], qpmt.[expirationDate]
-                    FROM dbo.[QuotationProductPayment] qpmt
-                    WHERE qpmt.[quotationProductId] = qp.[id]
-                    FOR JSON PATH
-                ) AS [paymentsJson]
-            FROM dbo.[QuotationProduct] qp
-            WHERE qp.[quotationId] = q.[id]
-            FOR JSON PATH
-        ) AS [productsJson],
-        (
-            SELECT qc.[id], qc.[comboId], cb.[name]
-            FROM dbo.[QuotationCombo] qc
-            JOIN dbo.[Combo] cb ON qc.[comboId] = cb.[id]
-            WHERE qc.[quotationId] = q.[id]
-            FOR JSON PATH
-        ) AS [combosJson],
-        (
-            SELECT qms.[id], qms.[providerName], qms.[serviceName], qms.[cost], qms.[salePrice], qms.[utility]
-            FROM dbo.[QuotationManualService] qms
-            WHERE qms.[quotationId] = q.[id]
-            FOR JSON PATH
-        ) AS [manualServicesJson],
-        (
-            SELECT qsh.[id], qsh.[state], qsh.[description], qsh.[createdAt], qsh.[userId], u.[name] AS [userName]
-            FROM dbo.[QuotationStateHistory] qsh
-            LEFT JOIN dbo.[User] u ON qsh.[userId] = u.[id]
-            WHERE qsh.[quotationId] = q.[id]
-            ORDER BY qsh.[id] DESC
-            FOR JSON PATH
-        ) AS [stateHistoryJson]
-    FROM dbo.[Quotation] q
-    WHERE q.[id] = @p_id;
-END;
-GO
-
--- 2.16a. spObtenerSiguienteConsecutivo
-IF OBJECT_ID('dbo.spObtenerSiguienteConsecutivo', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spObtenerSiguienteConsecutivo;
-GO
-
-CREATE PROCEDURE dbo.spObtenerSiguienteConsecutivo
-    @p_tipo NVARCHAR(50),
-    @p_branch_id INT = NULL,
-    @p_implant_id INT = NULL,
-    @p_consecutivo_formateado NVARCHAR(100) OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @prefix NVARCHAR(20) = N'COT';
-    DECLARE @currentNumber INT = 1;
-    DECLARE @padding INT = 4;
-    DECLARE @hasRecord BIT = 0;
-
-    SELECT TOP 1 
-        @prefix = ISNULL([prefix], N'COT'),
-        @currentNumber = ISNULL([currentNumber], 1),
-        @padding = ISNULL([padding], 4),
-        @hasRecord = 1
-    FROM dbo.[TransactionConsecutive] WITH (UPDLOCK, ROWLOCK)
-    WHERE [transactionType] IN (@p_tipo, N'QUOTATION', N'COTIZACION')
-      AND (@p_branch_id IS NULL OR [branchId] = @p_branch_id)
-      AND (@p_implant_id IS NULL OR [implantId] = @p_implant_id)
-    ORDER BY CASE WHEN [implantId] IS NOT NULL THEN 1 WHEN [branchId] IS NOT NULL THEN 2 ELSE 3 END ASC;
-
-    IF @hasRecord = 0
-    BEGIN
-        SELECT TOP 1 
-            @prefix = ISNULL([prefix], N'COT'),
-            @currentNumber = ISNULL([currentNumber], 1),
-            @padding = ISNULL([padding], 4),
-            @hasRecord = 1
-        FROM dbo.[TransactionConsecutive] WITH (UPDLOCK, ROWLOCK)
-        WHERE [transactionType] IN (@p_tipo, N'QUOTATION', N'COTIZACION')
-        ORDER BY [id] ASC;
-    END
-
-    IF @hasRecord = 1
-    BEGIN
-        SET @p_consecutivo_formateado = UPPER(@prefix) + N'-' + RIGHT(REPLICATE(N'0', @padding) + CAST(@currentNumber AS NVARCHAR(20)), @padding);
-        
-        UPDATE dbo.[TransactionConsecutive]
-        SET [currentNumber] = @currentNumber + 1,
-            [updatedAt] = GETDATE()
-        WHERE [transactionType] IN (@p_tipo, N'QUOTATION', N'COTIZACION')
-          AND (@p_branch_id IS NULL OR [branchId] = @p_branch_id)
-          AND (@p_implant_id IS NULL OR [implantId] = @p_implant_id);
-    END
-    ELSE
-    BEGIN
-        DECLARE @nextId INT = 1;
-        SELECT @nextId = ISNULL(MAX(id), 0) + 1 FROM dbo.[Quotation];
-        SET @p_consecutivo_formateado = N'COT-' + RIGHT(N'0000' + CAST(@nextId AS NVARCHAR(10)), 4);
-    END
-END;
-GO
-
--- 2.16c. spCotizacionCrear
-IF OBJECT_ID('dbo.spCotizacionCrear', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionCrear;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionCrear
-    @p_data NVARCHAR(MAX),
-    @p_acting_user_id INT = 1,
-    @p_quotation_id INT = NULL OUTPUT,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])
-        BEGIN
-            DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);
-        END
-
-        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
-        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
-        DECLARE @exchangeRate FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
-        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
-        DECLARE @implantId INT = JSON_VALUE(@p_data, '$.implantId');
-        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
-        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
-        DECLARE @totalAmount FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
-        DECLARE @baseCommissionable FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
-        DECLARE @chargesAndTaxes FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
-        DECLARE @commissionPercentage FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
-        DECLARE @destination NVARCHAR(250) = JSON_VALUE(@p_data, '$.destination');
-        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
-        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
-        DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
-        DECLARE @paxAdults INT = JSON_VALUE(@p_data, '$.paxAdults');
-        DECLARE @paxChildren INT = JSON_VALUE(@p_data, '$.paxChildren');
-        DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
-        DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
-
-        DECLARE @actingUserId INT = @p_acting_user_id;
-        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
-            SET @actingUserId = NULL;
-
-        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
-            SET @clientId = NULL;
-        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
-            SET @branchId = NULL;
-        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
-            SET @sellerId = NULL;
-        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
-            SET @implantId = NULL;
-        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
-            SET @ticketPrinterId = NULL;
-
-        DECLARE @internalNum NVARCHAR(100) = NULL;
-        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @consecutivo_formateado = @internalNum OUTPUT;
-
-        BEGIN TRANSACTION;
-
-        INSERT INTO dbo.[Quotation] (
-            internalNumber, [date], clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
-            baseCommissionable, chargesAndTaxes, totalAmount, commissionPercentage, userId, state, stateDescription, stateUpdatedAt,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren, reservationCode, manualDescription
-        ) VALUES (
-            ISNULL(@internalNum, N'TEMP'), GETDATE(), @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId, @ticketPrinterId,
-            @baseCommissionable, @chargesAndTaxes, @totalAmount, @commissionPercentage, @actingUserId, N'NUEVO', N'Creación de cotización', GETDATE(),
-            @destination, @startDate, @endDate, @passenger, @paxAdults, @paxChildren, @reservationCode, @manualDescription
-        );
-
-        SET @p_quotation_id = SCOPE_IDENTITY();
-
-        IF @internalNum IS NULL OR @internalNum = N'TEMP'
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET internalNumber = CAST(@p_quotation_id AS NVARCHAR(50))
-            WHERE id = @p_quotation_id;
-        END
-
-        INSERT INTO dbo.[QuotationStateHistory] (quotationId, state, [description], createdAt, userId)
-        VALUES (@p_quotation_id, N'NUEVO', N'Creación de cotización', GETDATE(), @actingUserId);
-
-        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
-        BEGIN
-            DECLARE @item_val NVARCHAR(MAX);
-            DECLARE item_cur CURSOR LOCAL FAST_FORWARD FOR
-            SELECT [value] FROM OPENJSON(@p_data, '$.items');
-
-            OPEN item_cur;
-            FETCH NEXT FROM item_cur INTO @item_val;
-
-            WHILE @@FETCH_STATUS = 0
-            BEGIN
-                DECLARE @productId INT = TRY_CAST(JSON_VALUE(@item_val, '$.productId') AS INT);
-                DECLARE @quantity INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.quantity') AS INT), 1);
-                DECLARE @price FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.price') AS FLOAT), 0);
-                DECLARE @cost FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.cost') AS FLOAT), 0);
-                DECLARE @providerId INT = TRY_CAST(JSON_VALUE(@item_val, '$.providerId') AS INT);
-                DECLARE @prestadoraId INT = TRY_CAST(JSON_VALUE(@item_val, '$.prestadoraId') AS INT);
-                DECLARE @checkInDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkIn') AS DATETIME2);
-                DECLARE @checkOutDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkOut') AS DATETIME2);
-                DECLARE @nights INT = TRY_CAST(JSON_VALUE(@item_val, '$.nights') AS INT);
-                DECLARE @paxAdultsItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxAdults') AS INT);
-                DECLARE @paxChildrenItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxChildren') AS INT);
-                DECLARE @serviceType NVARCHAR(250) = JSON_VALUE(@item_val, '$.serviceType');
-                DECLARE @destinationItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.destination');
-                DECLARE @reservationCodeItem NVARCHAR(100) = JSON_VALUE(@item_val, '$.reservationCode');
-                DECLARE @sellerCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.sellerCommission') AS FLOAT);
-                DECLARE @ticketPrinterCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.ticketPrinterCommission') AS FLOAT);
-                DECLARE @comboId INT = TRY_CAST(JSON_VALUE(@item_val, '$.comboId') AS INT);
-                DECLARE @mainTaxId INT = TRY_CAST(JSON_VALUE(@item_val, '$.mainTaxId') AS INT);
-                DECLARE @inNationality INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.inNationality') AS INT), 1);
-                DECLARE @service NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.service');
-                DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.servicios');
-                DECLARE @descripcion NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.descripcion');
-                DECLARE @passengerItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.passenger');
-
-                IF @providerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerId) SET @providerId = NULL;
-                IF @prestadoraId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraId) SET @prestadoraId = NULL;
-
-                DECLARE @qp_id INT;
-                INSERT INTO dbo.[QuotationProduct] (
-                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
-                    checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
-                    reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                    service, servicios, descripcion, passenger
-                ) VALUES (
-                    @p_quotation_id, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
-                    @checkInDate, @checkOutDate, @nights, @paxAdultsItem, @paxChildrenItem, @serviceType, @destinationItem,
-                    @reservationCodeItem, @sellerCommission, @ticketPrinterCommission, @comboId, @mainTaxId, @inNationality,
-                    @service, @servicios, @descripcion, @passengerItem
-                );
-                SET @qp_id = SCOPE_IDENTITY();
-
-                -- Insert Applied Taxes (QuotationProductTax)
-                IF JSON_QUERY(@item_val, '$.appliedTaxes') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
-                    SELECT
-                        @qp_id,
-                        TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT),
-                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.explicitAmount') AS FLOAT), ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.amount') AS FLOAT), 0)),
-                        TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT),
-                        JSON_VALUE(tax.value, '$.valueTypeSnapshot'),
-                        CASE WHEN TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) = @mainTaxId OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
-                    FROM OPENJSON(@item_val, '$.appliedTaxes') AS tax
-                    WHERE TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) IS NOT NULL;
-                END
-
-                -- Insert Passengers (QuotationProductPassenger)
-                IF JSON_QUERY(@item_val, '$.passengers') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
-                    SELECT
-                        @qp_id,
-                        JSON_VALUE(pax.value, '$.name'),
-                        JSON_VALUE(pax.value, '$.document')
-                    FROM OPENJSON(@item_val, '$.passengers') AS pax
-                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
-                END
-
-                -- Insert Variables (QuotationProductVariable)
-                IF JSON_QUERY(@item_val, '$.variables') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, value)
-                    SELECT
-                        @qp_id,
-                        TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT),
-                        JSON_VALUE(v.value, '$.value')
-                    FROM OPENJSON(@item_val, '$.variables') AS v
-                    WHERE TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT) IS NOT NULL;
-                END
-
-                -- Insert Payments (QuotationProductPayment)
-                IF JSON_QUERY(@item_val, '$.payments') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductPayment] (
-                        quotationProductId, amount, paymentMethod, date, reference, creditCardId, cardNumber, authorizationCode, voucher, expirationDate
-                    )
-                    SELECT
-                        @qp_id,
-                        ISNULL(TRY_CAST(JSON_VALUE(pmt.value, '$.amount') AS FLOAT), 0),
-                        JSON_VALUE(pmt.value, '$.paymentMethod'),
-                        TRY_CAST(JSON_VALUE(pmt.value, '$.date') AS DATETIME2),
-                        JSON_VALUE(pmt.value, '$.reference'),
-                        TRY_CAST(JSON_VALUE(pmt.value, '$.creditCardId') AS INT),
-                        JSON_VALUE(pmt.value, '$.cardNumber'),
-                        JSON_VALUE(pmt.value, '$.authorizationCode'),
-                        JSON_VALUE(pmt.value, '$.voucher'),
-                        JSON_VALUE(pmt.value, '$.expirationDate')
-                    FROM OPENJSON(@item_val, '$.payments') AS pmt;
-                END
-
-                FETCH NEXT FROM item_cur INTO @item_val;
-            END
-
-            CLOSE item_cur;
-            DEALLOCATE item_cur;
-        END
-
-        -- Recalculate totalAmount if 0 or missing
-        DECLARE @calcTotal FLOAT = (
-            SELECT SUM(ISNULL(qpt.explicitAmount, 0))
-            FROM dbo.[QuotationProductTax] qpt
-            JOIN dbo.[QuotationProduct] qp ON qpt.quotationProductId = qp.id
-            WHERE qp.quotationId = @p_quotation_id
-        );
-        IF @calcTotal IS NULL OR @calcTotal = 0
-        BEGIN
-            SET @calcTotal = (
-                SELECT SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1))
-                FROM dbo.[QuotationProduct] qp
-                WHERE qp.quotationId = @p_quotation_id
-            );
-        END
-
-        IF @calcTotal IS NOT NULL AND @calcTotal > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @calcTotal,
-                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotal),
-                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotal)
-            WHERE id = @p_quotation_id;
-        END
-        ELSE IF @totalAmount > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @totalAmount
-            WHERE id = @p_quotation_id;
-        END
-
-        COMMIT TRANSACTION;
-
-        SET @p_mensaje_resultado = N'SUCCESS: Cotización creada correctamente con ID ' + CAST(@p_quotation_id AS NVARCHAR(20));
-        SELECT @p_quotation_id AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT 0 AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
-    END CATCH
-END;
-
--- 2.16d. spCotizacionActualizar
-IF OBJECT_ID('dbo.spCotizacionActualizar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionActualizar;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionActualizar
-    @p_id INT,
-    @p_data NVARCHAR(MAX),
-    @p_acting_user_id INT = 1,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE id = @p_id)
-        BEGIN
-            SET @p_mensaje_resultado = N'ERROR: Cotización ' + CAST(@p_id AS NVARCHAR(20)) + N' no existe.';
-            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
-            RETURN;
-        END
-
-        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
-        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
-        DECLARE @exchangeRate FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
-        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
-        DECLARE @implantId INT = JSON_VALUE(@p_data, '$.implantId');
-        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
-        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
-        DECLARE @totalAmount FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
-        DECLARE @baseCommissionable FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
-        DECLARE @chargesAndTaxes FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
-        DECLARE @commissionPercentage FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
-        DECLARE @state NVARCHAR(50) = ISNULL(JSON_VALUE(@p_data, '$.state'), N'NUEVO');
-        DECLARE @stateDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.stateDescription');
-        DECLARE @destination NVARCHAR(250) = JSON_VALUE(@p_data, '$.destination');
-        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
-        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
-        DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
-        DECLARE @paxAdults INT = JSON_VALUE(@p_data, '$.paxAdults');
-        DECLARE @paxChildren INT = JSON_VALUE(@p_data, '$.paxChildren');
-        DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
-        DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
-
-        DECLARE @actingUserId INT = @p_acting_user_id;
-        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
-            SET @actingUserId = NULL;
-
-        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
-            SET @clientId = NULL;
-        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
-            SET @branchId = NULL;
-        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
-            SET @sellerId = NULL;
-        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
-            SET @implantId = NULL;
-        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
-            SET @ticketPrinterId = NULL;
-
-        BEGIN TRANSACTION;
-
-        UPDATE dbo.[Quotation]
-        SET
-            clientId = @clientId,
-            currency = @currency,
-            exchangeRate = @exchangeRate,
-            branchId = ISNULL(@branchId, branchId),
-            implantId = @implantId,
-            sellerId = @sellerId,
-            ticketPrinterId = @ticketPrinterId,
-            totalAmount = @totalAmount,
-            baseCommissionable = @baseCommissionable,
-            chargesAndTaxes = @chargesAndTaxes,
-            commissionPercentage = @commissionPercentage,
-            state = @state,
-            stateDescription = ISNULL(@stateDescription, stateDescription),
-            stateUpdatedAt = GETDATE(),
-            destination = @destination,
-            startDate = @startDate,
-            endDate = @endDate,
-            passenger = @passenger,
-            paxAdults = @paxAdults,
-            paxChildren = @paxChildren,
-            reservationCode = @reservationCode,
-            manualDescription = @manualDescription
-        WHERE id = @p_id;
-
-        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
-        BEGIN
-            DELETE FROM dbo.[QuotationProductTax] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
-            DELETE FROM dbo.[QuotationProductPassenger] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
-            DELETE FROM dbo.[QuotationProductVariable] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
-            DELETE FROM dbo.[QuotationProductPayment] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
-            DELETE FROM dbo.[QuotationProduct] WHERE quotationId = @p_id;
-
-            DECLARE @item_val_upd NVARCHAR(MAX);
-            DECLARE item_cur_upd CURSOR LOCAL FAST_FORWARD FOR
-            SELECT [value] FROM OPENJSON(@p_data, '$.items');
-
-            OPEN item_cur_upd;
-            FETCH NEXT FROM item_cur_upd INTO @item_val_upd;
-
-            WHILE @@FETCH_STATUS = 0
-            BEGIN
-                DECLARE @productIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.productId') AS INT);
-                DECLARE @quantityUpd INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.quantity') AS INT), 1);
-                DECLARE @priceUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.price') AS FLOAT), 0);
-                DECLARE @costUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.cost') AS FLOAT), 0);
-                DECLARE @providerIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.providerId') AS INT);
-                DECLARE @prestadoraIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.prestadoraId') AS INT);
-                DECLARE @checkInDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.checkIn') AS DATETIME2);
-                DECLARE @checkOutDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.checkOut') AS DATETIME2);
-                DECLARE @nightsUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.nights') AS INT);
-                DECLARE @paxAdultsItemUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.paxAdults') AS INT);
-                DECLARE @paxChildrenItemUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.paxChildren') AS INT);
-                DECLARE @serviceTypeUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.serviceType');
-                DECLARE @destinationItemUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.destination');
-                DECLARE @reservationCodeItemUpd NVARCHAR(100) = JSON_VALUE(@item_val_upd, '$.reservationCode');
-                DECLARE @sellerCommissionUpd FLOAT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.sellerCommission') AS FLOAT);
-                DECLARE @ticketPrinterCommissionUpd FLOAT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.ticketPrinterCommission') AS FLOAT);
-                DECLARE @comboIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.comboId') AS INT);
-                DECLARE @mainTaxIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.mainTaxId') AS INT);
-                DECLARE @inNationalityUpd INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.inNationality') AS INT), 1);
-                DECLARE @serviceUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.service');
-                DECLARE @serviciosUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.servicios');
-                DECLARE @descripcionUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.descripcion');
-                DECLARE @passengerItemUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.passenger');
-
-                IF @providerIdUpd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerIdUpd) SET @providerIdUpd = NULL;
-                IF @prestadoraIdUpd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraIdUpd) SET @prestadoraIdUpd = NULL;
-
-                DECLARE @qp_id_upd INT;
-                INSERT INTO dbo.[QuotationProduct] (
-                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
-                    checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
-                    reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                    service, servicios, descripcion, passenger
-                ) VALUES (
-                    @p_id, @productIdUpd, @quantityUpd, @priceUpd, @costUpd, @providerIdUpd, @prestadoraIdUpd,
-                    @checkInDateUpd, @checkOutDateUpd, @nightsUpd, @paxAdultsItemUpd, @paxChildrenItemUpd, @serviceTypeUpd, @destinationItemUpd,
-                    @reservationCodeItemUpd, @sellerCommissionUpd, @ticketPrinterCommissionUpd, @comboIdUpd, @mainTaxIdUpd, @inNationalityUpd,
-                    @serviceUpd, @serviciosUpd, @descripcionUpd, @passengerItemUpd
-                );
-                SET @qp_id_upd = SCOPE_IDENTITY();
-
-                -- Insert Applied Taxes (QuotationProductTax)
-                IF JSON_QUERY(@item_val_upd, '$.appliedTaxes') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
-                    SELECT
-                        @qp_id_upd,
-                        TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT),
-                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.explicitAmount') AS FLOAT), ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.amount') AS FLOAT), 0)),
-                        TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT),
-                        JSON_VALUE(tax.value, '$.valueTypeSnapshot'),
-                        CASE WHEN TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) = @mainTaxIdUpd OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
-                    FROM OPENJSON(@item_val_upd, '$.appliedTaxes') AS tax
-                    WHERE TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) IS NOT NULL;
-                END
-
-                -- Insert Passengers (QuotationProductPassenger)
-                IF JSON_QUERY(@item_val_upd, '$.passengers') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
-                    SELECT
-                        @qp_id_upd,
-                        JSON_VALUE(pax.value, '$.name'),
-                        JSON_VALUE(pax.value, '$.document')
-                    FROM OPENJSON(@item_val_upd, '$.passengers') AS pax
-                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
-                END
-
-                -- Insert Variables (QuotationProductVariable)
-                IF JSON_QUERY(@item_val_upd, '$.variables') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, value)
-                    SELECT
-                        @qp_id_upd,
-                        TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT),
-                        JSON_VALUE(v.value, '$.value')
-                    FROM OPENJSON(@item_val_upd, '$.variables') AS v
-                    WHERE TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT) IS NOT NULL;
-                END
-
-                -- Insert Payments (QuotationProductPayment)
-                IF JSON_QUERY(@item_val_upd, '$.payments') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductPayment] (
-                        quotationProductId, amount, paymentMethod, date, reference, creditCardId, cardNumber, authorizationCode, voucher, expirationDate
-                    )
-                    SELECT
-                        @qp_id_upd,
-                        ISNULL(TRY_CAST(JSON_VALUE(pmt.value, '$.amount') AS FLOAT), 0),
-                        JSON_VALUE(pmt.value, '$.paymentMethod'),
-                        TRY_CAST(JSON_VALUE(pmt.value, '$.date') AS DATETIME2),
-                        JSON_VALUE(pmt.value, '$.reference'),
-                        TRY_CAST(JSON_VALUE(pmt.value, '$.creditCardId') AS INT),
-                        JSON_VALUE(pmt.value, '$.cardNumber'),
-                        JSON_VALUE(pmt.value, '$.authorizationCode'),
-                        JSON_VALUE(pmt.value, '$.voucher'),
-                        JSON_VALUE(pmt.value, '$.expirationDate')
-                    FROM OPENJSON(@item_val_upd, '$.payments') AS pmt;
-                END
-
-                FETCH NEXT FROM item_cur_upd INTO @item_val_upd;
-            END
-
-            CLOSE item_cur_upd;
-            DEALLOCATE item_cur_upd;
-        END
-
-        -- Recalculate totalAmount if 0 or missing
-        DECLARE @calcTotalUpd FLOAT = (
-            SELECT SUM(ISNULL(qpt.explicitAmount, 0))
-            FROM dbo.[QuotationProductTax] qpt
-            JOIN dbo.[QuotationProduct] qp ON qpt.quotationProductId = qp.id
-            WHERE qp.quotationId = @p_id
-        );
-        IF @calcTotalUpd IS NULL OR @calcTotalUpd = 0
-        BEGIN
-            SET @calcTotalUpd = (
-                SELECT SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1))
-                FROM dbo.[QuotationProduct] qp
-                WHERE qp.quotationId = @p_id
-            );
-        END
-
-        IF @calcTotalUpd IS NOT NULL AND @calcTotalUpd > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @calcTotalUpd,
-                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotalUpd),
-                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotalUpd)
-            WHERE id = @p_id;
-        END
-        ELSE IF @totalAmount > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @totalAmount
-            WHERE id = @p_id;
-        END
-
-        COMMIT TRANSACTION;
-
-        SET @p_mensaje_resultado = N'SUCCESS: Cotización ' + CAST(@p_id AS NVARCHAR(20)) + N' actualizada correctamente.';
-        SELECT @p_id AS p_id, @p_mensaje_resultado AS p_mensaje_resultado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT 0 AS p_id, @p_mensaje_resultado AS p_mensaje_resultado;
-    END CATCH
-END;
-
--- 2.16e. spCotizacionEliminar
-IF OBJECT_ID('dbo.spCotizacionEliminar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionEliminar;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionEliminar
-    @p_id INT,
-    @p_acting_user_id INT = 1,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        DELETE FROM dbo.[Quotation] WHERE [id] = @p_id;
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])
-        BEGIN
-            DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);
-        END
-
-        COMMIT TRANSACTION;
-        SET @p_mensaje_resultado = N'SUCCESS: Cotización eliminada correctamente';
-        SELECT @p_mensaje_resultado AS [p_mensaje_resultado];
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT @p_mensaje_resultado AS [p_mensaje_resultado];
-    END CATCH
-END;
-GO
-
--- 2.16f. spCotizacionDuplicar
-IF OBJECT_ID('dbo.spCotizacionDuplicar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionDuplicar;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionDuplicar
-    @p_quotation_id INT,
-    @p_acting_user_id INT = 1,
-    @p_new_quotation_id INT = NULL OUTPUT,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE id = @p_quotation_id)
-        BEGIN
-            SET @p_mensaje_resultado = N'ERROR: Cotización origen no encontrada (ID ' + CAST(@p_quotation_id AS NVARCHAR(20)) + N').';
-            SELECT 0 AS p_new_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado, NULL AS internalNumber;
-            RETURN;
-        END
-
-        DECLARE @branchId INT = NULL;
-        DECLARE @implantId INT = NULL;
-
-        SELECT TOP 1 @branchId = branchId, @implantId = implantId
-        FROM dbo.[Quotation]
-        WHERE id = @p_quotation_id;
-
-        DECLARE @internalNum NVARCHAR(100) = NULL;
-        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @consecutivo_formateado = @internalNum OUTPUT;
-
-        IF @internalNum IS NULL OR @internalNum = N''
-            SET @internalNum = N'COT-' + FORMAT(GETDATE(), 'yyyyMMdd') + N'-' + CAST(FLOOR(RAND() * 10000) AS NVARCHAR(10));
-
-        BEGIN TRANSACTION;
-
-        INSERT INTO dbo.[Quotation] (
-            internalNumber, [date], clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
-            baseCommissionable, commissionPercentage, chargesAndTaxes, totalAmount, userId, state, stateDescription, stateUpdatedAt,
-            costoTotal, valorBase, utilidad, comisionTotalPercentage, comisionFreelancePercentage, comisionFreelanceValue,
-            comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage, destination, startDate, endDate, passenger, paxAdults, paxChildren,
-            reservationCode, copyFieldsToProducts, manualDescription
-        )
-        SELECT
-            @internalNum,
-            GETDATE(), clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
-            baseCommissionable, commissionPercentage, chargesAndTaxes, totalAmount, ISNULL(@p_acting_user_id, userId), N'NUEVO',
-            N'Copia de cotización #' + CAST(@p_quotation_id AS NVARCHAR(20)), GETDATE(),
-            costoTotal, valorBase, utilidad, comisionTotalPercentage, comisionFreelancePercentage, comisionFreelanceValue,
-            comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage, destination, startDate, endDate, passenger, paxAdults, paxChildren,
-            reservationCode, copyFieldsToProducts, manualDescription
-        FROM dbo.[Quotation]
-        WHERE id = @p_quotation_id;
-
-        SET @p_new_quotation_id = SCOPE_IDENTITY();
-
-        INSERT INTO dbo.[QuotationStateHistory] (quotationId, state, [description], createdAt, userId)
-        VALUES (@p_new_quotation_id, N'NUEVO', N'Copia de cotización #' + CAST(@p_quotation_id AS NVARCHAR(20)), GETDATE(), ISNULL(@p_acting_user_id, 1));
-
-        INSERT INTO dbo.[QuotationProduct] (
-            quotationId, productId, quantity, price, cost, providerId, prestadoraId,
-            checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
-            reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-            service, servicios, descripcion, passenger
-        )
-        SELECT
-            @p_new_quotation_id, productId, quantity, price, cost, providerId, prestadoraId,
-            checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
-            reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-            service, servicios, descripcion, passenger
-        FROM dbo.[QuotationProduct]
-        WHERE quotationId = @p_quotation_id;
-
-        IF OBJECT_ID('dbo.QuotationProductPassenger', 'U') IS NOT NULL
-        BEGIN
-            INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
-            SELECT new_qp.id, orig_pax.name, orig_pax.document
-            FROM dbo.[QuotationProductPassenger] orig_pax
-            JOIN dbo.[QuotationProduct] orig_qp ON orig_pax.quotationProductId = orig_qp.id
-            JOIN dbo.[QuotationProduct] new_qp ON new_qp.quotationId = @p_new_quotation_id AND new_qp.productId = orig_qp.productId
-            WHERE orig_qp.quotationId = @p_quotation_id;
-        END
-
-        COMMIT TRANSACTION;
-
-        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Cotización duplicada correctamente con ID ', @p_new_quotation_id, N' (', @internalNum, N')');
-        SELECT @p_new_quotation_id AS p_new_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado, @internalNum AS internalNumber;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT 0 AS p_new_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado, NULL AS internalNumber;
-    END CATCH
-END;
-GO
-
--- 2.16g. spPreCotizacionCrear
-IF OBJECT_ID('dbo.spPreCotizacionCrear', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spPreCotizacionCrear;
-GO
-
-CREATE PROCEDURE dbo.spPreCotizacionCrear
-    @p_data NVARCHAR(MAX),
-    @p_acting_user_id INT = 1,
-    @p_pre_quotation_id INT = NULL OUTPUT,
-    @p_consecutivo INT = NULL OUTPUT,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.[PreQuotation])
-        BEGIN
-            DBCC CHECKIDENT ('dbo.[PreQuotation]', RESEED, 0);
-        END
-
-        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
-        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
-        DECLARE @providerId INT = JSON_VALUE(@p_data, '$.providerId');
-        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
-        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
-        DECLARE @clientNameText NVARCHAR(255) = JSON_VALUE(@p_data, '$.clientNameText');
-        DECLARE @headerDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.headerDescription');
-        DECLARE @preQuotationType NVARCHAR(100) = ISNULL(JSON_VALUE(@p_data, '$.preQuotationType'), N'General');
-        DECLARE @quotationNotice NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.quotationNotice');
-        DECLARE @noticeResponse NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.noticeResponse');
-        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
-        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
-        DECLARE @customFields NVARCHAR(MAX) = ISNULL(JSON_QUERY(@p_data, '$.customFields'), N'{}');
-
-        IF @branchId IS NULL
-            SELECT TOP 1 @branchId = id FROM dbo.[Branch];
-
-        DECLARE @actingUserId INT = @p_acting_user_id;
-        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
-            SET @actingUserId = NULL;
-
-        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
-            SET @clientId = NULL;
-
-        DECLARE @maxQ INT = 0;
-        DECLARE @maxPQ INT = 0;
-        SELECT @maxQ = ISNULL(MAX(id), 0) FROM dbo.[Quotation];
-        SELECT @maxPQ = ISNULL(MAX(consecutivo), 0) FROM dbo.[PreQuotation];
-        DECLARE @v_consecutivo INT = CASE WHEN @maxQ > @maxPQ THEN @maxQ + 1 ELSE @maxPQ + 1 END;
-
-        BEGIN TRANSACTION;
-
-        INSERT INTO dbo.[PreQuotation] (
-            consecutivo, clientNameText, clientId, headerDescription, providerId, ticketPrinterId, sellerId, branchId,
-            preQuotationType, quotationNotice, noticeResponse, startDate, endDate, customFields, state, userId, createdAt, updatedAt
-        ) VALUES (
-            @v_consecutivo, @clientNameText, @clientId, @headerDescription, @providerId, @ticketPrinterId, @sellerId, @branchId,
-            @preQuotationType, @quotationNotice, @noticeResponse, @startDate, @endDate, @customFields, N'POR COTIZAR', @actingUserId, GETDATE(), GETDATE()
-        );
-
-        SET @p_pre_quotation_id = SCOPE_IDENTITY();
-        SET @p_consecutivo = @v_consecutivo;
-
-        INSERT INTO dbo.[PreQuotationStateHistory] (preQuotationId, state, [description], userId, createdAt)
-        VALUES (@p_pre_quotation_id, N'POR COTIZAR', N'Creación de pre-cotización con consecutivo #' + CAST(@v_consecutivo AS NVARCHAR(20)), @actingUserId, GETDATE());
-
-        COMMIT TRANSACTION;
-
-        SET @p_mensaje_resultado = N'SUCCESS: Pre-Cotización creada correctamente con consecutivo #' + CAST(@v_consecutivo AS NVARCHAR(20));
-        SELECT @p_pre_quotation_id AS p_pre_quotation_id, @p_consecutivo AS p_consecutivo, @p_mensaje_resultado AS p_mensaje_resultado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_pre_quotation_id = 0;
-        SET @p_consecutivo = 0;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT @p_pre_quotation_id AS p_pre_quotation_id, @p_consecutivo AS p_consecutivo, @p_mensaje_resultado AS p_mensaje_resultado;
-    END CATCH
-END;
-GO
-
--- 2.16h. spPreCotizacionListar
-IF OBJECT_ID('dbo.spPreCotizacionListar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spPreCotizacionListar;
-GO
-
-CREATE PROCEDURE dbo.spPreCotizacionListar
-    @p_search NVARCHAR(255) = NULL,
-    @p_state NVARCHAR(50) = NULL,
-    @p_branch_id INT = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT 
-        p.[id],
-        p.[consecutivo],
-        ISNULL(c.[name], ISNULL(p.[clientNameText], N'Cliente sin nombre')) AS [client_name],
-        p.[clientId] AS [client_id],
-        ISNULL(p.[headerDescription], N'') AS [header_description],
-        p.[providerId] AS [provider_id],
-        ISNULL(pr.[name], N'') AS [provider_name],
-        p.[ticketPrinterId] AS [ticket_printer_id],
-        ISNULL(tp.[name], N'') AS [ticket_printer_name],
-        p.[sellerId] AS [seller_id],
-        ISNULL(s.[name], N'') AS [seller_name],
-        p.[branchId] AS [branch_id],
-        ISNULL(b.[name], N'') AS [branch_name],
-        ISNULL(p.[preQuotationType], N'General') AS [pre_quotation_type],
-        ISNULL(p.[quotationNotice], N'') AS [quotation_notice],
-        ISNULL(p.[noticeResponse], N'') AS [notice_response],
-        p.[startDate] AS [start_date],
-        p.[endDate] AS [end_date],
-        ISNULL(p.[customFields], N'{}') AS [custom_fields],
-        p.[state],
-        p.[userId] AS [user_id],
-        ISNULL(u.[name], N'Sistema') AS [user_name],
-        p.[createdAt] AS [created_at],
-        p.[convertedQuotationId] AS [converted_quotation_id],
-        ISNULL(q.[internalNumber], N'') AS [converted_internal_number],
-        p.[convertedAt] AS [converted_at],
-        ISNULL(cu.[name], N'') AS [converted_user_name],
-        N'' AS [invoice_number],
-        DATEDIFF(MINUTE, p.[createdAt], ISNULL(p.[convertedAt], GETDATE())) AS [elapsed_minutes]
-    FROM dbo.[PreQuotation] p
-    LEFT JOIN dbo.[Client] c ON p.[clientId] = c.[id]
-    LEFT JOIN dbo.[Provider] pr ON p.[providerId] = pr.[id]
-    LEFT JOIN dbo.[TicketPrinter] tp ON p.[ticketPrinterId] = tp.[id]
-    LEFT JOIN dbo.[Seller] s ON p.[sellerId] = s.[id]
-    LEFT JOIN dbo.[Branch] b ON p.[branchId] = b.[id]
-    LEFT JOIN dbo.[User] u ON p.[userId] = u.[id]
-    LEFT JOIN dbo.[User] cu ON p.[convertedUserId] = cu.[id]
-    LEFT JOIN dbo.[Quotation] q ON p.[convertedQuotationId] = q.[id]
-    WHERE (@p_branch_id IS NULL OR @p_branch_id = 0 OR p.[branchId] = @p_branch_id)
-      AND (@p_state IS NULL OR @p_state = '' OR p.[state] = @p_state)
-      AND (
-        @p_search IS NULL OR @p_search = '' OR
-        CAST(p.[consecutivo] AS NVARCHAR(50)) LIKE '%' + TRIM(@p_search) + '%' OR
-        c.[name] LIKE '%' + TRIM(@p_search) + '%' OR
-        p.[clientNameText] LIKE '%' + TRIM(@p_search) + '%' OR
-        p.[headerDescription] LIKE '%' + TRIM(@p_search) + '%' OR
-        p.[quotationNotice] LIKE '%' + TRIM(@p_search) + '%'
-      )
-    ORDER BY p.[id] DESC;
-END;
-GO
-
--- 2.16i. spPreCotizacionConvertir
-IF OBJECT_ID('dbo.spPreCotizacionConvertir', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spPreCotizacionConvertir;
-GO
-
-CREATE PROCEDURE dbo.spPreCotizacionConvertir
-    @p_pre_quotation_id INT,
-    @p_quotation_id INT = NULL,
-    @p_acting_user_id INT = 1,
-    @p_notice_response NVARCHAR(MAX) = NULL,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        IF @p_pre_quotation_id IS NULL OR @p_pre_quotation_id = 0
-        BEGIN
-            SET @p_mensaje_resultado = N'ERROR: ID de Pre-Cotización inválido.';
-            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
-            RETURN;
-        END
-
-        DECLARE @actingUserId INT = @p_acting_user_id;
-        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
-            SET @actingUserId = NULL;
-
-        DECLARE @isConvert BIT = CASE WHEN @p_quotation_id IS NOT NULL AND @p_quotation_id > 0 THEN 1 ELSE 0 END;
-        DECLARE @currentState NVARCHAR(50);
-        SELECT @currentState = state FROM dbo.[PreQuotation] WHERE id = @p_pre_quotation_id;
-
-        BEGIN TRANSACTION;
-
-        IF @isConvert = 1
-        BEGIN
-            UPDATE dbo.[PreQuotation]
-            SET state = N'COTIZADA',
-                convertedQuotationId = @p_quotation_id,
-                convertedAt = GETDATE(),
-                convertedUserId = @actingUserId,
-                noticeResponse = ISNULL(@p_notice_response, noticeResponse),
-                updatedAt = GETDATE()
-            WHERE id = @p_pre_quotation_id;
-
-            INSERT INTO dbo.[PreQuotationStateHistory] (preQuotationId, state, [description], userId, createdAt)
-            VALUES (@p_pre_quotation_id, N'COTIZADA', N'Pre-cotización convertida exitosamente a cotización (ID: ' + CAST(@p_quotation_id AS NVARCHAR(20)) + N')', @actingUserId, GETDATE());
-
-            SET @p_mensaje_resultado = N'SUCCESS: Pre-Cotización convertida a Cotización correctamente.';
-        END
-        ELSE
-        BEGIN
-            UPDATE dbo.[PreQuotation]
-            SET noticeResponse = ISNULL(@p_notice_response, noticeResponse),
-                updatedAt = GETDATE()
-            WHERE id = @p_pre_quotation_id;
-
-            INSERT INTO dbo.[PreQuotationStateHistory] (preQuotationId, state, [description], userId, createdAt)
-            VALUES (@p_pre_quotation_id, ISNULL(@currentState, N'POR COTIZAR'), N'Respuesta / Duda registrada en la pre-cotización: ' + ISNULL(@p_notice_response, N''), @actingUserId, GETDATE());
-
-            SET @p_mensaje_resultado = N'SUCCESS: Respuesta / Duda registrada en la Pre-Cotización correctamente.';
-        END
-
-        COMMIT TRANSACTION;
-        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
-    END CATCH
-END;
-GO
-
--- 2.16j. spPreCotizacionEliminar
-IF OBJECT_ID('dbo.spPreCotizacionEliminar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spPreCotizacionEliminar;
-GO
-
-CREATE PROCEDURE dbo.spPreCotizacionEliminar
-    @p_id INT,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.[PreQuotation] WHERE id = @p_id)
-        BEGIN
-            SET @p_mensaje_resultado = N'ERROR: Pre-Cotización ' + CAST(@p_id AS NVARCHAR(20)) + N' no existe.';
-            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
-            RETURN;
-        END
-
-        BEGIN TRANSACTION;
-
-        DELETE FROM dbo.[PreQuotationStateHistory] WHERE preQuotationId = @p_id;
-        DELETE FROM dbo.[PreQuotation] WHERE id = @p_id;
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.[PreQuotation])
-        BEGIN
-            DBCC CHECKIDENT ('dbo.[PreQuotation]', RESEED, 0);
-        END
-
-        COMMIT TRANSACTION;
-
-        SET @p_mensaje_resultado = N'SUCCESS: Pre-Cotización eliminada correctamente';
-        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
-    END CATCH
-END;
-GO
-GO
-
-
--- 2.33. spCotizacionHistorial
-IF OBJECT_ID('dbo.spCotizacionHistorial', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionHistorial;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionHistorial
-    @p_referencia NVARCHAR(50) = NULL,
-    @p_fecha_desde DATETIME = NULL,
-    @p_fecha_hasta DATETIME = NULL,
-    @p_cliente NVARCHAR(250) = NULL,
-    @p_elaborado_por NVARCHAR(250) = NULL,
-    @p_monto_total FLOAT = NULL,
-    @p_estado NVARCHAR(50) = NULL,
-    @p_reserva NVARCHAR(100) = NULL,
-    @p_pasajero NVARCHAR(250) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @v_start INT = NULL;
-    DECLARE @v_end INT = NULL;
-    DECLARE @v_single INT = NULL;
-    DECLARE @p_ref_clean NVARCHAR(50) = NULL;
-
-    IF @p_referencia IS NOT NULL AND TRIM(@p_referencia) <> ''
-    BEGIN
-        SET @p_ref_clean = TRIM(REPLACE(@p_referencia, '#', ''));
-        IF CHARINDEX('-', @p_ref_clean) > 0
-        BEGIN
-            DECLARE @dashIdx INT = CHARINDEX('-', @p_ref_clean);
-            DECLARE @sStr NVARCHAR(20) = TRIM(SUBSTRING(@p_ref_clean, 1, @dashIdx - 1));
-            DECLARE @eStr NVARCHAR(20) = TRIM(SUBSTRING(@p_ref_clean, @dashIdx + 1, LEN(@p_ref_clean)));
-            IF ISNUMERIC(@sStr) = 1 AND ISNUMERIC(@eStr) = 1
-            BEGIN
-                SET @v_start = CAST(@sStr AS INT);
-                SET @v_end = CAST(@eStr AS INT);
-                IF @v_start > @v_end
-                BEGIN
-                    DECLARE @tmp INT = @v_start;
-                    SET @v_start = @v_end;
-                    SET @v_end = @tmp;
-                END
-            END
-        END
-        ELSE IF ISNUMERIC(@p_ref_clean) = 1
-        BEGIN
-            SET @v_single = CAST(@p_ref_clean AS INT);
-        END
-    END
-
-    SELECT
-        q.[id],
-        q.[internalNumber],
-        ISNULL(c.[name], N'Cliente desconocido') AS [clientName],
-        ISNULL((
-            SELECT TOP 1 prov.[name]
-            FROM dbo.[QuotationProduct] qp
-            JOIN dbo.[Provider] prov ON qp.[providerId] = prov.[id]
-            WHERE qp.[quotationId] = q.[id]
-        ), N'Proveedor Desconocido') AS [providerName],
-        q.[date] AS [createdAt],
-        q.[totalAmount],
-        q.[currency],
-        ISNULL(u.[name], N'Sistema') AS [userName],
-        ISNULL(q.[state], N'NUEVO') AS [state],
-        q.[stateDescription],
-        q.[stateUpdatedAt],
-        ISNULL((
-            SELECT TOP 1 qp.[nights]
-            FROM dbo.[QuotationProduct] qp
-            WHERE qp.[quotationId] = q.[id]
-        ), 1) AS [nights],
-        ISNULL(
-            NULLIF(q.[reservationCode], N''),
-            ISNULL((
-                SELECT TOP 1 qp.[reservationCode]
-                FROM dbo.[QuotationProduct] qp
-                WHERE qp.[quotationId] = q.[id] AND NULLIF(qp.[reservationCode], N'') IS NOT NULL
-            ), N'')
-        ) AS [reservationCode],
-        ISNULL(
-            NULLIF(q.[passenger], N''),
-            ISNULL((
-                SELECT TOP 1 qpax.[name]
-                FROM dbo.[QuotationProduct] qp
-                JOIN dbo.[QuotationProductPassenger] qpax ON qpax.[quotationProductId] = qp.[id]
-                WHERE qp.[quotationId] = q.[id]
-                ORDER BY qpax.[id] ASC
-            ), ISNULL((
-                SELECT TOP 1 qp.[passenger]
-                FROM dbo.[QuotationProduct] qp
-                WHERE qp.[quotationId] = q.[id] AND NULLIF(qp.[passenger], N'') IS NOT NULL
-            ), N'Mismo titular'))
-        ) AS [passengerName]
-    FROM dbo.[Quotation] q
-    LEFT JOIN dbo.[Client] c ON q.[clientId] = c.[id]
-    LEFT JOIN dbo.[User] u ON q.[userId] = u.[id]
-    WHERE
-        (
-            @p_referencia IS NULL OR TRIM(@p_referencia) = ''
-            OR (@v_start IS NOT NULL AND @v_end IS NOT NULL AND q.[id] BETWEEN @v_start AND @v_end)
-            OR (@v_single IS NOT NULL AND q.[id] = @v_single)
-            OR (@v_start IS NULL AND @v_single IS NULL AND (
-                CAST(q.[id] AS NVARCHAR(50)) LIKE '%' + TRIM(@p_referencia) + '%'
-                OR q.[internalNumber] LIKE '%' + TRIM(@p_referencia) + '%'
-            ))
-        )
-        AND (@p_fecha_desde IS NULL OR q.[date] >= @p_fecha_desde)
-        AND (@p_fecha_hasta IS NULL OR q.[date] <= @p_fecha_hasta)
-        AND (@p_cliente IS NULL OR TRIM(@p_cliente) = '' OR (c.[name] IS NOT NULL AND c.[name] LIKE '%' + TRIM(@p_cliente) + '%'))
-        AND (@p_elaborado_por IS NULL OR TRIM(@p_elaborado_por) = '' OR (u.[name] IS NOT NULL AND u.[name] LIKE '%' + TRIM(@p_elaborado_por) + '%'))
-        AND (@p_monto_total IS NULL OR q.[totalAmount] = @p_monto_total)
-        AND (@p_estado IS NULL OR TRIM(@p_estado) = '' OR q.[state] LIKE '%' + TRIM(@p_estado) + '%')
-        AND (
-            @p_reserva IS NULL OR TRIM(@p_reserva) = ''
-            OR q.[reservationCode] LIKE '%' + TRIM(@p_reserva) + '%'
-            OR EXISTS (
-                SELECT 1 FROM dbo.[QuotationProduct] qp
-                WHERE qp.[quotationId] = q.[id] AND qp.[reservationCode] LIKE '%' + TRIM(@p_reserva) + '%'
-            )
-        )
-        AND (
-            @p_pasajero IS NULL OR TRIM(@p_pasajero) = ''
-            OR q.[passenger] LIKE '%' + TRIM(@p_pasajero) + '%'
-            OR EXISTS (
-                SELECT 1 FROM dbo.[QuotationProduct] qp
-                LEFT JOIN dbo.[QuotationProductPassenger] qpax ON qpax.[quotationProductId] = qp.[id]
-                WHERE qp.[quotationId] = q.[id]
-                AND (qpax.[name] LIKE '%' + TRIM(@p_pasajero) + '%' OR qp.[passenger] LIKE '%' + TRIM(@p_pasajero) + '%')
-            )
-        )
-    ORDER BY q.[id] DESC;
-END;
 GO
 
 PRINT 'Procedimientos almacenados y funciones T-SQL compiladas exitosamente.';

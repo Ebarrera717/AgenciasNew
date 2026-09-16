@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { executePostgresQuery } from '@/lib/postgres'
 import { executeSQLServerProcedure } from '@/lib/sqlserver'
 import { registerLog } from '@/lib/logger'
+import { generateTraceCode, recordTraceEvent } from '@/lib/traceability'
 
 export async function POST(req: NextRequest) {
+    const traceCode = generateTraceCode();
     try {
         const { ids, userId } = await req.json()
 
@@ -23,11 +25,26 @@ export async function POST(req: NextRequest) {
         let xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
         
         if (!xmlStr || typeof xmlStr !== 'string') {
+            await recordTraceEvent({
+                code: traceCode,
+                userId: userId ? Number(userId) : null,
+                origin: 'EXPORTACION',
+                module: 'Facturación',
+                screen: 'Exportación Zeus ERP',
+                action: 'EXPORTAR_FACTURAS',
+                process: 'Generación XML Postgres',
+                eventType: 'ERROR',
+                stepName: 'Error al generar XML',
+                endpoint: '/api/invoices/export',
+                status: 'ERROR',
+                techMessage: 'spExportInvoices no devolvió una cadena XML válida',
+                functionalMessage: 'No se pudo generar la estructura XML de facturación'
+            });
             await registerLog(userId, 'INVOICE', 'EXPORT_ERROR', 'No se generó XML desde Postgres', { ids: idsStr });
-            return NextResponse.json({ message: 'Error en generación de XML Postgres' }, { status: 500 })
+            return NextResponse.json({ message: 'Error en generación de XML Postgres', traceCode }, { status: 500 })
         }
 
-        // 2. Integración Directa con SQL Server (Nueva versión)
+        // 2. Integración Directa con SQL Server
         let sqlServerMsg = 'Enviado exitosamente a SQL Server';
         let success = true;
         let spResult: any[] = [];
@@ -39,30 +56,54 @@ export async function POST(req: NextRequest) {
                 xml: xmlStr
             });
 
-            // El SP devuelve un recordset con el estado de cada factura procesada
             if (Array.isArray(sqlResult)) {
                 spResult = sqlResult;
-                const hasFailure = spResult.some(item => !(item.success === 1 || item.success === true || item.success === '1'));
+            } else if (sqlResult && typeof sqlResult === 'object') {
+                spResult = [sqlResult];
+            }
+
+            if (spResult.length > 0) {
+                const hasFailure = spResult.some((item: any) => !(item.success === 1 || item.success === true || item.success === '1'));
                 if (hasFailure) {
                     success = false;
                 }
-                const messages = spResult.map(item => item.message).filter(Boolean);
-                sqlServerMsg = messages.join(' | ');
-                if (!sqlServerMsg) {
-                    sqlServerMsg = hasFailure ? 'Algunas facturas fallaron al procesarse' : 'Exportación completada exitosamente';
-                }
-            } else if (sqlResult && typeof sqlResult === 'object') {
-                spResult = [sqlResult];
-                const item = spResult[0];
-                const itemSuccess = item.success === 1 || item.success === true || item.success === '1';
-                sqlServerMsg = item.message || '';
-                if (!itemSuccess) {
-                    success = false;
-                    if (!sqlServerMsg) sqlServerMsg = 'Error al procesar en SQL Server';
-                }
+                const formattedMsgs = spResult.map((item: any) => {
+                    const invId = item.invoiceId || item.Factura || item.id || idsStr;
+                    const isOk = item.success === 1 || item.success === true || item.success === '1';
+                    const rawMsg = item.message || '';
+                    const cleanMsg = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
+                    if (isOk) {
+                        return `✅ Factura #${invId}: Exportada correctamente a Zeus ERP`;
+                    } else {
+                        return `❌ Factura #${invId}: ${cleanMsg || 'Error no especificado en Zeus ERP'}`;
+                    }
+                });
+                sqlServerMsg = formattedMsgs.join(' | ');
+            } else {
+                sqlServerMsg = 'Exportación procesada en SQL Server';
             }
 
-            // Registrar log detallado por cada factura en Postgres
+            // Registrar traza detallada
+            await recordTraceEvent({
+                code: traceCode,
+                userId: userId ? Number(userId) : null,
+                origin: 'EXPORTACION',
+                module: 'Facturación',
+                screen: 'Exportación Zeus ERP',
+                action: 'EXPORTAR_FACTURAS',
+                process: 'Ejecución spFacturacionesCrear',
+                eventType: success ? 'FIN_PROCESO' : 'ERROR',
+                stepName: success ? 'Factura exportada exitosamente' : 'Error en Stored Procedure Zeus ERP',
+                spName: 'spFacturacionesCrear',
+                endpoint: '/api/invoices/export',
+                status: success ? 'SUCCESS' : 'ERROR',
+                techMessage: sqlServerMsg,
+                functionalMessage: success ? 'Factura exportada correctamente' : `Fallo al exportar factura: ${sqlServerMsg}`,
+                inputData: { ids: idsStr, xmlLength: xmlStr.length },
+                outputData: spResult
+            });
+
+            // Registrar log detallado por cada factura
             for (const item of spResult) {
                 const invId = item.invoiceId || 0;
                 const itemSuccess = item.success === 1 || item.success === true || item.success === '1';
@@ -76,7 +117,7 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            // 4. Actualizar Estado en Postgres (Nueva instrucción de usuario)
+            // Actualizar Estado en Postgres
             if (spResult.length > 0) {
                 console.log(`[EXPORT_API] Actualizando estados en Postgres para: ${idsStr}`);
                 try {
@@ -95,21 +136,40 @@ export async function POST(req: NextRequest) {
         } catch (sqlError: any) {
             console.error('[EXPORT_API] Error SQL Server:', sqlError.message);
             success = false;
-            sqlServerMsg = sqlError.message;
+            sqlServerMsg = sqlError.message || 'Error de conexión o ejecución en SQL Server';
+            
+            await recordTraceEvent({
+                code: traceCode,
+                userId: userId ? Number(userId) : null,
+                origin: 'EXPORTACION',
+                module: 'Facturación',
+                screen: 'Exportación Zeus ERP',
+                action: 'EXPORTAR_FACTURAS',
+                process: 'Conexión / Ejecución SQL Server',
+                eventType: 'ERROR',
+                stepName: 'Fallo de Ejecución en SQL Server',
+                spName: 'spFacturacionesCrear',
+                endpoint: '/api/invoices/export',
+                status: 'ERROR',
+                techMessage: sqlError.message || 'Error no especificado en SQL Server',
+                functionalMessage: 'Error de comunicación o procesamiento en SQL Server',
+                stackTrace: sqlError.stack
+            });
+
             await registerLog(userId, 'INVOICE', 'EXPORT_SQL_ERROR', `ID ${idsStr}: ${sqlServerMsg}`, { error: sqlError.message, xml: xmlStr });
         }
 
-        // 3. Respuesta JSON para el Dashboard
         return NextResponse.json({ 
             success: success,
             message: sqlServerMsg || (success ? 'Exportación completada exitosamente' : 'Error en la exportación'),
-            spResult: spResult,   // ← resultado del SP (Estado por factura)
-            xml: xmlStr
+            spResult: spResult,
+            xml: xmlStr,
+            traceCode
         });
 
     } catch (error: any) {
         console.error('Fatal Error calling export process:', error)
-        return NextResponse.json({ message: 'Error fatal en servidor', details: error.message }, { status: 500 })
+        return NextResponse.json({ message: 'Error fatal en servidor', details: error.message, traceCode }, { status: 500 })
     }
 }
 

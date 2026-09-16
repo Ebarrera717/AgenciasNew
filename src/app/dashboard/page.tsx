@@ -13,9 +13,9 @@ export default function DashboardIndex() {
 
     React.useEffect(() => {
         fetch('/api/quotations/list')
-            .then(res => res.json())
+            .then(res => (res.ok ? res.json() : []))
             .then(data => {
-                setRecent(data.slice(0, 5))
+                setRecent(Array.isArray(data) ? data.slice(0, 5) : [])
                 setLoading(false)
             })
             .catch(() => setLoading(false))

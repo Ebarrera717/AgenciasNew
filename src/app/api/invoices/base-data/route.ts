@@ -21,10 +21,11 @@ export async function GET(req: NextRequest) {
                 };
 
                 const [
-                    providers, prestadoras, branches, implants, products,
+                    clients, providers, prestadoras, branches, implants, products,
                     taxes, sellers, ticketPrinters, variables, currencies,
-                    creditCards, payments, ticketTypes, parameters, cities
+                    creditCards, payments, ticketTypes, parameters, cities, combos
                 ] = await Promise.all([
+                    safeQuery('SELECT [id], [name], [document] FROM dbo.[Client] WHERE [isActive] = 1 OR [isActive] IS NULL'),
                     safeQuery('SELECT * FROM dbo.[Provider] WHERE [isActive] = 1 OR [isActive] IS NULL'),
                     safeQuery('SELECT * FROM dbo.[Prestadora] WHERE [isActive] = 1 OR [isActive] IS NULL'),
                     safeQuery('SELECT * FROM dbo.[Branch] WHERE [isActive] = 1 OR [isActive] IS NULL'),
@@ -39,12 +40,13 @@ export async function GET(req: NextRequest) {
                     safeQuery('SELECT * FROM dbo.[Payment] WHERE [isActive] = 1 OR [isActive] IS NULL'),
                     safeQuery('SELECT * FROM dbo.[TicketType] WHERE [isActive] = 1 OR [isActive] IS NULL'),
                     safeQuery('SELECT * FROM dbo.[SystemParameter]'),
-                    safeQuery('SELECT * FROM dbo.[Cities]')
+                    safeQuery('SELECT * FROM dbo.[Cities]'),
+                    safeQuery('SELECT * FROM dbo.[Combo] WHERE [isActive] = 1 OR [isActive] IS NULL')
                 ]);
                 await pool.close();
 
                 return NextResponse.json({
-                    clients: [],
+                    clients,
                     providers,
                     prestadoras,
                     branches,
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
                     ticketPrinters,
                     variables,
                     currentUser: null,
-                    combos: [],
+                    combos,
                     currencies,
                     creditCards,
                     payments,

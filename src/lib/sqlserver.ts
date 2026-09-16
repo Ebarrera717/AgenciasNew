@@ -69,7 +69,7 @@ export function parseSQLServerUrl(connStr: string) {
 /**
  * Obtiene la conexión a SQL Server usando la variable de entorno o la función de Postgres.
  */
-export async function getSQLServerConnection() {
+export async function getSQLServerConnection(overrideDbName?: string) {
     let configRow: any = null;
     let sqlUrl = process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL;
 
@@ -88,10 +88,8 @@ export async function getSQLServerConnection() {
     } catch (e) {}
 
     if (sqlUrl && (sqlUrl.startsWith('sqlserver://') || sqlUrl.startsWith('mssql://'))) {
-        console.log('[SQL_CONN] Usando connection string de SQL Server desde variables de entorno (.env)...');
         configRow = parseSQLServerUrl(sqlUrl);
     } else {
-        console.log('[SQL_CONN] Llamando a "fnGetSQLServerConfig"() en Postgres...');
         try {
             const result = await prisma.$queryRawUnsafe<any[]>('SELECT * FROM "fnGetSQLServerConfig"()');
             if (result && result.length > 0) {
@@ -110,7 +108,7 @@ export async function getSQLServerConnection() {
     if (serverVal.includes('/')) serverVal = serverVal.replace('/', '\\');
     const userVal = (configRow.usuario || '').trim();
     const passVal = (configRow.clave || '').trim();
-    const dbVal = (configRow.base_datos || '').trim();
+    const dbVal = overrideDbName || (configRow.base_datos || '').trim();
     const portVal = (configRow.puerto || '').trim();
 
     let host = serverVal;
@@ -143,29 +141,30 @@ export async function getSQLServerConnection() {
     if (portVal && portVal !== '') {
         sqlConfig.port = parseInt(portVal, 10);
         delete sqlConfig.options.instanceName;
-        console.log(`[SQL_DEBUG] Conectando por PUERTO: ${host}:${sqlConfig.port}`);
+        console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}:${sqlConfig.port}`);
     } else if (instanceName) {
         sqlConfig.options.instanceName = instanceName;
-        console.log(`[SQL_DEBUG] Conectando por INSTANCIA: ${host}\\${instanceName} (Vía SQL Browser)`);
+        console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}\\${instanceName} (Vía SQL Browser)`);
     } else {
         sqlConfig.port = 1433;
-        console.log(`[SQL_DEBUG] Conectando por DEFECTO (1433): ${host}`);
+        console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}:1433`);
     }
 
     try {
-        const pool = await mssql.connect(sqlConfig);
-        console.log('[SQL_CONN] ¡ÉXITO al conectar con SQL Server!');
+        const pool = new mssql.ConnectionPool(sqlConfig);
+        await pool.connect();
+        console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] en SQL Server!`);
         return pool;
     } catch (error: any) {
-        console.warn(`[SQL_CONN] Falló primer intento de conexión en '${host}': ${error.message}`);
+        console.warn(`[SQL_CONN] Falló primer intento de conexión a '${dbVal}' en '${host}': ${error.message}`);
         
-        // Si falló por nombre de host (DNS) o timeout local y el host no era 127.0.0.1, intentar fallback local a 127.0.0.1
         if (host !== '127.0.0.1' && host !== 'localhost') {
             console.log(`[SQL_CONN] Intentando conexión de respaldo en 127.0.0.1 con puerto ${sqlConfig.port || 1433}...`);
             try {
                 const fallbackConfig = { ...sqlConfig, server: '127.0.0.1' };
-                const poolFallback = await mssql.connect(fallbackConfig);
-                console.log('[SQL_CONN] ¡ÉXITO al conectar con SQL Server mediante fallback 127.0.0.1!');
+                const poolFallback = new mssql.ConnectionPool(fallbackConfig);
+                await poolFallback.connect();
+                console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] mediante fallback 127.0.0.1!`);
                 return poolFallback;
             } catch (fallbackErr: any) {
                 console.error('[SQL_CONN] Falló también el intento de respaldo en 127.0.0.1:', fallbackErr.message);
@@ -184,12 +183,17 @@ export async function getSQLServerConnection() {
 /**
  * Ejecuta un Stored Procedure en SQL Server.
  */
-export async function executeSQLServerProcedure(spName: string, params: any) {
+export async function executeSQLServerProcedure(spName: string, params: any, targetDb?: string) {
     let pool;
+    const startTime = Date.now();
+    const isTraceProcedure = spName.toLowerCase().includes('sptraceability');
+    const isExportProcedure = spName.toLowerCase().includes('facturacion') || spName.toLowerCase().includes('cotizacion') || spName.toLowerCase().includes('export');
+
     try {
         const fullSpName = spName.includes('.') ? spName : `dbo.${spName}`;
-        console.log(`[SQL_SERVER_EXEC] Procedimiento: ${fullSpName} | Parámetros:`, JSON.stringify(params));
-        pool = await getSQLServerConnection();
+        const dbToUse = targetDb;
+        console.log(`[SQL_SERVER_EXEC] Procedimiento: ${fullSpName} | BD Destino: ${dbToUse || 'Principal (.env)'} | Parámetros:`, JSON.stringify(params));
+        pool = await getSQLServerConnection(dbToUse);
         const request = pool.request();
 
         if (params) {
@@ -213,10 +217,53 @@ export async function executeSQLServerProcedure(spName: string, params: any) {
 
         const result = await request.execute(fullSpName);
         await pool.close();
-        return result.recordset || result.rowsAffected;
+        const executionResult = result.recordset || result.rowsAffected;
+
+        if (!isTraceProcedure) {
+            import('@/lib/traceability').then(({ recordTraceEvent }) => {
+                recordTraceEvent({
+                    module: 'BASE_DATOS',
+                    screen: 'Ejecución SP SQL Server',
+                    action: 'EJECUCION_SP',
+                    process: `Invocación ${fullSpName}`,
+                    eventType: 'SP_FIN',
+                    stepName: `SP ${spName} Ejecutado`,
+                    spName: fullSpName,
+                    durationMs: Date.now() - startTime,
+                    status: 'SUCCESS',
+                    inputData: params,
+                    outputData: executionResult
+                }).catch(e => console.error('[TRACE_SP_AUTO_ERROR]', e?.message));
+            }).catch(() => {});
+        }
+
+        return executionResult;
     } catch (err: any) {
         if (pool) await pool.close();
-        throw err;
+
+        const formattedTechMsg = err?.lineNumber || err?.procedureName
+            ? `❌ Error T-SQL #${err?.number || 0} en SP '${err?.procedureName || spName}' (Línea ${err?.lineNumber || 'N/A'}): ${err?.message}`
+            : (err?.message || 'Error de ejecución en SQL Server');
+
+        if (!isTraceProcedure) {
+            import('@/lib/traceability').then(({ recordTraceEvent }) => {
+                recordTraceEvent({
+                    module: 'BASE_DATOS',
+                    screen: 'Ejecución SP SQL Server',
+                    action: 'EJECUCION_SP',
+                    process: `Fallo ${spName}`,
+                    eventType: 'ERROR',
+                    stepName: `Error en SP ${spName}`,
+                    spName: spName,
+                    durationMs: Date.now() - startTime,
+                    status: 'ERROR',
+                    inputData: params,
+                    techMessage: formattedTechMsg,
+                    stackTrace: err?.stack
+                }).catch(e => console.error('[TRACE_SP_AUTO_ERROR]', e?.message));
+            }).catch(() => {});
+        }
+        throw new Error(formattedTechMsg);
     }
 }
 
