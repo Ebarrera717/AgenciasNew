@@ -4,6 +4,17 @@ import { isSQLServerMode, getSQLServerConnection, executeSQLServerProcedure } fr
 import { registerLog } from '@/lib/logger'
 import { generateTraceCode, recordTraceEvent } from '@/lib/traceability'
 
+function formatZeusConsecutive(rawMsg: string): string {
+    if (!rawMsg) return '';
+    const clean = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
+    // Pattern like 55-3300000102-61494 or 55-33-00000102
+    const match = clean.match(/^([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})(?:-\d+)?$/i);
+    if (match) {
+        return `${match[1]}-${match[2]}-${match[3]}`;
+    }
+    return clean;
+}
+
 export async function POST(req: NextRequest) {
     const traceCode = generateTraceCode();
     try {
@@ -15,15 +26,25 @@ export async function POST(req: NextRequest) {
 
         const idsStr = Array.isArray(ids) ? ids.join(',') : ids.toString();
 
-        // 1. Obtener XML desde Postgres
-        const result = await executePostgresQuery(
-            `CALL spExportInvoices($1, $2, $3)`,
-            [idsStr, userId ? Number(userId) : 0, '']
-        )
+        // 1. Obtener XML (dual motor support)
+        let xmlStr = '';
+        if (isSQLServerMode()) {
+            const sqlResult = await executeSQLServerProcedure('spExportInvoices', { 
+                Envoices_id: idsStr, 
+                User_id: userId ? Number(userId) : 0 
+            });
+            xmlStr = Array.isArray(sqlResult) && sqlResult.length > 0 
+                ? (sqlResult[0]?.mensaje_resultado || sqlResult[0]?.xml || '') 
+                : '';
+        } else {
+            const result = await executePostgresQuery(
+                `CALL spExportInvoices($1, $2, $3)`,
+                [idsStr, userId ? Number(userId) : 0, '']
+            );
+            const row = result && result.length > 0 ? result[0] : null;
+            xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
+        }
 
-        const row = result && result.length > 0 ? result[0] : null;
-        let xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
-        
         if (!xmlStr || typeof xmlStr !== 'string') {
             await recordTraceEvent({
                 code: traceCode,
@@ -32,7 +53,7 @@ export async function POST(req: NextRequest) {
                 module: 'Facturación',
                 screen: 'Exportación Zeus ERP',
                 action: 'EXPORTAR_FACTURAS',
-                process: 'Generación XML Postgres',
+                process: 'Generación XML',
                 eventType: 'ERROR',
                 stepName: 'Error al generar XML',
                 endpoint: '/api/invoices/export',
@@ -40,8 +61,8 @@ export async function POST(req: NextRequest) {
                 techMessage: 'spExportInvoices no devolvió una cadena XML válida',
                 functionalMessage: 'No se pudo generar la estructura XML de facturación'
             });
-            await registerLog(userId, 'INVOICE', 'EXPORT_ERROR', 'No se generó XML desde Postgres', { ids: idsStr });
-            return NextResponse.json({ message: 'Error en generación de XML Postgres', traceCode }, { status: 500 })
+            await registerLog(userId, 'INVOICE', 'EXPORT_ERROR', 'No se generó XML para facturas', { ids: idsStr });
+            return NextResponse.json({ message: 'Error en generación de XML de facturación', traceCode }, { status: 500 })
         }
 
         // Obtener mapa de números de factura (internalNumber / consecutivo)
@@ -72,7 +93,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 2. Integración Directa con SQL Server
+        // 2. Integración Directa con SQL Server (spFacturacionesCrear -> Zeus ERP)
         let sqlServerMsg = 'Enviado exitosamente a SQL Server';
         let success = true;
         let spResult: any[] = [];
@@ -92,39 +113,30 @@ export async function POST(req: NextRequest) {
 
             if (spResult.length > 0) {
                 const hasFailure = spResult.some((item: any) => !(item.success === 1 || item.success === true || item.success === '1'));
+                const formattedMsgs = spResult.map((item: any) => {
+                    const invId = Number(item.invoiceId || item.Factura || item.id || 0);
+                    const invNum = invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : idsStr);
+                    const isOk = item.success === 1 || item.success === true || item.success === '1';
+                    const rawMsg = item.message || '';
+                    const zeusConsec = formatZeusConsecutive(rawMsg);
+                    const zeusStr = zeusConsec ? ` (Zeus ERP N° ${zeusConsec})` : '';
+                    if (isOk) {
+                        return `✅ Factura ${invNum}${zeusStr}: Exportada correctamente a Zeus ERP`;
+                    } else {
+                        const cleanMsg = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
+                        return `❌ Factura ${invNum}: ${cleanMsg || 'Error no especificado en Zeus ERP'}`;
+                    }
+                });
+
                 if (hasFailure) {
                     success = false;
-                    const formattedMsgs = spResult.map((item: any) => {
-                        const invId = Number(item.invoiceId || item.Factura || item.id || 0);
-                        const invNum = invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : idsStr);
-                        const isOk = item.success === 1 || item.success === true || item.success === '1';
-                        const rawMsg = item.message || '';
-                        const cleanMsg = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
-                        if (isOk) {
-                            return `✅ Factura N° ${invNum}: Exportada correctamente a Zeus ERP`;
-                        } else {
-                            return `❌ Factura N° ${invNum}: ${cleanMsg || 'Error no especificado en Zeus ERP'}`;
-                        }
-                    });
                     sqlServerMsg = formattedMsgs.join(' | ');
                 } else {
-                    const exportedNums = spResult.map((item: any) => {
-                        const invId = Number(item.invoiceId || item.Factura || item.id || 0);
-                        return invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : idsStr);
-                    });
-                    if (exportedNums.length === 1) {
-                        sqlServerMsg = `✅ Factura N° ${exportedNums[0]} exportada exitosamente a Zeus ERP`;
-                    } else {
-                        sqlServerMsg = `✅ Facturas N° ${exportedNums.join(', ')} exportadas exitosamente a Zeus ERP`;
-                    }
+                    sqlServerMsg = formattedMsgs.join(' | ');
                 }
             } else {
                 const exportedNums = idArray.map((id: number) => invoiceNumberMap[id] || `FAC-${id}`);
-                if (exportedNums.length === 1) {
-                    sqlServerMsg = `✅ Factura N° ${exportedNums[0]} exportada exitosamente a Zeus ERP`;
-                } else {
-                    sqlServerMsg = `✅ Facturas N° ${exportedNums.join(', ')} exportadas exitosamente a Zeus ERP`;
-                }
+                sqlServerMsg = `✅ Factura N° ${exportedNums.join(', ')} exportada exitosamente a Zeus ERP`;
             }
 
             // Registrar traza detallada
@@ -161,16 +173,35 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            // Actualizar Estado en Postgres
+            // Actualizar Estado en la Base de Datos Activa
             if (spResult.length > 0) {
-                console.log(`[EXPORT_API] Actualizando estados en Postgres para: ${idsStr}`);
-                try {
-                    await executePostgresQuery(
-                        `CALL public."spFacturaActualizarEstado"($1::JSONB)`,
-                        [JSON.stringify(spResult)]
-                     );
-                } catch (spPgError) {
-                    console.error('[EXPORT_API] Error al actualizar estado en Postgres:', spPgError);
+                console.log(`[EXPORT_API] Actualizando estados de facturas para: ${idsStr}`);
+                if (isSQLServerMode()) {
+                    for (const item of spResult) {
+                        const invId = Number(item.invoiceId || 0);
+                        const isOk = item.success === 1 || item.success === true || item.success === '1';
+                        if (isOk && invId > 0) {
+                            const rawMsg = item.message || '';
+                            const match = rawMsg.match(/^([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})/i);
+                            const fuente = match ? match[1] : '55';
+                            const serie = match ? match[2] : '33';
+                            const consecutivo = match ? match[3] : null;
+                            const pool = await getSQLServerConnection();
+                            await pool.request().query(
+                                `UPDATE dbo.[Invoices] SET status = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}'` : ''} WHERE id = ${invId}`
+                            );
+                            await pool.close();
+                        }
+                    }
+                } else {
+                    try {
+                        await executePostgresQuery(
+                            `CALL public."spFacturaActualizarEstado"($1::JSONB)`,
+                            [JSON.stringify(spResult)]
+                        );
+                    } catch (spPgError) {
+                        console.error('[EXPORT_API] Error al actualizar estado en Postgres:', spPgError);
+                    }
                 }
             }
 
@@ -216,4 +247,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: 'Error fatal en servidor', details: error.message, traceCode }, { status: 500 })
     }
 }
-

@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-09-16T20:46:53.221Z
+-- Fecha de Generación: 2026-09-16T21:25:45.433Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -7514,9 +7514,9 @@ BEGIN
 			bl_NoCalcIvaComision = ISNULL(F.Item.value('bl_nocalcivacomision[1]','BIT'),0),
 			am_basecomisionable = ISNULL(F.Item.value('am_basecomisionable[1]','MONEY'),0),
 			am_porcomision = ISNULL(F.Item.value('am_porcomision[1]','MONEY'),0),
-			id_tiposconceptfac = CF.id_TiposConceptoFacturacion,
-			id_conceptofacturacion = CF.id,
-			id_tiposservicio = CASE WHEN TS.id IS NOT NULL THEN TS.id ELSE TSA.id_TipoServicio END,
+			id_tiposconceptfac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion ORDER BY id), 2)),
+			id_conceptofacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE cd_codigo = 'SOP'), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion ORDER BY id), 1))),
+			id_tiposservicio = ISNULL(CASE WHEN TS.id IS NOT NULL THEN TS.id ELSE TSA.id_TipoServicio END, ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE cd_codigo IN ('htn','SOP')), ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios ORDER BY id), 1))),
 			cd_proveedores = ISNULL(F.Item.value('cd_proveedores[1]','VARCHAR(25)'),''),
 			ds_servicio = ISNULL(F.Item.value('ds_servicio[1]','VARCHAR(250)'),''),
 			am_valorprov = ISNULL(F.Item.value('am_valorprov[1]','MONEY'),0),
@@ -7657,7 +7657,7 @@ BEGIN
 			id_facturacion, id_item, in_tipoitem, ds_maestro, ds_VariableAdicional, ds_valor, cd_codigo
 		)
 		SELECT 
-			id_facturacion=ISNULL(V.Var.value('id_factura[1]', 'INT'),0),
+			id_facturacion=ISNULL(NULLIF(V.Var.value('id_factura[1]', 'INT'),0), ISNULL(NULLIF(V.Var.value('../id_factura[1]', 'INT'),0), ISNULL(V.Var.value('../../id_factura[1]', 'INT'),0))),
 			id_item=ISNULL(V.Var.value('id_item[1]', 'INT'),0),
 			in_tipoitem=ISNULL(V.Var.value('in_tipoitem[1]', 'INT'),0),
 			ds_maestro=ISNULL(V.Var.value('ds_maestro[1]', 'VARCHAR(25)'),''),
@@ -7739,16 +7739,25 @@ BEGIN
 				-- Resolve IDs for headers
 				IF ISNULL(@cd_sucursal,'')=''
 				BEGIN
-					SET @cd_sucursal='OFP'
+					SET @cd_sucursal='01'
 					SET @cd_implante=NULL
 				END
-				SELECT @id_sucursal = id FROM dbo.Sucursales WHERE cd_codigo = @cd_sucursal;
-				SELECT @id_implante = id FROM dbo.Implantes WHERE cd_codigo = @cd_implante AND id_sucursal = @id_sucursal;
-				SELECT @id_monedas_iata = id FROM dbo.Monedas_IATA WHERE cd_codigo = @ds_moneda;
-				SELECT @id_tiqueteador = id FROM dbo.Tiqueteadores WHERE cd_codigo = @cd_tiqueteador;
-				SELECT @id_tipoventa = id_tipoventa FROM dbo.Tiqueteadores WHERE cd_codigo = @cd_tiqueteador;
-				SELECT @cd_bu = cd_bu FROM dbo.Implantes WHERE cd_codigo = @cd_implante AND id_sucursal = @id_sucursal;
-				SELECT @cd_bu = cd_bu FROM dbo.Sucursales WHERE cd_codigo = @cd_sucursal AND ISNULL(@cd_bu,'')='';
+				SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_sucursal));
+				IF @id_sucursal IS NULL SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales ORDER BY id;
+
+				SELECT TOP 1 @id_implante = id FROM dbo.Implantes WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_implante)) AND id_sucursal = @id_sucursal;
+				SELECT TOP 1 @id_monedas_iata = id FROM dbo.Monedas_IATA WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@ds_moneda));
+				IF @id_monedas_iata IS NULL SELECT TOP 1 @id_monedas_iata = id FROM dbo.Monedas_IATA ORDER BY id;
+
+				SELECT TOP 1 @id_tiqueteador = id FROM dbo.Tiqueteadores WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_tiqueteador));
+				IF @id_tiqueteador IS NULL SELECT TOP 1 @id_tiqueteador = id FROM ZeusAgencias_23.dbo.Tiqueteadores WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_tiqueteador));
+				IF @id_tiqueteador IS NULL SELECT TOP 1 @id_tiqueteador = id FROM dbo.Tiqueteadores ORDER BY id;
+				IF @id_tiqueteador IS NULL SELECT TOP 1 @id_tiqueteador = id FROM ZeusAgencias_23.dbo.Tiqueteadores ORDER BY id;
+				IF @id_tiqueteador IS NULL SET @id_tiqueteador = 2;
+
+				SELECT TOP 1 @id_tipoventa = id_tipoventa FROM dbo.Tiqueteadores WHERE id = @id_tiqueteador;
+				SELECT TOP 1 @cd_bu = cd_bu FROM dbo.Implantes WHERE id = @id_implante;
+				IF ISNULL(@cd_bu,'')='' SELECT TOP 1 @cd_bu = cd_bu FROM dbo.Sucursales WHERE id = @id_sucursal;
 				IF @id_tipoventa IS NULL SET @id_tipoventa = 1;
 
 				SELECT TOP 1 @am_tcambiousd = am_tasa_cambio FROM dbo.Monedas_IATA WHERE cd_codigo = 'USD';
@@ -7844,7 +7853,7 @@ BEGIN
 						SET @TktSqlStmt = '';
 						
 						DELETE FROM #TmpVariablesObtenidas;
-						IF @gen_id_referencia_origen IS NOT NULL
+						IF @gen_id_referencia_origen IS NOT NULL AND OBJECT_ID('dbo.spConfiguracionVariablesObtenerValores', 'P') IS NOT NULL
 						BEGIN
 							INSERT INTO #TmpVariablesObtenidas
 							EXEC dbo.spConfiguracionVariablesObtenerValores 
@@ -8103,7 +8112,7 @@ BEGIN
 						SET @SrvImpuestosSqlStmt = '';
 						
 						DELETE FROM #TmpVariablesObtenidas;
-						IF @gen_id_referencia_origen IS NOT NULL
+						IF @gen_id_referencia_origen IS NOT NULL AND OBJECT_ID('dbo.spConfiguracionVariablesObtenerValores', 'P') IS NOT NULL
 						BEGIN
 							INSERT INTO #TmpVariablesObtenidas
 							EXEC dbo.spConfiguracionVariablesObtenerValores 
@@ -8345,19 +8354,19 @@ BEGIN
 					DECLARE @ReturnCode INT;
 					DECLARE @FacturaExecSqlStmt NVARCHAR(MAX);
 
-					DECLARE @ZML_VariablesXML XML = (
-						SELECT 
-							ds_maestro,
-							ds_VariableAdicional,
-							ds_valor,
-							cd_codigo
-						FROM #VariablesAdicionales
-						WHERE id_facturacion = @id_facturacion 
-						FOR XML PATH('Variable'), ROOT('Variables')
-					);
+					DECLARE @ZML_VariablesStr VARCHAR(MAX) = NULL;
+					SELECT 
+						@ZML_VariablesStr = COALESCE(@ZML_VariablesStr + ' UNION ALL ', '') + 
+						'SELECT ' + ISNULL('''' + REPLACE(cd_codigo, '''', '''''') + '''', 'NULL') + ' AS cd_items, NULL AS ds_Items, ' + 
+						ISNULL('''' + REPLACE(ds_maestro, '''', '''''') + '''', 'NULL') + ' AS ds_Maestro, ' + 
+						ISNULL('''' + REPLACE(ds_VariableAdicional, '''', '''''') + '''', 'NULL') + ' AS ds_Variable, ' + 
+						ISNULL('''' + REPLACE(ds_valor, '''', '''''') + '''', 'NULL') + ' AS ds_Valor, ' +
+						ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ' AS id_Clientes'
+					FROM #VariablesAdicionales
+					WHERE id_facturacion = @id_facturacion;
 
 					SET @FacturaExecSqlStmt = N'
-						EXEC @ReturnCode = dbo.spFacturaCrear' + CHAR(13) + CHAR(10) +
+						EXEC @ReturnCode = ZeusAgencias_23.dbo.spza_Factura_Crear' + CHAR(13) + CHAR(10) +
 							'@id_usuario = 1,' + CHAR(13) + CHAR(10) +
 							'@id_sucursal = ' + ISNULL(CAST(@id_sucursal AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@id_implante = ' + ISNULL(CAST(@id_implante AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
@@ -8429,18 +8438,15 @@ BEGIN
 							'@ds_num_resolucion_Adicional = '''',' + CHAR(13) + CHAR(10) +
 							'@id_fac_facturaRefacturacion = NULL,' + CHAR(13) + CHAR(10) +
 							'@bl_refacturacion_contabilizar_saldos = 0,' + CHAR(13) + CHAR(10) +
-							'@ZML_VariablesXML = ' + ISNULL('''' + REPLACE(CAST(@ZML_VariablesXML AS VARCHAR(MAX)), '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ZML_VariablesXML = @ZML_VariablesXML,' + CHAR(13) + CHAR(10) +
 							'@bl_FormatoResumidoFactElectro = 0,' + CHAR(13) + CHAR(10) +
 							'@bl_ExigeAdjuntoFactElectro = 0,' + CHAR(13) + CHAR(10) +
 							'@bl_omitir_Validar_IVA_facturacion = 0,' + CHAR(13) + CHAR(10) +
-							'@ZML_AjusteIvaXML = NULL,' + CHAR(13) + CHAR(10) +
-							'@ds_Respuesta = @FacturaRespuesta OUTPUT;';
-					--select @FacturaExecSqlStmt
-					--ROLLBACK TRAN
-					--RETURN 1
+							'@ZML_AjusteIvaXML = NULL;';
 					
 					EXEC sp_executesql @FacturaExecSqlStmt, 
-						N'@FacturaRespuesta VARCHAR(MAX) OUTPUT, @ReturnCode INT OUTPUT', 
+						N'@ZML_VariablesXML VARCHAR(MAX), @FacturaRespuesta VARCHAR(8000) OUTPUT, @ReturnCode INT OUTPUT', 
+						@ZML_VariablesXML = @ZML_VariablesStr,
 						@FacturaRespuesta = @FacturaRespuesta OUTPUT, 
 						@ReturnCode = @ReturnCode OUTPUT;
 					
