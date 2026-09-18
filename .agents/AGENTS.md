@@ -173,6 +173,27 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 - **Independencia Cruzada**: La ejecución o generación de un instalador para un motor garantiza 0 modificaciones en los archivos del otro motor.
 - **Integración con Protección de Correcciones**: Cada instalador/actualizador posee su propio historial de cambios y pruebas de regresión protegidas según el Skill [`separacion-instaladores-actualizadores`](file:///f:/Proyectos/AgenciasNew/.agents/skills/separacion-instaladores-actualizadores/SKILL.md).
 
+---
+
+## 13. Regla Obligatoria de Instalación, Actualización, Diagnóstico y Autoreparación Multibase (`korex-install-diagnostics-autorepair`)
+
+- **Principio Universal de Diagnóstico y Validación End-to-End**: Ninguna instalación o actualización de Korex se considera terminada por el simple hecho de haber copiado archivos. El proceso DEBE verificar de forma obligatoria y automatizada que **Korex realmente funciona** evaluando los 11 dominios técnicos:
+  1. *Entorno Windows* (Admin, espacio en disco, permisos).
+  2. *Node.js y npm* (Instalación, versión >= 18/20 LTS, PATH, prueba de ejecución).
+  3. *Archivos y Configuración Korex* (Integridad de archivos, `.env`, `web.config`).
+  4. *Dependencias* (`node_modules` y binarios).
+  5. *Servidor IIS* (Servicio `W3SVC`, creación del sitio, bindings y AppPool).
+  6. *ARR y URL Rewrite* (`rewrite.dll`, `requestRouter.dll`, proxy habilitado en `appcmd`).
+  7. *Puertos y Red* (3000 IIS, 3001 Node.js, identificación de PID, IPv4/IPv6, `localhost`, `127.0.0.1`).
+  8. *Proceso Korex / Servicio Windows* (`Korex_NextJS` / `Korex_SQLServer_Service`, captura de traza en `daemon/korex_nextjs.err.log` en caso de crash).
+  9. *Base de Datos Exclusiva* (PG: TCP + consultas / SQL: `SqlConnection` + consultas, con prohibición estricta de `CREATE DATABASE`).
+  10. *Diagnóstico Profundo HTTP 502.3 Bad Gateway* (Sincronización exacta de proxy inverso IIS <-> Backend).
+  11. *Prueba Funcional End-to-End* (Petición HTTP real y respuesta válida).
+- **Autoreparación Segura, Controlada y Reversible**: Capacidad de arrancar servicios caídos, habilitar el proxy ARR en IIS, corregir descalce de puertos en `web.config` y liberar puertos huérfanos con respaldo previo (`.env.bak_YYYYMMDD_HHMMSS`), sin realizar jamás acciones destructivas en bases de datos ni alterar el motor contrario.
+- **Generación de Reportes y Soporte Remoto**: Todo proceso genera reportes interactivos HTML (`Korex_Diagnostico_<MOTOR>_<TIMESTAMP>.html`) y paquetes de soporte remoto ZIP sanitizados (`Korex_Diagnostico_<MOTOR>_<TIMESTAMP>.zip`) con 0 contraseñas o secretos expuestos, facilitando el diagnóstico técnico a distancia.
+- **Validación Automatizada Continua**: Se debe ejecutar obligatoriamente `node scripts/validate_installer_diagnostics.js` y `node scripts/validate_full_suite.js` para asegurar el 100% de cumplimiento funcional multibase (Skill [`korex-install-diagnostics-autorepair`](file:///f:/Proyectos/AgenciasNew/.agents/skills/korex-install-diagnostics-autorepair/SKILL.md)).
+
+
 
 
 

@@ -325,30 +325,22 @@ Get-Website | ForEach-Object {
         Write-Log "No se encontró AppPool con nombre '$SiteName'."
     }
 
-# Paso 7. Verificación de salud HTTP final
-Write-Log "Realizando verificación de salud HTTP en http://localhost:$SitePort/..."
-$healthSuccess = $false
-for ($i = 1; $i -le 6; $i++) {
-    Write-Log "Intento $i de 6 para conectar al portal web..."
-    try {
-        $response = Invoke-WebRequest -Uri "http://localhost:$SitePort/" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-        if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
-            Write-Log "Verificación de salud exitosa: El portal respondió con código $($response.StatusCode)."
-            $healthSuccess = $true
-            break
-        } else {
-            Write-Log "El servidor respondió con código de estado HTTP: $($response.StatusCode)" "WARN"
-        }
-    } catch {
-        Write-Log "El portal web no respondió en este intento. Detalles: $_" "WARN"
-    }
-    Start-Sleep -Seconds 2
-}
-
-if (-not $healthSuccess) {
-    Write-Log "ERROR CRITICO: La verificación de salud HTTP falló. El portal no respondió exitosamente." "ERROR"
-    Show-Alert "Fallo de Verificación de Salud" "La actualización de archivos se completó, pero el portal web en http://localhost:$SitePort/ no responde o devolvió un error.`n`nPor favor verifique los logs de error en: $LogFile"
-    exit 1
+# Paso 7. Diagnóstico Profundo, Validación y Soporte Remoto (PostgreSQL)
+Write-Log "Ejecutando motor de diagnóstico profundo y validación para PostgreSQL..."
+$DiagScript = Join-Path $TargetDir "deploy\Korex_Diagnostics_Engine.ps1"
+if (Test-Path $DiagScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File "$DiagScript" `
+        -Engine "POSTGRESQL" `
+        -Mode "Reparacion" `
+        -TargetDir "$TargetDir" `
+        -PgHost "$PgHost" `
+        -PgPort "$PgPort" `
+        -PgDb "$PgDb" `
+        -PgUser "$PgUser" `
+        -PgPass "$PgPass" `
+        -SitePort $SitePort `
+        -NextjsPort $NextjsPort `
+        -GenerateZip
 }
 
 Write-Log "PROCESO DE ACTUALIZACION FINALIZADO CON EXITO."

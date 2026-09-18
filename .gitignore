@@ -69,5 +69,6 @@ install_log.txt
 scratch/
 resolve*.js
 tmp/
+Diagnosticos/
 
 

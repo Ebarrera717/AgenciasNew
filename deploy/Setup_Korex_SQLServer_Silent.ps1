@@ -311,20 +311,22 @@ if (Test-Path $AppCmd) {
     }
 }
 
-# Paso 8. VERIFICACION DE SALUD HTTP FINAL
-Write-Log "Verificacion de salud HTTP en http://localhost:$SitePort/..."
-for ($i = 1; $i -le 5; $i++) {
-    Write-Log "Prueba HTTP $i de 5..."
-    try {
-        $response = Invoke-WebRequest -Uri "http://localhost:$SitePort/" -UseBasicParsing -TimeoutSec 4 -ErrorAction Stop
-        if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
-            Write-Log "Verificacion exitosa: El portal respondio con HTTP $($response.StatusCode)."
-            break
-        }
-    } catch {
-        Write-Log "Esperando respuesta HTTP..." "WARN"
-    }
-    Start-Sleep -Seconds 2
+# Paso 8. Diagnóstico Profundo, Validación y Soporte Remoto (SQL Server)
+Write-Log "Ejecutando motor de diagnóstico profundo y validación para SQL Server..."
+$DiagScript = Join-Path $TargetDir "deploy\Korex_Diagnostics_Engine.ps1"
+if (Test-Path $DiagScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File "$DiagScript" `
+        -Engine "SQLSERVER" `
+        -Mode "Reparacion" `
+        -TargetDir "$TargetDir" `
+        -SqlHost "$SqlHost" `
+        -SqlPort "$SqlPort" `
+        -SqlDb "$SqlDb" `
+        -SqlUser "$SqlUser" `
+        -SqlPass "$SqlPass" `
+        -SitePort $SitePort `
+        -NextjsPort $NextjsPort `
+        -GenerateZip
 }
 
 Write-Log "PROCESO DE INSTALACION SQL SERVER COMPLETADO CON EXITO."

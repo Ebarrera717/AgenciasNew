@@ -19,6 +19,7 @@ ArchitecturesAllowed=x64compatible
 [Files]
 Source: "F:\Proyectos\AgenciasNew\RELEASE_KOREX\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "F:\Proyectos\AgenciasNew\deploy\Setup_Korex_Silent.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "F:\Proyectos\AgenciasNew\deploy\Korex_Diagnostics_Engine.ps1"; DestDir: "{app}\deploy"; Flags: ignoreversion
 
 [Code]
 var

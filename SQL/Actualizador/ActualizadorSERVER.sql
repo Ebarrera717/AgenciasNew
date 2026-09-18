@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-09-18T03:32:00.304Z
+-- Fecha de Generación: 2026-09-18T17:11:40.934Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 

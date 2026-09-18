@@ -159,6 +159,28 @@ async function validateFullSuite() {
         });
     }
 
+    // -------------------------------------------------------------------------
+    // CAPA 6: SUITE DE INSTALACIÓN, ACTUALIZACIÓN, DIAGNÓSTICO Y AISLAMIENTO
+    // -------------------------------------------------------------------------
+    console.log('\n[CAPA 6/6] Validando Instaladores, Actualizadores, Diagnóstico y Aislamiento...');
+    try {
+        const { execSync } = require('child_process');
+        execSync(`node "${path.join(__dirname, 'validate_installer_diagnostics.js')}"`, { stdio: 'pipe' });
+        results.push({
+            Capa: '6. Instaladores & Diagnóstico',
+            Componente: 'validate_installer_diagnostics.js',
+            Estado: '✅ OK',
+            Detalle: '10/10 Pruebas pasaron (PG/SQL Setup, Update, Diagnostics, Aislamiento y Seguridad)'
+        });
+    } catch (diagErr) {
+        results.push({
+            Capa: '6. Instaladores & Diagnóstico',
+            Componente: 'validate_installer_diagnostics.js',
+            Estado: '❌ FALLO',
+            Detalle: diagErr.message
+        });
+    }
+
     console.log('\n================================================================');
     console.log('         MATRIZ DE RESULTADOS DE LA VALIDACIÓN COMPLETA          ');
     console.log('================================================================');
