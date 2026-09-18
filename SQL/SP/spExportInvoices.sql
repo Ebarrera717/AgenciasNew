@@ -632,8 +632,8 @@ BEGIN
         0 AS am_basecomisionable,
         0 AS am_porcomision,
         '' AS cd_tiposconceptfac,
-        COALESCE(pr."billingConcept", '') AS cd_conceptofacturacion,
-        COALESCE(pr."serviceType", '') AS cd_tiposservicio,
+        COALESCE(NULLIF(TRIM(ep."billingConcept"), ''), NULLIF(TRIM(pr."billingConcept"), ''), '') AS cd_conceptofacturacion,
+        COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
         SUBSTRING(COALESCE(prov.code, prov.name, ''), 1, 25) AS cd_proveedores,
         SUBSTRING(COALESCE(ep."servicios", ''), 1, 250) AS ds_servicio,
         (
@@ -653,11 +653,11 @@ BEGIN
         ) AS am_valorprov,
         '' AS cd_monedaprov,
         COALESCE(ep."checkInDate", e.date) AS dt_llegada,
-        COALESCE(ep."checkOutDate", e.date) AS dt_salida,
+        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS dt_salida,
         0 AS am_pordescuento,
         0 AS am_basedescuento,
-        COALESCE(ep."checkInDate", e.date) AS Fecha_Salida,
-        COALESCE(ep."checkOutDate", e.date) AS Fecha_Llegada,
+        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS Fecha_Salida,
+        COALESCE(ep."checkInDate", e.date) AS Fecha_Llegada,
         '' AS ColId,
         '' AS cd_Consecutivo_depende,
         SUBSTRING(COALESCE(ep."reservationCode", ''), 1, 50) AS CodigoReserva,
@@ -775,32 +775,101 @@ BEGIN
                 ), 0)
             ELSE 0 END
         ) AS am_valor,
-        CASE WHEN itm.cd_FormasPago='EFE' THEN (
-            t."explicitAmount" +
-            CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
-                COALESCE((
-                    SELECT SUM(sub_t."explicitAmount")
-                    FROM public."InvoicesProductTax" sub_t
-                    JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
-                    WHERE sub_t."invoiceProductId" = t."invoiceProductId"
-                      AND sub_t."isMain" = false
-                      AND sub_ct."targetTaxId" = ct.id
-                ), 0)
-            ELSE 0 END
-        ) ELSE 0 END AS am_contado,
-        CASE WHEN itm.cd_FormasPago='TC' THEN (
-            t."explicitAmount" +
-            CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
-                COALESCE((
-                    SELECT SUM(sub_t."explicitAmount")
-                    FROM public."InvoicesProductTax" sub_t
-                    JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
-                    WHERE sub_t."invoiceProductId" = t."invoiceProductId"
-                      AND sub_t."isMain" = false
-                      AND sub_ct."targetTaxId" = ct.id
-                ), 0)
-            ELSE 0 END
-        ) ELSE 0 END AS am_credito,
+        CASE 
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = t."invoiceProductId" AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+            ) THEN (
+                t."explicitAmount" +
+                CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                    COALESCE((
+                        SELECT SUM(sub_t."explicitAmount")
+                        FROM public."InvoicesProductTax" sub_t
+                        JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                        WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                          AND sub_t."isMain" = false
+                          AND sub_ct."targetTaxId" = ct.id
+                    ), 0)
+                ELSE 0 END
+            )
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = t."invoiceProductId" AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+            ) THEN 0
+            ELSE ROUND(
+                (
+                    t."explicitAmount" +
+                    CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                        COALESCE((
+                            SELECT SUM(sub_t."explicitAmount")
+                            FROM public."InvoicesProductTax" sub_t
+                            JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                            WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                              AND sub_t."isMain" = false
+                              AND sub_ct."targetTaxId" = ct.id
+                        ), 0)
+                    ELSE 0 END
+                ) * 
+                COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId" AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId"), 0),
+                2
+            )
+        END AS am_contado,
+        CASE 
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = t."invoiceProductId" AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+            ) THEN 0
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = t."invoiceProductId" AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+            ) THEN (
+                t."explicitAmount" +
+                CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                    COALESCE((
+                        SELECT SUM(sub_t."explicitAmount")
+                        FROM public."InvoicesProductTax" sub_t
+                        JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                        WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                          AND sub_t."isMain" = false
+                          AND sub_ct."targetTaxId" = ct.id
+                    ), 0)
+                ELSE 0 END
+            )
+            ELSE (
+                (
+                    t."explicitAmount" +
+                    CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                        COALESCE((
+                            SELECT SUM(sub_t."explicitAmount")
+                            FROM public."InvoicesProductTax" sub_t
+                            JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                            WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                              AND sub_t."isMain" = false
+                              AND sub_ct."targetTaxId" = ct.id
+                        ), 0)
+                    ELSE 0 END
+                ) -
+                ROUND(
+                    (
+                        t."explicitAmount" +
+                        CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                            COALESCE((
+                                SELECT SUM(sub_t."explicitAmount")
+                                FROM public."InvoicesProductTax" sub_t
+                                JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                                WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                                  AND sub_t."isMain" = false
+                                  AND sub_ct."targetTaxId" = ct.id
+                            ), 0)
+                        ELSE 0 END
+                    ) * 
+                    COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId" AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                    NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId"), 0),
+                    2
+                )
+            )
+        END AS am_credito,
         ct.id AS id_carg,
         ct.id AS id_imp,
         CASE WHEN ct.code = 'IVA' THEN B'1' ELSE B'0' END AS bl_iva,
@@ -858,8 +927,8 @@ BEGIN
         f.id_factura AS id_factura,
         itm.id_item AS id_item,
         itm.in_tipoitem AS in_tipoitem,
-        CASE WHEN itm.in_tipoitem=1 THEN itm.cd_tiquete ELSE itm.cd_Consecutivo_variablesadicionales END AS ds_maestro,
-        COALESCE(mv.name, '') AS ds_VariableAdicional,
+        CASE WHEN itm.in_tipoitem=1 THEN 'Tiquetes' ELSE 'FacturacionServicios' END AS ds_maestro,
+        COALESCE(mv.name, mv.code, '') AS ds_VariableAdicional,
         COALESCE(v.value, '') AS ds_valor,
         COALESCE(mv.code, '') AS cd_codigo
     FROM public."InvoicesProductVariable" v

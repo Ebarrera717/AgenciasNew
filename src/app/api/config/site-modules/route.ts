@@ -53,18 +53,19 @@ export async function PUT(req: NextRequest) {
         }
 
         if (isSQLServerMode()) {
+            const mssql = await import('mssql');
             let pool;
             try {
                 pool = await getSQLServerConnection();
                 if (String(type).toUpperCase() === 'MENU') {
                     await pool.request()
-                        .input('id', Number(id))
-                        .input('active', Boolean(active) ? 1 : 0)
+                        .input('id', mssql.Int, Number(id))
+                        .input('active', mssql.Bit, Boolean(active) ? 1 : 0)
                         .query('UPDATE dbo.[Menu] SET [activo] = @active WHERE [id] = @id');
                 } else if (String(type).toUpperCase() === 'MASTER') {
                     await pool.request()
-                        .input('id', Number(id))
-                        .input('inactivo', Boolean(active) ? 0 : 1)
+                        .input('id', mssql.Int, Number(id))
+                        .input('inactivo', mssql.Bit, Boolean(active) ? 0 : 1)
                         .query('UPDATE dbo.[Master] SET [inactivo] = @inactivo WHERE [id] = @id');
                 }
                 await pool.close();

@@ -141,6 +141,14 @@ BEGIN
                 p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Columna [CheckOut]): Formato de fecha incorrecto. Valor recibido: "' || TRIM(v_cols[21]) || '". Ejemplo de formato correcto: 2026-10-10 (o 2026/10/10)';
                 RETURN;
             END IF;
+
+            -- Validar que la Fecha Final (Check-Out) no sea anterior a la Fecha Inicial (Check-In)
+            IF TRIM(v_cols[20]) <> '' AND TRIM(v_cols[21]) <> '' THEN
+                IF REPLACE(TRIM(v_cols[21]), '/', '-')::TIMESTAMP < REPLACE(TRIM(v_cols[20]), '/', '-')::TIMESTAMP THEN
+                    p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Inconsistencia de Fechas): La fecha final / Check-Out ("' || TRIM(v_cols[21]) || '") no puede ser anterior a la fecha inicial / Check-In ("' || TRIM(v_cols[20]) || '"). Por favor verifique el rango de fechas en el archivo Excel.';
+                    RETURN;
+                END IF;
+            END IF;
             
             INSERT INTO tmp_import_invoice_rows (
                 grupo, cliente_doc, sucursal_cd, implant_cd, vendedor_cd, tiqueteador_cd,
@@ -486,7 +494,14 @@ BEGIN
             IF v_product_record.variables_str IS NOT NULL AND v_product_record.variables_str <> '' THEN
                 FOREACH v_var_item IN ARRAY string_to_array(v_product_record.variables_str, '|') LOOP
                     v_var_parts := string_to_array(v_var_item, ':');
-                    SELECT id INTO v_variable_id FROM public."MasterVariable" WHERE LOWER(code) = LOWER(TRIM(v_var_parts[1]));
+                    v_variable_id := NULL;
+                    SELECT id INTO v_variable_id FROM public."MasterVariable" WHERE LOWER(code) = LOWER(TRIM(v_var_parts[1])) OR LOWER(name) = LOWER(TRIM(v_var_parts[1]));
+                    IF v_variable_id IS NULL AND TRIM(v_var_parts[1]) <> '' THEN
+                        INSERT INTO public."MasterVariable" ("code", "name")
+                        VALUES (TRIM(v_var_parts[1]), TRIM(v_var_parts[1]))
+                        RETURNING id INTO v_variable_id;
+                    END IF;
+
                     IF v_variable_id IS NOT NULL THEN
                         INSERT INTO public."InvoicesProductVariable" ("invoiceProductId", "masterVariableId", "value")
                         VALUES (v_ip_id, v_variable_id, COALESCE(v_var_parts[2], ''));

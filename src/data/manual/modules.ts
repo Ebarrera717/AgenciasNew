@@ -243,7 +243,7 @@ export const MANUAL_MODULES: ManualModule[] = [
                 code: 'FAC-01',
                 name: 'Emisión e Historial de Facturas',
                 summary: 'Gestión del historial de facturación de venta y estado contable.',
-                concept: 'Registra los movimientos contables de venta, cartera, cuentas por cobrar e impuestos a partir de las cotizaciones aprobadas.',
+                concept: 'Registra los movimientos contables de venta, cartera, cuentas por cobrar e impuestos a partir de las cotizaciones aprobadas. La asignación de cuentas contables para Cargos sigue la prioridad estricta en 3 niveles: 1) Tipo de Servicio, 2) Concepto de Facturación, 3) Cargo. Para Impuestos, la cuenta se asigna de forma directa desde la tabla de Impuestos.',
                 fields: [
                     { name: 'Buscador de Facturas', type: 'Texto', description: 'Busca facturas por número de consecutivo, cliente o estado.' },
                     { name: 'Estado Contable', type: 'Indicador', description: 'Muestra el estado de la factura (Nuevo, Facturado, Cancelado).' },
@@ -310,7 +310,7 @@ export const MANUAL_MODULES: ManualModule[] = [
                     {
                         number: 2,
                         title: 'Validar y Procesar Lote',
-                        description: 'Verifique la vista previa sin errores y presione "Procesar Lote".'
+                        description: 'Verifique la vista previa sin errores y presione "Procesar Lote". El sistema lee automáticamente variables adicionales del sistema (ej: AREAT:XYZZ12 bajo la columna Variables_Co / Variables_Codigos_Y_Valores), vinculándolas a la factura y transmitiéndolas a Zeus ERP.'
                     }
                 ]
             }
@@ -978,6 +978,37 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { number: 1, title: 'Buscar Código de Traza', description: 'Ingrese el código TRC-... en el buscador superior y presione Enter.' },
                     { number: 2, title: 'Abrir Inspección Técnica', description: 'Haga clic en el botón Inspeccionar de la sesión deseada para abrir la línea de tiempo.' },
                     { number: 3, title: 'Descargar Informe', description: 'Haga clic en Exportar Informe (.json) para adjuntar la evidencia técnica al ticket de soporte.' }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'zeus-variables-integration',
+        title: 'Integración de Variables Adicionales con Zeus ERP',
+        iconName: 'Layers',
+        category: 'Integraciones y Exportación ERP',
+        description: 'Manual de funcionamiento para la homologación y transferencia automática de variables adicionales y datos dinámicos hacia Zeus ERP.',
+        overview: 'Permite que todas las variables dinámicas parametrizadas en AgenciasNew/Korex (como AREAT, centros de costo, solicitantes, proyectos u otros datos adicionales) se transmitan automáticamente a Zeus ERP durante la exportación de facturas y cotizaciones, insertándose en VariableDatosMaestro y quedando visibles inmediatamente en la ventana de "Datos Adicionales" de Zeus ERP.',
+        procedures: [
+            {
+                code: 'VAR-01',
+                name: 'Parametrización y Homologación de Variables Adicionales',
+                summary: 'Configuración de variables en Korex para su emparejamiento automático con el catálogo de Zeus ERP.',
+                concept: 'El sistema empareja las variables por código, nombre o descripción contra dbo.VariableDefinicion en Zeus ERP, asignando el maestro correspondiente (IDEN=37 Facturación Servicios, IDEN=35 Tiquetes).',
+                fields: [
+                    { name: 'Código de Variable', type: 'Texto / Clave', description: 'Código identificador de la variable (ej. AREAT).' },
+                    { name: 'Nombre / Descripción', type: 'Texto', description: 'Etiqueta o nombre de la variable adicional.' },
+                    { name: 'Valor Asignado', type: 'Texto / Número / Fecha', description: 'Valor capturado en el producto de factura o cotización.' }
+                ],
+                businessRules: [
+                    'Si la variable existe en VariableDefinicion de Zeus ERP, se asocia automáticamente al maestro y se inserta en VariableDatosMaestro con su tipo de dato (Varchar, Numeric, Date).',
+                    'Para servicios, el CódigoMaestro corresponde al consecutivo de variables adicionales (cd_Consecutivo_VariablesAdicionales) generado en Fac_Servicios.',
+                    'Para tiquetes, el CódigoMaestro corresponde al número del tiquete (cd_tiquete) generado en Tiquetes.'
+                ],
+                steps: [
+                    { number: 1, title: 'Registrar Variables en Korex', description: 'Defina las variables adicionales requeridas en el maestro de variables y asígnelas a los productos de la cotización o factura.' },
+                    { number: 2, title: 'Exportar Factura a Zeus ERP', description: 'Al presionar "Enviar a Zeus ERP", el proceso empaqueta las variables en el XML y ejecuta spFacturacionesCrear.' },
+                    { number: 3, title: 'Consultar en Zeus ERP', description: 'Abra la factura o servicio en Zeus ERP y haga clic en "Datos Adicionales" para verificar los valores sincronizados.' }
                 ]
             }
         ]

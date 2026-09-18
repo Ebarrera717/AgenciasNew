@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { executePostgresQuery } from '@/lib/postgres'
-import { isSQLServerMode, getSQLServerConnection, executeSQLServerProcedure } from '@/lib/sqlserver'
+import { isSQLServerMode, getSQLServerConnection, executeSQLServerProcedure, getZeusERPDatabaseName } from '@/lib/sqlserver'
 import { registerLog } from '@/lib/logger'
 import { generateTraceCode, recordTraceEvent } from '@/lib/traceability'
 
 function formatZeusConsecutive(rawMsg: string): string {
     if (!rawMsg) return '';
     const clean = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
-    // Pattern like 55-3300000102-61494 or 55-33-00000102
-    const match = clean.match(/^([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})(?:-\d+)?$/i);
+    // Pattern like 55-66-00000025 or 55-3300000102-61494
+    const match = clean.match(/([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})/i);
     if (match) {
         return `${match[1]}-${match[2]}-${match[3]}`;
     }
-    return clean;
+    return '';
 }
 
 export async function POST(req: NextRequest) {
@@ -99,11 +99,12 @@ export async function POST(req: NextRequest) {
         let spResult: any[] = [];
 
         try {
-            console.log(`[EXPORT_API] Iniciando carga en SQL Server para ID: ${idsStr}`);
+            const targetDb = await getZeusERPDatabaseName();
+            console.log(`[EXPORT_API] Iniciando carga en SQL Server (BD: ${targetDb}) para ID: ${idsStr}`);
             
             const sqlResult = await executeSQLServerProcedure('spFacturacionesCrear', {
                 xml: xmlStr
-            });
+            }, targetDb);
 
             if (Array.isArray(sqlResult)) {
                 spResult = sqlResult;
@@ -127,31 +128,32 @@ export async function POST(req: NextRequest) {
 
             if (spResult.length > 0) {
                 const hasFailure = spResult.some((item: any) => !checkItemSuccess(item));
-                const formattedMsgs = spResult.map((item: any) => {
-                    const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray.length === 1 ? idArray[0] : 0));
-                    const invNum = invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : idsStr);
+                const formattedMsgs = spResult.map((item: any, idx: number) => {
+                    const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray[idx] || (idArray.length === 1 ? idArray[0] : 0)));
+                    const invNum = invoiceNumberMap[invId] || (invId ? `FAC-${invId}` : (idArray[idx] ? `FAC-${idArray[idx]}` : idsStr));
                     const isOk = checkItemSuccess(item);
                     const rawMsg = getItemMessage(item);
+
                     const zeusConsec = formatZeusConsecutive(rawMsg);
                     const zeusStr = zeusConsec ? ` (Zeus ERP N° ${zeusConsec})` : '';
                     if (isOk) {
-                        return `✅ Factura ${invNum}${zeusStr}: Exportada correctamente a Zeus ERP`;
+                        return `✅ Factura ${invNum}${zeusStr}: Exportada e inyectada correctamente a Zeus ERP.`;
                     } else {
-                        const cleanMsg = rawMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
+                        const cleanMsg = rawMsg.replace(/^[?❌\s]+Factura\s+\d+:\s*/i, '').split('--- DYNAMIC EXECUTION TRACE ---')[0].trim();
                         return `❌ Factura ${invNum}: ${cleanMsg || 'Error no especificado en Zeus ERP'}`;
                     }
                 });
 
                 if (hasFailure) {
                     success = false;
-                    sqlServerMsg = formattedMsgs.join(' | ');
+                    sqlServerMsg = formattedMsgs.join('\n');
                 } else {
                     success = true;
-                    sqlServerMsg = formattedMsgs.join(' | ');
+                    sqlServerMsg = formattedMsgs.join('\n');
                 }
             } else {
                 const exportedNums = idArray.map((id: number) => invoiceNumberMap[id] || `FAC-${id}`);
-                sqlServerMsg = `✅ Factura N° ${exportedNums.join(', ')} exportada exitosamente a Zeus ERP`;
+                sqlServerMsg = `✅ Facturas N° ${exportedNums.join(', ')} exportadas exitosamente a Zeus ERP.`;
             }
 
             // Registrar traza detallada

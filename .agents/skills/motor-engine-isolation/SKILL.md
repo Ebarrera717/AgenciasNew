@@ -57,8 +57,20 @@ description: Regla de arquitectura permanente de aislamiento absoluto de motores
 
 ---
 
-## 6. Checklist Obligatorio de Verificación Pre-Entrega
+## 6. Separación Total de Instaladores y Actualizadores (`separacion-instaladores-actualizadores`)
+- Los instaladores y actualizadores son 100% independientes por motor desde la generación hasta la ejecución:
+  - **PostgreSQL**: `GenerarSetup.bat` / `GenerarActualizador.bat` (Exclusivo PostgreSQL).
+  - **SQL Server**: `GenerarSetupSqlServer.bat` / `GenerarActualizadorSqlServer.bat` (Exclusivo SQL Server).
+- Prohibidos los instaladores híbridos o de selección dinámica.
+- Ver detalles completos en el Skill [`separacion-instaladores-actualizadores`](file:///f:/Proyectos/AgenciasNew/.agents/skills/separacion-instaladores-actualizadores/SKILL.md).
+
+---
+
+## 7. Checklist Obligatorio de Verificación Pre-Entrega
 - [ ] ¿Identificó la variable/función de motor activo (`isSQLServerMode()`)?
 - [ ] En modo SQL Server: ¿Se garantizó que NO se invoca ningún SP de PostgreSQL ni `prisma.$queryRaw` de escritura/lectura?
 - [ ] En modo PostgreSQL: ¿Se garantizó que NO se abre conexión ni se ejecuta ningún SP T-SQL en SQL Server?
 - [ ] ¿Se validó que las transacciones y operaciones de importación sean 100% nativas al motor seleccionado?
+- [ ] ¿Se respetó la separación estricta de instaladores y actualizadores por motor según su matriz correspondiente?
+- [ ] ¿Se verificó que los cambios no degraden ni sobrescriban correcciones protegidas en ninguno de los dos motores?
+

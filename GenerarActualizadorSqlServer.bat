@@ -32,11 +32,11 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [PASO 2/3] Auditando suite completa de maestros y funcionalidades (PG + SQL)...
-node scripts/validate_full_system.js
+echo [PASO 2/3] Auditando maestros y funcionalidades exclusivas de SQL Server...
+node scripts/validate_sqlserver.js
 
 if %ERRORLEVEL% NEQ 0 (
-    echo ERROR: Fallo la validacion pre-empaquetado para SQL Server.
+    echo ERROR: Fallo la validacion de maestros y funcionalidades SQL Server. Actualizador cancelado.
     pause
     exit /b %ERRORLEVEL%
 )

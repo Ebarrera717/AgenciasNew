@@ -299,6 +299,18 @@ BEGIN
     );
 END;
 
+-- 17b. MasterVariable
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'MasterVariable' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[MasterVariable] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_MasterVariable PRIMARY KEY,
+        [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_MasterVariable_Code UNIQUE,
+        [name] NVARCHAR(150) NOT NULL,
+        [isForAllClients] BIT NOT NULL CONSTRAINT DF_MasterVariable_IsForAll DEFAULT 0,
+        [isActive] BIT NOT NULL CONSTRAINT DF_MasterVariable_IsActive DEFAULT 1
+    );
+END;
+
 -- 18. ChargeAndTax
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChargeAndTax' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -1167,8 +1179,15 @@ BEGIN
     CREATE TABLE dbo.[TiposServicios] (
         [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         [cd_codigo] VARCHAR(25) NULL,
-        [ds_nombre] VARCHAR(250) NULL
+        [ds_nombre] VARCHAR(250) NULL,
+        [cd_cuenta] VARCHAR(20) NULL
     );
+END;
+
+IF OBJECT_ID('dbo.TiposServicios', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TiposServicios') AND name = 'cd_cuenta')
+        ALTER TABLE dbo.[TiposServicios] ADD [cd_cuenta] VARCHAR(20) NULL;
 END;
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ConceptoFacturacion' AND schema_id = SCHEMA_ID('dbo'))

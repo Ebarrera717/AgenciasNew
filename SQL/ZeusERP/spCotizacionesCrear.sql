@@ -712,16 +712,16 @@ BEGIN
 			id_TiposConceptFac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 2))),
 			id_ConceptoFacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 3))),
 			id_TiposServicio = ISNULL(
-				CASE WHEN TS.id IS NOT NULL AND TS.cd_cuenta IS NOT NULL AND RTRIM(LTRIM(TS.cd_cuenta)) <> '' THEN TS.id ELSE NULL END,
+				TS.id,
 				ISNULL(
-					(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(50)'))) AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> ''),
+					(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(50)')))),
 					ISNULL(
-						(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(100)'))) AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> ''),
+						(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(100)')))),
 						ISNULL(
-							(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.CotizacionServicios.value('ds_servicio[1]','VARCHAR(100)'))) AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> ''),
+							(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.CotizacionServicios.value('ds_servicio[1]','VARCHAR(100)')))),
 							ISNULL(
-								(SELECT TOP 1 TSA2.id_TipoServicio FROM dbo.tiposServicio_asignados TSA2 JOIN dbo.TiposServicios TS2 ON TS2.id = TSA2.id_TipoServicio WHERE TSA2.id_ConceptoFacturacion = CF.id AND TS2.cd_cuenta IS NOT NULL AND RTRIM(LTRIM(TS2.cd_cuenta)) <> ''),
-								ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '' ORDER BY id ASC), 9)
+								(SELECT TOP 1 TSA2.id_TipoServicio FROM dbo.tiposServicio_asignados TSA2 JOIN dbo.TiposServicios TS2 ON TS2.id = TSA2.id_TipoServicio WHERE TSA2.id_ConceptoFacturacion = CF.id),
+								ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = 'htn'), 1)
 							)
 						)
 					)
@@ -1009,6 +1009,80 @@ BEGIN
 		LEFT JOIN dbo.TipoProveedores TP ON TP.cd_codigo=ISNULL(C.CotizacionServicios_TipoProv.value('cd_tipoproveedores[1]','VARCHAR(3)'),'')
 		LEFT JOIN dbo.Hoteles H ON H.cd_codigo=ISNULL(C.CotizacionServicios_TipoProv.value('cd_proveedores[1]','VARCHAR(25)'),'')
 		
+		-- Validar Regla Universal de Cuentas Contables para Cotizaciones
+		-- 1. CARGOS / SERVICIOS (3 Niveles: 1. Tipo de Servicio -> 2. Concepto de Facturación -> 3. Cargo)
+		DECLARE @c_srv_name VARCHAR(100), @c_id_ts INT, @c_id_cf INT, @c_id_cd INT, @c_cargo_name VARCHAR(100), @c_acct VARCHAR(20), @c_cot_num VARCHAR(50);
+		DECLARE curCotCargos CURSOR LOCAL FAST_FORWARD FOR
+		SELECT 
+			CS.ds_servicio,
+			CS.id_TiposServicio,
+			CS.id_ConceptoFacturacion,
+			CC.id_cargosdesc,
+			CC.ds_cargonm,
+			CC.cd_Cotizacion
+		FROM @CotizacionCargos CC
+		JOIN @CotizacionServicios CS ON CS.cd_Consecutivo_VariablesAdicionales = CC.cd_CotizacionServicios AND CS.cd_Cotizacion = CC.cd_Cotizacion;
+
+		OPEN curCotCargos;
+		FETCH NEXT FROM curCotCargos INTO @c_srv_name, @c_id_ts, @c_id_cf, @c_id_cd, @c_cargo_name, @c_cot_num;
+		WHILE @@FETCH_STATUS = 0
+		BEGIN
+			SET @c_acct = NULL;
+			
+			-- 1. Tipo de Servicio
+			IF @c_id_ts IS NOT NULL
+				SELECT TOP 1 @c_acct = cd_cuenta FROM dbo.TiposServicios WHERE id = @c_id_ts AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+				
+			-- 2. Concepto de Facturación
+			IF (@c_acct IS NULL OR RTRIM(LTRIM(@c_acct)) = '') AND @c_id_cf IS NOT NULL
+				SELECT TOP 1 @c_acct = cd_cuenta FROM dbo.ConceptoFacturacion WHERE id = @c_id_cf AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+				
+			-- 3. Cargo
+			IF (@c_acct IS NULL OR RTRIM(LTRIM(@c_acct)) = '') AND @c_id_cd IS NOT NULL
+				SELECT TOP 1 @c_acct = cd_cuenta FROM dbo.CargosDesc WHERE id = @c_id_cd AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+				
+			IF @c_acct IS NULL OR RTRIM(LTRIM(@c_acct)) = ''
+			BEGIN
+				CLOSE curCotCargos;
+				DEALLOCATE curCotCargos;
+				DECLARE @err_cot_acct NVARCHAR(4000) = '❌ Cotización ' + ISNULL(@c_cot_num, '') + ': Error de Parametrización Contable: No fue posible determinar la cuenta contable para el Cargo/Servicio "' + ISNULL(@c_cargo_name, ISNULL(@c_srv_name, 'Cargo')) + '". Verifique la parametrización en Tipo de Servicio, Concepto de Facturación o Cargo.';
+				RAISERROR(@err_cot_acct, 16, 1);
+				RETURN;
+			END
+
+			FETCH NEXT FROM curCotCargos INTO @c_srv_name, @c_id_ts, @c_id_cf, @c_id_cd, @c_cargo_name, @c_cot_num;
+		END
+		CLOSE curCotCargos;
+		DEALLOCATE curCotCargos;
+
+		-- 2. IMPUESTOS (Directo desde ImpRet)
+		DECLARE @c_tax_name VARCHAR(100), @c_id_ir INT, @c_tax_acct VARCHAR(20), @c_tax_cot VARCHAR(50);
+		DECLARE curCotTaxes CURSOR LOCAL FAST_FORWARD FOR
+		SELECT CI.ds_Impas, CI.id_ImpRet, CI.cd_Cotizacion
+		FROM @CotizacionImpuestos CI;
+
+		OPEN curCotTaxes;
+		FETCH NEXT FROM curCotTaxes INTO @c_tax_name, @c_id_ir, @c_tax_cot;
+		WHILE @@FETCH_STATUS = 0
+		BEGIN
+			SET @c_tax_acct = NULL;
+			IF @c_id_ir IS NOT NULL
+				SELECT TOP 1 @c_tax_acct = cd_cuenta FROM dbo.ImpRet WHERE id = @c_id_ir AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+				
+			IF @c_tax_acct IS NULL OR RTRIM(LTRIM(@c_tax_acct)) = ''
+			BEGIN
+				CLOSE curCotTaxes;
+				DEALLOCATE curCotTaxes;
+				DECLARE @err_cot_tax NVARCHAR(4000) = '❌ Cotización ' + ISNULL(@c_tax_cot, '') + ': Error de Parametrización Contable: El Impuesto "' + ISNULL(@c_tax_name, 'Impuesto') + '" no tiene cuenta contable configurada en la tabla de Impuestos (ImpRet).';
+				RAISERROR(@err_cot_tax, 16, 1);
+				RETURN;
+			END
+
+			FETCH NEXT FROM curCotTaxes INTO @c_tax_name, @c_id_ir, @c_tax_cot;
+		END
+		CLOSE curCotTaxes;
+		DEALLOCATE curCotTaxes;
+
 		-- Insert (cd_consecutivo automático)
         INSERT INTO dbo.Cotizacion(
 				id_sucursal,

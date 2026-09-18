@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { registerLog } from '@/lib/logger'
-import { executeSQLServerProcedure, isSQLServerMode } from '@/lib/sqlserver'
+import { executeSQLServerProcedure, isSQLServerMode, getZeusERPDatabaseName } from '@/lib/sqlserver'
 import { executePostgresQuery } from '@/lib/postgres'
 import { generateTraceCode, recordTraceEvent } from '@/lib/traceability'
 import { getNextTransactionConsecutive } from '@/lib/consecutives'
@@ -76,6 +76,26 @@ function extractNumericValue(val: any): string {
     }
 
     return str;
+}
+
+function getExcelVariableString(row: any): string {
+    if (!row || typeof row !== 'object') return '';
+    const explicit = row.Variables_Codigos_Y_Valores || row.Variables_Cotizacion || row.Variables_Adicionales || 
+                     row.Variables_Codigos || row.Variables_Co || row.Variables || 
+                     row['Variables_Codigos_Y_Valores'] || row['Variables Codigos Y Valores'] || 
+                     row['Variables_Co'] || row['Variables_Cotizacion'] || row['Variables_Adicionales'] || row['Variables'];
+    if (explicit !== undefined && explicit !== null && explicit !== '') {
+        return explicit.toString().trim();
+    }
+    for (const key of Object.keys(row)) {
+        if (/^variables?/i.test(key.trim())) {
+            const val = row[key];
+            if (val !== undefined && val !== null && val.toString().trim() !== '') {
+                return val.toString().trim();
+            }
+        }
+    }
+    return '';
 }
 
 export async function POST(req: NextRequest) {
@@ -291,6 +311,13 @@ export async function POST(req: NextRequest) {
                     const checkIn = normalizeDateString(it.CheckIn || it['Check-In'] || '');
                     const checkOut = normalizeDateString(it.CheckOut || it['Check-Out'] || '');
 
+                    if (checkIn && checkOut && new Date(checkOut).getTime() < new Date(checkIn).getTime()) {
+                        await pool.close();
+                        return NextResponse.json({
+                            message: `ERROR en Excel: La fecha final / Check-Out ('${checkOut}') no puede ser anterior a la fecha inicial / Check-In ('${checkIn}') para el ítem '${it.Producto_Codigo || 'Producto'}'. Por favor verifique el archivo Excel.`
+                        }, { status: 400 });
+                    }
+
                     const prodRes = await pool.request()
                         .input('invoiceId', mssql.Int, invoiceId)
                         .input('productId', mssql.Int, productId)
@@ -433,6 +460,43 @@ export async function POST(req: NextRequest) {
                                 .query(`INSERT INTO dbo.[InvoicesProductPasenger] (invoiceProductId, name, document) VALUES (@invoiceProductId, @name, @document)`);
                         }
                     }
+
+                    // Inserción de Variables Adicionales (SystemParameterVariables / MasterVariables)
+                    const varStr = getExcelVariableString(it);
+                    if (varStr) {
+                        const varItems = varStr.split('|');
+                        for (const vItem of varItems) {
+                            if (!vItem.trim() || !vItem.includes(':')) continue;
+                            const parts = vItem.split(':');
+                            const varCode = parts[0].trim();
+                            const varVal = parts.slice(1).join(':').trim();
+                            if (varCode && varVal) {
+                                let masterVarId: number | null = null;
+                                const mvRes = await pool.request()
+                                    .input('code', mssql.VarChar, varCode)
+                                    .query(`SELECT TOP 1 id FROM dbo.[MasterVariable] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) = UPPER(@code)`);
+                                if (mvRes.recordset && mvRes.recordset.length > 0) {
+                                    masterVarId = mvRes.recordset[0].id;
+                                } else {
+                                    const newMvRes = await pool.request()
+                                        .input('code', mssql.VarChar, varCode)
+                                        .input('name', mssql.VarChar, varCode)
+                                        .query(`INSERT INTO dbo.[MasterVariable] (code, name) OUTPUT INSERTED.id VALUES (@code, @name)`);
+                                    if (newMvRes.recordset && newMvRes.recordset.length > 0) {
+                                        masterVarId = newMvRes.recordset[0].id;
+                                    }
+                                }
+
+                                if (masterVarId) {
+                                    await pool.request()
+                                        .input('invoiceProductId', mssql.Int, invoiceProductId)
+                                        .input('masterVariableId', mssql.Int, masterVarId)
+                                        .input('value', mssql.VarChar, varVal)
+                                        .query(`INSERT INTO dbo.[InvoicesProductVariable] (invoiceProductId, masterVariableId, value) VALUES (@invoiceProductId, @masterVariableId, @value)`);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Update Total
@@ -500,7 +564,7 @@ export async function POST(req: NextRequest) {
                 row.Proveedor_Codigo || '',
                 row.Prestadora_Codigo || row.Hotel_Codigo || row.Hotel_id || '',
                 impuestosStr,
-                row.Variables_Codigos_Y_Valores || '',
+                getExcelVariableString(row),
                 row.Pasajeros || '',
                 extractNumericValue(row.Precio_Unitario || ''),
                 extractNumericValue(row.Cantidad || ''),
@@ -590,7 +654,8 @@ export async function POST(req: NextRequest) {
                     const xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
 
                     if (xmlStr && typeof xmlStr === 'string' && !xmlStr.startsWith('ERROR')) {
-                        const sqlResult = await executeSQLServerProcedure('spFacturacionesCrear', { xml: xmlStr });
+                        const targetDb = await getZeusERPDatabaseName();
+                        const sqlResult = await executeSQLServerProcedure('spFacturacionesCrear', { xml: xmlStr }, targetDb);
                         autoExportResult = { success: true, message: 'Exportado automáticamente a SQL Server (Zeus ERP)', sqlResult };
                         await registerLog(actingUserId, 'INVOICE', 'AUTO_EXPORT_SUCCESS', `ID(s) ${createdIdsStr}: Exportación automática exitosa a SQL Server`, { sqlResult });
                     } else {

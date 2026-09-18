@@ -67,6 +67,24 @@ export function parseSQLServerUrl(connStr: string) {
 }
 
 /**
+ * Obtiene el nombre de la base de datos externa de Zeus ERP desde Parámetros del Sistema (BaseSQLServer)
+ * o desde process.env.ZEUS_ERP_DB, por defecto 'ZeusAgencias_23'. NUNCA Korex_pruebas.
+ */
+export async function getZeusERPDatabaseName(): Promise<string> {
+    try {
+        const param = await prisma.systemParameter.findUnique({
+            where: { code: 'BaseSQLServer' },
+            select: { value: true }
+        });
+        if (param && param.value && param.value.trim() !== '') {
+            return param.value.trim();
+        }
+    } catch (e) {}
+
+    return process.env.ZEUS_ERP_DB || 'ZeusAgencias_23';
+}
+
+/**
  * Obtiene la conexión a SQL Server usando la variable de entorno o la función de Postgres.
  */
 export async function getSQLServerConnection(overrideDbName?: string) {
@@ -187,11 +205,17 @@ export async function executeSQLServerProcedure(spName: string, params: any, tar
     let pool;
     const startTime = Date.now();
     const isTraceProcedure = spName.toLowerCase().includes('sptraceability');
-    const isExportProcedure = spName.toLowerCase().includes('facturacion') || spName.toLowerCase().includes('cotizacion') || spName.toLowerCase().includes('export');
+    const isZeusProcedure = spName.toLowerCase().includes('spfacturacionescrear') || 
+                            spName.toLowerCase().includes('spcotizacionescrear') || 
+                            spName.toLowerCase().includes('facturacion') || 
+                            spName.toLowerCase().includes('cotizacion');
 
     try {
         const fullSpName = spName.includes('.') ? spName : `dbo.${spName}`;
-        const dbToUse = targetDb;
+        let dbToUse = targetDb;
+        if (!dbToUse && isZeusProcedure) {
+            dbToUse = await getZeusERPDatabaseName();
+        }
         console.log(`[SQL_SERVER_EXEC] Procedimiento: ${fullSpName} | BD Destino: ${dbToUse || 'Principal (.env)'} | Parámetros:`, JSON.stringify(params));
         pool = await getSQLServerConnection(dbToUse);
         const request = pool.request();
@@ -217,7 +241,15 @@ export async function executeSQLServerProcedure(spName: string, params: any, tar
 
         const result = await request.execute(fullSpName);
         await pool.close();
-        const executionResult = result.recordset || result.rowsAffected;
+        let executionResult: any = result.recordset;
+        const allRecordsets = result.recordsets as any[] | undefined;
+        if (Array.isArray(allRecordsets) && allRecordsets.length > 1) {
+            const foundLogRs = allRecordsets.find(rs => rs && rs.length > 0 && ('invoiceId' in rs[0] || 'quotationId' in rs[0] || 'success' in rs[0]));
+            executionResult = foundLogRs || allRecordsets[allRecordsets.length - 1] || result.recordset;
+        }
+        if (!executionResult && result.rowsAffected) {
+            executionResult = result.rowsAffected;
+        }
 
         if (!isTraceProcedure) {
             import('@/lib/traceability').then(({ recordTraceEvent }) => {

@@ -121,10 +121,11 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const { generateTraceCode, recordTraceEvent } = await import('@/lib/traceability')
     const traceCode = generateTraceCode()
     let actingUserId = 1
+    let id = 0
 
     try {
         const { id: paramId } = await context.params
-        const id = parseInt(paramId)
+        id = parseInt(paramId)
         if (isNaN(id)) return NextResponse.json({ message: 'ID inválido' }, { status: 400 })
 
         const body = await request.json()

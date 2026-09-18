@@ -12,7 +12,8 @@ export async function GET() {
                 pool = await getSQLServerConnection();
                 const res = await pool.request().execute('dbo.spMenuListar');
                 await pool.close();
-                return NextResponse.json(res.recordset || []);
+                const items = (res.recordset || []).filter((r: any) => r.activo === true || r.activo === 1 || r.activo === 'true');
+                return NextResponse.json(items);
             } catch (err: any) {
                 if (pool) await pool.close();
                 throw err;

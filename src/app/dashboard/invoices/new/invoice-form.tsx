@@ -574,6 +574,20 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
 
     const handleSave = async (e: React.FormEvent, downloadPdf = false) => {
         e.preventDefault();
+
+        // Validar que en ningún ítem la Fecha Final (Check-Out) sea anterior a la Fecha Inicial (Check-In)
+        for (let i = 0; i < (formData.items || []).length; i++) {
+            const item = formData.items[i];
+            if (item.checkIn && item.checkOut) {
+                const dIn = new Date(item.checkIn.includes('T') ? item.checkIn.split('T')[0] : item.checkIn);
+                const dOut = new Date(item.checkOut.includes('T') ? item.checkOut.split('T')[0] : item.checkOut);
+                if (dOut.getTime() < dIn.getTime()) {
+                    alert(`ATENCIÓN: Inconsistencia en rango de fechas para el producto #${i + 1} (${item.descripcion || 'Ítem'}):\nLa Fecha Final / Check-Out (${item.checkOut}) no puede ser anterior a la Fecha Inicial / Check-In (${item.checkIn}).\nPor favor corrija las fechas antes de guardar.`);
+                    return;
+                }
+            }
+        }
+
         // Synchronously open a blank window if printing, to bypass browser popup blockers
         const printWindow = downloadPdf ? window.open('about:blank', '_blank') : null;
         setSaving(true)

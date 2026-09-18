@@ -59,6 +59,7 @@ tmp_*.json
 tmp_*.txt
 # Build Release
 RELEASE_AGENCIAS/
+RELEASE_KOREX/
 Instalador/
 
 # Local installer files
@@ -67,4 +68,6 @@ unins000.exe
 install_log.txt
 scratch/
 resolve*.js
+tmp/
+
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { executePostgresQuery } from '@/lib/postgres'
-import { executeSQLServerProcedure } from '@/lib/sqlserver'
+import { executeSQLServerProcedure, getZeusERPDatabaseName } from '@/lib/sqlserver'
 import { registerLog } from '@/lib/logger'
 
 export async function POST(req: NextRequest) {
@@ -35,11 +35,12 @@ export async function POST(req: NextRequest) {
         let spResult: any[] = [];
 
         try {
-            console.log(`[EXPORT_API] Iniciando carga en SQL Server para ID: ${idsStr} como ${exportType}`);
+            const targetDb = await getZeusERPDatabaseName();
+            console.log(`[EXPORT_API] Iniciando carga en SQL Server (BD: ${targetDb}) para ID: ${idsStr} como ${exportType}`);
             
             const sqlResult = await executeSQLServerProcedure(mssqlProcedure, {
                 xml: xmlStr
-            });
+            }, targetDb);
 
             // El SP devuelve un recordset con el estado de cada cotización procesada
             if (Array.isArray(sqlResult)) {

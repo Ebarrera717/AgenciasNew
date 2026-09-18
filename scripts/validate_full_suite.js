@@ -123,6 +123,42 @@ async function validateFullSuite() {
         Detalle: 'Auditor post-migración'
     });
 
+    // -------------------------------------------------------------------------
+    // CAPA 5: VALIDACIÓN DE SPs OBLIGATORIOS EN ZEUS ERP (ZeusAgencias_23)
+    // -------------------------------------------------------------------------
+    console.log('\n[CAPA 5/5] Validando SPs de Integración en Zeus ERP (ZeusAgencias_23)...');
+    try {
+        const mssql = require('mssql');
+        const zeusConfig = {
+            user: process.env.SQLSERVER_USER || 'zeusagencias',
+            password: process.env.SQLSERVER_PASSWORD || 'zzeusagencias',
+            server: process.env.SQLSERVER_HOST || 'ZEUSAGENCIAS10',
+            database: process.env.ZEUS_ERP_DB || 'ZeusAgencias_23',
+            port: 1433,
+            options: { encrypt: false, trustServerCertificate: true }
+        };
+        const pool = await mssql.connect(zeusConfig);
+        const resFac = await pool.request().query("SELECT OBJECT_ID('dbo.spFacturacionesCrear', 'P') AS sp_id;");
+        const resCot = await pool.request().query("SELECT OBJECT_ID('dbo.spCotizacionesCrear', 'P') AS sp_id;");
+        const facOk = !!resFac.recordset[0]?.sp_id;
+        const cotOk = !!resCot.recordset[0]?.sp_id;
+
+        results.push({
+            Capa: '5. Zeus ERP (ZeusAgencias_23)',
+            Componente: 'spFacturacionesCrear & spCotizacionesCrear',
+            Estado: (facOk && cotOk) ? '✅ OK' : '❌ FALTANTE',
+            Detalle: `spFacturacionesCrear: ${facOk ? 'Activo' : 'Ausente'}, spCotizacionesCrear: ${cotOk ? 'Activo' : 'Ausente'}`
+        });
+        await pool.close();
+    } catch (zeusErr) {
+        results.push({
+            Capa: '5. Zeus ERP (ZeusAgencias_23)',
+            Componente: 'Conectividad & SPs',
+            Estado: '❌ FALLO',
+            Detalle: zeusErr.message
+        });
+    }
+
     console.log('\n================================================================');
     console.log('         MATRIZ DE RESULTADOS DE LA VALIDACIÓN COMPLETA          ');
     console.log('================================================================');

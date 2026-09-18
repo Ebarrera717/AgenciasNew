@@ -5196,7 +5196,22 @@ BEGIN
 		 SELECT
 			id_TiposConceptFac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 2))),
 			id_ConceptoFacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 3))),
-			id_TiposServicio=ISNULL(TS.id,9) ,
+			id_TiposServicio = ISNULL(
+				CASE WHEN TS.id IS NOT NULL AND TS.cd_cuenta IS NOT NULL AND RTRIM(LTRIM(TS.cd_cuenta)) <> '' THEN TS.id ELSE NULL END,
+				ISNULL(
+					(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(50)'))) AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> ''),
+					ISNULL(
+						(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(100)'))) AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> ''),
+						ISNULL(
+							(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.CotizacionServicios.value('ds_servicio[1]','VARCHAR(100)'))) AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> ''),
+							ISNULL(
+								(SELECT TOP 1 TSA2.id_TipoServicio FROM dbo.tiposServicio_asignados TSA2 JOIN dbo.TiposServicios TS2 ON TS2.id = TSA2.id_TipoServicio WHERE TSA2.id_ConceptoFacturacion = CF.id AND TS2.cd_cuenta IS NOT NULL AND RTRIM(LTRIM(TS2.cd_cuenta)) <> ''),
+								ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '' ORDER BY id ASC), 9)
+							)
+						)
+					)
+				)
+			),
 			id_Cotizacion=NULL ,
 			id_fac_factura=NULL ,
 			id_fac_remision=NULL,
@@ -7631,11 +7646,11 @@ BEGIN
         ep.price AS am_valorprov,
         NULL AS id_monedaprov,
         COALESCE(ep."checkInDate", e.date) AS dt_llegada,
-        COALESCE(ep."checkOutDate", e.date) AS dt_salida,
+        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS dt_salida,
         0 AS am_pordescuento,
         0 AS am_basedescuento,
-        COALESCE(ep."checkInDate", e.date) AS Fecha_Salida,
-        COALESCE(ep."checkOutDate", e.date) AS Fecha_Llegada,
+        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS Fecha_Salida,
+        COALESCE(ep."checkInDate", e.date) AS Fecha_Llegada,
         '' AS ColId,
         '' AS cd_Consecutivo_depende,
         SUBSTRING(COALESCE(ep."reservationCode", ''), 1, 50) AS CodigoReserva,
@@ -8007,7 +8022,7 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT OFF;
 
-    IF OBJECT_ID('dbo.ImpRet', 'U') IS NULL
+    IF OBJECT_ID('dbo.ImpRet') IS NULL
     BEGIN
         CREATE TABLE dbo.ImpRet (
             id INT IDENTITY(1,1) PRIMARY KEY,
@@ -8032,16 +8047,26 @@ BEGIN
         ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
     END;
 
-    IF OBJECT_ID('dbo.CargosDesc', 'U') IS NULL
+    IF OBJECT_ID('dbo.CargosDesc') IS NULL
     BEGIN
         CREATE TABLE dbo.CargosDesc (
             id INT IDENTITY(1,1) PRIMARY KEY,
             cd_codigo VARCHAR(20) NOT NULL,
-            ds_nombre VARCHAR(250) NULL
+            ds_nombre VARCHAR(250) NULL,
+            cd_cuenta VARCHAR(20) NULL
         );
     END;
+    IF OBJECT_ID('dbo.CargosDesc') IS NOT NULL
+    BEGIN
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CargosDesc') AND name = 'cd_cuenta')
+            ALTER TABLE dbo.CargosDesc ADD cd_cuenta VARCHAR(20) NULL;
 
-    IF OBJECT_ID('dbo.parametros', 'U') IS NULL
+        UPDATE dbo.CargosDesc 
+        SET cd_cuenta = '28151080' 
+        WHERE (cd_codigo = 'TAR' OR id = 1) AND (cd_cuenta IS NULL OR RTRIM(LTRIM(cd_cuenta)) = '');
+    END;
+
+    IF OBJECT_ID('dbo.parametros') IS NULL
     BEGIN
         CREATE TABLE dbo.parametros (
             id INT IDENTITY(1,1) PRIMARY KEY,
@@ -8062,7 +8087,7 @@ BEGIN
         END;
     END;
 
-    IF OBJECT_ID('dbo.Parametr', 'U') IS NULL
+    IF OBJECT_ID('dbo.Parametr') IS NULL
     BEGIN
         CREATE TABLE dbo.Parametr (
             PARAMETRO VARCHAR(50) PRIMARY KEY,
@@ -8553,6 +8578,7 @@ BEGIN
 		);
 
 		CREATE TABLE #Pasajeros (
+			id INT IDENTITY(1,1),
 			id_facturacion INT, id_item INT, in_tipoitem INT,
 			ds_paxape VARCHAR(50) COLLATE DATABASE_DEFAULT, ds_paxname VARCHAR(50) COLLATE DATABASE_DEFAULT,
 			ds_paxprefix VARCHAR(10) COLLATE DATABASE_DEFAULT, ds_paxClasificacion VARCHAR(10) COLLATE DATABASE_DEFAULT,
@@ -9312,7 +9338,22 @@ BEGIN
 			am_porcomision = ISNULL(F.Item.value('am_porcomision[1]','MONEY'),0),
 			id_tiposconceptfac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 2))),
 			id_conceptofacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 3))),
-			id_tiposservicio = CASE WHEN TS.id IS NOT NULL THEN TS.id ELSE TSA.id_TipoServicio END,
+			id_tiposservicio = ISNULL(
+				TS.id,
+				ISNULL(
+					(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(50)')))),
+					ISNULL(
+						(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(100)')))),
+						ISNULL(
+							(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('ds_servicio[1]','VARCHAR(100)')))),
+							ISNULL(
+								(SELECT TOP 1 TSA2.id_TipoServicio FROM dbo.tiposServicio_asignados TSA2 JOIN dbo.TiposServicios TS2 ON TS2.id = TSA2.id_TipoServicio WHERE TSA2.id_ConceptoFacturacion = CF.id),
+								ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = 'htn'), 1)
+							)
+						)
+					)
+				)
+			),
 			cd_proveedores = ISNULL(F.Item.value('cd_proveedores[1]','VARCHAR(25)'),''),
 			ds_servicio = ISNULL(F.Item.value('ds_servicio[1]','VARCHAR(250)'),''),
 			am_valorprov = ISNULL(F.Item.value('am_valorprov[1]','MONEY'),0),
@@ -9411,7 +9452,16 @@ BEGIN
 			am_contado=ISNULL(C.Cargo.value('am_contado[1]', 'MONEY'),0),
 			am_credito=ISNULL(C.Cargo.value('am_credito[1]', 'MONEY'),0),
 			am_valor=ISNULL(C.Cargo.value('am_valor[1]', 'MONEY'),0),
-			id_carg=CASE WHEN CD.id IS NOT NULL THEN CD.id ELSE IR.Id_cargo_dep END, 
+			id_carg = ISNULL(
+				CD.id,
+				ISNULL(
+					(SELECT TOP 1 id FROM dbo.CargosDesc WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.Cargo.value('cd_codigo[1]', 'VARCHAR(20)'))) OR RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.Cargo.value('ds_nombre[1]', 'VARCHAR(100)')))),
+					ISNULL(
+						(SELECT TOP 1 id FROM dbo.CargosDesc WHERE cd_codigo = 'TAR'),
+						CASE WHEN CD.id IS NOT NULL THEN CD.id ELSE ISNULL(IR.Id_cargo_dep, 1) END
+					)
+				)
+			),
 			id_imp=IR.id, 
 			bl_iva=ISNULL(IR.bl_IVA,0),
 			in_orden=ISNULL(C.Cargo.value('in_orden[1]', 'INT'),0)
@@ -9475,11 +9525,11 @@ BEGIN
 
 			-- Cursor over unique ReservaFactura in this query result
 			DECLARE curInvoices CURSOR LOCAL FOR
-			SELECT DISTINCT cd_fuente,cd_serie,cd_consecutivo,id_factura
+			SELECT DISTINCT id_factura, cd_fuente, cd_serie, cd_consecutivo
 			FROM #Facturacion;
 
 			OPEN curInvoices;
-			FETCH NEXT FROM curInvoices INTO @cd_fuente,@cd_serie,@cd_consecutivo,@id_facturacion;
+			FETCH NEXT FROM curInvoices INTO @id_facturacion, @cd_fuente, @cd_serie, @cd_consecutivo;
 
 			WHILE @@FETCH_STATUS = 0
 			BEGIN
@@ -9500,10 +9550,9 @@ BEGIN
 				FROM #FormasPagos
 				WHERE id_facturacion = @id_facturacion;
 
-				-- Fetch header details from the first record in the group
+				-- Fetch header details from the specific invoice record
 
 				SELECT TOP 1
-					@id_facturacion = id_factura,
 					@id_item = id_item,
 					@in_tipoitem = in_tipoitem, 
 					@ds_cliid = ds_cliid,
@@ -9528,9 +9577,32 @@ BEGIN
 					@cd_implante = cd_implante,
 					@FechaCont = ds_fecha
 				FROM #Facturacion
-				WHERE cd_fuente = @cd_fuente
-					 AND cd_serie = @cd_serie
-					 AND cd_consecutivo = @cd_consecutivo
+				WHERE id_factura = @id_facturacion;
+
+				-- Enriquecimiento obligatorio desde el maestro CLIENTES de Zeus ERP
+				DECLARE @z_dir VARCHAR(250), @z_ciudad VARCHAR(50), @z_tel VARCHAR(50), @z_email VARCHAR(100), @z_vendedor VARCHAR(10), @z_razoncial VARCHAR(250);
+				SELECT TOP 1 
+					@z_razoncial = RTRIM(LTRIM(RAZONCIAL)),
+					@z_dir = RTRIM(LTRIM(DIRECCION)), 
+					@z_ciudad = RTRIM(LTRIM(CIUDAD)), 
+					@z_tel = RTRIM(LTRIM(TELEFONO)), 
+					@z_email = RTRIM(LTRIM(EMAIL)), 
+					@z_vendedor = RTRIM(LTRIM(IDVENDE)) 
+				FROM dbo.CLIENTES 
+				WHERE LTRIM(RTRIM(IDCLIENTE)) = LTRIM(RTRIM(@cd_cliente)) OR LTRIM(RTRIM(IDCLIENTE)) = LTRIM(RTRIM(@ds_cliid));
+
+				IF @z_dir IS NOT NULL AND @z_dir <> '' SET @ds_clidir = @z_dir;
+				IF @z_ciudad IS NOT NULL AND @z_ciudad <> '' SET @ds_clicity = @z_ciudad;
+				IF @z_tel IS NOT NULL AND @z_tel <> '' SET @ds_clitel = @z_tel;
+				IF @z_email IS NOT NULL AND @z_email <> '' SET @ds_ClienteEmail = @z_email;
+				IF @z_vendedor IS NOT NULL AND @z_vendedor <> '' SET @cd_vendedor = @z_vendedor;
+				IF @z_razoncial IS NOT NULL AND @z_razoncial <> '' SET @ds_cliname = @z_razoncial;
+
+				-- Validar que el vendedor exista en MAEVENDE de Zeus ERP
+				IF @cd_vendedor IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.MAEVENDE WHERE RTRIM(LTRIM(IDVENDE)) = RTRIM(LTRIM(@cd_vendedor)))
+				BEGIN
+					SELECT TOP 1 @cd_vendedor = IDVENDE FROM dbo.MAEVENDE WHERE IDVENDE IS NOT NULL ORDER BY IDVENDE ASC;
+				END;
 
 				-- Resolve IDs for headers
 				IF ISNULL(@cd_sucursal,'')=''
@@ -9565,21 +9637,29 @@ BEGIN
 						ELSE am_tarifa + am_iva + am_vat
 					END
 				)
-				FROM #TmpFacturaItems;
+				FROM #TmpFacturaItems
+				WHERE id_factura = @id_facturacion;
+
+				IF @ValorFactura IS NULL OR @ValorFactura = 0
+				BEGIN
+					SELECT @ValorFactura = SUM(am_valor)
+					FROM #TmpFacturaCargos;
+				END;
+				IF @ValorFactura IS NULL SET @ValorFactura = 0;
 
 				UPDATE #Facturacion
-				SET cd_Consecutivo_variablesadicionales = LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 10)
-				WHERE tipo IN ('SRV','Hotel','Auto') AND cd_Consecutivo_variablesadicionales IS NULL
+				SET cd_Consecutivo_variablesadicionales = LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8)
+				WHERE tipo IN ('SRV','Hotel','Auto') AND cd_Consecutivo_variablesadicionales IS NULL AND id_factura = @id_facturacion;
 
 				-- Build dynamic SQL @SqlStmt
 				SET @SqlStmt = '';
 				SET @ItemIndex = 1;	
 					
 
-				-- Generar cd_Consecutivo_variablesadicionales aleatorio para los servicios padres
+				-- Generar cd_Consecutivo_variablesadicionales aleatorio para los servicios padres (8 caracteres para concordar con Fac_Servicios)
 				UPDATE #TmpFacturaItems
-				SET cd_Consecutivo_variablesadicionales = LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 10)
-				WHERE tipo_item IN ('SRV','Hotel','Auto') AND cd_Consecutivo_variablesadicionales IS NULL
+				SET cd_Consecutivo_variablesadicionales = LEFT(REPLACE(CONVERT(VARCHAR(36), NEWID()), '-', ''), 8)
+				WHERE tipo_item IN ('SRV','Hotel','Auto') AND (cd_Consecutivo_variablesadicionales IS NULL OR cd_Consecutivo_variablesadicionales = '') AND id_factura = @id_facturacion;
 				 
 				UPDATE C
 				SET C.am_valor = ROUND(p.am_valor * (C.am_porcentaje/ 100.0), @NumDecimales),
@@ -9598,7 +9678,9 @@ BEGIN
 				INNER JOIN #TmpFacturaItems FI ON FI.id_item = FP.id_item
 				INNER JOIN dbo.ConceptoFacturacion CF ON CF.id = FI.id_conceptofacturacion
 				WHERE (@CalcularAutoValoresItemFac = 'S' OR CF.bl_CalculoAutoValoresFacturacion=1)
-					  AND CF.id NOT IN(1,2);	
+					  AND CF.id NOT IN(1,2)
+					  AND ISNULL(FP.am_valor, 0) = 0
+					  AND (SELECT COUNT(*) FROM #TmpFacturaFormasPago WHERE id_item = FP.id_item) = 1;	
 								
 				-- Reconstruct dynamic @SqlStmt from tables
 				SET @SqlStmt = '';
@@ -9648,28 +9730,45 @@ BEGIN
 						-- Build cargos / impuestos SQL
 						SET @TktSqlStmt = '';
 						
-						DELETE FROM #TmpVariablesObtenidas;
-						IF @gen_id_referencia_origen IS NOT NULL AND OBJECT_ID('dbo.spConfiguracionVariablesObtenerValores', 'P') IS NOT NULL
-						BEGIN
-							INSERT INTO #TmpVariablesObtenidas
-							EXEC dbo.spConfiguracionVariablesObtenerValores 
-								@id_usuario = 1, 
-								@id_ReservaGDS_Detalles = @gen_id_referencia_origen;
-								
-							DECLARE @var_Iden_Variable INT, @var_IDEN_Maestro INT, @var_ValorObtenido VARCHAR(MAX);
-							DECLARE curVars CURSOR LOCAL FAST_FORWARD FOR
-							SELECT Iden_Variable, IDEN_Maestro, ValorObtenido FROM #TmpVariablesObtenidas WHERE ISNULL(ValorObtenido, '') <> '';
+						-- Variables Adicionales para Tiquetes (desde #VariablesAdicionales enviadas en XML)
+						DECLARE @var_Iden_Variable INT, @var_IDEN_Maestro INT, @var_ValorObtenido VARCHAR(MAX), @var_TipoDato VARCHAR(20);
+						DECLARE curVarsTkt CURSOR LOCAL FAST_FORWARD FOR
+						SELECT 
+							ISNULL(vd.IDEN, 0) AS Iden_Variable,
+							ISNULL(vdm.IDEN, 35) AS IDEN_Maestro,
+							va.ds_valor AS ValorObtenido,
+							ISNULL(vd.TipoDato, 'Varchar') AS TipoDato
+						FROM #VariablesAdicionales va
+						LEFT JOIN dbo.VariableDefinicion vd ON (
+							UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
+							OR UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.cd_codigo)))
+							OR UPPER(RTRIM(LTRIM(vd.Descripcion))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
+							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.ds_VariableAdicional))) + ']'
+							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.cd_codigo))) + ']'
+						)
+						LEFT JOIN dbo.VariableDefinicionMaestro vdm ON vdm.Codigo = 'Tiquetes'
+						WHERE (va.id_item = @gen_id_item OR (va.id_facturacion = @id_facturacion AND (va.id_item IS NULL OR va.id_item = 0)))
+						  AND ISNULL(va.ds_valor, '') <> '';
 
-							OPEN curVars;
-							FETCH NEXT FROM curVars INTO @var_Iden_Variable, @var_IDEN_Maestro, @var_ValorObtenido;
-							WHILE @@FETCH_STATUS = 0
+						OPEN curVarsTkt;
+						FETCH NEXT FROM curVarsTkt INTO @var_Iden_Variable, @var_IDEN_Maestro, @var_ValorObtenido, @var_TipoDato;
+						WHILE @@FETCH_STATUS = 0
+						BEGIN
+							IF @var_Iden_Variable > 0
 							BEGIN
-								SET @TktSqlStmt = @TktSqlStmt + ' INSERT INTO dbo.VariableDatosMaestro (Iden_Variable, IDEN_Maestro, cd_maestro, ValorObtenido) VALUES (' + CAST(@var_Iden_Variable AS VARCHAR) + ', ' + CAST(@var_IDEN_Maestro AS VARCHAR) + ', ''' + REPLACE(@gen_cd_tiquete, '''', '''''') + ''', ''' + REPLACE(@var_ValorObtenido, '''', '''''') + ''');' + CHAR(13) + CHAR(10)
-								FETCH NEXT FROM curVars INTO @var_Iden_Variable, @var_IDEN_Maestro, @var_ValorObtenido;
+								SET @TktSqlStmt = @TktSqlStmt + CHAR(13) + CHAR(10) + ' IF NOT EXISTS (SELECT 1 FROM dbo.VariableMaestro WHERE IDEN_Maestro = ' + CAST(@var_IDEN_Maestro AS VARCHAR) + ' AND IDEN_Variable = ' + CAST(@var_Iden_Variable AS VARCHAR) + ') INSERT INTO dbo.VariableMaestro (IDEN_Maestro, IDEN_Variable, Formula, OrdenEvaluacion) VALUES (' + CAST(@var_IDEN_Maestro AS VARCHAR) + ', ' + CAST(@var_Iden_Variable AS VARCHAR) + ', '''', 0);' + CHAR(13) + CHAR(10) +
+									' INSERT INTO dbo.VariableDatosMaestro (IDEN_Maestro, IDEN_Variable, CodigoMaestro, ValorNumerico, ValorFecha, ValorVarchar) VALUES (' + 
+									CAST(@var_IDEN_Maestro AS VARCHAR) + ', ' + 
+									CAST(@var_Iden_Variable AS VARCHAR) + ', ''' + 
+									REPLACE(@gen_cd_tiquete, '''', '''''') + ''', ' +
+									CASE WHEN @var_TipoDato IN ('Numeric', 'Integer') AND ISNUMERIC(@var_ValorObtenido) = 1 THEN REPLACE(@var_ValorObtenido, ',', '.') ELSE 'NULL' END + ', ' +
+									CASE WHEN @var_TipoDato = 'Date' AND ISDATE(@var_ValorObtenido) = 1 THEN '''' + REPLACE(@var_ValorObtenido, '''', '''''') + '''' ELSE 'NULL' END + ', ''' +
+									REPLACE(@var_ValorObtenido, '''', '''''') + ''');';
 							END;
-							CLOSE curVars;
-							DEALLOCATE curVars;
-						END
+							FETCH NEXT FROM curVarsTkt INTO @var_Iden_Variable, @var_IDEN_Maestro, @var_ValorObtenido, @var_TipoDato;
+						END;
+						CLOSE curVarsTkt;
+						DEALLOCATE curVarsTkt;
 						
 						DECLARE @c_codigo VARCHAR(20), @ds_nombre VARCHAR(100), @cd_tipo CHAR(1), @am_porcentaje NUMERIC(8,4), @am_valor MONEY, @am_contado MONEY, @am_credito MONEY, @id_carg INT, @id_imp INT;
 						
@@ -9695,13 +9794,13 @@ BEGIN
 							FETCH NEXT FROM curItemTaxes INTO @c_codigotax, @ds_nombretax, @cd_tipotax, @am_porcentajetax, @am_valortax, @am_contadotax, @am_creditotax, @id_cargtax, @id_imptax;
 							WHILE @@FETCH_STATUS = 0
 							BEGIN
-								SET @TktImpuestosSqlStmt = @TktImpuestosSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_TiqueteImpuestos_Insertar @id_tiquetecargos = @NewCargId, @id_impret = ' + CAST(ISNULL(@id_imptax, 1) AS VARCHAR) + ', @ds_impas = ''' + REPLACE(@ds_nombretax, '''', '''''') + ''',@cd_impcta='''', @am_valor = ' + CAST(@am_valortax AS VARCHAR) + ', @am_contado = ' + CAST(@am_contadotax AS VARCHAR) + ', @am_credito = ' + CAST(@am_creditotax AS VARCHAR) + ', @am_porcentaje = ' + CAST(@am_porcentajetax AS VARCHAR) + ', @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @bl_contabilizar=1;'  
+								SET @TktImpuestosSqlStmt = @TktImpuestosSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_TiqueteImpuestos_Insertar @id_tiquetecargos = @NewCargId, @id_impret = ' + CAST(ISNULL(@id_imptax, 1) AS VARCHAR) + ', @ds_impas = ''' + ISNULL(@ds_nombretax,'') + ''', @cd_impcta = '''', @am_valor = ' + CAST(ISNULL(@am_valortax,0) AS VARCHAR) + ', @am_contado = ' + CAST(ISNULL(@am_contadotax,0) AS VARCHAR) + ', @am_credito = ' + CAST(ISNULL(@am_creditotax,0) AS VARCHAR) + ', @am_porcentaje=' + CAST(ISNULL(@am_porcentajetax,0) AS VARCHAR) + ', @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @bl_contabilizar=1;' 
 								FETCH NEXT FROM curItemTaxes INTO @c_codigotax, @ds_nombretax, @cd_tipotax, @am_porcentajetax, @am_valortax, @am_contadotax, @am_creditotax, @id_cargtax, @id_imptax;
 							END
 							CLOSE curItemTaxes;
 							DEALLOCATE curItemTaxes;
 
-							SET @TktSqlStmt = @TktSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_TiqueteCargos_Insertar @id_fac_remision = @NewRmId, @id_fac_factura = @NewFacId, @id_tiquetes = @NewTktId, @id_cargosdesc = ' + CAST(ISNULL(@id_carg, 1) AS VARCHAR) + ', @ds_cargonm = ''' + REPLACE(@ds_nombre, '''', '''''') + ''', @am_valor = ' + CAST(@am_valor AS VARCHAR) + ', @am_contado = ' + CAST(@am_contado AS VARCHAR) + ', @am_credito = ' + CAST(@am_credito AS VARCHAR) + ', @bl_noshow = 0, @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @SqlStmt = ''' + REPLACE(@TktImpuestosSqlStmt, '''', '''''') + ''';'  
+							SET @TktSqlStmt = @TktSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_TiqueteCargos_Insertar @id_fac_factura = @NewFacId, @id_fac_remision = @NewRmId, @id_tiquetes = @NewTktId, @id_cargosdesc = ' + CAST(ISNULL(@id_carg, 1) AS VARCHAR) + ', @ds_cargonm = ''' + ISNULL(@ds_nombre,'') + ''', @am_valor = ' + CAST(ISNULL(@am_valor,0) AS VARCHAR) + ', @am_contado = ' + CAST(ISNULL(@am_contado,0) AS VARCHAR) + ', @am_credito = ' + CAST(ISNULL(@am_credito,0) AS VARCHAR) + ', @bl_noshow = 0, @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @SqlStmt = ''' + REPLACE(ISNULL(@TktImpuestosSqlStmt,''), '''', '''''') + ''';'  
 							
 							FETCH NEXT FROM curItemCargos INTO @c_codigo, @ds_nombre, @cd_tipo, @am_porcentaje, @am_valor, @am_contado, @am_credito, @id_carg, @id_imp;
 						END
@@ -9720,7 +9819,7 @@ BEGIN
 						FETCH NEXT FROM curItemFPs INTO @fp_id_fp, @fp_id_tc, @fp_cd_codigo, @fp_ds_nombre, @fp_cd_tipotarjeta, @fp_ds_numerotarjeta, @fp_ds_vouchertarjeta, @fp_ds_expiraciontarjeta, @fp_ds_autorizaciontarjeta, @fp_in_cuotas, @fp_am_valor;
 						WHILE @@FETCH_STATUS = 0
 						BEGIN
-							SET @TktSqlStmt = @TktSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_TiqueteFormasPago_Insertar @id_tiquetes = @NewTktId, @id_fac_factura = @NewFacId, @id_fac_remision = @NewRmId, @id_FormasPago = ' + CAST(@fp_id_fp AS VARCHAR) + ', @ds_fpnm = ''' + REPLACE(@fp_ds_nombre, '''', '''''') + ''', @bl_fprepresenta = 0, @id_TarjetasCredito = ' + ISNULL(CAST(@fp_id_tc AS VARCHAR), 'NULL') + ', @cd_tccode = ' + ISNULL('''' + @fp_cd_tipotarjeta + '''', 'NULL') + ', @ds_tcnumber = ' + ISNULL('''' + @fp_ds_numerotarjeta + '''', 'NULL') + ', @ds_tcvoucher = ' + ISNULL('''' + @fp_ds_vouchertarjeta + '''', 'NULL') + ', @ds_tcexp = ' + ISNULL('''' + @fp_ds_expiraciontarjeta + '''', 'NULL') + ', @cd_idbanco = NULL, @ds_cheque = NULL, @ds_plaza = NULL, @ds_referencia = NULL, @ds_poliza = NULL, @ds_polanexo = NULL, @am_valor = ' + CAST(@fp_am_valor AS VARCHAR) + ', @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @ds_tcautorizacion = ' + ISNULL('''' + @fp_ds_autorizaciontarjeta + '''', 'NULL') + ', @in_tccuotas = ' + ISNULL(CAST(@fp_in_cuotas AS VARCHAR),'0') + ';' 
+							SET @TktSqlStmt = @TktSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_TiqueteFormasPago_Insertar @id_fac_factura = @NewFacId, @id_fac_remision = @NewRmId, @id_Tiquetes = @NewTktId, @id_formaspago = ' + CAST(@fp_id_fp AS VARCHAR) + ', @ds_fpnm = ''' + REPLACE(@fp_ds_nombre, '''', '''''') + ''', @bl_fprepresenta = 0, @id_tarjetascredito = ' + ISNULL(CAST(@fp_id_tc AS VARCHAR), 'NULL') + ', @cd_tccode = ' + ISNULL('''' + @fp_cd_tipotarjeta + '''', 'NULL') + ', @ds_tcnumber = ' + ISNULL('''' + @fp_ds_numerotarjeta + '''', 'NULL') + ', @ds_tcvoucher = ' + ISNULL('''' + @fp_ds_vouchertarjeta + '''', 'NULL') + ', @ds_tcexp = ' + ISNULL('''' + @fp_ds_expiraciontarjeta + '''', 'NULL') + ', @cd_idbanco = NULL, @ds_cheque = NULL, @ds_plaza = NULL, @ds_referencia = NULL, @ds_poliza = NULL, @ds_polanexo = NULL, @am_valor = ' + CAST(@fp_am_valor AS VARCHAR) + ', @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @ds_tcautorizacion = ' + ISNULL('''' + @fp_ds_autorizaciontarjeta + '''', 'NULL') + ', @in_tccuotas = ' + ISNULL(CAST(@fp_in_cuotas AS VARCHAR), '0') + ';' 
 							FETCH NEXT FROM curItemFPs INTO @fp_id_fp, @fp_id_tc, @fp_cd_codigo, @fp_ds_nombre, @fp_cd_tipotarjeta, @fp_ds_numerotarjeta, @fp_ds_vouchertarjeta, @fp_ds_expiraciontarjeta, @fp_ds_autorizaciontarjeta, @fp_in_cuotas, @fp_am_valor;
 						END
 						CLOSE curItemFPs;
@@ -9782,6 +9881,12 @@ BEGIN
 							@am_hf = ' + ISNULL(CAST(@gen_am_highfare AS VARCHAR),'0') + ',
 							@am_lf = ' + ISNULL(CAST(@gen_am_lowfare AS VARCHAR),'0') + ',
 							@am_tarifa = ' + ISNULL(CAST(@gen_am_tarifa AS VARCHAR),'0') + ',
+							@am_iva = ' + ISNULL(CAST(@gen_am_iva AS VARCHAR),'0') + ',
+							@am_comision = ' + ISNULL(CAST(@gen_am_comision AS VARCHAR),'0') + ',
+							@am_porcomision = ' + ISNULL(CAST(@gen_am_porcomision AS VARCHAR),'0') + ',
+							@am_tua = ' + ISNULL(CAST(@gen_am_tua AS VARCHAR),'0') + ',
+							@am_comb = ' + ISNULL(CAST(@gen_am_comb AS VARCHAR),'0') + ',
+							@am_vat = ' + ISNULL(CAST(@gen_am_vat AS VARCHAR),'0') + ',
 							@cd_ah = ''' + ISNULL(@gen_cd_tourcode, '') + ''',
 							@am_desah = 0,
 							@id_gds = ' + ISNULL(CAST(@gen_id_gds AS VARCHAR),'NULL') + ',
@@ -9791,7 +9896,6 @@ BEGIN
 							@bl_NoCalcIvaComision = 0,
 							@am_comisionPNR = ' + ISNULL(CAST(@gen_am_Comision AS VARCHAR),'0') + ',
 							@am_basecomisionable = ' + ISNULL(CAST(@gen_am_tarifa AS VARCHAR),'0') + ',
-							@am_porcomision = 0,
 							@ds_records = ''' + ISNULL(@gen_ds_records,'') + ''',
 							@id_hotel = NULL,
 							@id_precompra = ' + ISNULL(CAST(@gen_Id_Precompra AS VARCHAR), 'NULL') + ',
@@ -9907,28 +10011,52 @@ BEGIN
 						SET @SrvSqlStmt = '';
 						SET @SrvImpuestosSqlStmt = '';
 						
-						DELETE FROM #TmpVariablesObtenidas;
-						IF @gen_id_referencia_origen IS NOT NULL AND OBJECT_ID('dbo.spConfiguracionVariablesObtenerValores', 'P') IS NOT NULL
+						-- Variables Adicionales para Servicios (desde #VariablesAdicionales enviadas en XML)
+						IF ISNULL(@gen_cd_Consecutivo_variablesadicionales, '') = ''
 						BEGIN
-							INSERT INTO #TmpVariablesObtenidas
-							EXEC dbo.spConfiguracionVariablesObtenerValores 
-								@id_usuario = 1, 
-								@id_ReservaGDS_Servicios = @gen_id_referencia_origen;
+							SET @gen_cd_Consecutivo_variablesadicionales = 'I' + RIGHT('0000000' + CAST(@gen_id_item AS VARCHAR), 7);
+						END;
 
-							DECLARE @var_Iden_Variable_srv INT, @var_IDEN_Maestro_srv INT, @var_ValorObtenido_srv VARCHAR(MAX);
-							DECLARE curVarsSrv CURSOR LOCAL FAST_FORWARD FOR
-							SELECT Iden_Variable, IDEN_Maestro, ValorObtenido FROM #TmpVariablesObtenidas WHERE ISNULL(ValorObtenido, '') <> '';
+						DECLARE @SrvVarsSqlStmt VARCHAR(MAX) = '';
+						SET @SrvVarsSqlStmt = '';
+						DECLARE @var_Iden_Variable_srv INT, @var_IDEN_Maestro_srv INT, @var_ValorObtenido_srv VARCHAR(MAX), @var_TipoDato_srv VARCHAR(20);
+						DECLARE curVarsSrv CURSOR LOCAL FAST_FORWARD FOR
+						SELECT 
+							ISNULL(vd.IDEN, 0) AS Iden_Variable,
+							ISNULL(vdm.IDEN, 37) AS IDEN_Maestro,
+							va.ds_valor AS ValorObtenido,
+							ISNULL(vd.TipoDato, 'Varchar') AS TipoDato
+						FROM #VariablesAdicionales va
+						LEFT JOIN dbo.VariableDefinicion vd ON (
+							UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
+							OR UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.cd_codigo)))
+							OR UPPER(RTRIM(LTRIM(vd.Descripcion))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
+							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.ds_VariableAdicional))) + ']'
+							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.cd_codigo))) + ']'
+						)
+						LEFT JOIN dbo.VariableDefinicionMaestro vdm ON vdm.Codigo = 'FacturacionServicios'
+						WHERE (va.id_item = @gen_id_item OR (va.id_facturacion = @id_facturacion AND (va.id_item IS NULL OR va.id_item = 0)))
+						  AND ISNULL(va.ds_valor, '') <> '';
 
-							OPEN curVarsSrv;
-							FETCH NEXT FROM curVarsSrv INTO @var_Iden_Variable_srv, @var_IDEN_Maestro_srv, @var_ValorObtenido_srv;
-							WHILE @@FETCH_STATUS = 0
+						OPEN curVarsSrv;
+						FETCH NEXT FROM curVarsSrv INTO @var_Iden_Variable_srv, @var_IDEN_Maestro_srv, @var_ValorObtenido_srv, @var_TipoDato_srv;
+						WHILE @@FETCH_STATUS = 0
+						BEGIN
+							IF @var_Iden_Variable_srv > 0
 							BEGIN
-								SET @SrvSqlStmt = @SrvSqlStmt +CHAR(13) + CHAR(10)+ ' INSERT INTO dbo.VariableDatosMaestro (Iden_Variable, IDEN_Maestro, cd_maestro, ValorObtenido) VALUES (' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ', ' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ', ''' + REPLACE(@gen_cd_Consecutivo_variablesadicionales, '''', '''''') + ''', ''' + REPLACE(@var_ValorObtenido_srv, '''', '''''') + ''');' 
-								FETCH NEXT FROM curVarsSrv INTO @var_Iden_Variable_srv, @var_IDEN_Maestro_srv, @var_ValorObtenido_srv;
+								SET @SrvVarsSqlStmt = @SrvVarsSqlStmt + CHAR(13) + CHAR(10) + ' IF NOT EXISTS (SELECT 1 FROM dbo.VariableMaestro WHERE IDEN_Maestro = ' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ' AND IDEN_Variable = ' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ') INSERT INTO dbo.VariableMaestro (IDEN_Maestro, IDEN_Variable, Formula, OrdenEvaluacion) VALUES (' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ', ' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ', '''', 0);' + CHAR(13) + CHAR(10) +
+									' INSERT INTO dbo.VariableDatosMaestro (IDEN_Maestro, IDEN_Variable, CodigoMaestro, ValorNumerico, ValorFecha, ValorVarchar)' +
+									' SELECT ' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ', ' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ', cd_Consecutivo_VariablesAdicionales, ' +
+									CASE WHEN @var_TipoDato_srv IN ('Numeric', 'Integer') AND ISNUMERIC(@var_ValorObtenido_srv) = 1 THEN REPLACE(@var_ValorObtenido_srv, ',', '.') ELSE 'NULL' END + ', ' +
+									CASE WHEN @var_TipoDato_srv = 'Date' AND ISDATE(@var_ValorObtenido_srv) = 1 THEN '''' + REPLACE(@var_ValorObtenido_srv, '''', '''''') + '''' ELSE 'NULL' END + ', ''' +
+									REPLACE(@var_ValorObtenido_srv, '''', '''''') + '''' +
+									' FROM dbo.Fac_Servicios WHERE id = @NewSrvId;';
 							END;
-							CLOSE curVarsSrv;
-							DEALLOCATE curVarsSrv;
-						END
+							FETCH NEXT FROM curVarsSrv INTO @var_Iden_Variable_srv, @var_IDEN_Maestro_srv, @var_ValorObtenido_srv, @var_TipoDato_srv;
+						END;
+						CLOSE curVarsSrv;
+						DEALLOCATE curVarsSrv;
+
 						SET @SrvCargSqlStmt = '';
 						SET @SrvFpSqlStmt = '';
 
@@ -9958,70 +10086,200 @@ BEGIN
 							FETCH NEXT FROM curItemSrvTaxes INTO @sc_codigotax, @sc_ds_nombretax, @sc_cd_tipotax, @sc_am_porcentajetax, @sc_am_valortax, @sc_am_contadotax, @sc_am_creditotax, @sc_id_cargtax, @sc_id_imptax;
 							WHILE @@FETCH_STATUS = 0
 							BEGIN
-								SET @SrvImpuestosSqlStmt = @SrvImpuestosSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioImpuestos_Insertar @id_FacServiciosCargos = @NewCargId, @id_impret = ' + CAST(ISNULL(@sc_id_imptax, 1) AS VARCHAR) + ', @ds_impas = ''' + ISNULL(@sc_ds_nombretax, '') + ''', @cd_impcta = '''', @am_valor = ' + CAST(ISNULL(@sc_am_valortax,0) AS VARCHAR) + ', @am_contado = ' + CAST(ISNULL(@sc_am_contadotax,0) AS VARCHAR) + ', @am_credito = ' + CAST(ISNULL(@sc_am_creditotax,0) AS VARCHAR) + ', @am_porcentaje = ' + CAST(ISNULL(@sc_am_porcentajetax,0) AS VARCHAR) + ', @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @bl_contabilizar = 1, @am_deltaCorreccion = 0;' 
+								-- Validar cuenta del Impuesto (Directo desde ImpRet)
+							IF @sc_id_imptax IS NOT NULL
+							BEGIN
+								DECLARE @tax_acct_val VARCHAR(20) = NULL;
+								SELECT @tax_acct_val = cd_cuenta FROM dbo.ImpRet WHERE id = @sc_id_imptax;
+								IF @tax_acct_val IS NULL OR RTRIM(LTRIM(@tax_acct_val)) = ''
+								BEGIN
+									DECLARE @err_tax_msg NVARCHAR(4000) = '❌ Error de Parametrización Contable: El Impuesto "' + ISNULL(@sc_ds_nombretax, 'DESCONOCIDO') + '" no tiene cuenta contable configurada en la tabla de Impuestos (ImpRet). Por favor verifique la parametrización en AgenciasNew o en Zeus ERP antes de continuar.';
+									RAISERROR(@err_tax_msg, 16, 1);
+									RETURN;
+								END;
+							END;
+								SET @SrvImpuestosSqlStmt = @SrvImpuestosSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioImpuestos_Insertar @id_FacServiciosCargos = @NewCargId, @id_impret = ' + CAST(ISNULL(@sc_id_imptax, 1) AS VARCHAR) + ', @ds_impas = ''' + ISNULL(@sc_ds_nombretax,'') + ''', @cd_impcta='''', @am_valor = ' + CAST(ISNULL(@sc_am_valortax,0) AS VARCHAR) + ', @am_contado = ' + CAST(ISNULL(@sc_am_contadotax,0) AS VARCHAR) + ', @am_credito = ' + CAST(ISNULL(@sc_am_creditotax,0) AS VARCHAR) + ', @am_porcentaje=' + CAST(ISNULL(@sc_am_porcentajetax,0) AS VARCHAR) + ', @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @bl_contabilizar=1;' 
 								
-								FETCH NEXT FROM curItemSrvTaxes INTO @sc_codigotax, @sc_ds_nombretax, @sc_cd_tipotax, @sc_am_porcentajetax, @sc_am_valortax, @sc_am_contadotax, @sc_am_creditotax, @sc_id_cargtax, @sc_id_imptax;
-							END
-							CLOSE curItemSrvTaxes;
-							DEALLOCATE curItemSrvTaxes;
-
-							SET @SrvCargSqlStmt = @SrvCargSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioCargos_Insertar @id_Fac_Servicios = @NewSrvId, @id_cargosdesc = ' + CAST(ISNULL(@sc_id_carg, 1) AS VARCHAR) + ', @ds_cargonm = ''' + ISNULL(@sc_ds_nombre, '') + ''', @am_valor = ' + CAST(ISNULL(@sc_am_valor,0) AS VARCHAR) + ', @am_contado = ' + CAST(ISNULL(@sc_am_contado,0) AS VARCHAR) + ', @am_credito = ' + CAST(ISNULL(@sc_am_credito,0) AS VARCHAR) + ', @bl_noshow = 0, @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @SqlStmt = ''' + REPLACE(ISNULL(@SrvImpuestosSqlStmt,''), '''', '''''') + ''';' 
-							
-							FETCH NEXT FROM curItemSrvCargos INTO @sc_codigo, @sc_ds_nombre, @sc_cd_tipo, @sc_am_porcentaje, @sc_am_valor, @sc_am_contado, @sc_am_credito, @sc_id_carg, @sc_id_imp;
+							FETCH NEXT FROM curItemSrvTaxes INTO @sc_codigotax, @sc_ds_nombretax, @sc_cd_tipotax, @sc_am_porcentajetax, @sc_am_valortax, @sc_am_contadotax, @sc_am_creditotax, @sc_id_cargtax, @sc_id_imptax;
 						END
-						CLOSE curItemSrvCargos;
-						DEALLOCATE curItemSrvCargos;
-						 
-						-- Build Formas de Pago SQL
-						DECLARE @sfp_id_fp INT, @sfp_id_tc INT, @sfp_cd_codigo VARCHAR(10), @sfp_ds_nombre VARCHAR(50), @sfp_cd_tipotarjeta VARCHAR(10), @sfp_ds_numerotarjeta VARCHAR(50), @sfp_ds_vouchertarjeta VARCHAR(50), @sfp_ds_expiraciontarjeta VARCHAR(10), @sfp_ds_autorizaciontarjeta VARCHAR(50), @sfp_in_cuotas INT, @sfp_am_valor MONEY;
-						DECLARE curItemSrvFPs CURSOR LOCAL FAST_FORWARD FOR
-						SELECT id_formaspago, id_tarjetascredito, cd_codigo, ds_nombre, cd_tipotarjeta, ds_numerotarjeta, ds_vouchertarjeta, ds_expiraciontarjeta, ds_autorizaciontarjeta, in_cuotas, am_valor
-						FROM #TmpFacturaFormasPago
-						WHERE id_item = @gen_id_item;
+						CLOSE curItemSrvTaxes;
+						DEALLOCATE curItemSrvTaxes;
 
-						OPEN curItemSrvFPs;
+						-- REGLA UNIVERSAL DE ASIGNACION DE CUENTAS CONTABLES (3 NIVELES)
+						-- 1ª Prioridad: Tipo de Servicio (TiposServicios.cd_cuenta)
+						-- 2ª Prioridad: Concepto de Facturacion (ConceptoFacturacion.cd_cuenta)
+						-- 3ª Prioridad: Cargo (CargosDesc.cd_cuenta)
+						DECLARE @resolved_account VARCHAR(20) = NULL;
+
+						IF @gen_id_tiposservicio IS NOT NULL
+						BEGIN
+							SELECT @resolved_account = cd_cuenta 
+							FROM dbo.TiposServicios 
+							WHERE id = @gen_id_tiposservicio AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+						END;
+
+						IF (@resolved_account IS NULL OR RTRIM(LTRIM(@resolved_account)) = '') AND @gen_id_conceptofacturacion IS NOT NULL
+						BEGIN
+							SELECT @resolved_account = cd_cuenta 
+							FROM dbo.ConceptoFacturacion 
+							WHERE id = @gen_id_conceptofacturacion AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+						END;
+
+						IF (@resolved_account IS NULL OR RTRIM(LTRIM(@resolved_account)) = '') AND @sc_id_carg IS NOT NULL
+						BEGIN
+							SELECT @resolved_account = cd_cuenta 
+							FROM dbo.CargosDesc 
+							WHERE id = @sc_id_carg AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+						END;
+
+						-- Si ninguno de los 3 niveles tiene cuenta contable, detener y emitir error controlado
+						IF @resolved_account IS NULL OR RTRIM(LTRIM(@resolved_account)) = ''
+						BEGIN
+							DECLARE @err_cargo_msg NVARCHAR(4000) = '❌ Error de Parametrización Contable: No fue posible determinar la cuenta contable para el Cargo/Servicio "' + ISNULL(@sc_ds_nombre, 'DESCONOCIDO') + '". Verifique la parametrización en Tipo de Servicio (' + ISNULL(@gen_ds_tiposservicio, '') + '), Concepto de Facturación o Cargo.';
+							RAISERROR(@err_cargo_msg, 16, 1);
+							RETURN;
+						END;
+
+						SET @SrvCargSqlStmt = @SrvCargSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioCargos_Insertar @id_Fac_Servicios = @NewSrvId, @id_cargosdesc = ' + CAST(ISNULL(@sc_id_carg, 1) AS VARCHAR) + ', @ds_cargonm = ''' + ISNULL(@sc_ds_nombre,'') + ''', @am_valor = ' + CAST(ISNULL(@sc_am_valor,0) AS VARCHAR) + ', @am_contado = ' + CAST(ISNULL(@sc_am_contado,0) AS VARCHAR) + ', @am_credito = ' + CAST(ISNULL(@sc_am_credito,0) AS VARCHAR) + ', @bl_noshow = 0, @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @SqlStmt = ''' + REPLACE(ISNULL(@SrvImpuestosSqlStmt,''), '''', '''''') + ''';' 
+						
+						FETCH NEXT FROM curItemSrvCargos INTO @sc_codigo, @sc_ds_nombre, @sc_cd_tipo, @sc_am_porcentaje, @sc_am_valor, @sc_am_contado, @sc_am_credito, @sc_id_carg, @sc_id_imp;
+					END
+					CLOSE curItemSrvCargos;
+					DEALLOCATE curItemSrvCargos;
+					 
+					-- Build Formas de Pago SQL
+					DECLARE @sfp_id_fp INT, @sfp_id_tc INT, @sfp_cd_codigo VARCHAR(10), @sfp_ds_nombre VARCHAR(50), @sfp_cd_tipotarjeta VARCHAR(10), @sfp_ds_numerotarjeta VARCHAR(50), @sfp_ds_vouchertarjeta VARCHAR(50), @sfp_ds_expiraciontarjeta VARCHAR(10), @sfp_ds_autorizaciontarjeta VARCHAR(50), @sfp_in_cuotas INT, @sfp_am_valor MONEY;
+					DECLARE curItemSrvFPs CURSOR LOCAL FAST_FORWARD FOR
+					SELECT id_formaspago, id_tarjetascredito, cd_codigo, ds_nombre, cd_tipotarjeta, ds_numerotarjeta, ds_vouchertarjeta, ds_expiraciontarjeta, ds_autorizaciontarjeta, in_cuotas, am_valor
+					FROM #TmpFacturaFormasPago
+					WHERE id_item = @gen_id_item;
+
+					OPEN curItemSrvFPs;
+					FETCH NEXT FROM curItemSrvFPs INTO @sfp_id_fp, @sfp_id_tc, @sfp_cd_codigo, @sfp_ds_nombre, @sfp_cd_tipotarjeta, @sfp_ds_numerotarjeta, @sfp_ds_vouchertarjeta, @sfp_ds_expiraciontarjeta, @sfp_ds_autorizaciontarjeta, @sfp_in_cuotas, @sfp_am_valor;
+					WHILE @@FETCH_STATUS = 0
+					BEGIN
+						SET @SrvFpSqlStmt = @SrvFpSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioFormasPago_Insertar @id_fac_factura = @NewFacId, @id_fac_remision = @NewRmId, @id_Fac_Servicios = @NewSrvId, @id_formaspago = ' + CAST(@sfp_id_fp AS VARCHAR) + ', @ds_fpnm = ''' + REPLACE(@sfp_ds_nombre, '''', '''''') + ''', @bl_fprepresenta = 0, @id_tarjetascredito = ' + ISNULL(CAST(@sfp_id_tc AS VARCHAR), 'NULL') + ', @cd_tccode = ' + ISNULL('''' + @sfp_cd_tipotarjeta + '''', 'NULL') + ', @ds_tcnumber = ' + ISNULL('''' + @sfp_ds_numerotarjeta + '''', 'NULL') + ', @ds_tcvoucher = ' + ISNULL('''' + @sfp_ds_vouchertarjeta + '''', 'NULL') + ', @ds_tcexp = ' + ISNULL('''' + @sfp_ds_expiraciontarjeta + '''', 'NULL') + ', @cd_idbanco = NULL, @ds_cheque = NULL, @ds_plaza = NULL, @ds_referencia = NULL, @ds_poliza = NULL, @ds_polanexo = NULL, @am_valor = ' + CAST(@sfp_am_valor AS VARCHAR) + ', @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @ds_tcautorizacion = ' + ISNULL('''' + @sfp_ds_autorizaciontarjeta + '''', 'NULL') + ', @in_tccuotas = ' + ISNULL(CAST(@sfp_in_cuotas AS VARCHAR), '0') + ';' 
 						FETCH NEXT FROM curItemSrvFPs INTO @sfp_id_fp, @sfp_id_tc, @sfp_cd_codigo, @sfp_ds_nombre, @sfp_cd_tipotarjeta, @sfp_ds_numerotarjeta, @sfp_ds_vouchertarjeta, @sfp_ds_expiraciontarjeta, @sfp_ds_autorizaciontarjeta, @sfp_in_cuotas, @sfp_am_valor;
+					END
+					CLOSE curItemSrvFPs;
+					DEALLOCATE curItemSrvFPs;
+
+					-- Build provider SQL
+					SET @SrvProvSqlStmt = '';
+					DECLARE @c_id_tipoproveedor INT, @c_cd_tipoproveedor VARCHAR(10), @c_ds_tipoproveedor VARCHAR(100);
+					
+					IF @gen_cd_proveedores IS NOT NULL
+					BEGIN
+						SELECT TOP 1
+							@c_id_tipoproveedor = tp.id,
+							@c_cd_tipoproveedor = tp.cd_codigo,
+							@c_ds_tipoproveedor = tp.ds_nombre
+						FROM dbo.TipoProveedores tp WITH(NOLOCK) 
+						WHERE tp.cd_codigo = ISNULL(@gen_cd_tipoproveedor,'HTL');
+
+						SELECT @c_cd_proveedores = IDPROVE
+							   ,@c_ds_proveedores = RAZONCIAL
+						FROM dbo.PROVEEDORES 
+						WHERE IDPROVE = @gen_cd_proveedores;
+						
+						IF @c_id_tipoproveedor IS NOT NULL
+						BEGIN
+							SET @SrvProvSqlStmt = CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioTipoProv_Insertar @id_Fac_Servicios = @NewSrvId, @id_tipoproveedores = ' + CAST(@c_id_tipoproveedor AS VARCHAR) + ', @cd_TipoProveedores = ''' + ISNULL(@c_cd_tipoproveedor,'') + ''', @ds_TipoProveedores = ''' + ISNULL(@c_ds_tipoproveedor,'')+ ''', @cd_proveedores = ''' + ISNULL(@c_cd_proveedores,'')+''', @ds_proveedores = ''' + ISNULL(@c_cd_proveedores,'')+ ''';'
+						END;
+					END;
+
+					IF @gen_id_tiposservicio IS NULL
+					BEGIN
+						SELECT TOP 1 @gen_id_tiposservicio = ISNULL(
+							(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(@gen_ds_tiposservicio))),
+							ISNULL(
+								(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(@gen_ds_tiposservicio))),
+								ISNULL(
+									(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(@gen_ds_servicio))),
+									ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = 'htn'), 1)
+								)
+							)
+						);
+					END;
+
+						SELECT @gen_ds_tiposservicio = ds_nombre FROM dbo.TiposServicios WHERE id = @gen_id_tiposservicio;
+
+						-- Separar nombre y apellido del titular si ds_paxape viene vacio
+						IF (ISNULL(@gen_ds_paxape, '') = '' AND CHARINDEX(' ', LTRIM(RTRIM(@gen_ds_paxname))) > 0)
+						BEGIN
+							DECLARE @raw_pax_main VARCHAR(100) = LTRIM(RTRIM(@gen_ds_paxname));
+							IF LEN(@raw_pax_main) - LEN(REPLACE(@raw_pax_main, ' ', '')) = 1
+							BEGIN
+								SET @gen_ds_paxape = LTRIM(SUBSTRING(@raw_pax_main, CHARINDEX(' ', @raw_pax_main) + 1, 100));
+								SET @gen_ds_paxname = SUBSTRING(@raw_pax_main, 1, CHARINDEX(' ', @raw_pax_main) - 1);
+							END
+							ELSE
+							BEGIN
+								DECLARE @sp_idx INT = CHARINDEX(' ', @raw_pax_main, CHARINDEX(' ', @raw_pax_main) + 1);
+								SET @gen_ds_paxape = LTRIM(SUBSTRING(@raw_pax_main, @sp_idx + 1, 100));
+								SET @gen_ds_paxname = SUBSTRING(@raw_pax_main, 1, @sp_idx - 1);
+							END
+						END;
+
+						-- Build pax adicionales SQL (pasajeros orden > 1)
+						SET @SrvPaxSqlStmt = '';
+						DECLARE @ad_paxname VARCHAR(50), @ad_paxape VARCHAR(50), @ad_paxprefix VARCHAR(10), @ad_voucher VARCHAR(50), @ad_ident VARCHAR(50);
+						DECLARE curExtraPax CURSOR LOCAL FAST_FORWARD FOR
+						SELECT 
+							CASE 
+								WHEN ISNULL(ds_paxape, '') <> '' THEN ds_paxname
+								WHEN CHARINDEX(' ', LTRIM(RTRIM(ds_paxname))) = 0 THEN ds_paxname
+								WHEN LEN(LTRIM(RTRIM(ds_paxname))) - LEN(REPLACE(LTRIM(RTRIM(ds_paxname)), ' ', '')) = 1 
+									THEN SUBSTRING(LTRIM(RTRIM(ds_paxname)), 1, CHARINDEX(' ', LTRIM(RTRIM(ds_paxname))) - 1)
+								ELSE SUBSTRING(LTRIM(RTRIM(ds_paxname)), 1, CHARINDEX(' ', LTRIM(RTRIM(ds_paxname)), CHARINDEX(' ', LTRIM(RTRIM(ds_paxname))) + 1) - 1)
+							END AS ds_paxname,
+							CASE 
+								WHEN ISNULL(ds_paxape, '') <> '' THEN ds_paxape
+								WHEN CHARINDEX(' ', LTRIM(RTRIM(ds_paxname))) = 0 THEN ''
+								WHEN LEN(LTRIM(RTRIM(ds_paxname))) - LEN(REPLACE(LTRIM(RTRIM(ds_paxname)), ' ', '')) = 1 
+									THEN LTRIM(SUBSTRING(LTRIM(RTRIM(ds_paxname)), CHARINDEX(' ', LTRIM(RTRIM(ds_paxname))) + 1, 100))
+								ELSE LTRIM(SUBSTRING(LTRIM(RTRIM(ds_paxname)), CHARINDEX(' ', LTRIM(RTRIM(ds_paxname)), CHARINDEX(' ', LTRIM(RTRIM(ds_paxname))) + 1) + 1, 100))
+							END AS ds_paxape,
+							ISNULL(NULLIF(ds_paxprefix, ''), 'SR') AS ds_paxprefix,
+							cd_voucherpax,
+							cd_paxidentificacion
+						FROM (
+							SELECT *, ROW_NUMBER() OVER (ORDER BY id ASC) AS rn
+							FROM #Pasajeros
+							WHERE id_item = @gen_id_item
+						) p_numbered
+						WHERE p_numbered.rn > 1;
+
+						OPEN curExtraPax;
+						FETCH NEXT FROM curExtraPax INTO @ad_paxname, @ad_paxape, @ad_paxprefix, @ad_voucher, @ad_ident;
 						WHILE @@FETCH_STATUS = 0
 						BEGIN
-							SET @SrvFpSqlStmt = @SrvFpSqlStmt + CHAR(13) + CHAR(10) +' EXECUTE dbo.spza_ServicioFormasPago_Insertar @id_Fac_Servicios = @NewSrvId, @id_fac_factura = @NewFacId, @id_fac_remision = @NewRmId, @id_formaspago = ' + CAST(@sfp_id_fp AS VARCHAR) + ',@ds_fpnm =' + ISNULL('''' + @sfp_ds_nombre + '''', 'NULL') + ', @am_valor = ' + CAST(@sfp_am_valor AS VARCHAR) + ',@bl_fprepresenta=0 , @id_tarjetascredito = ' + ISNULL(CAST(@sfp_id_tc AS VARCHAR), 'NULL') + ', @cd_tccode = ' + ISNULL('''' +@sfp_cd_tipotarjeta + '''', 'NULL') + ', @ds_tcnumber = ' + ISNULL('''' + @sfp_ds_numerotarjeta + '''', 'NULL') + ', @ds_tcvoucher = ' + ISNULL('''' + @sfp_ds_vouchertarjeta + '''', 'NULL') + ', @ds_tcexp = ' + ISNULL('''' + @sfp_ds_expiraciontarjeta + '''', 'NULL') + ', @ds_tcautorizacion = ' + ISNULL('''' + @sfp_ds_autorizaciontarjeta + '''', 'NULL') + ', @in_tccuotas = ' + ISNULL(CAST(@sfp_in_cuotas AS VARCHAR),'0') + ', @cd_idbanco=NULL, @ds_cheque=NULL,@ds_plaza=NULL,@ds_referencia=NULL, @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio;' 
-							FETCH NEXT FROM curItemSrvFPs INTO @sfp_id_fp, @sfp_id_tc, @sfp_cd_codigo, @sfp_ds_nombre, @sfp_cd_tipotarjeta, @sfp_ds_numerotarjeta, @sfp_ds_vouchertarjeta, @sfp_ds_expiraciontarjeta, @sfp_ds_autorizaciontarjeta, @sfp_in_cuotas, @sfp_am_valor;
-						END
-						CLOSE curItemSrvFPs;
-						DEALLOCATE curItemSrvFPs;
+							SET @SrvPaxSqlStmt = @SrvPaxSqlStmt + CHAR(13) + CHAR(10) + 
+								' EXECUTE dbo.spza_ServicioPaxAdicional_insertar @FacId = @NewFacId, @RemId = @NewRemId, @id_Fac_Servicios = @NewSrvId, @ds_paxname = ''' + 
+								REPLACE(@ad_paxname, '''', '''''') + ''', @ds_paxape = ''' + REPLACE(@ad_paxape, '''', '''''') + 
+								''', @in_edad = NULL, @ds_paxprefix= ''' + @ad_paxprefix + ''', @ds_paxClasificacion = NULL, @cd_voucherpax=NULL, @cd_tiquete=NULL;';
+							FETCH NEXT FROM curExtraPax INTO @ad_paxname, @ad_paxape, @ad_paxprefix, @ad_voucher, @ad_ident;
+						END;
+						CLOSE curExtraPax;
+						DEALLOCATE curExtraPax;
 
-						-- Build provider SQL
-						SET @SrvProvSqlStmt = '';
-						DECLARE @c_id_tipoproveedor INT, @c_cd_tipoproveedor VARCHAR(10), @c_ds_tipoproveedor VARCHAR(100);
-						IF ISNULL(@gen_cd_proveedores, '') <> ''
+						-- Validar inconsistencia de rango de fechas (Fecha Final / Check-Out anterior a Fecha Inicial / Check-In)
+						DECLARE @val_f_salida SMALLDATETIME = ISNULL(@gen_dt_salida, @gen_Fecha_Salida);
+						DECLARE @val_f_llegada SMALLDATETIME = ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada);
+
+						IF @val_f_salida IS NOT NULL AND @val_f_llegada IS NOT NULL AND @val_f_salida < @val_f_llegada
 						BEGIN
-							SELECT TOP 1 
-								@c_id_tipoproveedor = tp.id, 
-								@c_cd_tipoproveedor = tp.cd_codigo, 
-								@c_ds_tipoproveedor = tp.ds_nombre 
-							FROM dbo.TipoProveedores tp WITH(NOLOCK) 
-							WHERE tp.cd_codigo = ISNULL(@gen_cd_tipoproveedor,'HTL');
-
-							SELECT @c_cd_proveedores = IDPROVE
-								   ,@c_ds_proveedores = RAZONCIAL
-							FROM dbo.PROVEEDORES 
-							WHERE IDPROVE = @gen_cd_proveedores;
-							
-							IF @c_id_tipoproveedor IS NOT NULL
-							BEGIN
-								SET @SrvProvSqlStmt = CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioTipoProv_Insertar @id_Fac_Servicios = @NewSrvId, @id_tipoproveedores = ' + CAST(@c_id_tipoproveedor AS VARCHAR) + ', @cd_TipoProveedores = ''' + ISNULL(@c_cd_tipoproveedor,'') + ''', @ds_TipoProveedores = ''' + ISNULL(@c_ds_tipoproveedor,'')+ ''', @cd_proveedores = ''' + ISNULL(@c_cd_proveedores,'')+''', @ds_proveedores = ''' + ISNULL(@c_ds_proveedores,'')+ ''';'
-							END;
+							DECLARE @err_date_msg NVARCHAR(4000) = '❌ Factura ' + ISNULL(@cd_consecutivo, '') + ': Inconsistencia de fechas en el producto "' + ISNULL(@gen_ds_descrip, 'Ítem') + '". La Fecha Final / Check-Out (' + CONVERT(VARCHAR, @val_f_salida, 111) + ') no puede ser anterior a la Fecha Inicial / Check-In (' + CONVERT(VARCHAR, @val_f_llegada, 111) + '). Por favor edite la factura y corrija las fechas.';
+							RAISERROR(@err_date_msg, 16, 1);
+							RETURN;
 						END;
 
-						SELECT @gen_ds_tiposservicio = ds_nombre FROM dbo.TiposServicios WHERE id = @gen_id_tiposservicio
+						-- Calcular noches y dias
+						DECLARE @calc_noches INT = DATEDIFF(day, @val_f_llegada, @val_f_salida);
+						IF @calc_noches IS NULL OR @calc_noches <= 0 SET @calc_noches = 1;
+						DECLARE @calc_dias INT = @calc_noches;
 
-						-- Build pax SQL
-						SET @SrvPaxSqlStmt = '';
-						IF ISNULL(@gen_ds_paxname, '') <> ''
-						BEGIN
-							SET @SrvPaxSqlStmt = CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioPaxAdicional_insertar @FacId = @NewFacId, @RemId = @NewRemId, @id_Fac_Servicios = @NewSrvId, @ds_paxname = ''' + REPLACE(@gen_ds_paxname, '''', '''''') + ''', @ds_paxape = ''' + REPLACE(@gen_ds_paxape, '''', '''''') + ''', @in_edad = NULL, @ds_paxprefix= ''' + @gen_ds_paxprefix + ''', @ds_paxClasificacion = NULL, @cd_voucherpax=NULL, @cd_tiquete=NULL;'
-						END;
-
-						SET @SrvSqlStmt = @SrvCargSqlStmt + @SrvFpSqlStmt + @SrvProvSqlStmt;
+						SET @SrvSqlStmt = @SrvVarsSqlStmt + @SrvCargSqlStmt + @SrvFpSqlStmt + @SrvProvSqlStmt;
 						
 						SET @SqlStmt = @SqlStmt + CHAR(13) + CHAR(10) + '
 						DECLARE @NewSrvId_' + CAST(@ItemIndex AS VARCHAR) + ' INT;
@@ -10055,8 +10313,8 @@ BEGIN
 							@in_edad = NULL,
 							@cd_voucher = NULL,
 							@in_cantpax = 1,
-							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, @gen_Fecha_Llegada, 120) + '''', 'NULL') + ',
-							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, @gen_Fecha_Salida, 120) + '''', 'NULL') + ',
+							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
+							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
 							@ds_destino = ''' + ISNULL(@gen_cd_destino, '') + ''',
 							@id_gds = '+ CAST(ISNULL(@gen_id_gds,1) AS VARCHAR) + ',
 							@am_basecomisionable = ' + CAST(ISNULL(@gen_am_basecomisionable,0) AS VARCHAR) + ',
@@ -10064,8 +10322,8 @@ BEGIN
 							@id_tipoplan = NULL,
 							@id_acomodacion = NULL,
 							@ds_paxClasificacion = NULL,
-							@in_dias = NULL,
-							@in_noches = NULL,
+							@in_dias = ' + CAST(@calc_dias AS VARCHAR) + ',
+							@in_noches = ' + CAST(@calc_noches AS VARCHAR) + ',
 							@bl_notdomicilionacional=0,
 							@CodigoReserva =''' + ISNULL(@gen_ds_records,'') + ''',
 							@AnticiposSqlStmt = NULL,
@@ -10074,16 +10332,16 @@ BEGIN
 							@id_monedas_iata = @id_monedas_iata,
 							@Tcambio = @Tcambio,
 							@Id_GrConcepto = NULL,
-							@in_diasSrv = NULL,
-							@in_nochesSrv = NULL,
+							@in_diasSrv = ' + CAST(@calc_dias AS VARCHAR) + ',
+							@in_nochesSrv = ' + CAST(@calc_noches AS VARCHAR) + ',
 							@OrdenGrabacion = ' + CAST(@ItemIndex AS VARCHAR) + ',
 							@Id_Especialista = NULL,
 							@am_porcentaje_descuento = ' + CAST(ISNULL(@gen_am_pordescuento, 0) AS VARCHAR) + ',
 							@am_valor_descuento = 0,
 							@ds_motivo_descuento = NULL,
 							@Id_CargosDesc_Descuento = NULL,
-							@dt_FechaSalidaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, @gen_Fecha_Salida, 120) + '''', 'NULL') + ',
-							@dt_FechaLlegadaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, @gen_Fecha_Llegada, 120) + '''', 'NULL') + ',
+							@dt_FechaSalidaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_Fecha_Salida, @gen_dt_salida), 120) + '''', 'NULL') + ',
+							@dt_FechaLlegadaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_Fecha_Llegada, @gen_dt_llegada), 120) + '''', 'NULL') + ',
 							@cd_localizador = NULL,
 							@cd_VoucherPax = NULL,
 							@am_basecomisionableprov = ' + CAST(ISNULL(@gen_am_basecomisionable,0) AS VARCHAR) + ',
@@ -10151,6 +10409,8 @@ BEGIN
 					DECLARE @FacturaExecSqlStmt NVARCHAR(MAX);
 
 					DECLARE @ZML_VariablesStr VARCHAR(MAX) = NULL;
+					
+					-- 1. Variables explícitas desde el XML
 					SELECT 
 						@ZML_VariablesStr = COALESCE(@ZML_VariablesStr + ' UNION ALL ', '') + 
 						'SELECT ' + ISNULL('''' + REPLACE(cd_codigo, '''', '''''') + '''', 'NULL') + ' AS cd_items, NULL AS ds_Items, ' + 
@@ -10160,6 +10420,50 @@ BEGIN
 						ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ' AS id_Clientes'
 					FROM #VariablesAdicionales
 					WHERE id_facturacion = @id_facturacion;
+
+					-- 2. Variables exigidas por el cliente en Zeus ERP para Servicios (IDEN_Maestro = 37 / FacturacionServicios)
+					SELECT 
+						@ZML_VariablesStr = COALESCE(@ZML_VariablesStr + ' UNION ALL ', '') + 
+						'SELECT ' + ISNULL('''' + REPLACE(FI.cd_Consecutivo_variablesadicionales, '''', '''''') + '''', 'NULL') + ' AS cd_items, NULL AS ds_Items, ''FacturacionServicios'' AS ds_Maestro, ' + 
+						ISNULL('''' + REPLACE(VD.Nombre, '''', '''''') + '''', 'NULL') + ' AS ds_Variable, ' + 
+						'ISNULL(NULLIF(''' + REPLACE(ISNULL(VD.DefaultVarchar, 'N/A'), '''', '''''') + ''', ''''), ''N/A'') AS ds_Valor, ' +
+						ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ' AS id_Clientes'
+					FROM #TmpFacturaItems FI
+					CROSS JOIN dbo.Cliente_ConfiguracionVariables CCV
+					JOIN dbo.VariableDefinicion VD ON VD.IDEN = CCV.Iden_Variable
+					WHERE FI.id_factura = @id_facturacion 
+					  AND FI.tipo_item IN ('SRV', 'Hotel', 'Auto')
+					  AND CCV.IDEN_Maestro = 37
+					  AND RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
+					  AND CCV.bl_Exige = 1
+					  AND NOT EXISTS (
+						  SELECT 1 FROM #VariablesAdicionales VA 
+						  WHERE VA.id_facturacion = @id_facturacion 
+						    AND VA.cd_codigo = FI.cd_Consecutivo_variablesadicionales
+						    AND VA.ds_VariableAdicional = VD.Nombre
+					  );
+
+					-- 3. Variables exigidas por el cliente en Zeus ERP para Tiquetes (IDEN_Maestro = 35 / FacturacionTiquetes)
+					SELECT 
+						@ZML_VariablesStr = COALESCE(@ZML_VariablesStr + ' UNION ALL ', '') + 
+						'SELECT ' + ISNULL('''' + REPLACE(FI.cd_tiquete, '''', '''''') + '''', 'NULL') + ' AS cd_items, NULL AS ds_Items, ''FacturacionTiquetes'' AS ds_Maestro, ' + 
+						ISNULL('''' + REPLACE(VD.Nombre, '''', '''''') + '''', 'NULL') + ' AS ds_Variable, ' + 
+						'ISNULL(NULLIF(''' + REPLACE(ISNULL(VD.DefaultVarchar, 'N/A'), '''', '''''') + ''', ''''), ''N/A'') AS ds_Valor, ' +
+						ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ' AS id_Clientes'
+					FROM #TmpFacturaItems FI
+					CROSS JOIN dbo.Cliente_ConfiguracionVariables CCV
+					JOIN dbo.VariableDefinicion VD ON VD.IDEN = CCV.Iden_Variable
+					WHERE FI.id_factura = @id_facturacion 
+					  AND FI.tipo_item IN ('Aire')
+					  AND CCV.IDEN_Maestro = 35
+					  AND RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
+					  AND CCV.bl_Exige = 1
+					  AND NOT EXISTS (
+						  SELECT 1 FROM #VariablesAdicionales VA 
+						  WHERE VA.id_facturacion = @id_facturacion 
+						    AND VA.cd_codigo = FI.cd_tiquete
+						    AND VA.ds_VariableAdicional = VD.Nombre
+					  );
 
 					SET @FacturaExecSqlStmt = N'
 						EXEC @ReturnCode = ZeusAgencias_23.dbo.spza_Factura_Crear' + CHAR(13) + CHAR(10) +
@@ -10279,17 +10583,20 @@ BEGIN
 						IF @resFuente IS NULL SET @resFuente = ISNULL(NULLIF(LTRIM(RTRIM(@cd_fuente)), ''), '55');
 						IF @resSerie IS NULL SET @resSerie = ISNULL(NULLIF(LTRIM(RTRIM(@cd_serie)), ''), '33');
 						
-						-- Actualizar registro local de Invoices en la BD activa de Korex
-						UPDATE dbo.[Invoices]
-						SET 
-							fuente = @resFuente,
-							serie = @resSerie,
-							consecutivo = @resConsecutivo,
-							state = 'EXPORTED'
-						WHERE id = @id_facturacion;
-
+						-- Actualizar registro local de Invoices si la tabla existe en la BD activa (Korex local)
 						DECLARE @numInterno VARCHAR(50) = NULL;
-						SELECT TOP 1 @numInterno = ISNULL(internalNumber, CAST(id AS VARCHAR)) FROM dbo.[Invoices] WHERE id = @id_facturacion;
+						IF OBJECT_ID('dbo.Invoices', 'U') IS NOT NULL
+						BEGIN
+							UPDATE dbo.[Invoices]
+							SET 
+								fuente = @resFuente,
+								serie = @resSerie,
+								consecutivo = @resConsecutivo,
+								state = 'EXPORTED'
+							WHERE id = @id_facturacion;
+
+							SELECT TOP 1 @numInterno = ISNULL(internalNumber, CAST(id AS VARCHAR)) FROM dbo.[Invoices] WHERE id = @id_facturacion;
+						END;
 
 						SET @FacturaRespuesta = '✅ Factura ' + ISNULL(@numInterno, CAST(@id_facturacion AS VARCHAR)) + ' (Zeus ERP N° ' + ISNULL(@resFuente, '') + '-' + ISNULL(@resSerie, '') + '-' + ISNULL(@resConsecutivo, '') + '): Exportada e inyectada correctamente a Zeus ERP.';
 					END
@@ -10315,7 +10622,7 @@ BEGIN
 				INSERT INTO @LogResults (invoiceId, success, message)
 				VALUES (@id_facturacion, CASE WHEN @FacturaEstado = 0 THEN 1 ELSE 0 END, @FacturaRespuesta);
 
-				FETCH NEXT FROM curInvoices INTO @cd_fuente,@cd_serie,@cd_consecutivo,@id_facturacion;
+				FETCH NEXT FROM curInvoices INTO @id_facturacion, @cd_fuente, @cd_serie, @cd_consecutivo;
 			END;
 
 			CLOSE curInvoices;
@@ -10594,6 +10901,14 @@ BEGIN
             IF TRIM(v_cols[21]) <> '' AND REPLACE(TRIM(v_cols[21]), '/', '-') !~ '^\d{4}-\d{2}-\d{2}' THEN
                 p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Columna [CheckOut]): Formato de fecha incorrecto. Valor recibido: "' || TRIM(v_cols[21]) || '". Ejemplo de formato correcto: 2026-10-10 (o 2026/10/10)';
                 RETURN;
+            END IF;
+
+            -- Validar que la Fecha Final (Check-Out) no sea anterior a la Fecha Inicial (Check-In)
+            IF TRIM(v_cols[20]) <> '' AND TRIM(v_cols[21]) <> '' THEN
+                IF REPLACE(TRIM(v_cols[21]), '/', '-')::TIMESTAMP < REPLACE(TRIM(v_cols[20]), '/', '-')::TIMESTAMP THEN
+                    p_mensaje_resultado := 'ERROR en FILA ' || v_imported_count || ' (Inconsistencia de Fechas): La fecha final / Check-Out ("' || TRIM(v_cols[21]) || '") no puede ser anterior a la fecha inicial / Check-In ("' || TRIM(v_cols[20]) || '"). Por favor verifique el rango de fechas en el archivo Excel.';
+                    RETURN;
+                END IF;
             END IF;
             
             INSERT INTO tmp_import_invoice_rows (
@@ -10940,7 +11255,14 @@ BEGIN
             IF v_product_record.variables_str IS NOT NULL AND v_product_record.variables_str <> '' THEN
                 FOREACH v_var_item IN ARRAY string_to_array(v_product_record.variables_str, '|') LOOP
                     v_var_parts := string_to_array(v_var_item, ':');
-                    SELECT id INTO v_variable_id FROM public."MasterVariable" WHERE LOWER(code) = LOWER(TRIM(v_var_parts[1]));
+                    v_variable_id := NULL;
+                    SELECT id INTO v_variable_id FROM public."MasterVariable" WHERE LOWER(code) = LOWER(TRIM(v_var_parts[1])) OR LOWER(name) = LOWER(TRIM(v_var_parts[1]));
+                    IF v_variable_id IS NULL AND TRIM(v_var_parts[1]) <> '' THEN
+                        INSERT INTO public."MasterVariable" ("code", "name")
+                        VALUES (TRIM(v_var_parts[1]), TRIM(v_var_parts[1]))
+                        RETURNING id INTO v_variable_id;
+                    END IF;
+
                     IF v_variable_id IS NOT NULL THEN
                         INSERT INTO public."InvoicesProductVariable" ("invoiceProductId", "masterVariableId", "value")
                         VALUES (v_ip_id, v_variable_id, COALESCE(v_var_parts[2], ''));

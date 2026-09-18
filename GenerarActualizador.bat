@@ -12,9 +12,9 @@ if %errorlevel% neq 0 (
     pause
     exit /b %errorlevel%
 )
-node "%~dp0scripts\validate_full_system.js"
+node "%~dp0scripts\validate_postgres.js"
 if %errorlevel% neq 0 (
-    echo ERROR: Fallo la validacion de maestros y funcionalidades. Actualizador cancelado.
+    echo ERROR: Fallo la validacion de maestros y funcionalidades PostgreSQL. Actualizador cancelado.
     pause
     exit /b %errorlevel%
 )

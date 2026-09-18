@@ -93,7 +93,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { id: 7, code: 'MANUAL', name: 'Manual Operativo', parent: null, action: '/dashboard/manual', activo: true }
     ]
 
-    const itemsToRender = menuList.length > 0 ? menuList : defaultMenuItems.filter(i => i.activo)
+    const itemsToRender = (menuList.length > 0 ? menuList : defaultMenuItems).filter(
+        item => item.activo === true || (item.activo as any) === 1 || (item.activo as any) === 'true'
+    )
 
 
     const getMenuIcon = (code: string, action: string) => {

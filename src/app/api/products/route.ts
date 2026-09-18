@@ -13,7 +13,22 @@ export async function GET(req: NextRequest) {
                 pool = await getSQLServerConnection();
                 const res = await pool.request().execute('dbo.spProductListar');
                 await pool.close();
-                return NextResponse.json(paginateArray(req, res.recordset || [], (p: any) => [p.code, p.type, p.description, p.billingConcept, p.serviceType]));
+                const products = (res.recordset || []).map((p: any) => {
+                    let parsedTaxIds = p.taxIds;
+                    if (typeof parsedTaxIds === 'string') {
+                        try { parsedTaxIds = JSON.parse(parsedTaxIds); } catch (e) { parsedTaxIds = []; }
+                    }
+                    let parsedMandatory = p.mandatoryFields;
+                    if (typeof parsedMandatory === 'string') {
+                        try { parsedMandatory = JSON.parse(parsedMandatory); } catch (e) { parsedMandatory = []; }
+                    }
+                    return {
+                        ...p,
+                        taxIds: Array.isArray(parsedTaxIds) ? parsedTaxIds : [],
+                        mandatoryFields: Array.isArray(parsedMandatory) ? parsedMandatory : []
+                    };
+                });
+                return NextResponse.json(paginateArray(req, products, (p: any) => [p.code, p.type, p.description, p.billingConcept, p.serviceType]));
             } catch (err: any) {
                 if (pool) await pool.close();
                 throw err;

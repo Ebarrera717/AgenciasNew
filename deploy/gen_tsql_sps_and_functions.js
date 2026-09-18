@@ -8,17 +8,24 @@ function generateTsqlFunctionsAndSps() {
 
     const path03 = path.join(__dirname, '..', 'SQL', 'SqlServer', '03_Functions_And_SPs.sql');
     
-    let spCotizaciones = '';
-    let spFacturaciones = '';
-    
+    let zeusSpsContent = '';
+    const zeusDir = path.join(__dirname, '..', 'SQL', 'ZeusERP');
+    if (fs.existsSync(zeusDir)) {
+        const files = fs.readdirSync(zeusDir).filter(f => f.endsWith('.sql')).sort();
+        for (const file of files) {
+            const filePath = path.join(zeusDir, file);
+            zeusSpsContent += `\n\n-- ==========================================\n-- Procedimiento Zeus ERP: ${file}\n-- ==========================================\n\n` + fs.readFileSync(filePath, 'utf8') + '\n\nGO\n';
+        }
+    }
+
+    // Fallback retrocompatible para SQL/SP/
     const pathSpCotizaciones = path.join(__dirname, '..', 'SQL', 'SP', 'spCotizacionesCrear.sql');
     const pathSpFacturaciones = path.join(__dirname, '..', 'SQL', 'SP', 'spFacturacionesCrear.sql');
-    
-    if (fs.existsSync(pathSpCotizaciones)) {
-        spCotizaciones = fs.readFileSync(pathSpCotizaciones, 'utf8');
+    if (!zeusSpsContent.includes('spCotizacionesCrear') && fs.existsSync(pathSpCotizaciones)) {
+        zeusSpsContent += '\n\n' + fs.readFileSync(pathSpCotizaciones, 'utf8') + '\n\nGO\n';
     }
-    if (fs.existsSync(pathSpFacturaciones)) {
-        spFacturaciones = fs.readFileSync(pathSpFacturaciones, 'utf8');
+    if (!zeusSpsContent.includes('spFacturacionesCrear') && fs.existsSync(pathSpFacturaciones)) {
+        zeusSpsContent += '\n\n' + fs.readFileSync(pathSpFacturaciones, 'utf8') + '\n\nGO\n';
     }
 
     const baseContent = `-- ============================================================================
@@ -33,6 +40,8 @@ GO
 
 -- Safeguards de Columnas para Tablas de Zeus ERP y Korex
 IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo') ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+GO
+IF OBJECT_ID('dbo.TiposServicios', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TiposServicios') AND name = 'cd_cuenta') ALTER TABLE dbo.TiposServicios ADD cd_cuenta VARCHAR(20) NULL;
 GO
 IF OBJECT_ID('dbo.Facturas', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'cd_vendedor') ALTER TABLE dbo.Facturas ADD cd_vendedor VARCHAR(25) NULL;
 GO
@@ -447,7 +456,22 @@ CREATE PROCEDURE dbo.spProductListar
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT pr.[id], pr.[code], pr.[type], pr.[description], pr.[basePrice], pr.[cost], ISNULL(pr.[isActive], 1) AS [isActive]
+    SELECT 
+        pr.[id], 
+        pr.[code], 
+        pr.[type], 
+        pr.[description], 
+        pr.[basePrice], 
+        pr.[cost], 
+        pr.[billingConcept], 
+        pr.[serviceType], 
+        pr.[airlineItinerary], 
+        pr.[classItinerary], 
+        pr.[flightItinerary], 
+        pr.[ticketTypeId], 
+        pr.[mandatoryFields], 
+        pr.[taxIds], 
+        ISNULL(pr.[isActive], 1) AS [isActive]
     FROM dbo.[Product] pr
     WHERE (@p_type IS NULL OR pr.[type] = @p_type)
     ORDER BY pr.[description] ASC;
@@ -804,7 +828,7 @@ GO
 
 `;
 
-    const fullScript = baseContent + '\n\n' + spCotizaciones + '\n\nGO\n\n' + spFacturaciones + '\n\nGO\n\nPRINT \'Procedimientos almacenados y funciones T-SQL compiladas exitosamente.\';\n';
+    const fullScript = baseContent + '\n\n' + zeusSpsContent + '\n\nPRINT \'Procedimientos almacenados y funciones T-SQL compiladas exitosamente.\';\n';
 
     fs.writeFileSync(path03, fullScript, 'utf8');
     console.log('✅ SQL/SqlServer/03_Functions_And_SPs.sql ampliado y generado con éxito.');

@@ -461,8 +461,8 @@ BEGIN
     )
     SELECT 
         COALESCE(pr."type", '') as cd_TiposConceptFac, 
-        COALESCE(pr."billingConcept", pr."code", '') as cd_ConceptoFacturacion, 
-        COALESCE(pr."serviceType", qp."serviceType", '') as cd_TiposServicio, 
+        COALESCE(NULLIF(TRIM(qp."billingConcept"), ''), NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') as cd_ConceptoFacturacion, 
+        COALESCE(NULLIF(TRIM(qp."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') as cd_TiposServicio, 
         q.cd_consecutivo as cd_Cotizacion,
         '' as cd_fac_factura, 
         '' as cd_fac_remision, 
