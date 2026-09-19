@@ -162,7 +162,7 @@ async function validateFullSuite() {
     // -------------------------------------------------------------------------
     // CAPA 6: SUITE DE INSTALACIÓN, ACTUALIZACIÓN, DIAGNÓSTICO Y AISLAMIENTO
     // -------------------------------------------------------------------------
-    console.log('\n[CAPA 6/6] Validando Instaladores, Actualizadores, Diagnóstico y Aislamiento...');
+    console.log('\n[CAPA 6/7] Validando Instaladores, Actualizadores, Diagnóstico y Aislamiento...');
     try {
         const { execSync } = require('child_process');
         execSync(`node "${path.join(__dirname, 'validate_installer_diagnostics.js')}"`, { stdio: 'pipe' });
@@ -181,14 +181,64 @@ async function validateFullSuite() {
         });
     }
 
+    // -------------------------------------------------------------------------
+    // CAPA 7: SUITE DE MONITOREO Y PROTECCIÓN DEL RENDIMIENTO
+    // -------------------------------------------------------------------------
+    console.log('\n[CAPA 7/8] Validando Monitoreo Autónomo y Protección del Rendimiento...');
+    try {
+        const { execSync } = require('child_process');
+        execSync(`node "${path.join(__dirname, 'validate_performance_suite.js')}"`, { stdio: 'pipe' });
+        results.push({
+            Capa: '7. Rendimiento & Protección',
+            Componente: 'validate_performance_suite.js',
+            Estado: '✅ OK',
+            Detalle: '6/6 Pruebas pasaron (PG/SQL DMVs, Benchmarks, Baseline, Aislamiento y Sanitización)'
+        });
+    } catch (perfErr) {
+        results.push({
+            Capa: '7. Rendimiento & Protección',
+            Componente: 'validate_performance_suite.js',
+            Estado: '❌ FALLO',
+            Detalle: perfErr.message
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // CAPA 8: SUITE DE ESTRATEGIA DE EJECUCIÓN Y FALLBACK (SERVICE + TASK SCHEDULER)
+    // -------------------------------------------------------------------------
+    console.log('\n[CAPA 8/8] Validando Estrategia de Ejecución y Fallback (Task Scheduler)...');
+    try {
+        const { execSync } = require('child_process');
+        execSync(`node "${path.join(__dirname, 'validate_execution_strategy_suite.js')}"`, { stdio: 'pipe' });
+        results.push({
+            Capa: '8. Ejecución & Fallback',
+            Componente: 'validate_execution_strategy_suite.js',
+            Estado: '✅ OK',
+            Detalle: '7/7 Pruebas pasaron (Dual Engine, Task Scheduler Fallback, Updater Preservation)'
+        });
+    } catch (execErr) {
+        results.push({
+            Capa: '8. Ejecución & Fallback',
+            Componente: 'validate_execution_strategy_suite.js',
+            Estado: '❌ FALLO',
+            Detalle: execErr.message
+        });
+    }
+
     console.log('\n================================================================');
     console.log('         MATRIZ DE RESULTADOS DE LA VALIDACIÓN COMPLETA          ');
     console.log('================================================================');
     console.table(results);
 
-    console.log('\n================================================================');
-    console.log('   ESTADO GLOBAL: SISTEMA 100% OPERATIVO Y REGLAS CUMPLIDAS     ');
-    console.log('================================================================\n');
+    const hasFailure = results.some(r => r.Estado.includes('❌') || r.Estado.includes('FALLO'));
+    if (hasFailure) {
+        console.log('\n❌ ERROR: Se detectaron fallas en una o más capas de la validación.');
+        process.exit(1);
+    } else {
+        console.log('\n================================================================');
+        console.log('   ESTADO GLOBAL: SISTEMA 100% OPERATIVO Y REGLAS CUMPLIDAS     ');
+        console.log('================================================================\n');
+    }
 }
 
 validateFullSuite();

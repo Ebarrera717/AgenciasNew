@@ -12,7 +12,9 @@
     "lint": "eslint",
     "db:apply": "node deploy/apply_local_db.js",
     "test:full": "node scripts/validate_full_suite.js",
-    "test:multidb": "node scripts/test_multidb_runner.js"
+    "test:multidb": "node scripts/test_multidb_runner.js",
+    "test:performance": "node scripts/validate_performance_suite.js",
+    "test:execution": "node scripts/validate_execution_strategy_suite.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

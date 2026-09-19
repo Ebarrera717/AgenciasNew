@@ -131,9 +131,14 @@ if (Test-Path "$ReleaseDir\GenerarLicencia.bat") { Remove-Item "$ReleaseDir\Gene
 
 if (!(Test-Path "$ReleaseDir\deploy")) { New-Item -ItemType Directory -Path "$ReleaseDir\deploy" | Out-Null }
 if (Test-Path ".\deploy\clean_movement_tables.js") { Copy-Item ".\deploy\clean_movement_tables.js" -Destination "$ReleaseDir\deploy" -Force }
+if (Test-Path ".\deploy\Korex_Diagnostics_Engine.ps1") { Copy-Item ".\deploy\Korex_Diagnostics_Engine.ps1" -Destination "$ReleaseDir\deploy" -Force }
+if (Test-Path ".\deploy\Korex_Performance_Engine.ps1") { Copy-Item ".\deploy\Korex_Performance_Engine.ps1" -Destination "$ReleaseDir\deploy" -Force }
+if (Test-Path ".\deploy\task_scheduler_manager.ps1") { Copy-Item ".\deploy\task_scheduler_manager.ps1" -Destination "$ReleaseDir\deploy" -Force }
 
 if (!(Test-Path "$ReleaseDir\scripts")) { New-Item -ItemType Directory -Path "$ReleaseDir\scripts" | Out-Null }
 if (Test-Path ".\scripts\activar-licencia.js") { Copy-Item ".\scripts\activar-licencia.js" -Destination "$ReleaseDir\scripts" -Force }
+if (Test-Path ".\scripts\korex_diagnostic_engine.js") { Copy-Item ".\scripts\korex_diagnostic_engine.js" -Destination "$ReleaseDir\scripts" -Force }
+if (Test-Path ".\scripts\korex_performance_engine.js") { Copy-Item ".\scripts\korex_performance_engine.js" -Destination "$ReleaseDir\scripts" -Force }
 
 # Garantizar que generar-licencia.js NO viaje al cliente final
 if (Test-Path "$ReleaseDir\scripts\generar-licencia.js") { Remove-Item "$ReleaseDir\scripts\generar-licencia.js" -Force }

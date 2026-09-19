@@ -193,8 +193,33 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 - **Generación de Reportes y Soporte Remoto**: Todo proceso genera reportes interactivos HTML (`Korex_Diagnostico_<MOTOR>_<TIMESTAMP>.html`) y paquetes de soporte remoto ZIP sanitizados (`Korex_Diagnostico_<MOTOR>_<TIMESTAMP>.zip`) con 0 contraseñas o secretos expuestos, facilitando el diagnóstico técnico a distancia.
 - **Validación Automatizada Continua**: Se debe ejecutar obligatoriamente `node scripts/validate_installer_diagnostics.js` y `node scripts/validate_full_suite.js` para asegurar el 100% de cumplimiento funcional multibase (Skill [`korex-install-diagnostics-autorepair`](file:///f:/Proyectos/AgenciasNew/.agents/skills/korex-install-diagnostics-autorepair/SKILL.md)).
 
+---
 
+## 14. Regla Obligatoria de Monitoreo Autónomo, Optimización y Protección del Rendimiento (`performance-monitoring-protection`)
 
+- **Rendimiento como Pilar Permanente de Calidad**: El rendimiento del sistema es parte integral de la calidad de Korex (junto con *Compatibilidad Multibase*, *Aislamiento de Motores* y *Permanencia de Correcciones*).
+- **Detección Autónoma y Proactiva**: El sistema debe detectar proactivamente consultas lentas, SPs/funciones degradadas, endpoints lentos, crecimiento no controlado de tablas, índices faltantes o sin uso, dead tuples, estadísticas desactualizadas y bloqueos de transacciones.
+- **Ciclo Metodológico Cerrado**: Todo análisis u optimización debe seguir el flujo:
+  `MEDIR → DETECTAR → ANALIZAR → PROPONER → PROBAR → VALIDAR → APLICAR CUANDO SEA SEGURO → VOLVER A MEDIR`.
+- **4 Modos de Operación**:
+  - `monitor`: Solo lectura, telemetría y comparación con línea base (`.performance_baseline.json`).
+  - `recommend`: Análisis y propuestas clasificadas por Impacto (ALTO/MEDIO/BAJO) y Riesgo (ALTO/MEDIO/BAJO).
+  - `optimize`: Aplicación de optimizaciones seguras previamente probadas.
+  - `maintenance`: Ejecución de tareas de mantenimiento autorizadas (`ANALYZE`, `sp_updatestats`).
+- **Política de Autonomía Segura**:
+  - *Permitido autónomamente*: Diagnóstico, lectura de DMVs/catálogos, benchmarks, generación de reportes HTML sanitizados y actualización de estadísticas en modo mantenimiento.
+  - *Prohibido autónomamente (Requiere aprobación humana)*: `DROP INDEX`, `DROP TABLE`, creación desatendida de índices o modificaciones estructurales/lógicas de SPs.
+- **Aislamiento Estricto y Sanitización**:
+  - PostgreSQL y SQL Server se monitorean y optimizan de forma 100% aislada.
+  - Todos los reportes generados en `Diagnosticos/` deben estar 100% libres de credenciales, contraseñas y secretos.
+- **Verificación Automatizada**: Se debe validar obligatoriamente ejecutando `node scripts/validate_performance_suite.js` y `node scripts/validate_full_suite.js` siguiendo el Skill [`performance-monitoring-protection`](file:///f:/Proyectos/AgenciasNew/.agents/skills/performance-monitoring-protection/SKILL.md).
 
+---
 
+## 15. Regla Obligatoria de Estrategia de Ejecución y Fallback para Korex (`execution-strategy-fallback`)
 
+- **Estrategia Dual de Ejecución (No Depender Exclusivamente de Servicios)**: Korex cuenta con dos mecanismos de producción: **Opción A (Principal: Windows Service)** y **Opción B (Fallback Automático: Windows Task Scheduler)**, manteniendo IIS + ARR como reverse proxy externo en ambos modos.
+- **Transición Transparente en Instaladores**: Si las políticas de seguridad de Windows o permisos del cliente impiden registrar o iniciar el Servicio de Windows, el instalador **NO aborta la instalación**. Registra la causa técnica exacta en el log e inicia automáticamente la tarea programada (`Korex NextJS - Startup` / `Korex SQLServer - Startup`) con trigger `/sc onstart`, ejecución elevada y entorno de producción Standalone (`node server.js`).
+- **Preservación en Actualizaciones**: Los scripts actualizadores (`Update_Korex.ps1` / `Update_Korex_SQLServer.ps1`) detectan primero el mecanismo activo (`EXECUTION_MECHANISM` en `.env`) y lo conservan. Si un cliente opera bajo `TASK_SCHEDULER`, la actualización NO intentará forzarlo a `WINDOWS_SERVICE`.
+- **Prohibición de Evadir Seguridad**: Si tanto el Servicio como el Task Scheduler son bloqueados por restricciones corporativas, el instalador no intentará alterar antivirus, firewalls ni políticas de seguridad; emitirá un reporte técnico detallado para el oficial de IT del cliente.
+- **Aislamiento y Validación**: La estrategia respeta el 100% de aislamiento entre PostgreSQL y SQL Server. Se valida obligatoriamente mediante `node scripts/validate_execution_strategy_suite.js` y `node scripts/validate_full_suite.js` (Skill [`execution-strategy-fallback`](file:///f:/Proyectos/AgenciasNew/.agents/skills/execution-strategy-fallback/SKILL.md)).

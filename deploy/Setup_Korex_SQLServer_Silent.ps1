@@ -235,20 +235,34 @@ if (Test-Path $WebConfigPath) {
     Set-Content -Path $WebConfigPath -Value $configContent -Encoding UTF8
 }
 
-# Paso 6. PROBAR CONEXION Y REGISTRAR SERVICIO WINDOWS
+# Paso 6. REGISTRAR E INICIAR MECANISMO DE CONTROL DE PROCESO (SERVICE O TASK SCHEDULER)
 Check-SQLServerConnection $SqlHost $SqlPort $SqlDb $SqlUser $SqlPass
 
-Write-Log "Deteniendo Servicio de Windows previo si existe..."
+$executionMechanism = "NONE"
+$serviceSuccess = $false
+
+Write-Log "Deteniendo instancias y servicios previos para inicio limpio en SQL Server..."
 Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
 Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
 Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
 
+# Liberar cualquier proceso residual que mantenga bloqueado el puerto de backend ($NextjsPort)
+$portOwner = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($portOwner) {
+    Write-Log "Detectado proceso residual en puerto $NextjsPort (PID: $($portOwner.OwningProcess)). Finalizando..." "WARN"
+    Stop-Process -Id $portOwner.OwningProcess -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+}
+
+Start-Sleep -Seconds 1
+
+# ESTRATEGIA A (OPCION PRINCIPAL): Windows Service
+Write-Log "--- [ESTRATEGIA A] Intentando registrar Mecanismo Principal: Windows Service (Korex_NextJS) ---"
 if (Test-Path "$TargetDir\install-service.js") {
-    Write-Log "Ejecutando install-service.js para registrar el Servicio de Windows..."
     Set-Location $TargetDir
     node .\install-service.js >> $LogFile 2>&1
-    Start-Sleep -Seconds 4
+    Start-Sleep -Seconds 3
     
     $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
     if (-not $svc) {
@@ -266,16 +280,83 @@ if (Test-Path "$TargetDir\install-service.js") {
     if ($svc) {
         Write-Log "Iniciando Servicio de Windows $($svc.Name)..."
         Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 3
+        Start-Sleep -Seconds 4
+        
         $svcRefresh = Get-Service -Name $svc.Name
-        Write-Log "Servicio de Windows $($svcRefresh.Name) registrado con estado: $($svcRefresh.Status)"
+        if ($svcRefresh.Status -eq 'Running') {
+            # Verificar escucha real en puerto
+            Start-Sleep -Seconds 2
+            $portCheck = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($portCheck) {
+                Write-Log "Mecanismo Principal [Windows Service] OPERATIVO al 100% en puerto $NextjsPort (PID: $($portCheck.OwningProcess))."
+                $serviceSuccess = $true
+                $executionMechanism = "WINDOWS_SERVICE"
+            }
+        }
+        
+        if (-not $serviceSuccess) {
+            Write-Log "Aviso: El servicio $($svc.Name) se registro pero no mantuvo el puerto $NextjsPort en escucha." "WARN"
+            $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
+            if (Test-Path $errLogPath) {
+                $errDetails = Get-Content $errLogPath -Tail 25 | Out-String
+                Write-Log "--- TRAZA DETALLADA DE ERROR DEL SERVICIO WINDOWS (SQL SERVER) ---" "ERROR"
+                Write-Log "$errDetails" "ERROR"
+            }
+        }
     } else {
-        Write-Log "ERROR: No se pudo registrar el Servicio de Windows Korex_NextJS." "ERROR"
-        Show-Alert "Fallo de Registro de Servicio" "No se pudo crear automaticamente el Servicio de Windows Korex_NextJS.`n`nPor favor revise install_sqlserver_log.txt."
+        Write-Log "Aviso: No fue posible registrar el Servicio de Windows en SQL Server (posible restriccion de politicas corporativas de Windows)." "WARN"
     }
-} else {
-    Write-Log "ERROR: No se encontro install-service.js en $TargetDir." "ERROR"
-    Show-Alert "Archivo Faltante" "No se encontro el instalador del servicio install-service.js."
+}
+
+# ESTRATEGIA B (MECANISMO ALTERNATIVO / FALLBACK): Windows Task Scheduler
+if (-not $serviceSuccess) {
+    Write-Log "=================================================================" "WARN"
+    Write-Log "  ACTIVANDO ESTRATEGIA B (FALLBACK): WINDOWS TASK SCHEDULER     " "WARN"
+    Write-Log "  Motivo: Politica de seguridad o restriccion en Windows Service " "WARN"
+    Write-Log "=================================================================" "WARN"
+    
+    # Detener servicio previo fallido
+    Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+    Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
+    Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
+    
+    $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+    if (-not (Test-Path $taskMgrScript)) {
+        $taskMgrScript = Join-Path $PSScriptRoot "task_scheduler_manager.ps1"
+    }
+    
+    if (Test-Path $taskMgrScript) {
+        Write-Log "Configurando tarea programada ONSTART (Korex SQLServer - Startup)..."
+        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 2
+        
+        Write-Log "Iniciando tarea programada y validando escucha en puerto $NextjsPort..."
+        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 3
+        
+        $taskPortCheck = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($taskPortCheck) {
+            Write-Log "Mecanismo Alternativo [Task Scheduler] ACTIVADO Y OPERATIVO exitosamente para SQL Server en puerto $NextjsPort (PID: $($taskPortCheck.OwningProcess))."
+            $executionMechanism = "TASK_SCHEDULER"
+        } else {
+            Write-Log "ERROR: Task Scheduler se registro pero el proceso Node no logro escuchar en puerto $NextjsPort." "ERROR"
+        }
+    } else {
+        Write-Log "ERROR: No se encontro task_scheduler_manager.ps1 en deploy." "ERROR"
+    }
+}
+
+if ($executionMechanism -eq "NONE") {
+    Write-Log "ERROR CRITICO: Tanto Windows Service como Task Scheduler fallaron por politicas del servidor en SQL Server." "ERROR"
+    Show-Alert "Fallo de Arranque de la Aplicación" "No fue posible iniciar Korex como Servicio de Windows ni como Tarea Programada (Task Scheduler).`n`nPor favor revise install_sqlserver_log.txt y consulte con el administrador del sistema."
+    exit 1
+}
+
+# Registrar mecanismo activo en .env para persistencia en futuras actualizaciones
+$EnvFile = Join-Path $TargetDir ".env"
+if (Test-Path $EnvFile) {
+    Add-Content -Path $EnvFile -Value "EXECUTION_MECHANISM=`"$executionMechanism`"" -Encoding UTF8
+    Write-Log "Mecanismo activo persistido en .env: EXECUTION_MECHANISM=$executionMechanism"
 }
 
 # Paso 7. REGISTRAR SITIO WEB EN IIS

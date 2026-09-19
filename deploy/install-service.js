@@ -24,16 +24,25 @@ try {
   console.error("No se pudo leer el puerto desde .env, usando 3001 como default:", e.message);
 }
 
-// Crea el objeto del nuevo servicio
+// Crea el objeto del nuevo servicio con ruta absoluta de Node.js y parametros de resiliencia
 var svc = new Service({
   name: 'Korex_NextJS',
   description: 'Servicio backend de Next.js para el proyecto Korex ejecutándose en Standalone Mode.',
   script: scriptPath,
+  execPath: process.execPath,
   workingDirectory: __dirname,
+  wait: 2,
+  grow: 0.25,
+  maxRestarts: 5,
+  abortOnError: false,
   env: [
     {
       name: "PORT",
       value: port
+    },
+    {
+      name: "HOSTNAME",
+      value: "127.0.0.1"
     },
     {
       name: "NODE_ENV",
@@ -42,9 +51,21 @@ var svc = new Service({
   ]
 });
 
+function configureServiceRecovery() {
+  try {
+    execSync('sc.exe failure Korex_NextJS reset= 60 actions= restart/5000/restart/10000/restart/15000', { stdio: 'pipe' });
+    console.log('Politica de autorecuperacion en Windows SCM configurada exitosamente.');
+  } catch (e) {
+    try {
+      execSync('sc.exe failure korex_nextjs.exe reset= 60 actions= restart/5000/restart/10000/restart/15000', { stdio: 'pipe' });
+    } catch (e2) {}
+  }
+}
+
 // Escucha eventos del instalador
 svc.on('install', function() {
   console.log('Servicio instalado en Windows Exitosamente!');
+  configureServiceRecovery();
   try { svc.start(); } catch(e) {}
 });
 
@@ -80,12 +101,14 @@ svc.on('alreadyinstalled', function() {
     }
   }
 
+  configureServiceRecovery();
   console.log('Iniciando servicio...');
   try { svc.start(); } catch(e) {}
 });
 
 svc.on('start', function() {
   console.log('El servicio está ejecutándose de forma persistente internamente en el puerto ' + port);
+  configureServiceRecovery();
 });
 
 // Instalar el servicio

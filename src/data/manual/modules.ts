@@ -1012,6 +1012,68 @@ export const MANUAL_MODULES: ManualModule[] = [
                 ]
             }
         ]
+    },
+    {
+        id: 'performance-protection',
+        title: 'Monitoreo Autónomo y Protección del Rendimiento',
+        iconName: 'Activity',
+        category: 'Diagnóstico, Rendimiento y Mantenimiento',
+        description: 'Manual de funcionamiento del motor de análisis de rendimiento, telemetría de consultas y SPs, índices faltantes y líneas base.',
+        overview: 'El módulo y motor de Rendimiento de Korex evalúa de manera continua y proactiva el comportamiento de las bases de datos (PostgreSQL y SQL Server), identificando cuellos de botella, índices faltantes mediante catálogos/DMVs, acumulación de dead tuples o páginas no usadas, y variaciones respecto a la línea base histórica (.performance_baseline.json). Cuenta con 4 modos operacionales (monitor, recommend, optimize, maintenance) con política estricta de no realizar cambios destructivos desatendidos.',
+        procedures: [
+            {
+                code: 'PERF-01',
+                name: 'Ejecución del Análisis y Diagnóstico de Rendimiento',
+                summary: 'Generación del diagnóstico de volumen, tiempos de SPs y recomendaciones de optimización.',
+                concept: 'El motor mide las duraciones reales de las consultas más frecuentes, analiza los índices activos y faltantes, y emite un reporte interactivo clasificado por impacto.',
+                fields: [
+                    { name: 'Motor Objetivo', type: 'PostgreSQL / SQL Server', description: 'Motor de base de datos a analizar con aislamiento estricto.' },
+                    { name: 'Modo de Operación', type: 'monitor | recommend | optimize | maintenance', description: 'Nivel de intervención del motor (solo lectura, recomendaciones o refresco de estadísticas).' },
+                    { name: 'Reporte HTML Sanitizado', type: 'Archivo en Diagnosticos/', description: 'Informe interactivo con métricas de tablas, SPs e índices sin exponer credenciales.' }
+                ],
+                businessRules: [
+                    'Queda estrictamente prohibido ejecutar operaciones destructivas (DROP INDEX/DROP TABLE) de forma automática.',
+                    'El modo maintenance únicamente ejecuta tareas seguras como ANALYZE o sp_updatestats.',
+                    'Los reportes generados están 100% sanitizados y libres de contraseñas o secretos de conexión.'
+                ],
+                steps: [
+                    { number: 1, title: 'Ejecutar Suite o Motor', description: 'Ejecute node scripts/korex_performance_engine.js --engine=postgres --mode=recommend o mediante el wrapper PowerShell deploy/Korex_Performance_Engine.ps1.' },
+                    { number: 2, title: 'Revisar Informe en Diagnósticos', description: 'Abra el archivo HTML generado en la carpeta Diagnosticos/ para evaluar las oportunidades de mejora y tiempos de ejecución.' },
+                    { number: 3, title: 'Aplicar Mantenimiento Seguro', description: 'Para actualizar estadísticas desactualizadas, ejecute el motor con el parámetro --mode=maintenance.' }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'execution-fallback',
+        title: 'Estrategia de Ejecución y Fallback (Service + Task Scheduler)',
+        iconName: 'Server',
+        category: 'Infraestructura, Servicios y Contingencia',
+        description: 'Manual de funcionamiento de la arquitectura dual de ejecución de Korex mediante Windows Service o Windows Task Scheduler.',
+        overview: 'Korex no depende exclusivamente de los Servicios de Windows. Cuando las directivas corporativas de seguridad o restricciones de permisos bloquean la creación o el inicio del servicio, el instalador activa automáticamente Windows Task Scheduler (tarea programada ONSTART con privilegios elevados) para arrancar el servidor Next.js Standalone, manteniendo IIS + ARR como reverse proxy y preservando el mecanismo activo en todas las actualizaciones posteriores.',
+        procedures: [
+            {
+                code: 'EXEC-01',
+                name: 'Gestión y Diagnóstico de Mecanismos de Ejecución',
+                summary: 'Inspección del mecanismo activo (WINDOWS_SERVICE o TASK_SCHEDULER) y administración de contingencias.',
+                concept: 'Permite identificar qué mecanismo está controlando el proceso backend de Korex y ejecutar tareas de inicio, detención, reinicio o cambio controlado sin alterar las bases de datos ni el proxy IIS.',
+                fields: [
+                    { name: 'Mecanismo Activo', type: 'WINDOWS_SERVICE / TASK_SCHEDULER', description: 'Mecanismo registrado en .env y activo en el sistema operativo.' },
+                    { name: 'Nombre de Tarea / Servicio', type: 'Texto Identificador', description: 'Korex_NextJS / Korex SQLServer - Startup.' },
+                    { name: 'Puerto Backend', type: 'Puerto TCP (3001)', description: 'Puerto interno donde escucha Node.js para recibir el tráfico de IIS (ARR).' }
+                ],
+                businessRules: [
+                    'Si el Servicio de Windows es bloqueado por políticas corporativas, el instalador pasa automáticamente a Task Scheduler sin declarar error fatal.',
+                    'El actualizador conserva obligatoriamente el mecanismo activo sin forzar conversiones innecesarias.',
+                    'Queda estrictamente prohibido intentar evadir políticas de seguridad desactivando antivirus o firewalls.'
+                ],
+                steps: [
+                    { number: 1, title: 'Consultar Estado del Mecanismo', description: 'Ejecute powershell -File deploy/task_scheduler_manager.ps1 -Action Status para verificar la tarea programada o consulte services.msc.' },
+                    { number: 2, title: 'Ejecutar Diagnóstico Completo', description: 'Ejecute powershell -File deploy/Korex_Diagnostics_Engine.ps1 -Mode Diagnostico para obtener el reporte HTML con el PID y estado de red.' },
+                    { number: 3, title: 'Reiniciar el Backend', description: 'Utilice el comando -Action Restart en task_scheduler_manager.ps1 o Restart-Service según el mecanismo activo.' }
+                ]
+            }
+        ]
     }
 ];
 

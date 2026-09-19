@@ -110,27 +110,95 @@ if (Test-Path ".\deploy\update_db_sqlserver.js") {
 }
 
 # =============================================================================
-# PASO 3: REINICIAR SERVICIO WINDOWS
+# PASO 3: REINICIAR / ACTUALIZAR MECANISMO DE EJECUCIÓN (SERVICE O TASK SCHEDULER)
 # =============================================================================
-Write-Log "Reiniciando servicio de Windows Korex_SQLServer_Service..."
-Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
-
-if (Test-Path ".\install-service.js") {
-    node .\install-service.js >> $LogFile 2>&1
-    Start-Sleep -Seconds 3
+$activeMechanism = "WINDOWS_SERVICE"
+if (Test-Path $EnvFile) {
+    $envLines = Get-Content $EnvFile
+    foreach ($el in $envLines) {
+        if ($el -match '^EXECUTION_MECHANISM="?(TASK_SCHEDULER|WINDOWS_SERVICE)"?') {
+            $activeMechanism = $matches[1]
+        }
+    }
 }
 
-$svc = Get-Service -Name "Korex_SQLServer_Service" -ErrorAction SilentlyContinue
-if (-not $svc) { $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue }
-if (-not $svc) { $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue }
+Write-Log "Mecanismo de ejecucion activo detectado en SQL Server: $activeMechanism"
 
-if ($svc) {
-    Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 3
-    Write-Log "Estado del servicio tras actualizacion: $($svc.Status)"
+# Detener instancias previas limpiamente
+Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
+Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+
+$taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+if (Test-Path $taskMgrScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Stop -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort > $null 2>&1
+}
+
+Start-Sleep -Seconds 2
+
+$startedOk = $false
+
+if ($activeMechanism -eq "TASK_SCHEDULER") {
+    Write-Log "Actualizando y reiniciando via Windows Task Scheduler (Korex SQLServer - Startup)..."
+    if (Test-Path $taskMgrScript) {
+        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 2
+        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 3
+        
+        $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($chk) {
+            Write-Log "Task Scheduler SQL Server reiniciado exitosamente. Backend escuchando en puerto $OldNextjsPort (PID: $($chk.OwningProcess))."
+            $startedOk = $true
+        }
+    }
+} else {
+    # Intentar Windows Service
+    if (Test-Path ".\install-service.js") {
+        node .\install-service.js >> $LogFile 2>&1
+        Start-Sleep -Seconds 3
+    }
+    
+    $svc = Get-Service -Name "Korex_SQLServer_Service" -ErrorAction SilentlyContinue
+    if (-not $svc) { $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue }
+    if (-not $svc) { $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue }
+    
+    if ($svc) {
+        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 4
+        $svcRefresh = Get-Service -Name $svc.Name
+        if ($svcRefresh.Status -eq 'Running') {
+            $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($chk) {
+                Write-Log "Servicio de Windows SQL Server ($($svc.Name)) activo y escuchando en puerto $OldNextjsPort (PID: $($chk.OwningProcess))."
+                $startedOk = $true
+            }
+        }
+    }
+    
+    # Fallback a Task Scheduler si el servicio fallo al reiniciar
+    if (-not $startedOk) {
+        Write-Log "Aviso: Servicio Windows SQL Server fallo al reiniciar. Activando fallback a Task Scheduler..." "WARN"
+        if (Test-Path $taskMgrScript) {
+            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+            Start-Sleep -Seconds 2
+            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+            Start-Sleep -Seconds 3
+            $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($chk) {
+                Write-Log "Fallback a Task Scheduler SQL Server completado exitosamente en puerto $OldNextjsPort."
+                $startedOk = $true
+                Add-Content -Path $EnvFile -Value "EXECUTION_MECHANISM=`"TASK_SCHEDULER`"" -Encoding UTF8
+            }
+        }
+    }
+}
+
+if (-not $startedOk) {
+    Write-Log "ERROR CRITICO: No fue posible reanudar el backend SQL Server tras la actualizacion." "ERROR"
+    Show-Alert "Fallo de Inicio del Backend" "La aplicacion se actualizo pero no fue posible reiniciar el proceso en el puerto $OldNextjsPort.`n`nPor favor revise install_sqlserver_log.txt."
+    exit 1
 }
 
 # =============================================================================

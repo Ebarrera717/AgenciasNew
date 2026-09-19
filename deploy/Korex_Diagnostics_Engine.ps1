@@ -298,42 +298,96 @@ if ($nextPortConn) {
     Add-TestResult "TEST-PORT-002" "Puerto Backend Node.js ($NextjsPort)" "WARN" "Puerto $NextjsPort no esta escuchando" "Puerto $NextjsPort escuchando" "ADVERTENCIA" "Verificar servicio Korex_NextJS" "N/A" "Inicie el servicio de Windows Korex_NextJS o ejecute node server.js."
 }
 
-# DOMINIO 8: DIAGNOSTICO DEL PROCESO KOREX / SERVICIO WINDOWS
-Write-DiagLog "--- [DOMINIO 8] Evaluando Servicio de Windows Korex ---"
+# DOMINIO 8: DIAGNOSTICO DEL PROCESO KOREX (WINDOWS SERVICE / TASK SCHEDULER)
+Write-DiagLog "--- [DOMINIO 8] Evaluando Mecanismo de Control del Proceso Korex (Servicio / Task Scheduler) ---"
 $svcName = if ($Engine -eq "SQLSERVER") { "Korex_SQLServer_Service" } else { "Korex_NextJS" }
-$svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
-if (-not $svc) {
-    $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
-}
-if (-not $svc) {
-    $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
-}
+$taskName = if ($Engine -eq "SQLSERVER") { "Korex SQLServer - Startup" } else { "Korex NextJS - Startup" }
 
-if ($svc) {
-    if ($svc.Status -eq "Running") {
-        Add-TestResult "TEST-PROC-001" "Servicio Windows ($([string]$svc.Name))" "OK" "Servicio en ejecucion (Running)" "Estado Running" "OK" "Verificacion de servicio" "N/A"
-    } else {
-        if ($Mode -eq "Reparacion") {
-            Write-DiagLog "Intentando autoreparacion: Iniciando servicio $($svc.Name)..." "WARN"
-            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 3
-            $svcRefresh = Get-Service -Name $svc.Name
-            if ($svcRefresh.Status -eq "Running") {
-                Add-TestResult "TEST-PROC-001" "Servicio Windows ($([string]$svc.Name))" "OK" "Servicio arrancado exitosamente" "Estado Running" "ADVERTENCIA" "Start-Service $($svc.Name)" "CORREGIDO"
-            } else {
-                $daemonErrLog = Join-Path $TargetDir ("daemon\" + [string]$svc.Name + ".err.log")
-                $errSnippet = "No se encontro archivo de log"
-                if (Test-Path $daemonErrLog) {
-                    $errSnippet = (Get-Content $daemonErrLog -Tail 10) -join " | "
-                }
-                Add-TestResult "TEST-PROC-001" "Servicio Windows ($([string]$svc.Name))" "ERROR" "Servicio se cerro tras inicio. Error: $errSnippet" "Estado Running" "CRITICO" "Start-Service $($svc.Name)" "NO CORREGIDO" "Revise el log de daemon: $daemonErrLog."
-            }
-        } else {
-            Add-TestResult "TEST-PROC-001" "Servicio Windows ($([string]$svc.Name))" "ERROR" "Servicio detenido ($([string]$svc.Status))" "Estado Running" "ERROR" "Verificacion de servicio" "N/A" "Inicie el servicio $($svc.Name) en services.msc."
+$activeExec = "DESCONOCIDO"
+$envFileCheck = Join-Path $TargetDir ".env"
+if (Test-Path $envFileCheck) {
+    $eLines = Get-Content $envFileCheck
+    foreach ($el in $eLines) {
+        if ($el -match '^EXECUTION_MECHANISM="?(TASK_SCHEDULER|WINDOWS_SERVICE)"?') {
+            $activeExec = $matches[1]
         }
     }
+}
+
+$svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+if (-not $svc) { $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue }
+if (-not $svc) { $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue }
+
+$taskExists = $false
+$taskState = "No Registrada"
+try {
+    if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {
+        $t = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        if ($t) { $taskExists = $true; $taskState = [string]$t.State }
+    } else {
+        $out = cmd.exe /c "schtasks.exe /query /tn `"$taskName`" /fo csv /nh" 2>&1
+        if ($LASTEXITCODE -eq 0) { $taskExists = $true; $taskState = "Registrada" }
+    }
+} catch {}
+
+$backendPortActive = $false
+$backendPid = 0
+try {
+    $bConn = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($bConn) {
+        $backendPortActive = $true
+        $backendPid = $bConn.OwningProcess
+    }
+} catch {}
+
+if ($svc -and $svc.Status -eq "Running" -and $backendPortActive) {
+    Add-TestResult "TEST-PROC-001" "Mecanismo de Ejecución Activo (Windows Service)" "OK" "Servicio $($svc.Name) en ejecución y escuchando en puerto $NextjsPort (PID: $backendPid)" "Servicio o Tarea en ejecución" "OK" "Verificación de servicio" "N/A"
+} elseif ($taskExists -and $backendPortActive) {
+    Add-TestResult "TEST-PROC-001" "Mecanismo de Ejecución Activo (Task Scheduler)" "OK" "Tarea '$taskName' activa ($taskState) y escuchando en puerto $NextjsPort (PID: $backendPid)" "Servicio o Tarea en ejecución" "OK" "Verificación de tarea programada" "N/A"
+} elseif ($backendPortActive) {
+    Add-TestResult "TEST-PROC-001" "Proceso Backend Node.js" "OK" "Proceso Node escuchando activamente en puerto $NextjsPort (PID: $backendPid)" "Puerto $NextjsPort escuchando" "OK" "Inspección de puertos" "N/A"
 } else {
-    Add-TestResult "TEST-PROC-001" "Servicio Windows ($svcName)" "WARN" "Servicio de Windows no registrado" "Servicio registrado" "ADVERTENCIA" "Registrar servicio con install-service.js" "N/A" "Ejecute node install-service.js en $TargetDir para instalar el servicio."
+    # Backend no responde -> evaluar autoreparación
+    if ($Mode -eq "Reparacion") {
+        Write-DiagLog "Intentando autoreparación del proceso Korex..." "WARN"
+        $repaired = $false
+        
+        # 1. Intentar Servicio si existe
+        if ($svc) {
+            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+            $svcRef = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            if ($svcRef -and $svcRef.Status -eq "Running") {
+                $bConn2 = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($bConn2) { $repaired = $true; $backendPid = $bConn2.OwningProcess }
+            }
+        }
+        
+        # 2. Si no reparó, intentar Task Scheduler
+        if (-not $repaired) {
+            $taskMgr = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+            if (Test-Path $taskMgr) {
+                Write-DiagLog "Reintentando arranque mediante Task Scheduler..." "WARN"
+                & powershell.exe -ExecutionPolicy Bypass -File "$taskMgr" -Action Start -Engine $Engine -TargetDir "$TargetDir" -Port $NextjsPort > $null 2>&1
+                Start-Sleep -Seconds 3
+                $bConn3 = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($bConn3) { $repaired = $true; $backendPid = $bConn3.OwningProcess }
+            }
+        }
+        
+        if ($repaired) {
+            Add-TestResult "TEST-PROC-001" "Control de Proceso Korex" "OK" "Proceso backend restablecido con éxito en puerto $NextjsPort (PID: $backendPid)" "Proceso activo" "ADVERTENCIA" "Autoreparación de proceso" "CORREGIDO"
+        } else {
+            $errSnippet = "No se detectó proceso escuchando en puerto $NextjsPort."
+            $daemonErrLog = Join-Path $TargetDir ("daemon\" + [string]$svcName + ".err.log")
+            if (Test-Path $daemonErrLog) {
+                $errSnippet += " Log daemon: " + ((Get-Content $daemonErrLog -Tail 5) -join " | ")
+            }
+            Add-TestResult "TEST-PROC-001" "Control de Proceso Korex" "ERROR" "No fue posible iniciar el backend como Servicio ni como Task Scheduler. $errSnippet" "Proceso activo en puerto $NextjsPort" "CRITICO" "Verificación de políticas de seguridad" "NO CORREGIDO" "Revise que el puerto $NextjsPort no esté bloqueado y los permisos de ejecución de Node.js."
+        }
+    } else {
+        Add-TestResult "TEST-PROC-001" "Control de Proceso Korex" "ERROR" "Servicio o Tarea detenida. Puerto $NextjsPort no responde." "Proceso activo" "ERROR" "Verificación de proceso" "N/A" "Inicie el servicio $($svcName) o ejecute la tarea '$taskName'."
+    }
 }
 
 # DOMINIO 9: DIAGNOSTICO EXCLUSIVO DE BASE DE DATOS

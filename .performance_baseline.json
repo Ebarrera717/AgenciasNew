@@ -1,0 +1,51 @@
+{
+  "postgres": {
+    "timestamp": "2026-09-18T20:38:53.497Z",
+    "slowQueries": [
+      {
+        "name": "fnCotizacionListar",
+        "durationMs": 0,
+        "status": "Error: no existe la función public.fnCotizacionListar(unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown, integer, integer)"
+      },
+      {
+        "name": "fnCotizacionHistorial",
+        "durationMs": 0,
+        "status": "Error: no existe la función public.fnCotizacionHistorial(integer, integer)"
+      },
+      {
+        "name": "fnRoleListar",
+        "durationMs": 17.76,
+        "status": "OK"
+      }
+    ],
+    "summary": {
+      "totalTables": 25,
+      "totalIndexes": 30,
+      "totalSizeMB": 14.3828125,
+      "avgQueryDurationMs": 0,
+      "issuesCount": 0
+    }
+  },
+  "sqlserver": {
+    "timestamp": "2026-09-18T20:38:55.030Z",
+    "slowQueries": [
+      {
+        "name": "spCotizacionListar",
+        "durationMs": 28.97,
+        "status": "OK"
+      },
+      {
+        "name": "spRoleListar",
+        "durationMs": 39.05,
+        "status": "OK"
+      }
+    ],
+    "summary": {
+      "totalTables": 129,
+      "totalIndexes": 0,
+      "totalSizeMB": 7.101559000000003,
+      "avgQueryDurationMs": 0,
+      "issuesCount": 0
+    }
+  }
+}

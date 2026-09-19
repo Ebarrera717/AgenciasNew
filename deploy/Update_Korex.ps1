@@ -110,10 +110,18 @@ function Check-PostgresConnection($pgHost, $pgPort) {
 # ==========================================
 
 # Paso 1. Detener procesos previos para liberar bloqueos
-Write-Log "Deteniendo el servicio Windows Korex_NextJS..."
+Write-Log "Deteniendo instancias previas (Servicio o Tarea Programada)..."
 Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
+Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
 Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# Detener tarea programada si existe
+$taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+if (Test-Path $taskMgrScript) {
+    & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Stop -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort > $null 2>&1
+}
 
 Write-Log "Deteniendo el sitio web Korex en IIS para liberar puertos..."
 try {
@@ -227,37 +235,79 @@ if (Test-Path ".\install-service.js") {
 }
 
 # Forzar arranque y verificar estado
-$svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
-if (-not $svc) {
-    $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
+# Paso 5. Reanudar / Actualizar el mecanismo de ejecucion activo
+$activeMechanism = "WINDOWS_SERVICE"
+if (Test-Path $EnvFile) {
+    $envLines = Get-Content $EnvFile
+    foreach ($el in $envLines) {
+        if ($el -match '^EXECUTION_MECHANISM="?(TASK_SCHEDULER|WINDOWS_SERVICE)"?') {
+            $activeMechanism = $matches[1]
+        }
+    }
 }
 
-if ($svc) {
-    $svcStatus = $svc.Status
-    if ($svcStatus -ne 'Running') {
+Write-Log "Mecanismo de ejecucion activo detectado: $activeMechanism"
+
+$startedOk = $false
+
+if ($activeMechanism -eq "TASK_SCHEDULER") {
+    Write-Log "Actualizando y reiniciando via Windows Task Scheduler (Korex NextJS - Startup)..."
+    $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+    if (Test-Path $taskMgrScript) {
+        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 2
+        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 3
+        
+        $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($chk) {
+            Write-Log "Task Scheduler reiniciado exitosamente. Backend escuchando en puerto $NextjsPort (PID: $($chk.OwningProcess))."
+            $startedOk = $true
+        }
+    }
+} else {
+    # Intentar Windows Service
+    $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
+    if (-not $svc) {
+        $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
+    }
+    
+    if ($svc) {
+        Write-Log "Iniciando Servicio de Windows $($svc.Name)..."
         Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 4
-        $svcStatus = (Get-Service -Name $svc.Name).Status
-    }
-    if ($svcStatus -ne 'Running') {
-        Write-Log "ERROR: El servicio $($svc.Name) está registrado pero no pudo iniciarse de forma estable en el arranque." "ERROR"
-        
-        $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
-        $errDetails = ""
-        if (Test-Path $errLogPath) {
-            $errDetails = Get-Content $errLogPath -Tail 20 | Out-String
+        $svcRefresh = Get-Service -Name $svc.Name
+        if ($svcRefresh.Status -eq 'Running') {
+            $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($chk) {
+                Write-Log "Servicio de Windows $($svc.Name) activo y escuchando en puerto $NextjsPort (PID: $($chk.OwningProcess))."
+                $startedOk = $true
+            }
         }
-        if (-not $errDetails) {
-            $errDetails = "No se pudieron recuperar detalles adicionales del log de daemon."
-        }
-        
-        Show-Alert "Fallo de Inicio del Servicio" "El servicio de Windows '$($svc.Name)' se registró pero se cerró inmediatamente en el arranque.`n`nDetalle del error en el servidor (Node.js):`n$errDetails"
-        exit 1
     }
-    Write-Log "Estado final del servicio: $svcStatus"
-} else {
-    Write-Log "ERROR: El servicio Korex_NextJS no está registrado en el sistema." "ERROR"
-    Show-Alert "Error del Servicio de Windows" "No se pudo registrar el servicio Windows 'Korex_NextJS'.`n`nPor favor verifique los permisos administrativos."
+    
+    # Si fallo el servicio en actualizacion, fallback a Task Scheduler
+    if (-not $startedOk) {
+        Write-Log "Aviso: Servicio Windows fallo al reiniciar. Activando fallback a Task Scheduler..." "WARN"
+        $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+        if (Test-Path $taskMgrScript) {
+            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+            Start-Sleep -Seconds 2
+            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+            Start-Sleep -Seconds 3
+            $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($chk) {
+                Write-Log "Fallback a Task Scheduler completado exitosamente en puerto $NextjsPort."
+                $startedOk = $true
+                Add-Content -Path $EnvFile -Value "EXECUTION_MECHANISM=`"TASK_SCHEDULER`"" -Encoding UTF8
+            }
+        }
+    }
+}
+
+if (-not $startedOk) {
+    Write-Log "ERROR CRITICO: No fue posible reanudar el backend tras la actualizacion." "ERROR"
+    Show-Alert "Fallo de Inicio del Backend" "La aplicacion se actualizo pero no fue posible reiniciar el proceso en el puerto $NextjsPort.`n`nPor favor revise update_log.txt."
     exit 1
 }
 
