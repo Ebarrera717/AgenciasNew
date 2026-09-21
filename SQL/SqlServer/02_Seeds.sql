@@ -29,37 +29,42 @@ END;
 -- 2. Parámetros del Sistema Requeridos
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'ServidorSQLServer')
 BEGIN
-    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ServidorSQLServer', N'Host de SQL Server', N'127.0.0.1');
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ServidorSQLServer', N'Host de SQL Server', N'');
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'BaseSQLServer')
 BEGIN
-    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'BaseSQLServer', N'Base de Datos SQL Server', N'Korex_colaereo');
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'BaseSQLServer', N'Base de Datos SQL Server', N'');
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'UsuarioSQLServer')
 BEGIN
-    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'UsuarioSQLServer', N'Usuario SQL Server', N'sa');
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'UsuarioSQLServer', N'Usuario SQL Server', N'');
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'ClaveSQLServer')
 BEGIN
-    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ClaveSQLServer', N'Contraseña SQL Server', N'zzeusagencias');
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ClaveSQLServer', N'Contraseña SQL Server', N'');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'EncriptarClaves')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EncriptarClaves', N'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', N'0');
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'PuertoSQLServer')
 BEGIN
-    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'PuertoSQLServer', N'Puerto SQL Server', N'1433');
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'PuertoSQLServer', N'Puerto SQL Server', N'');
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'EnviarCotizacionesAutoSQLserver')
 BEGIN
-    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarCotizacionesAutoSQLserver', N'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', N'1');
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarCotizacionesAutoSQLserver', N'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', N'0');
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'EnviarFacturacionAutoSQLserver')
 BEGIN
-    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarFacturacionAutoSQLserver', N'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', N'1');
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarFacturacionAutoSQLserver', N'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', N'0');
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'ModoFacturacionAuto')

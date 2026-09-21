@@ -1,5 +1,6 @@
 import mssql from 'mssql'
 import prisma from './prisma'
+import { decryptPassword, decryptUrlPasswords } from './security'
 
 import fs from 'fs'
 import path from 'path'
@@ -53,7 +54,7 @@ export function parseSQLServerUrl(connStr: string) {
             const val = decodeURIComponent(p.substring(eqIdx + 1).trim());
             if (key === 'database') database = val;
             else if (key === 'user' || key === 'user id' || key === 'uid') user = val;
-            else if (key === 'password' || key === 'pwd') password = val;
+            else if (key === 'password' || key === 'pwd') password = decryptPassword(val);
         }
     }
 
@@ -118,14 +119,14 @@ export async function getSQLServerConnection(overrideDbName?: string) {
         }
     }
 
-    if (!configRow || !configRow.servidor) {
-        throw new Error('No se pudo obtener la configuración de conexión a SQL Server desde .env ni desde la base de datos.');
+    if (!configRow || !configRow.servidor || configRow.servidor.trim() === '') {
+        throw new Error('Parámetros de conexión a SQL Server no configurados en .env ni en Parámetros del Sistema.');
     }
 
     let serverVal = (configRow.servidor || '').trim();
     if (serverVal.includes('/')) serverVal = serverVal.replace('/', '\\');
     const userVal = (configRow.usuario || '').trim();
-    const passVal = (configRow.clave || '').trim();
+    const passVal = decryptPassword((configRow.clave || '').trim());
     const dbVal = overrideDbName || (configRow.base_datos || '').trim();
     const portVal = (configRow.puerto || '').trim();
 
@@ -138,7 +139,8 @@ export async function getSQLServerConnection(overrideDbName?: string) {
         instanceName = parts[1];
     }
 
-    if (host.toLowerCase() === 'localhost') {
+    const localCompName = (process.env.COMPUTERNAME || '').toUpperCase();
+    if (host.toLowerCase() === 'localhost' || host.toLowerCase() === '.' || host.toLowerCase() === '(local)' || (localCompName && host.toUpperCase() === localCompName)) {
         host = '127.0.0.1';
     }
 
@@ -150,9 +152,10 @@ export async function getSQLServerConnection(overrideDbName?: string) {
         options: {
             encrypt: false,
             trustServerCertificate: true,
-            enableArithAbort: true
+            enableArithAbort: true,
+            connectTimeout: 15000
         },
-        connectionTimeout: 20000,
+        connectionTimeout: 15000,
         requestTimeout: 60000
     };
 
@@ -171,22 +174,47 @@ export async function getSQLServerConnection(overrideDbName?: string) {
     try {
         const pool = new mssql.ConnectionPool(sqlConfig);
         await pool.connect();
-        console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] en SQL Server!`);
+        console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] en SQL Server (${host})!`);
         return pool;
     } catch (error: any) {
         console.warn(`[SQL_CONN] Falló primer intento de conexión a '${dbVal}' en '${host}': ${error.message}`);
         
-        if (host !== '127.0.0.1' && host !== 'localhost') {
-            console.log(`[SQL_CONN] Intentando conexión de respaldo en 127.0.0.1 con puerto ${sqlConfig.port || 1433}...`);
+        // Intentar fallback 1: 127.0.0.1 directo en puerto 1433 sin instanceName
+        if (host !== '127.0.0.1') {
+            console.log(`[SQL_CONN] Intentando conexión de respaldo en 127.0.0.1 (IPv4 Loopback)...`);
             try {
-                const fallbackConfig = { ...sqlConfig, server: '127.0.0.1' };
+                const fallbackConfig = { 
+                    ...sqlConfig, 
+                    server: '127.0.0.1',
+                    port: sqlConfig.port || 1433,
+                    options: { ...sqlConfig.options }
+                };
+                delete fallbackConfig.options.instanceName;
                 const poolFallback = new mssql.ConnectionPool(fallbackConfig);
                 await poolFallback.connect();
                 console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] mediante fallback 127.0.0.1!`);
                 return poolFallback;
             } catch (fallbackErr: any) {
-                console.error('[SQL_CONN] Falló también el intento de respaldo en 127.0.0.1:', fallbackErr.message);
+                console.error('[SQL_CONN] Falló intento de respaldo en 127.0.0.1:', fallbackErr.message);
             }
+        }
+
+        // Intentar fallback 2: localhost directo
+        if (host !== 'localhost') {
+            console.log(`[SQL_CONN] Intentando conexión de respaldo en localhost...`);
+            try {
+                const fallbackLocalhost = { 
+                    ...sqlConfig, 
+                    server: 'localhost',
+                    port: sqlConfig.port || 1433,
+                    options: { ...sqlConfig.options }
+                };
+                delete fallbackLocalhost.options.instanceName;
+                const poolLocalhost = new mssql.ConnectionPool(fallbackLocalhost);
+                await poolLocalhost.connect();
+                console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] mediante fallback localhost!`);
+                return poolLocalhost;
+            } catch (localErr: any) {}
         }
 
         const richMsg = `[Servidor: ${host} | Puerto: ${sqlConfig.port || 'Instancia (' + (instanceName || 'browser') + ')'} | BD: ${dbVal} | Usuario: ${userVal}] - Error: ${error.message}${error.code ? ' [Código: ' + error.code + ']' : ''}`;

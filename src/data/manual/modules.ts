@@ -1074,6 +1074,71 @@ export const MANUAL_MODULES: ManualModule[] = [
                 ]
             }
         ]
+    },
+    {
+        id: 'master-skill-governance',
+        title: 'Gobernanza y Reglas Maestras (Skill Maestro ID: 74163)',
+        iconName: 'ShieldCheck',
+        category: 'Gobernanza, Aislamiento y Arquitectura',
+        description: 'Manual de directrices maestras de desarrollo, instalación, actualización, aislamiento estricto y protección del entorno .env.',
+        overview: 'El SKILL MAESTRO KOREX (ID: 74163) es el marco regulatorio central del sistema. Define la inviolabilidad absoluta del archivo .env en paquetes e instaladores, la creación de configuración desde cero en instalaciones nuevas, la preservación intocable de credenciales en actualizaciones, la parametrización limpia de integraciones externas (Zeus ERP) y el aislamiento total entre motores PostgreSQL y SQL Server.',
+        procedures: [
+            {
+                code: 'GOV-01',
+                name: 'Protección Inviolable del Entorno (.env) y Despliegue Limpio',
+                summary: 'Garantía de que ningún paquete instalador contenga credenciales de desarrollo y que los actualizadores no alteren el .env del cliente.',
+                concept: 'Asegura que los paquetes de distribución (RELEASE_KOREX y setups Inno Setup) nunca transporten variables de entorno locales de los desarrolladores, y que los actualizadores conserven intacta la configuración de producción del cliente.',
+                fields: [
+                    { name: 'DATABASE_PROVIDER', type: 'postgresql / sqlserver', description: 'Motor de base de datos activo y aislado.' },
+                    { name: 'BaseSQLServer / ServidorSQLServer', type: 'Parámetros del Sistema', description: 'Parámetros de conexión a Zeus ERP sembrados vacíos para evitar conexiones prematuras.' },
+                    { name: 'EnviarFacturasAutoSQLserver', type: '0 / 1', description: 'Parámetro de exportación automática sembrado en 0 (desactivado) por defecto.' }
+                ],
+                businessRules: [
+                    'RELEASE_KOREX y los archivos .iss deben excluir estrictamente cualquier archivo .env.',
+                    'El actualizador se detiene de inmediato si no encuentra el .env existente y nunca inyecta credenciales fallback por defecto.',
+                    'Los procesos internos de Korex (importaciones, cotizaciones) nunca intentan conectar a Zeus ERP si no han sido expresamente parametrizados.'
+                ],
+                steps: [
+                    { number: 1, title: 'Validar Suite Maestra', description: 'Ejecute node scripts/validate_master_skill_suite.js para auditar la inviolabilidad del .env y las reglas de aislamiento.' },
+                    { number: 2, title: 'Generar Empaquetado Sanitizado', description: 'Ejecute powershell -File deploy/Generar_Empaquetado.ps1 para compilar y purgar archivos .env del paquete final.' },
+                    { number: 3, title: 'Compilar Instaladores y Actualizadores', description: 'Ejecute GenerarSetupSqlServer.bat / GenerarActualizadorSqlServer.bat para producir los ejecutables finales verificados.' }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'password-encryption-governance',
+        title: 'Encriptación de Contraseñas SQL y Zeus ERP',
+        iconName: 'Lock',
+        category: 'Seguridad, Criptografía y Conectividad',
+        description: 'Manual de funcionamiento del sistema de encriptación de contraseñas AES-256 en archivos .env y parámetros de conexión a Zeus ERP.',
+        overview: 'Korex protege todas las credenciales de bases de datos mediante encriptación reversible AES-256 (tokens ENC(...)). Las conexiones a PostgreSQL y SQL Server desencriptan automáticamente las cadenas de conexión en memoria sin exponer claves en texto plano. La protección de la clave de Zeus ERP se gobierna mediante el parámetro general EncriptarClaves, permitiendo alternar el modo con sincronización automática.',
+        procedures: [
+            {
+                code: 'SEC-01',
+                name: 'Gestión y Cifrado de Contraseñas de Base de Datos y Zeus ERP',
+                summary: 'Administración del parámetro EncriptarClaves y cifrado de contraseñas en .env y parámetros del sistema.',
+                concept: 'Permite mantener la confidencialidad de las contraseñas de producción tanto en servidores locales como remotos, protegiendo las credenciales ante accesos no autorizados a archivos de configuración o tablas de base de datos.',
+                fields: [
+                    { name: 'EncriptarClaves', type: '0: Desactivado / 1: Activado', description: 'Parámetro general que determina si la contraseña de Zeus ERP se almacena cifrada en la base de datos.' },
+                    { name: 'ClaveSQLServer', type: 'Texto / Token ENC(...)', description: 'Contraseña para la conexión externa de exportación a Zeus ERP.' },
+                    { name: 'Token ENC(...)', type: 'Formato Criptográfico', description: 'Estructura ENC(vector_iv:texto_cifrado) procesada por el motor criptográfico AES-256.' }
+                ],
+                businessRules: [
+                    'Si una contraseña en .env o en base de datos contiene formato ENC(...), el sistema la desencripta de forma transparente al conectar.',
+                    'Al activar EncriptarClaves = 1, la contraseña de Zeus ERP se cifra automáticamente.',
+                    'Al desactivar EncriptarClaves = 0, la contraseña de Zeus ERP se almacena en texto plano.',
+                    'Las utilidades de línea de comandos (node scripts/encrypt_password.js) permiten cifrar contraseñas de forma desatendida.'
+                ],
+                steps: [
+                    { number: 1, title: 'Activar Encriptación General', description: 'En Parámetros del Sistema, edite el parámetro EncriptarClaves y asigne el valor 1.' },
+                    { number: 2, title: 'Cifrar Archivo .ENV Local', description: 'Ejecute node scripts/encrypt_password.js --env para convertir las contraseñas en texto plano a tokens ENC(...).' },
+                    { number: 3, title: 'Validar Conectividad', description: 'Pruebe la conexión en /api/test-sqlserver o ejecute node scripts/validate_password_encryption_suite.js.' }
+                ]
+            }
+        ]
     }
 ];
+
+
 

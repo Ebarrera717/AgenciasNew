@@ -51,13 +51,16 @@ function Register-KorexStartupTask {
 
     # Crear runner script batch seguro para fijar variables de entorno y directorio
     $runnerBat = Join-Path $target "korex_task_runner.bat"
+    $startupLog = Join-Path $target "korex_startup.log"
     $batContent = @"
 @echo off
 cd /d "$target"
 set PORT=$p
 set HOSTNAME=127.0.0.1
 set NODE_ENV=production
-"$nodeExe" "$serverJs"
+echo [%%date%% %%time%%] Iniciando servidor Korex Standalone en puerto $p... >> "$startupLog"
+"$nodeExe" "$serverJs" >> "$startupLog" 2>&1
+echo [%%date%% %%time%%] Servidor Korex finalizo con codigo %%ERRORLEVEL%% >> "$startupLog"
 "@
     Set-Content -Path $runnerBat -Value $batContent -Encoding ASCII -Force
 
@@ -65,14 +68,14 @@ set NODE_ENV=production
     $registered = $false
     try {
         if (Get-Command Register-ScheduledTask -ErrorAction SilentlyContinue) {
-            $actionObj = New-ScheduledTaskAction -Execute "$runnerBat" -WorkingDirectory "$target"
+            $actionObj = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"`"$runnerBat`"`"" -WorkingDirectory "$target"
             $triggerObj = New-ScheduledTaskTrigger -AtStartup
             $principalObj = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
             $settingsObj = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Days 365)
             
             Register-ScheduledTask -TaskName $task -Action $actionObj -Trigger $triggerObj -Principal $principalObj -Settings $settingsObj -Force | Out-Null
             $registered = $true
-            Write-Host "[TASK SCHEDULER] Tarea '$task' registrada con Register-ScheduledTask (SYSTEM, Highest)." -ForegroundColor Green
+            Write-Host "[TASK SCHEDULER] Tarea '$task' registrada con Register-ScheduledTask (cmd.exe /c, SYSTEM, Highest)." -ForegroundColor Green
         }
     } catch {
         Write-Host "[TASK SCHEDULER] Aviso con cmdlet nativo: $($_.Exception.Message). Usando schtasks.exe..." -ForegroundColor Yellow
@@ -80,14 +83,14 @@ set NODE_ENV=production
 
     if (-not $registered) {
         try {
-            $cmd = "schtasks.exe /create /tn `"$task`" /tr `"`"$runnerBat`"`" /sc onstart /ru `"SYSTEM`" /rl highest /f"
+            $cmd = "schtasks.exe /create /tn `"$task`" /tr `"cmd.exe /c \`"$runnerBat\`"`" /sc onstart /ru `"SYSTEM`" /rl highest /f"
             $output = cmd.exe /c $cmd 2>&1
             if ($LASTEXITCODE -eq 0) {
                 $registered = $true
-                Write-Host "[TASK SCHEDULER] Tarea '$task' creada exitosamente via schtasks.exe." -ForegroundColor Green
+                Write-Host "[TASK SCHEDULER] Tarea '$task' creada exitosamente via schtasks.exe (SYSTEM)." -ForegroundColor Green
             } else {
                 # Fallback sin usuario SYSTEM explicito si la politica corporativa restringe /ru SYSTEM
-                $cmdUser = "schtasks.exe /create /tn `"$task`" /tr `"`"$runnerBat`"`" /sc onstart /rl highest /f"
+                $cmdUser = "schtasks.exe /create /tn `"$task`" /tr `"cmd.exe /c \`"$runnerBat\`"`" /sc onstart /rl highest /f"
                 $outputUser = cmd.exe /c $cmdUser 2>&1
                 if ($LASTEXITCODE -eq 0) {
                     $registered = $true
@@ -120,7 +123,7 @@ function Start-KorexStartupTask {
         }
     } catch {}
 
-    # 2. Ejecutar tarea programada
+    # 2. Ejecutar tarea programada via Task Scheduler
     try {
         if (Get-Command Start-ScheduledTask -ErrorAction SilentlyContinue) {
             Start-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
@@ -131,10 +134,10 @@ function Start-KorexStartupTask {
         cmd.exe /c "schtasks.exe /run /tn `"$task`"" 2>&1 | Out-Null
     }
 
-    # 3. Esperar y validar escucha en puerto
+    # 3. Esperar y validar escucha en puerto (hasta 10s)
     Write-Host "[TASK SCHEDULER] Esperando arranque del servidor Next.js en puerto $p..." -ForegroundColor Cyan
     $started = $false
-    for ($i = 0; $i -lt 12; $i++) {
+    for ($i = 0; $i -lt 10; $i++) {
         Start-Sleep -Seconds 1
         $chk = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($chk) {
@@ -143,6 +146,35 @@ function Start-KorexStartupTask {
             Write-Host "[TASK SCHEDULER] Servidor Next.js Standalone activo en puerto $p (Proceso: $procName, PID: $($chk.OwningProcess))." -ForegroundColor Green
             $started = $true
             break
+        }
+    }
+
+    # 4. Fallback directo si Task Scheduler no logro arrancar por politicas de sesion 0 en Windows Server
+    if (-not $started) {
+        Write-Host "[TASK SCHEDULER] Task Scheduler no inicio en 10s. Probando ejecucion en segundo plano directa..." -ForegroundColor Yellow
+        $runnerBat = Join-Path $target "korex_task_runner.bat"
+        if (Test-Path $runnerBat) {
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/c `"`"$runnerBat`"`"" -WorkingDirectory "$target" -WindowStyle Hidden -ErrorAction SilentlyContinue
+            for ($j = 0; $j -lt 8; $j++) {
+                Start-Sleep -Seconds 1
+                $chk = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($chk) {
+                    $proc = Get-Process -Id $chk.OwningProcess -ErrorAction SilentlyContinue
+                    $procName = if ($proc) { $proc.ProcessName } else { "node" }
+                    Write-Host "[TASK SCHEDULER] Servidor iniciado exitosamente en segundo plano en puerto $p (Proceso: $procName, PID: $($chk.OwningProcess))." -ForegroundColor Green
+                    $started = $true
+                    break
+                }
+            }
+        }
+    }
+
+    if (-not $started) {
+        Write-Host "[TASK SCHEDULER] El servidor no respondio en puerto $p." -ForegroundColor Red
+        $logPath = Join-Path $target "korex_startup.log"
+        if (Test-Path $logPath) {
+            Write-Host "[TASK SCHEDULER] --- Ultimas lineas de korex_startup.log ---" -ForegroundColor Red
+            Get-Content $logPath -Tail 25 | Write-Host -ForegroundColor Red
         }
     }
 

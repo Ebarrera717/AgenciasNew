@@ -68,7 +68,7 @@ if exist "C:\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Inno Setup 6\ISCC.exe"
 if exist "C:\Users\rubie\AppData\Local\Programs\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Users\rubie\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
 
 if "%ISCC_PATH%"=="" (
-    echo Error: No se pudo encontrar Inno Setup (ISCC.exe) en las rutas comunes.
+    echo Error: No se pudo encontrar Inno Setup ^(ISCC.exe^) en las rutas comunes.
     echo Por favor, instala Inno Setup o compila deploy\Korex_SQLServer_Update.iss manualmente.
     pause
     exit /b 1

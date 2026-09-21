@@ -1,6 +1,7 @@
 import { Pool } from 'pg'
 import path from 'path'
 import fs from 'fs'
+import { decryptUrlPasswords } from './security'
 
 let pgPool: Pool | null = null;
 
@@ -25,7 +26,7 @@ export function getPostgresUrl(): string {
         pgUrl = "postgresql://postgres:zzeusagencias@192.168.80.26:5432/Korex_colaereo?schema=public";
     }
 
-    return pgUrl;
+    return decryptUrlPasswords(pgUrl);
 }
 
 export function getPostgresPool(): Pool {

@@ -1,13 +1,17 @@
 import { PrismaClient } from '@prisma/client'
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
+import { decryptUrlPasswords } from './security'
 
 const getActiveDbUrl = () => {
     const provider = (process.env.DATABASE_PROVIDER || '').toLowerCase().trim();
+    let url = '';
     if (provider === 'sqlserver') {
-        return (process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL || '').trim();
+        url = (process.env.DATABASE_URL_SQLSERVER || process.env.DATABASE_URL || '').trim();
+    } else {
+        url = (process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL || '').trim();
     }
-    return (process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL || '').trim();
+    return decryptUrlPasswords(url);
 };
 
 const isSqlUrl = (url: string) => {

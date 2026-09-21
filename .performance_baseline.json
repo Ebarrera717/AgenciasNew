@@ -1,6 +1,6 @@
 {
   "postgres": {
-    "timestamp": "2026-09-18T20:38:53.497Z",
+    "timestamp": "2026-09-21T21:41:33.111Z",
     "slowQueries": [
       {
         "name": "fnCotizacionListar",
@@ -14,7 +14,7 @@
       },
       {
         "name": "fnRoleListar",
-        "durationMs": 17.76,
+        "durationMs": 8.71,
         "status": "OK"
       }
     ],
@@ -27,16 +27,16 @@
     }
   },
   "sqlserver": {
-    "timestamp": "2026-09-18T20:38:55.030Z",
+    "timestamp": "2026-09-21T21:41:35.192Z",
     "slowQueries": [
       {
         "name": "spCotizacionListar",
-        "durationMs": 28.97,
+        "durationMs": 33.7,
         "status": "OK"
       },
       {
         "name": "spRoleListar",
-        "durationMs": 39.05,
+        "durationMs": 25.45,
         "status": "OK"
       }
     ],

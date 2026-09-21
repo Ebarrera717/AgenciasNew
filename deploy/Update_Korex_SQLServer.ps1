@@ -48,54 +48,68 @@ Write-Log "Iniciando proceso de actualizacion silenciosa para SQL Server..."
 $env:Path += ";C:\Program Files\nodejs"
 
 # =============================================================================
-# PASO 0: RESPALDO DE CONFIGURACIÓN PREVIA Y DIAGNÓSTICO PRE-FLIGHT
+# PASO 0: DETECCIÓN, VALIDACIÓN DE HASH Y RESPALDO INVIOLABLE DE .ENV
 # =============================================================================
 $EnvFile = "$TargetDir\.env"
-$Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-if (Test-Path $EnvFile) {
-    $EnvBackup = "$TargetDir\.env.bak_$Timestamp"
-    Copy-Item -Path $EnvFile -Destination $EnvBackup -Force
-    Write-Log "Respaldo de configuracion .env generado en: $EnvBackup"
+if (-not (Test-Path $EnvFile)) {
+    Write-Log "ERROR CRITICO: No se encontro el archivo .env de la instalacion existente del cliente. Abortando actualizacion." "ERROR"
+    Show-Alert "Error Critico de Actualizacion" "No se encontro el archivo .env de la instalacion existente en este directorio:`n$TargetDir`n`nEl actualizador de SQL Server no puede continuar sin la configuracion previa del cliente."
+    exit 1
 }
 
+$Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$EnvBackup = "$TargetDir\.env.bak_$Timestamp"
+Copy-Item -Path $EnvFile -Destination $EnvBackup -Force
+Write-Log "Respaldo inviolable de configuracion .env generado en: $EnvBackup"
+
 # =============================================================================
-# PASO 1: LEER VARIABLES PREVIAS O PARÁMETROS
+# PASO 1: LEER CONFIGURACIÓN DEL .ENV EXISTENTE
 # =============================================================================
 $DbUrl = ""
 $OldSitePort = 3000
 $OldNextjsPort = 3001
 
-if (Test-Path $EnvFile) {
-    $EnvContent = Get-Content $EnvFile
-    foreach ($line in $EnvContent) {
-        if ($line -match '^DATABASE_URL="(.*)"') { 
-            $DbUrl = $matches[1]
-        }
-        if ($line -match '^DATABASE_URL_SQLSERVER="(.*)"') { 
-            $DbUrl = $matches[1]
-        }
-        if ($line -match '^NEXTAUTH_URL="http://[^:]+:([0-9]+)"') {
-            $OldSitePort = [int]$matches[1]
-        }
-        if ($line -match '^PORT="?([0-9]+)"?') {
-            $OldNextjsPort = [int]$matches[1]
-        }
+$EnvContent = Get-Content $EnvFile
+foreach ($line in $EnvContent) {
+    if ($line -match '^DATABASE_URL="(.*)"') { 
+        $DbUrl = $matches[1]
     }
+    if ($line -match '^DATABASE_URL_SQLSERVER="(.*)"') { 
+        $DbUrl = $matches[1]
+    }
+    if ($line -match '^NEXTAUTH_URL="http://[^:]+:([0-9]+)"') {
+        $OldSitePort = [int]$matches[1]
+    }
+    if ($line -match '^PORT="?([0-9]+)"?') {
+        $OldNextjsPort = [int]$matches[1]
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($DbUrl)) {
+    Write-Log "ERROR CRITICO: El archivo .env existente no contiene una variable DATABASE_URL valida." "ERROR"
+    Show-Alert "Error de Configuracion" "El archivo .env de la instalacion no contiene informacion de conexion valida.`n`nRevise el archivo .env antes de actualizar."
+    exit 1
 }
 
 if (![string]::IsNullOrEmpty($SqlHost) -and ![string]::IsNullOrEmpty($SqlDb) -and ![string]::IsNullOrEmpty($SqlUser)) {
     Write-Log "Usando parametros SQL Server recibidos: Host=$SqlHost, Port=$SqlPort, DB=$SqlDb, User=$SqlUser"
 } else {
-    Write-Log "Extrayendo credenciales SQL Server desde .env..."
-    if ($DbUrl -and ($DbUrl -match 'sqlserver://([^:]+):([0-9]+);database=([^;]+);user=([^;]+);password=([^;]+)')) {
+    Write-Log "Extrayendo credenciales SQL Server desde .env existente..."
+    if ($DbUrl -match 'sqlserver://([^:]+):([0-9]+);database=([^;]+);user=([^;]+);password=([^;]+)') {
         $SqlHost = $matches[1]
         $SqlPort = $matches[2]
         $SqlDb = $matches[3]
         $SqlUser = [System.Uri]::UnescapeDataString($matches[4])
         $SqlPass = [System.Uri]::UnescapeDataString($matches[5])
     } else {
-        $SqlHost = "127.0.0.1"; $SqlPort = "1433"; $SqlDb = "Korex_colaereo"; $SqlUser = "sa"; $SqlPass = "zzeusagencias"
+        Write-Log "ERROR CRITICO: No fue posible parsear el string de conexion SQL Server desde el .env del cliente." "ERROR"
+        Show-Alert "Error de Formato de Conexion" "La cadena de conexion en .env no tiene el formato esperado de SQL Server (sqlserver://host:port;database=...)."
+        exit 1
     }
+}
+
+if ($SqlHost -eq $env:COMPUTERNAME -or $SqlHost.ToLower() -eq "localhost" -or $SqlHost -eq "." -or $SqlHost -eq "(local)") {
+    $SqlHost = "127.0.0.1"
 }
 
 # =============================================================================
@@ -115,10 +129,18 @@ if (Test-Path ".\deploy\update_db_sqlserver.js") {
 $activeMechanism = "WINDOWS_SERVICE"
 if (Test-Path $EnvFile) {
     $envLines = Get-Content $EnvFile
+    $hasProvider = $false
     foreach ($el in $envLines) {
         if ($el -match '^EXECUTION_MECHANISM="?(TASK_SCHEDULER|WINDOWS_SERVICE)"?') {
             $activeMechanism = $matches[1]
         }
+        if ($el -match '^DATABASE_PROVIDER=') {
+            $hasProvider = $true
+        }
+    }
+    if (-not $hasProvider) {
+        Add-Content -Path $EnvFile -Value "DATABASE_PROVIDER=`"sqlserver`"" -Encoding UTF8
+        Write-Log "Añadida configuracion DATABASE_PROVIDER=sqlserver al archivo .env."
     }
 }
 
@@ -197,6 +219,18 @@ if ($activeMechanism -eq "TASK_SCHEDULER") {
 
 if (-not $startedOk) {
     Write-Log "ERROR CRITICO: No fue posible reanudar el backend SQL Server tras la actualizacion." "ERROR"
+    $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
+    if (Test-Path $errLogPath) {
+        $errDetails = Get-Content $errLogPath -Tail 25 | Out-String
+        Write-Log "--- ULTIMO LOG DEL DAEMON WINDOWS SERVICE ---" "ERROR"
+        Write-Log "$errDetails" "ERROR"
+    }
+    $startupLogPath = "$TargetDir\korex_startup.log"
+    if (Test-Path $startupLogPath) {
+        $startupDetails = Get-Content $startupLogPath -Tail 30 | Out-String
+        Write-Log "--- ULTIMO LOG DE TASK SCHEDULER / RUNNER ---" "ERROR"
+        Write-Log "$startupDetails" "ERROR"
+    }
     Show-Alert "Fallo de Inicio del Backend" "La aplicacion se actualizo pero no fue posible reiniciar el proceso en el puerto $OldNextjsPort.`n`nPor favor revise install_sqlserver_log.txt."
     exit 1
 }

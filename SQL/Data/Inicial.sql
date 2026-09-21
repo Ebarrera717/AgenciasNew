@@ -64,18 +64,17 @@ ON CONFLICT (code) DO NOTHING;
 -- 7. Parámetros de conectividad SQL Server
 INSERT INTO public."SystemParameter" (code, name, value)
 VALUES
-    ('ServidorSQLServer',                'Host de SQL Server',                           'Rubiel/RUBIEL'),
-    ('UsuarioSQLServer',                 'Usuario SQL Server',                           'sa'),
-    ('ClaveSQLServer',                   'Contraseña SQL Server',                        '111985*'),
-    ('BaseSQLServer',                    'Base de Datos SQL Server',                     'Agencias'),
+    ('ServidorSQLServer',                'Host de SQL Server',                           ''),
+    ('UsuarioSQLServer',                 'Usuario SQL Server',                           ''),
+    ('ClaveSQLServer',                   'Contraseña SQL Server',                        ''),
+    ('EncriptarClaves',                  'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0'),
+    ('BaseSQLServer',                    'Base de Datos SQL Server',                     ''),
     ('PuertoSQLServer',                  'Puerto SQL Server',                            ''),
-    ('EnviarCotizacionesAutoSQLserver',  'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', '1'),
-	('EnviarFacturacionAutoSQLserver',   'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', '1'),
+    ('EnviarCotizacionesAutoSQLserver',  'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', '0'),
+	('EnviarFacturacionAutoSQLserver',   'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', '0'),
 	('Pais',                    		 'Pais',                     					 'Colombia'),
 	('MOSTRAR_TOTALIZACION_COTIZACION',  'Mostrar totalización financiera en cotización', 'true')
-ON CONFLICT (code) DO UPDATE
-    SET name  = EXCLUDED.name,
-        value = EXCLUDED.value;
+ON CONFLICT (code) DO NOTHING;
 
 -- 8. Monedas iniciales
 INSERT INTO public."Currency" (code, name, "exchangeRate")

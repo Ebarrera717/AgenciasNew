@@ -215,16 +215,22 @@ if ([string]::IsNullOrEmpty($SqlDb)) { $SqlDb = "Korex_colaereo" }
 if ([string]::IsNullOrEmpty($SqlUser)) { $SqlUser = "sa" }
 if ([string]::IsNullOrEmpty($SqlPass)) { $SqlPass = "zzeusagencias" }
 
-Write-Log "Parametros SQL Server: Host=$SqlHost, Port=$SqlPort, DB=$SqlDb, User=$SqlUser"
+Write-Log "Parametros SQL Server recibidos: Host=$SqlHost, Port=$SqlPort, DB=$SqlDb, User=$SqlUser"
+
+$targetSqlHost = $SqlHost
+if ($SqlHost -eq $env:COMPUTERNAME -or $SqlHost.ToLower() -eq "localhost" -or $SqlHost -eq "." -or $SqlHost -eq "(local)") {
+    Write-Log "Detectado host local ($SqlHost). Usando 127.0.0.1 en .env para garantizar resolucion IPv4 inmediata en Node.js."
+    $targetSqlHost = "127.0.0.1"
+}
 
 $EncodedUser = [System.Uri]::EscapeDataString($SqlUser)
 $EncodedPass = [System.Uri]::EscapeDataString($SqlPass)
-$DatabaseUrlSql = "sqlserver://$($SqlHost):$($SqlPort);database=$($SqlDb);user=$($EncodedUser);password=$($EncodedPass);encrypt=false;trustServerCertificate=true"
+$DatabaseUrlSql = "sqlserver://$($targetSqlHost):$($SqlPort);database=$($SqlDb);user=$($EncodedUser);password=$($EncodedPass);encrypt=false;trustServerCertificate=true"
 
 $EnvFile = "$TargetDir\.env"
-$NewEnvContent = "DATABASE_URL_SQLSERVER=`"$DatabaseUrlSql`"`nDATABASE_URL=`"$DatabaseUrlSql`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nLICENSE_SECRET=`"Korex_Master_License_Secret_Key_2026_Secure`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
+$NewEnvContent = "DATABASE_PROVIDER=`"sqlserver`"`nDATABASE_URL_SQLSERVER=`"$DatabaseUrlSql`"`nDATABASE_URL=`"$DatabaseUrlSql`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nLICENSE_SECRET=`"Korex_Master_License_Secret_Key_2026_Secure`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
 Set-Content -Path $EnvFile -Value $NewEnvContent -Encoding UTF8
-Write-Log "Archivo .env de SQL Server creado/actualizado correctamente."
+Write-Log "Archivo .env de SQL Server creado/actualizado correctamente (DATABASE_PROVIDER=sqlserver, Host=$targetSqlHost)."
 
 # Paso 5. ACTUALIZAR PROXY INVERSO EN web.config
 $WebConfigPath = "$TargetDir\web.config"
@@ -340,6 +346,12 @@ if (-not $serviceSuccess) {
             $executionMechanism = "TASK_SCHEDULER"
         } else {
             Write-Log "ERROR: Task Scheduler se registro pero el proceso Node no logro escuchar en puerto $NextjsPort." "ERROR"
+            $startupLogPath = "$TargetDir\korex_startup.log"
+            if (Test-Path $startupLogPath) {
+                $startupDetails = Get-Content $startupLogPath -Tail 30 | Out-String
+                Write-Log "--- TRAZA DE ARRANQUE (korex_startup.log) ---" "ERROR"
+                Write-Log "$startupDetails" "ERROR"
+            }
         }
     } else {
         Write-Log "ERROR: No se encontro task_scheduler_manager.ps1 en deploy." "ERROR"
@@ -348,6 +360,18 @@ if (-not $serviceSuccess) {
 
 if ($executionMechanism -eq "NONE") {
     Write-Log "ERROR CRITICO: Tanto Windows Service como Task Scheduler fallaron por politicas del servidor en SQL Server." "ERROR"
+    $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
+    if (Test-Path $errLogPath) {
+        $errDetails = Get-Content $errLogPath -Tail 25 | Out-String
+        Write-Log "--- ULTIMO LOG DEL DAEMON WINDOWS SERVICE ---" "ERROR"
+        Write-Log "$errDetails" "ERROR"
+    }
+    $startupLogPath = "$TargetDir\korex_startup.log"
+    if (Test-Path $startupLogPath) {
+        $startupDetails = Get-Content $startupLogPath -Tail 30 | Out-String
+        Write-Log "--- ULTIMO LOG DE TASK SCHEDULER / RUNNER ---" "ERROR"
+        Write-Log "$startupDetails" "ERROR"
+    }
     Show-Alert "Fallo de Arranque de la Aplicación" "No fue posible iniciar Korex como Servicio de Windows ni como Tarea Programada (Task Scheduler).`n`nPor favor revise install_sqlserver_log.txt y consulte con el administrador del sistema."
     exit 1
 }

@@ -140,35 +140,47 @@ $DbUrl = ""
 $OldSitePort = 3000
 $OldNextjsPort = 3001
 
-# Primero, leer puertos y conexión existentes en el .env si este existe
-if (Test-Path $EnvFile) {
-    $EnvContent = Get-Content $EnvFile
-    foreach ($line in $EnvContent) {
-        if ($line -match '^NEXTAUTH_URL="http://localhost:(\d+)"') {
-            $OldSitePort = [int]$matches[1]
-        }
-        if ($line -match '^PORT="?(\d+)"?') {
-            $OldNextjsPort = [int]$matches[1]
-        }
-        if ($line -match '^DATABASE_URL="(.*)"') {
-            $DbUrl = $matches[1]
-        }
+# Primero, verificar y leer el archivo .env existente
+if (-not (Test-Path $EnvFile)) {
+    Write-Log "ERROR CRITICO: No se encontro el archivo .env de la instalacion existente del cliente. Abortando actualizacion." "ERROR"
+    Show-Alert "Error Critico de Actualizacion" "No se encontro el archivo .env de la instalacion existente en este directorio:`n$TargetDir`n`nEl actualizador de PostgreSQL no puede continuar sin la configuracion previa del cliente."
+    exit 1
+}
+
+$EnvContent = Get-Content $EnvFile
+foreach ($line in $EnvContent) {
+    if ($line -match '^NEXTAUTH_URL="http://localhost:(\d+)"') {
+        $OldSitePort = [int]$matches[1]
     }
+    if ($line -match '^PORT="?(\d+)"?') {
+        $OldNextjsPort = [int]$matches[1]
+    }
+    if ($line -match '^DATABASE_URL="(.*)"') {
+        $DbUrl = $matches[1]
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($DbUrl)) {
+    Write-Log "ERROR CRITICO: El archivo .env existente no contiene una variable DATABASE_URL valida." "ERROR"
+    Show-Alert "Error de Configuracion" "El archivo .env de la instalacion no contiene informacion de conexion valida.`n`nRevise el archivo .env antes de actualizar."
+    exit 1
 }
 
 # Si se pasaron los parámetros completos por linea de comandos, los usamos
 if (![string]::IsNullOrEmpty($PgHost) -and ![string]::IsNullOrEmpty($PgPort) -and ![string]::IsNullOrEmpty($PgDb) -and ![string]::IsNullOrEmpty($PgUser)) {
     Write-Log "Usando configuracion de conexion DB recibida por parametros: Host=$PgHost, Port=$PgPort, DB=$PgDb, User=$PgUser"
 } else {
-    Write-Log "No se recibieron parametros completos de conexion. Leyendo del archivo .env..."
-    if ($DbUrl -and ($DbUrl -match '^postgresql://([^:]+):([^@]*)@([^:]+):([0-9]+)/([^?]+)')) {
+    Write-Log "Extrayendo credenciales PostgreSQL desde .env existente..."
+    if ($DbUrl -match '^postgresql://([^:]+):([^@]*)@([^:]+):([0-9]+)/([^?]+)') {
         $PgUser = [System.Uri]::UnescapeDataString($matches[1])
         $PgPass = [System.Uri]::UnescapeDataString($matches[2])
         $PgHost = $matches[3]
         $PgPort = $matches[4]
         $PgDb = $matches[5]
     } else {
-        $PgUser = "postgres"; $PgPass = ""; $PgHost = "localhost"; $PgPort = "5432"; $PgDb = "agencias_new"
+        Write-Log "ERROR CRITICO: No fue posible parsear el string de conexion PostgreSQL desde el .env del cliente." "ERROR"
+        Show-Alert "Error de Formato de Conexion" "La cadena de conexion en .env no tiene el formato esperado de PostgreSQL (postgresql://user:pass@host:port/db)."
+        exit 1
     }
 }
 
@@ -182,7 +194,7 @@ $NextjsPort = Resolve-PortConflict $OldNextjsPort 3020
 if ($DbUrl) {
     Write-Log "Actualizando archivo .env con puertos (IIS=$SitePort, Next.js=$NextjsPort)..."
     $DatabaseUrl = "postgresql://$($PgUser):$($PgPass)@$($PgHost):$($PgPort)/$($PgDb)?schema=public"
-    $NewEnvContent = "DATABASE_URL=`"$DatabaseUrl`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
+    $NewEnvContent = "DATABASE_PROVIDER=`"postgresql`"`nDATABASE_URL=`"$DatabaseUrl`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
     Set-Content -Path $EnvFile -Value $NewEnvContent -Encoding UTF8
 }
 

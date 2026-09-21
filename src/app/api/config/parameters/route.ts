@@ -2,8 +2,84 @@ import { paginateArray } from '@/lib/pagination'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
+import { encryptPassword, decryptPassword, isEncrypted } from '@/lib/security'
 
 export const dynamic = 'force-dynamic'
+
+async function isPasswordEncryptionActive(): Promise<boolean> {
+    if (process.env.ENCRYPT_PASSWORDS === '1' || process.env.ENCRYPT_PASSWORDS?.toLowerCase() === 'true') {
+        return true;
+    }
+    try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query("SELECT [value] FROM dbo.[SystemParameter] WHERE [code] = 'EncriptarClaves'");
+                await pool.close();
+                const val = res.recordset[0]?.value;
+                return val === '1' || val === 'true' || val === 'SI';
+            } catch (err) {
+                if (pool) await pool.close();
+                return false;
+            }
+        } else {
+            const rows = await prisma.$queryRawUnsafe<any[]>("SELECT value FROM public.\"SystemParameter\" WHERE code = 'EncriptarClaves'");
+            const val = rows[0]?.value;
+            return val === '1' || val === 'true' || val === 'SI';
+        }
+    } catch (e) {
+        return false;
+    }
+}
+
+async function syncClaveSQLServerEncryption(targetEncrypted: boolean) {
+    try {
+        if (isSQLServerMode()) {
+            let pool;
+            try {
+                pool = await getSQLServerConnection();
+                const res = await pool.request().query("SELECT [id], [value] FROM dbo.[SystemParameter] WHERE [code] = 'ClaveSQLServer'");
+                const row = res.recordset[0];
+                if (row && row.value && row.value.trim() !== '') {
+                    const currVal = row.value.trim();
+                    let newVal = currVal;
+                    if (targetEncrypted && !isEncrypted(currVal)) {
+                        newVal = encryptPassword(currVal);
+                    } else if (!targetEncrypted && isEncrypted(currVal)) {
+                        newVal = decryptPassword(currVal);
+                    }
+                    if (newVal !== currVal) {
+                        await pool.request()
+                            .input('id', row.id)
+                            .input('val', newVal)
+                            .query("UPDATE dbo.[SystemParameter] SET [value] = @val WHERE [id] = @id");
+                    }
+                }
+                await pool.close();
+            } catch (err) {
+                if (pool) await pool.close();
+            }
+        } else {
+            const rows = await prisma.$queryRawUnsafe<any[]>("SELECT id, value FROM public.\"SystemParameter\" WHERE code = 'ClaveSQLServer'");
+            const row = rows[0];
+            if (row && row.value && row.value.trim() !== '') {
+                const currVal = row.value.trim();
+                let newVal = currVal;
+                if (targetEncrypted && !isEncrypted(currVal)) {
+                    newVal = encryptPassword(currVal);
+                } else if (!targetEncrypted && isEncrypted(currVal)) {
+                    newVal = decryptPassword(currVal);
+                }
+                if (newVal !== currVal) {
+                    await prisma.$queryRawUnsafe("UPDATE public.\"SystemParameter\" SET value = $1 WHERE id = $2", newVal, row.id);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('[PARAMETERS_ENCRYPTION_SYNC] Error al sincronizar ClaveSQLServer:', e);
+    }
+}
 
 export async function GET(req: NextRequest) {
     try {
@@ -36,6 +112,14 @@ export async function POST(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         
+        let processedValue = value || '';
+        if (code === 'ClaveSQLServer') {
+            const encActive = await isPasswordEncryptionActive();
+            if (encActive && processedValue && !isEncrypted(processedValue)) {
+                processedValue = encryptPassword(processedValue);
+            }
+        }
+
         if (isSQLServerMode()) {
             let pool;
             try {
@@ -43,7 +127,7 @@ export async function POST(req: NextRequest) {
                 const res = await pool.request()
                     .input('code', code || '')
                     .input('name', name || '')
-                    .input('value', value || '')
+                    .input('value', processedValue)
                     .query(`
                         INSERT INTO dbo.[SystemParameter] ([code], [name], [value])
                         OUTPUT INSERTED.id
@@ -51,7 +135,12 @@ export async function POST(req: NextRequest) {
                     `);
                 await pool.close();
                 const dbId = res.recordset[0]?.id;
-                const parameter = { id: dbId, code, name, value };
+                const parameter = { id: dbId, code, name, value: processedValue };
+
+                if (code === 'EncriptarClaves') {
+                    await syncClaveSQLServerEncryption(processedValue === '1' || processedValue === 'true');
+                }
+
                 return NextResponse.json({ message: 'Parámetro creado', parameter });
             } catch (err: any) {
                 if (pool) await pool.close();
@@ -63,7 +152,7 @@ export async function POST(req: NextRequest) {
             `CALL public.spParameterCrear($1::TEXT, $2::TEXT, $3::TEXT, $4::INT, $5::INT, $6::TEXT)`,
             code,
             name,
-            value,
+            processedValue,
             actingUserId,
             0, // p_parameter_id
             '' // p_mensaje_resultado
@@ -76,7 +165,11 @@ export async function POST(req: NextRequest) {
             throw new Error(message || 'Error creating parameter');
         }
 
-        const parameter = { id: dbId, code, name, value };
+        const parameter = { id: dbId, code, name, value: processedValue };
+
+        if (code === 'EncriptarClaves') {
+            await syncClaveSQLServerEncryption(processedValue === '1' || processedValue === 'true');
+        }
 
         import('@/lib/logger').then(({ logSystemEvent }) => {
             logSystemEvent({ userId: actingUserId, action: 'CREATE', module: 'PARAMETER', description: `Parámetro ${parameter.name} creado (SP).`, metadata: parameter });
@@ -95,6 +188,16 @@ export async function PUT(req: NextRequest) {
         const userIdHeader = req.headers.get('X-User-Id')
         const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
         
+        let processedValue = value || '';
+        if (code === 'ClaveSQLServer') {
+            const encActive = await isPasswordEncryptionActive();
+            if (encActive && processedValue && !isEncrypted(processedValue)) {
+                processedValue = encryptPassword(processedValue);
+            } else if (!encActive && processedValue && isEncrypted(processedValue)) {
+                processedValue = decryptPassword(processedValue);
+            }
+        }
+
         if (isSQLServerMode()) {
             let pool;
             try {
@@ -103,14 +206,19 @@ export async function PUT(req: NextRequest) {
                     .input('id', parseInt(id))
                     .input('code', code || '')
                     .input('name', name || '')
-                    .input('value', value || '')
+                    .input('value', processedValue)
                     .query(`
                         UPDATE dbo.[SystemParameter]
                         SET [code] = @code, [name] = @name, [value] = @value
                         WHERE [id] = @id
                     `);
                 await pool.close();
-                const parameter = { id, code, name, value };
+                const parameter = { id, code, name, value: processedValue };
+
+                if (code === 'EncriptarClaves') {
+                    await syncClaveSQLServerEncryption(processedValue === '1' || processedValue === 'true');
+                }
+
                 return NextResponse.json({ message: 'Parámetro actualizado', parameter });
             } catch (err: any) {
                 if (pool) await pool.close();
@@ -123,7 +231,7 @@ export async function PUT(req: NextRequest) {
             parseInt(id),
             code,
             name,
-            value,
+            processedValue,
             actingUserId,
             '' // p_mensaje_resultado
         );
@@ -133,7 +241,11 @@ export async function PUT(req: NextRequest) {
             throw new Error(message);
         }
 
-        const parameter = { id, code, name, value };
+        const parameter = { id, code, name, value: processedValue };
+
+        if (code === 'EncriptarClaves') {
+            await syncClaveSQLServerEncryption(processedValue === '1' || processedValue === 'true');
+        }
 
         import('@/lib/logger').then(({ logSystemEvent }) => {
             logSystemEvent({ userId: actingUserId, action: 'UPDATE', module: 'PARAMETER', description: `Parámetro ${parameter.name} actualizado (SP).`, metadata: parameter });

@@ -3267,21 +3267,25 @@ INSERT INTO public."SystemParameter" (code, name, value) VALUES ('LICENSE_EXPIRA
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PuertoSQLServer', 'Puerto SQL Server', '') ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EnviarCotizacionesAutoSQLserver', 'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', '1') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EnviarCotizacionesAutoSQLserver', 'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', '0') ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EnviarFacturacionAutoSQLserver', 'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', '1') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EnviarFacturacionAutoSQLserver', 'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', '0') ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('Pais', 'Pais', 'Colombia') ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('MOSTRAR_TOTALIZACION_COTIZACION', 'Mostrar totalización financiera en cotización', 'true') ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('ServidorSQLServer', 'Host de SQL Server', 'ZEUSAGENCIAS10') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('ServidorSQLServer', 'Host de SQL Server', '') ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('UsuarioSQLServer', 'Usuario SQL Server', 'zeusagencias') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('UsuarioSQLServer', 'Usuario SQL Server', '') ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('ClaveSQLServer', 'Contraseña SQL Server', 'zzeusagencias') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('ClaveSQLServer', 'Contraseña SQL Server', '') ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO public."SystemParameter" (code, name, value) VALUES ('BaseSQLServer', 'Base de Datos SQL Server', 'Zeusagencias_23') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EncriptarClaves', 'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('BaseSQLServer', 'Base de Datos SQL Server', '') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PuertoSQLServer', 'Puerto de SQL Server', '') ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('AGENCY_NAME', 'Nombre o Razón Social de la Agencia', 'KOREX AGENCIA PRUEBA') ON CONFLICT (code) DO NOTHING;
 

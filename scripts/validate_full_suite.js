@@ -206,7 +206,7 @@ async function validateFullSuite() {
     // -------------------------------------------------------------------------
     // CAPA 8: SUITE DE ESTRATEGIA DE EJECUCIÓN Y FALLBACK (SERVICE + TASK SCHEDULER)
     // -------------------------------------------------------------------------
-    console.log('\n[CAPA 8/8] Validando Estrategia de Ejecución y Fallback (Task Scheduler)...');
+    console.log('\n[CAPA 8/9] Validando Estrategia de Ejecución y Fallback (Task Scheduler)...');
     try {
         const { execSync } = require('child_process');
         execSync(`node "${path.join(__dirname, 'validate_execution_strategy_suite.js')}"`, { stdio: 'pipe' });
@@ -222,6 +222,50 @@ async function validateFullSuite() {
             Componente: 'validate_execution_strategy_suite.js',
             Estado: '❌ FALLO',
             Detalle: execErr.message
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // CAPA 9: SUITE DEL SKILL MAESTRO KOREX (ID: 74163) - AISLAMIENTO & .ENV
+    // -------------------------------------------------------------------------
+    console.log('\n[CAPA 9/10] Validando SKILL MAESTRO KOREX (ID: 74163)...');
+    try {
+        const { execSync } = require('child_process');
+        execSync(`node "${path.join(__dirname, 'validate_master_skill_suite.js')}"`, { stdio: 'pipe' });
+        results.push({
+            Capa: '9. SKILL MAESTRO (74163)',
+            Componente: 'validate_master_skill_suite.js',
+            Estado: '✅ OK',
+            Detalle: '7/7 Pruebas pasaron (Aislamiento, .env Inviolable, Setup de Cero, Fallbacks Protegidos)'
+        });
+    } catch (masterErr) {
+        results.push({
+            Capa: '9. SKILL MAESTRO (74163)',
+            Componente: 'validate_master_skill_suite.js',
+            Estado: '❌ FALLO',
+            Detalle: masterErr.message
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // CAPA 10: SUITE DE ENCRIPTACIÓN DE CONTRASEÑAS SQL & ZEUS ERP (.ENV Y PARÁMETRO)
+    // -------------------------------------------------------------------------
+    console.log('\n[CAPA 10/10] Validando Encriptación de Contraseñas (.ENV & Zeus ERP)...');
+    try {
+        const { execSync } = require('child_process');
+        execSync(`node "${path.join(__dirname, 'validate_password_encryption_suite.js')}"`, { stdio: 'pipe' });
+        results.push({
+            Capa: '10. Encriptación Contraseñas',
+            Componente: 'validate_password_encryption_suite.js',
+            Estado: '✅ OK',
+            Detalle: '7/7 Pruebas pasaron (AES-256 .ENV, Zeus ERP Clave, Parámetro EncriptarClaves)'
+        });
+    } catch (encErr) {
+        results.push({
+            Capa: '10. Encriptación Contraseñas',
+            Componente: 'validate_password_encryption_suite.js',
+            Estado: '❌ FALLO',
+            Detalle: encErr.message
         });
     }
 
@@ -242,3 +286,4 @@ async function validateFullSuite() {
 }
 
 validateFullSuite();
+

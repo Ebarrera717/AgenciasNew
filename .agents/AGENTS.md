@@ -223,3 +223,35 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 - **Preservación en Actualizaciones**: Los scripts actualizadores (`Update_Korex.ps1` / `Update_Korex_SQLServer.ps1`) detectan primero el mecanismo activo (`EXECUTION_MECHANISM` en `.env`) y lo conservan. Si un cliente opera bajo `TASK_SCHEDULER`, la actualización NO intentará forzarlo a `WINDOWS_SERVICE`.
 - **Prohibición de Evadir Seguridad**: Si tanto el Servicio como el Task Scheduler son bloqueados por restricciones corporativas, el instalador no intentará alterar antivirus, firewalls ni políticas de seguridad; emitirá un reporte técnico detallado para el oficial de IT del cliente.
 - **Aislamiento y Validación**: La estrategia respeta el 100% de aislamiento entre PostgreSQL y SQL Server. Se valida obligatoriamente mediante `node scripts/validate_execution_strategy_suite.js` y `node scripts/validate_full_suite.js` (Skill [`execution-strategy-fallback`](file:///f:/Proyectos/AgenciasNew/.agents/skills/execution-strategy-fallback/SKILL.md)).
+
+---
+
+## 16. SKILL MAESTRO KOREX (ID: 74163) - Desarrollo, Instalación, Actualización, Aislamiento y Protección Inviolable del `.env`
+
+- **Estado y Alcance**: SKILL OBLIGATORIO Y PERMANENTE aplicable a Backend, Frontend, Base de Datos, SPs, Migraciones, Instaladores, Actualizadores, Pruebas y Producción.
+- **Protección Inviolable del Entorno de Producción (`.env`)**:
+  - **Prohibición Absoluta de Empaquetado**: Queda terminantemente prohibido incluir archivos `.env`, `.env.local` o `.env.production` dentro de `RELEASE_KOREX` o en los paquetes de Inno Setup. Todos los scripts de empaquetado (`deploy/Generar_Empaquetado.ps1`) y scripts `.iss` deben incluir exclusiones explícitas (`Excludes: "*.env, *.env.*, .env, *.bak*"`).
+  - **Instalación Inicial desde Cero**: El instalador (`Setup_Korex_Silent.ps1` / `Setup_Korex_SQLServer_Silent.ps1`) genera el `.env` desde cero solicitando credenciales al administrador o tomándolas de la base de datos de producción existente.
+  - **Actualizadores Inmutables de Configuración**: Los actualizadores (`Update_Korex.ps1` / `Update_Korex_SQLServer.ps1`) NUNCA deben sobrescribir el `.env` del cliente ni contener variables de desarrollo por defecto (como `agencias_new`, `Korex_colaereo`, `sa`, `zzeusagencias`). Si falta el `.env`, el actualizador debe detenerse de inmediato con error crítico.
+- **Parametrización Limpia de Integraciones Externas (Zeus ERP)**:
+  - Los parámetros del sistema para servidores externos (`ServidorSQLServer`, `BaseSQLServer`, `UsuarioSQLServer`, `ClaveSQLServer`) deben sembrarse completamente vacíos (`''`) por defecto.
+  - Los parámetros de auto-exportación (`EnviarFacturasAutoSQLserver`, `EnviarCotizacionesAutoSQLserver`) deben inicializarse estrictamente en `'0'` (desactivado).
+  - Ningún login, arranque o proceso interno de Korex debe intentar conectar a servidores externos si no han sido configurados explícitamente por el usuario o si la exportación no ha sido solicitada.
+- **Aislamiento Absoluto de Motores (1 Motor Activo = 1 Única Infraestructura)**: El sistema opera 100% aislado según `DATABASE_PROVIDER` (`postgresql` o `sqlserver`), sin consultar ni conectar jamás al motor inactivo.
+- **Validación Automatizada**: Toda modificación debe superar `node scripts/validate_master_skill_suite.js` y las 10 capas de `node scripts/validate_full_suite.js` (Skill [`korex-master-rules`](file:///f:/Proyectos/AgenciasNew/.agents/skills/korex-master-rules/SKILL.md)).
+
+---
+
+## 17. Regla de Encriptación de Contraseñas SQL y Zeus ERP (`password-encryption-governance`)
+
+- **Encriptación Reversible Estándar (AES-256-CBC)**: Todas las contraseñas de bases de datos pueden ser protegidas con el formato `ENC(<iv_hex>:<ciphertext_hex>)`.
+- **Compatibilidad Transparente en .ENV**:
+  - `src/lib/postgres.ts`, `src/lib/prisma.ts` y `src/lib/sqlserver.ts` desencriptan automáticamente tokens `ENC(...)` presentes en cadenas de conexión (`DATABASE_URL`, `DATABASE_URL_POSTGRES`, `DATABASE_URL_SQLSERVER`, `SQLSERVER_PASSWORD`).
+- **Gobernanza por Parámetro General (`EncriptarClaves`)**:
+  - Parámetro en `SystemParameter` (`EncriptarClaves`, por defecto `'0'`).
+  - Cuando `EncriptarClaves == '1'`: Toda contraseña de Zeus ERP (`ClaveSQLServer`) guardada desde la interfaz de administración se encripta automáticamente en la base de datos.
+  - Cuando se conmuta el parámetro entre `'0'` y `'1'`, el sistema sincroniza automáticamente el estado de encriptación de `ClaveSQLServer`.
+- **Desencriptación Segura sin Errores**: Todo proceso que consulte `ClaveSQLServer` para conectar a Zeus ERP (`getSQLServerConnection()`) desencripta transparentemente el valor antes de abrir la conexión, evitando fallos independientemente del estado del interruptor.
+- **Herramienta CLI y Pruebas Automatizadas**: Todo cambio debe superar `node scripts/encrypt_password.js --test`, `node scripts/validate_password_encryption_suite.js` y las 10 capas de `node scripts/validate_full_suite.js`.
+
+
