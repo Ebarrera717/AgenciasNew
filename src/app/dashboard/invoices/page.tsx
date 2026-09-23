@@ -273,6 +273,7 @@ export default function InvoicesListPage() {
                                 />
                             </th>
                             <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Referencia</th>
+                            <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Factura Zeus ERP</th>
                             <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Cliente</th>
                             <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Fechas</th>
                             <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Total</th>
@@ -282,9 +283,9 @@ export default function InvoicesListPage() {
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                         {loading ? (
-                            <tr><td colSpan={7} className="p-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600 mx-auto"></div></td></tr>
+                            <tr><td colSpan={8} className="p-20 text-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600 mx-auto"></div></td></tr>
                         ) : invoices.length === 0 ? (
-                            <tr><td colSpan={7} className="p-20 text-center text-zinc-500 font-medium">No se encontraron facturas.</td></tr>
+                            <tr><td colSpan={8} className="p-20 text-center text-zinc-500 font-medium">No se encontraron facturas.</td></tr>
                         ) : (
                             filteredInvoices.map((q) => {
                                 const mainProd = q.products?.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
@@ -294,6 +295,9 @@ export default function InvoicesListPage() {
                                 const checkInDisplay = q.checkInDate || firstProd?.checkInDate;
                                 const checkOutDisplay = q.checkOutDate || firstProd?.checkOutDate;
                                 const isSelected = selectedIds.includes(q.id);
+                                const zeusDisplayNum = q.zeusInvoiceNumber || (q.consecutivo ? (q.serie && !q.consecutivo.startsWith(q.serie) ? `${q.serie}${q.consecutivo}` : q.consecutivo) : null);
+                                const isImportedFromExcel = q.isExcelImport || (q.internalNumber || '').startsWith('FAC-');
+                                const isExportedToZeus = q.state === 'EXPORTED' || q.state === 'EXPORTADO';
 
                                 return (
                                     <tr key={q.id} className={`hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all ${isSelected ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}>
@@ -308,6 +312,19 @@ export default function InvoicesListPage() {
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-blue-600">{q.internalNumber || `#${q.id}`}</div>
                                             <div className="text-[10px] text-zinc-400 mt-0.5">ID #{q.id} • {q.date ? format(new Date(q.date), 'dd MMM, yyyy') : '-'}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {isExportedToZeus && zeusDisplayNum ? (
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black border shadow-xs ${
+                                                    isImportedFromExcel 
+                                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                                                    : "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                                                }`}>
+                                                    {zeusDisplayNum}
+                                                </span>
+                                            ) : (
+                                                <span className="text-zinc-400 text-xs font-medium">-</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-bold text-zinc-900 dark:text-white">{q.client?.name || q.clientName || 'Consumidor Final'}</div>

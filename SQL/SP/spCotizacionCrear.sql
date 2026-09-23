@@ -56,6 +56,83 @@ BEGIN
         DECLARE @internalNum NVARCHAR(100) = NULL;
         EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @consecutivo_formateado = @internalNum OUTPUT;
 
+        -- Validación de variables adicionales obligatorias del cliente para cotizaciones
+        IF @clientId IS NOT NULL
+        BEGIN
+            DECLARE @clientMandatoryVarsJson NVARCHAR(MAX) = (SELECT mandatoryVariables FROM dbo.[Client] WHERE id = @clientId);
+            IF @clientMandatoryVarsJson IS NOT NULL AND ISJSON(@clientMandatoryVarsJson) = 1
+            BEGIN
+                DECLARE @reqVarList TABLE (varId INT);
+                IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotation') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotation') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END
+                ELSE IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotations') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotations') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END
+                ELSE IF JSON_VALUE(@clientMandatoryVarsJson, '$[0]') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson) WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END
+
+                IF EXISTS (SELECT 1 FROM @reqVarList)
+                BEGIN
+                    DECLARE @reqVarId INT;
+                    DECLARE req_var_cur CURSOR LOCAL FAST_FORWARD FOR
+                    SELECT varId FROM @reqVarList;
+
+                    OPEN req_var_cur;
+                    FETCH NEXT FROM req_var_cur INTO @reqVarId;
+
+                    WHILE @@FETCH_STATUS = 0
+                    BEGIN
+                        DECLARE @reqVarName NVARCHAR(250) = (SELECT [name] FROM dbo.[MasterVariable] WHERE id = @reqVarId);
+                        SET @reqVarName = ISNULL(@reqVarName, CONCAT(N'Variable #', @reqVarId));
+
+                        IF EXISTS (
+                            SELECT 1
+                            FROM OPENJSON(@p_data, '$.items') AS itm
+                            OUTER APPLY (
+                                SELECT COUNT(1) AS cnt
+                                FROM OPENJSON(itm.[value], '$.variables') AS v
+                                WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
+                                  AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
+                            ) vars
+                            WHERE ISNULL(vars.cnt, 0) = 0
+                        )
+                        BEGIN
+                            DECLARE @missingProdDesc NVARCHAR(250) = (
+                                SELECT TOP 1 ISNULL(p.[description], CONCAT(N'Producto #', ISNULL(TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS NVARCHAR(50)), '1')))
+                                FROM OPENJSON(@p_data, '$.items') AS itm
+                                LEFT JOIN dbo.[Product] p ON p.id = TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS INT)
+                                OUTER APPLY (
+                                    SELECT COUNT(1) AS cnt
+                                    FROM OPENJSON(itm.[value], '$.variables') AS v
+                                    WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
+                                      AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
+                                ) vars
+                                WHERE ISNULL(vars.cnt, 0) = 0
+                            );
+
+                            SET @p_mensaje_resultado = CONCAT(N'ERROR: El cliente requiere completar la variable adicional "', @reqVarName, N'" en el producto "', ISNULL(@missingProdDesc, N'Producto'), N'".');
+                            CLOSE req_var_cur;
+                            DEALLOCATE req_var_cur;
+                            RETURN;
+                        END
+
+                        FETCH NEXT FROM req_var_cur INTO @reqVarId;
+                    END
+
+                    CLOSE req_var_cur;
+                    DEALLOCATE req_var_cur;
+                END
+            END
+        END
+
         BEGIN TRANSACTION;
 
         INSERT INTO dbo.[Quotation] (
@@ -114,6 +191,8 @@ BEGIN
                 DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.servicios');
                 DECLARE @descripcion NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.descripcion');
                 DECLARE @passengerItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.passenger');
+                DECLARE @providerDueDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.providerDueDate') AS DATETIME2);
+                DECLARE @providerInvoice NVARCHAR(100) = JSON_VALUE(@item_val, '$.providerInvoice');
 
                 IF @providerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerId) SET @providerId = NULL;
                 IF @prestadoraId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraId) SET @prestadoraId = NULL;
@@ -123,12 +202,12 @@ BEGIN
                     quotationId, productId, quantity, price, cost, providerId, prestadoraId,
                     checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
                     reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                    service, servicios, descripcion, passenger
+                    service, servicios, descripcion, passenger, providerDueDate, providerInvoice
                 ) VALUES (
                     @p_quotation_id, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
                     @checkInDate, @checkOutDate, @nights, @paxAdultsItem, @paxChildrenItem, @serviceType, @destinationItem,
                     @reservationCodeItem, @sellerCommission, @ticketPrinterCommission, @comboId, @mainTaxId, @inNationality,
-                    @service, @servicios, @descripcion, @passengerItem
+                    @service, @servicios, @descripcion, @passengerItem, @providerDueDate, @providerInvoice
                 );
                 SET @qp_id = SCOPE_IDENTITY();
 

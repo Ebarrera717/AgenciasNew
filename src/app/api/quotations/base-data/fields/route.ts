@@ -41,7 +41,9 @@ const labelsMap: Record<string, Record<string, string>> = {
         servicios: 'Servicio (Manual)',
         descripcion: 'Descripción (Manual)',
         passengers: 'Pasajeros',
-        payments: 'Formas de Pago'
+        payments: 'Formas de Pago',
+        providerDueDate: 'Fecha Vencimiento Proveedor',
+        providerInvoice: 'Factura Proveedor'
     }
 }
 

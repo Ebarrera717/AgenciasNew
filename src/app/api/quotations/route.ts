@@ -53,23 +53,14 @@ export async function POST(req: NextRequest) {
             });
         });
 
-        // Intentar auto-exportar a SQL Server si está en modo SQL Server o parámetro activo
+        // Intentar auto-exportar a Zeus ERP si el parámetro EnviarCotizacionesAutoSQLserver está activo ('1')
+        let autoExportResult = null;
         if (dbQuotationId) {
             try {
-                const exportRes = await prisma.$queryRawUnsafe<any[]>(
-                    `CALL public.spExportQuotation($1, $2, $3)`,
-                    dbQuotationId.toString(),
-                    actingUserId,
-                    ''
-                );
-                const xmlRow = exportRes && exportRes.length > 0 ? exportRes[0] : null;
-                const xmlStr = xmlRow?.mensaje_resultado || xmlRow?.p_mensaje_resultado || (xmlRow && typeof xmlRow === 'object' ? Object.values(xmlRow)[0] : '');
-                if (xmlStr && typeof xmlStr === 'string' && xmlStr.trim().startsWith('<')) {
-                    const { executeSQLServerProcedure } = await import('@/lib/sqlserver');
-                    await executeSQLServerProcedure('spCotizacionesCrear', { xml: xmlStr }).catch((e: any) => console.warn('[AUTO_EXPORT] SQL Server import warning:', e?.message));
-                }
+                const { autoExportQuotationToZeusERP } = await import('@/lib/zeus-auto-export');
+                autoExportResult = await autoExportQuotationToZeusERP(dbQuotationId, actingUserId);
             } catch (expErr: any) {
-                console.warn('[AUTO_EXPORT] Auto-export to SQL Server warning:', expErr?.message);
+                console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning:', expErr?.message);
             }
         }
 

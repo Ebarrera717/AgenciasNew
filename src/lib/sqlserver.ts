@@ -40,7 +40,6 @@ export function parseSQLServerUrl(connStr: string) {
         host = parts[0];
         instanceName = parts[1];
     }
-    if (host.toLowerCase() === 'localhost') host = '127.0.0.1';
 
     let database = '';
     let user = '';
@@ -55,11 +54,15 @@ export function parseSQLServerUrl(connStr: string) {
             if (key === 'database') database = val;
             else if (key === 'user' || key === 'user id' || key === 'uid') user = val;
             else if (key === 'password' || key === 'pwd') password = decryptPassword(val);
+            else if (key === 'instance' || key === 'instancename') instanceName = val;
+            else if (key === 'port') portStr = val;
         }
     }
 
     return {
         servidor: instanceName ? `${host}\\${instanceName}` : host,
+        instanceName: instanceName,
+        rawHost: host,
         usuario: user,
         clave: password,
         base_datos: database,
@@ -131,17 +134,12 @@ export async function getSQLServerConnection(overrideDbName?: string) {
     const portVal = (configRow.puerto || '').trim();
 
     let host = serverVal;
-    let instanceName: string | undefined = undefined;
+    let instanceName: string | undefined = configRow.instanceName;
 
     if (serverVal.includes('\\')) {
         const parts = serverVal.split('\\');
         host = parts[0];
         instanceName = parts[1];
-    }
-
-    const localCompName = (process.env.COMPUTERNAME || '').toUpperCase();
-    if (host.toLowerCase() === 'localhost' || host.toLowerCase() === '.' || host.toLowerCase() === '(local)' || (localCompName && host.toUpperCase() === localCompName)) {
-        host = '127.0.0.1';
     }
 
     const sqlConfig: any = {
@@ -159,13 +157,15 @@ export async function getSQLServerConnection(overrideDbName?: string) {
         requestTimeout: 60000
     };
 
-    if (portVal && portVal !== '') {
-        sqlConfig.port = parseInt(portVal, 10);
-        delete sqlConfig.options.instanceName;
-        console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}:${sqlConfig.port}`);
-    } else if (instanceName) {
+    if (instanceName) {
         sqlConfig.options.instanceName = instanceName;
+        if (portVal && portVal !== '' && portVal !== '1433') {
+            sqlConfig.port = parseInt(portVal, 10);
+        }
         console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}\\${instanceName} (Vía SQL Browser)`);
+    } else if (portVal && portVal !== '') {
+        sqlConfig.port = parseInt(portVal, 10);
+        console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}:${sqlConfig.port}`);
     } else {
         sqlConfig.port = 1433;
         console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}:1433`);
@@ -174,54 +174,52 @@ export async function getSQLServerConnection(overrideDbName?: string) {
     try {
         const pool = new mssql.ConnectionPool(sqlConfig);
         await pool.connect();
-        console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] en SQL Server (${host})!`);
+        console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] en SQL Server (${host}${instanceName ? '\\' + instanceName : ''})!`);
         return pool;
     } catch (error: any) {
-        console.warn(`[SQL_CONN] Falló primer intento de conexión a '${dbVal}' en '${host}': ${error.message}`);
+        console.warn(`[SQL_CONN] Falló intento principal de conexión a '${dbVal}' en '${host}${instanceName ? '\\' + instanceName : ''}': ${error.message}`);
         
-        // Intentar fallback 1: 127.0.0.1 directo en puerto 1433 sin instanceName
-        if (host !== '127.0.0.1') {
-            console.log(`[SQL_CONN] Intentando conexión de respaldo en 127.0.0.1 (IPv4 Loopback)...`);
+        // Estrategia de fallbacks inteligentes
+        const fallbackHosts: { server: string; instanceName?: string; port?: number }[] = [];
+        if (instanceName) {
+            if (host.toLowerCase() !== 'localhost') fallbackHosts.push({ server: 'localhost', instanceName });
+            if (host !== '127.0.0.1') fallbackHosts.push({ server: '127.0.0.1', instanceName });
+            const compName = process.env.COMPUTERNAME;
+            if (compName && host.toUpperCase() !== compName.toUpperCase()) fallbackHosts.push({ server: compName, instanceName });
+        } else {
+            if (host !== '127.0.0.1') fallbackHosts.push({ server: '127.0.0.1', port: sqlConfig.port || 1433 });
+            if (host.toLowerCase() !== 'localhost') fallbackHosts.push({ server: 'localhost', port: sqlConfig.port || 1433 });
+        }
+
+        for (const fb of fallbackHosts) {
             try {
-                const fallbackConfig = { 
-                    ...sqlConfig, 
-                    server: '127.0.0.1',
-                    port: sqlConfig.port || 1433,
+                console.log(`[SQL_CONN] Intentando conexión de respaldo en '${fb.server}${fb.instanceName ? '\\' + fb.instanceName : ':' + (fb.port || 1433)}'...`);
+                const fbConfig = {
+                    ...sqlConfig,
+                    server: fb.server,
+                    port: fb.port,
                     options: { ...sqlConfig.options }
                 };
-                delete fallbackConfig.options.instanceName;
-                const poolFallback = new mssql.ConnectionPool(fallbackConfig);
-                await poolFallback.connect();
-                console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] mediante fallback 127.0.0.1!`);
-                return poolFallback;
-            } catch (fallbackErr: any) {
-                console.error('[SQL_CONN] Falló intento de respaldo en 127.0.0.1:', fallbackErr.message);
+                if (fb.instanceName) {
+                    fbConfig.options.instanceName = fb.instanceName;
+                    delete fbConfig.port;
+                } else {
+                    delete fbConfig.options.instanceName;
+                }
+                const poolFb = new mssql.ConnectionPool(fbConfig);
+                await poolFb.connect();
+                console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] mediante fallback ${fb.server}!`);
+                return poolFb;
+            } catch (fbErr: any) {
+                console.warn(`[SQL_CONN] Falló fallback en ${fb.server}: ${fbErr.message}`);
             }
         }
 
-        // Intentar fallback 2: localhost directo
-        if (host !== 'localhost') {
-            console.log(`[SQL_CONN] Intentando conexión de respaldo en localhost...`);
-            try {
-                const fallbackLocalhost = { 
-                    ...sqlConfig, 
-                    server: 'localhost',
-                    port: sqlConfig.port || 1433,
-                    options: { ...sqlConfig.options }
-                };
-                delete fallbackLocalhost.options.instanceName;
-                const poolLocalhost = new mssql.ConnectionPool(fallbackLocalhost);
-                await poolLocalhost.connect();
-                console.log(`[SQL_CONN] ¡ÉXITO al conectar con BD [${dbVal}] mediante fallback localhost!`);
-                return poolLocalhost;
-            } catch (localErr: any) {}
-        }
-
-        const richMsg = `[Servidor: ${host} | Puerto: ${sqlConfig.port || 'Instancia (' + (instanceName || 'browser') + ')'} | BD: ${dbVal} | Usuario: ${userVal}] - Error: ${error.message}${error.code ? ' [Código: ' + error.code + ']' : ''}`;
+        const richMsg = `[Servidor Configurado: ${serverVal}${portVal ? ':' + portVal : ''} | Host Intentado: ${host} | Instancia: ${instanceName || 'Predeterminada'} | BD: ${dbVal} | Usuario: ${userVal}] - Error: ${error.message}${error.code ? ' [Código: ' + error.code + ']' : ''}`;
         const enrichedError = new Error(richMsg);
         (enrichedError as any).code = error.code || 'SQL_CONN_ERROR';
         (enrichedError as any).originalError = error;
-        (enrichedError as any).connectionConfig = { host, port: sqlConfig.port, db: dbVal, user: userVal };
+        (enrichedError as any).connectionConfig = { server: serverVal, host, instanceName, port: sqlConfig.port, db: dbVal, user: userVal };
         throw enrichedError;
     }
 }
@@ -233,10 +231,9 @@ export async function executeSQLServerProcedure(spName: string, params: any, tar
     let pool;
     const startTime = Date.now();
     const isTraceProcedure = spName.toLowerCase().includes('sptraceability');
-    const isZeusProcedure = spName.toLowerCase().includes('spfacturacionescrear') || 
-                            spName.toLowerCase().includes('spcotizacionescrear') || 
-                            spName.toLowerCase().includes('facturacion') || 
-                            spName.toLowerCase().includes('cotizacion');
+    const cleanSpName = spName.toLowerCase().replace(/^dbo\./, '').trim();
+    const isZeusProcedure = cleanSpName === 'spfacturacionescrear' || 
+                            cleanSpName === 'spcotizacionescrear';
 
     try {
         const fullSpName = spName.includes('.') ? spName : `dbo.${spName}`;

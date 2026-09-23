@@ -292,6 +292,8 @@ model QuotationProduct {
   servicios               String?
   descripcion             String?
   passenger               String?                     @db.VarChar(255)
+  providerDueDate         DateTime?                   @db.Timestamp(6)
+  providerInvoice         String?                     @db.VarChar(100)
   prestadora              Prestadora?                 @relation(fields: [prestadoraId], references: [id])
   product                 Product                     @relation(fields: [productId], references: [id], onDelete: Cascade)
   provider                Provider?                   @relation(fields: [providerId], references: [id])
@@ -468,6 +470,8 @@ model Invoices {
   serie                String?   @db.VarChar(50)
   consecutivo          String?   @db.VarChar(50)
   dueDate              DateTime? @db.Timestamp(6)
+  isExcelImport        Boolean?  @default(false)
+  zeusInvoiceNumber    String?   @db.VarChar(100)
 }
 
 model InvoicesProduct {
@@ -499,6 +503,8 @@ model InvoicesProduct {
   ticketTypeId            Int?
   airline                 String?                    @db.VarChar(100)
   ticketCode              String?
+  providerDueDate         DateTime?                  @db.Timestamp(6)
+  providerInvoice         String?                    @db.VarChar(100)
   itineraries             InvoicesProductItinerary[]
 }
 

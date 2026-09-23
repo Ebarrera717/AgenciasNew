@@ -578,7 +578,26 @@ CREATE PROCEDURE dbo.spInvoicesListar
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT i.[id], i.[internalNumber], i.[date], i.[clientId], c.[name] AS [clientName], i.[currency], i.[totalAmount], ISNULL(i.[state], N'NUEVO') AS [state]
+    SELECT 
+        i.[id], 
+        i.[internalNumber], 
+        i.[date], 
+        i.[dueDate],
+        i.[clientId], 
+        c.[name] AS [clientName], 
+        c.[document] AS [clientDocument],
+        i.[currency], 
+        i.[totalAmount], 
+        ISNULL(i.[state], N'NUEVO') AS [state],
+        ISNULL(i.[isExcelImport], 0) AS [isExcelImport],
+        i.[zeusInvoiceNumber],
+        i.[fuente],
+        i.[serie],
+        i.[consecutivo],
+        (SELECT TOP 1 pax.name FROM dbo.InvoicesProduct ip JOIN dbo.InvoicesProductPasenger pax ON pax.invoiceProductId = ip.id WHERE ip.invoiceId = i.id AND pax.name IS NOT NULL AND pax.name <> '') AS [paxName],
+        (SELECT TOP 1 ISNULL(prov.name, ip.providerInvoice) FROM dbo.InvoicesProduct ip LEFT JOIN dbo.Provider prov ON ip.providerId = prov.id WHERE ip.invoiceId = i.id AND (prov.name IS NOT NULL OR ip.providerInvoice IS NOT NULL)) AS [providerName],
+        (SELECT MIN(ip.checkInDate) FROM dbo.InvoicesProduct ip WHERE ip.invoiceId = i.id) AS [checkInDate],
+        (SELECT MAX(ip.checkOutDate) FROM dbo.InvoicesProduct ip WHERE ip.invoiceId = i.id) AS [checkOutDate]
     FROM dbo.[Invoices] i
     LEFT JOIN dbo.[Client] c ON i.[clientId] = c.[id]
     WHERE (@p_internalNumber IS NULL OR i.[internalNumber] LIKE '%' + TRIM(@p_internalNumber) + '%')

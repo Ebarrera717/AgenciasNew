@@ -44,17 +44,16 @@ try {
     contentServer += '-- ==========================================================\n\n';
     contentServer += '-- >>> PROCEDIMIENTOS ALMACENADOS (SQL SERVER) <<<\n\n';
 
-    const spDir = path.join(root, 'SP');
-    if (fs.existsSync(spDir)) {
-        const sps = fs.readdirSync(spDir).filter(f => f.endsWith('.sql'));
-        for (const sp of sps) {
-            const fileContent = fs.readFileSync(path.join(spDir, sp), 'utf8');
-            if (fileContent.toLowerCase().includes('plpgsql')) {
-                content += `-- Archivo: ${sp}\n`;
-                content += fileContent + '\n\n';
-            } else {
-                contentServer += `-- Archivo: ${sp}\n`;
-                contentServer += fileContent + '\n\n';
+    const spDirs = [path.join(root, 'SP'), path.join(root, 'Procedure')];
+    for (const spDir of spDirs) {
+        if (fs.existsSync(spDir)) {
+            const sps = fs.readdirSync(spDir).filter(f => f.endsWith('.sql'));
+            for (const sp of sps) {
+                const fileContent = fs.readFileSync(path.join(spDir, sp), 'utf8');
+                if (fileContent.toLowerCase().includes('plpgsql')) {
+                    content += `-- Archivo: ${sp}\n`;
+                    content += fileContent + '\n\n';
+                }
             }
         }
     }
@@ -62,9 +61,12 @@ try {
     fs.writeFileSync(actFile, content, 'utf8');
     console.log('Actualizador.SQL (PostgreSQL) regenerado con éxito (' + content.length + ' bytes).');
 
-    const serverActFile = path.join(root, 'Actualizador', 'ActualizadorSERVER.SQL');
-    fs.writeFileSync(serverActFile, contentServer, 'utf8');
-    console.log('ActualizadorSERVER.SQL (SQL Server) regenerado con éxito (' + contentServer.length + ' bytes).');
+    const releaseSqlDir = path.join(__dirname, '..', 'RELEASE_KOREX', 'SQL');
+    if (!fs.existsSync(releaseSqlDir)) {
+        fs.mkdirSync(releaseSqlDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(releaseSqlDir, 'Actualizador.SQL'), content, 'utf8');
+    console.log('Copia de Actualizador.SQL guardada en RELEASE_KOREX/SQL/Actualizador.SQL');
 } catch (e) {
     console.error("Error construyendo Actualizador:", e);
 }

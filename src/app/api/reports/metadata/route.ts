@@ -78,7 +78,9 @@ const COLUMN_FRIENDLY_NAMES: Record<string, Record<string, string>> = {
         ticketPrinterCommission: 'Comisión Tiqueteador (Producto)',
         passenger: 'Pasajeros Asignados (Producto)',
         service: 'Detalle del Servicio',
-        description: 'Descripción del Producto'
+        description: 'Descripción del Producto',
+        providerDueDate: 'Fecha Vencimiento Proveedor',
+        providerInvoice: 'Factura Proveedor'
     },
     QuotationManualService: {
         id: 'ID Servicio Manual',

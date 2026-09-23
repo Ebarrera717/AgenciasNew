@@ -113,6 +113,8 @@ const AVAILABLE_MANDATORY_FIELDS = [
     { key: 'QuotationProduct.inNationality', label: 'Nacionalidad', group: 'Por Producto' },
     { key: 'QuotationProduct.service', label: 'Detalle de Servicio', group: 'Por Producto' },
     { key: 'QuotationProduct.description', label: 'Descripción Manual', group: 'Por Producto' },
+    { key: 'QuotationProduct.providerDueDate', label: 'Fecha Vencimiento Proveedor', group: 'Por Producto' },
+    { key: 'QuotationProduct.providerInvoice', label: 'Factura Proveedor', group: 'Por Producto' },
     { key: 'QuotationProduct.nights', label: 'Noches', group: 'Por Producto' },
     { key: 'Quotation.sellerId', label: 'Vendedor', group: 'Cabecera' },
     { key: 'Quotation.ticketPrinterId', label: 'Tiqueteador', group: 'Cabecera' },
@@ -333,7 +335,14 @@ export default function SettingsPage() {
         const code = (item?.code || '').toUpperCase();
         const name = (item?.name || '').toUpperCase();
 
-        if (code.includes('SQL') || name.includes('SQL')) {
+        if (
+            code.includes('SQL') || 
+            name.includes('SQL') || 
+            code.includes('ENCRIPT') || 
+            name.includes('ENCRIPT') || 
+            code.includes('ZEUS') || 
+            name.includes('ZEUS')
+        ) {
             return 'sql';
         }
         if (
@@ -1157,13 +1166,19 @@ export default function SettingsPage() {
                     try {
                         mandatoryVars = JSON.parse(mandatoryVars);
                     } catch (e) {
-                        mandatoryVars = [];
+                        mandatoryVars = { quotation: [], invoice: [] };
                     }
                 }
-                if (!Array.isArray(mandatoryVars)) {
-                    mandatoryVars = [];
+                let quotationVars: any[] = [];
+                let invoiceVars: any[] = [];
+                if (Array.isArray(mandatoryVars)) {
+                    quotationVars = mandatoryVars;
+                    invoiceVars = [];
+                } else if (mandatoryVars && typeof mandatoryVars === 'object') {
+                    quotationVars = Array.isArray(mandatoryVars.quotation) ? mandatoryVars.quotation : (Array.isArray(mandatoryVars.quotations) ? mandatoryVars.quotations : []);
+                    invoiceVars = Array.isArray(mandatoryVars.invoice) ? mandatoryVars.invoice : (Array.isArray(mandatoryVars.invoices) ? mandatoryVars.invoices : []);
                 }
-                setFormData({ ...item, sellerId: item.sellerId ? item.sellerId.toString() : '', mandatoryVariables: mandatoryVars })
+                setFormData({ ...item, sellerId: item.sellerId ? item.sellerId.toString() : '', mandatoryVariables: { quotation: quotationVars, invoice: invoiceVars } })
             } else if (activeTab === 'productos') {
                 let mandatory = item.mandatoryFields;
                 if (typeof mandatory === 'string') {
@@ -1206,7 +1221,7 @@ export default function SettingsPage() {
             } else if (activeTab === 'prestadoras') {
                 setFormData({ code: '', name: '', category: '', location: '', providerId: '', type: '' })
             } else if (activeTab === 'clientes') {
-                setFormData({ name: '', document: '', contactInfo: '', address: '', sellerId: '', mandatoryVariables: [] })
+                setFormData({ name: '', document: '', contactInfo: '', address: '', sellerId: '', mandatoryVariables: { quotation: [], invoice: [] } })
             } else if (activeTab === 'proveedores') {
                 setFormData({ code: '', name: '', contactInfo: '', providerTypeId: '', airlineCode: '', sigla: '' })
             } else if (activeTab === 'tipos-proveedores') {
@@ -3331,55 +3346,91 @@ export default function SettingsPage() {
                                                 )}
                                                 {activeTab === 'clientes' && (
                                                     <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 mt-6 space-y-4">
-                                                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                                                            Variables Adicionales Obligatorias para Cotizaciones
-                                                        </h4>
-                                                        <p className="text-xs text-zinc-500">
-                                                            Selecciona cuáles variables adicionales serán de carácter obligatorio al guardar una cotización para este cliente.
-                                                        </p>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
+                                                        <div>
+                                                            <h4 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                                                                Variables Adicionales Obligatorias
+                                                            </h4>
+                                                            <p className="text-xs text-zinc-500 mt-1">
+                                                                Selecciona qué variables adicionales serán de carácter obligatorio al guardar una <b>Cotización</b> o <b>Factura</b> para este cliente.
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-2 max-h-72 overflow-y-auto p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200/60 dark:border-zinc-800">
                                                             {variables && variables.length > 0 ? (
                                                                 variables.map((v: any) => {
-                                                                    const isChecked = Array.isArray(formData.mandatoryVariables)
-                                                                        ? formData.mandatoryVariables.includes(v.id)
-                                                                        : false;
+                                                                    const quotationMandatory: any[] = Array.isArray(formData.mandatoryVariables?.quotation)
+                                                                        ? formData.mandatoryVariables.quotation
+                                                                        : (Array.isArray(formData.mandatoryVariables) ? formData.mandatoryVariables : []);
+                                                                    const invoiceMandatory: any[] = Array.isArray(formData.mandatoryVariables?.invoice)
+                                                                        ? formData.mandatoryVariables.invoice
+                                                                        : [];
+
+                                                                    const isQuotationChecked = quotationMandatory.some((id: any) => String(id) === String(v.id) || String(id) === String(v.code));
+                                                                    const isInvoiceChecked = invoiceMandatory.some((id: any) => String(id) === String(v.id) || String(id) === String(v.code));
+
                                                                     return (
-                                                                        <label key={v.id} className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
-                                                                                checked={isChecked}
-                                                                                onChange={(e) => {
-                                                                                    const currentMandatory = Array.isArray(formData.mandatoryVariables)
-                                                                                        ? [...formData.mandatoryVariables]
-                                                                                        : [];
-                                                                                    if (e.target.checked) {
-                                                                                        if (!currentMandatory.includes(v.id)) {
-                                                                                            currentMandatory.push(v.id);
-                                                                                        }
-                                                                                    } else {
-                                                                                        const index = currentMandatory.indexOf(v.id);
-                                                                                        if (index > -1) {
-                                                                                            currentMandatory.splice(index, 1);
-                                                                                        }
-                                                                                    }
-                                                                                    setFormData({ ...formData, mandatoryVariables: currentMandatory });
-                                                                                }}
-                                                                            />
+                                                                        <div key={v.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white dark:bg-zinc-900/80 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 rounded-xl border border-zinc-200 dark:border-zinc-800 transition-colors">
                                                                             <div className="flex flex-col">
                                                                                 <div className="flex items-center gap-2">
-                                                                                    <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">{v.name}</span>
+                                                                                    <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{v.name}</span>
                                                                                     {v.isForAllClients && (
-                                                                                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800">Global (Todos los clientes)</span>
+                                                                                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800">Global</span>
                                                                                     )}
                                                                                 </div>
                                                                                 <span className="text-[10px] text-zinc-400 font-mono">{v.code}</span>
                                                                             </div>
-                                                                        </label>
+                                                                            
+                                                                            <div className="flex items-center gap-4 shrink-0">
+                                                                                <label className="flex items-center gap-2 cursor-pointer bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 cursor-pointer"
+                                                                                        checked={isQuotationChecked}
+                                                                                        onChange={(e) => {
+                                                                                            const currentQ = [...quotationMandatory];
+                                                                                            const currentI = [...invoiceMandatory];
+                                                                                            if (e.target.checked) {
+                                                                                                if (!currentQ.includes(v.id)) currentQ.push(v.id);
+                                                                                            } else {
+                                                                                                const idx = currentQ.findIndex((id: any) => String(id) === String(v.id) || String(id) === String(v.code));
+                                                                                                if (idx > -1) currentQ.splice(idx, 1);
+                                                                                            }
+                                                                                            setFormData({
+                                                                                                ...formData,
+                                                                                                mandatoryVariables: { quotation: currentQ, invoice: currentI }
+                                                                                            });
+                                                                                        }}
+                                                                                    />
+                                                                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Cotización</span>
+                                                                                </label>
+
+                                                                                <label className="flex items-center gap-2 cursor-pointer bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-emerald-400 dark:hover:border-emerald-500 transition-all">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 cursor-pointer"
+                                                                                        checked={isInvoiceChecked}
+                                                                                        onChange={(e) => {
+                                                                                            const currentQ = [...quotationMandatory];
+                                                                                            const currentI = [...invoiceMandatory];
+                                                                                            if (e.target.checked) {
+                                                                                                if (!currentI.includes(v.id)) currentI.push(v.id);
+                                                                                            } else {
+                                                                                                const idx = currentI.findIndex((id: any) => String(id) === String(v.id) || String(id) === String(v.code));
+                                                                                                if (idx > -1) currentI.splice(idx, 1);
+                                                                                            }
+                                                                                            setFormData({
+                                                                                                ...formData,
+                                                                                                mandatoryVariables: { quotation: currentQ, invoice: currentI }
+                                                                                            });
+                                                                                        }}
+                                                                                    />
+                                                                                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Factura</span>
+                                                                                </label>
+                                                                            </div>
+                                                                        </div>
                                                                     );
                                                                 })
                                                             ) : (
-                                                                <div className="col-span-2 text-center py-4 text-xs text-zinc-400">
+                                                                <div className="text-center py-6 text-xs text-zinc-400">
                                                                     No hay variables adicionales configuradas en el sistema.
                                                                 </div>
                                                             )}

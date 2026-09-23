@@ -69,19 +69,19 @@ const ALL_MASTERS = [
     { key: 'proveedores', label: 'Proveedores (Provider)', pgTable: 'Provider', sqlTable: 'Provider', backupSqlTable: 'PROVEEDORES' },
     { key: 'tipos-proveedores', label: 'Tipos de Proveedor (ProviderType)', pgTable: 'ProviderType', sqlTable: 'ProviderType' },
     { key: 'productos', label: 'Productos (Product)', pgTable: 'Product', sqlTable: 'Product' },
-    { key: 'variables', label: 'Variables (Variable)', pgTable: 'Variable', sqlTable: 'Variable' },
+    { key: 'variables', label: 'Variables (MasterVariable)', pgTable: 'MasterVariable', sqlTable: 'MasterVariable' },
     { key: 'parametros', label: 'Parámetros (SystemParameter)', pgTable: 'SystemParameter', sqlTable: 'SystemParameter' },
     { key: 'monedas', label: 'Monedas (Currency)', pgTable: 'Currency', sqlTable: 'Currency' },
     { key: 'combos', label: 'Combos (Combo)', pgTable: 'Combo', sqlTable: 'Combo' },
-    { key: 'equivalencias', label: 'Equivalencias (Equivalence)', pgTable: 'Equivalence', sqlTable: 'Equivalence' },
+    { key: 'equivalencias', label: 'Equivalencias (EquivalencesInterfaces)', pgTable: 'EquivalencesInterfaces', sqlTable: 'EquivalencesInterfaces' },
     { key: 'extraccion-interfaces', label: 'Extracción Interfaces (InterfaceExtractParam)', pgTable: 'InterfaceExtractParam', sqlTable: 'InterfaceExtractParam' },
     { key: 'resoluciones-documentos', label: 'Resoluciones Documentos (DocumentResolution)', pgTable: 'DocumentResolution', sqlTable: 'DocumentResolution' },
     { key: 'consecutivos-transacciones', label: 'Consecutivos Transacciones (TransactionConsecutive)', pgTable: 'TransactionConsecutive', sqlTable: 'TransactionConsecutive' },
-    { key: 'tarifa-administrativa', label: 'Tarifa Administrativa (AdministrativeFeeConfig)', pgTable: 'AdministrativeFeeConfig', sqlTable: 'AdministrativeFeeConfig' },
+    { key: 'tarifa-administrativa', label: 'Tarifa Administrativa (SystemParameter)', pgTable: 'SystemParameter', sqlTable: 'SystemParameter' },
     { key: 'modulos-sitio', label: 'Módulos del Sitio (Master / Menu)', pgTable: 'Master', sqlTable: 'Master' },
-    { key: 'paises', label: 'Países (Country)', pgTable: 'Country', sqlTable: 'Country' },
-    { key: 'ciudades', label: 'Ciudades (City)', pgTable: 'City', sqlTable: 'City' },
-    { key: 'aeropuertos', label: 'Aeropuertos (Airport)', pgTable: 'Airport', sqlTable: 'Airport' },
+    { key: 'paises', label: 'Países (Countries)', pgTable: 'Countries', sqlTable: 'Countries' },
+    { key: 'ciudades', label: 'Ciudades (Cities)', pgTable: 'Cities', sqlTable: 'Cities' },
+    { key: 'aeropuertos', label: 'Aeropuertos (Airports)', pgTable: 'Airports', sqlTable: 'Airports' },
     { key: 'tipos-tiquetes', label: 'Tipos de Tiquetes (TicketType)', pgTable: 'TicketType', sqlTable: 'TicketType' },
     { key: 'estados-cotizacion', label: 'Estados de Cotización (QuotationState)', pgTable: 'QuotationState', sqlTable: 'QuotationState' }
 ];
@@ -113,13 +113,18 @@ async function validateFullSystem() {
         const sqlConfig = {
             user: parsed.usuario,
             password: parsed.clave,
-            server: parsed.servidor,
+            server: parsed.rawHost || (parsed.servidor.includes('\\') ? parsed.servidor.split('\\')[0] : parsed.servidor),
             database: parsed.base_datos,
-            port: parsed.puerto ? parseInt(parsed.puerto, 10) : 1433,
             options: { encrypt: false, trustServerCertificate: true, enableArithAbort: true },
             connectionTimeout: 8000,
             requestTimeout: 15000
         };
+
+        if (parsed.instanceName || parsed.servidor.includes('\\')) {
+            sqlConfig.options.instanceName = parsed.instanceName || parsed.servidor.split('\\')[1];
+        } else {
+            sqlConfig.port = parsed.puerto ? parseInt(parsed.puerto, 10) : 1433;
+        }
 
         if (mssql) {
             pool = await mssql.connect(sqlConfig);

@@ -358,7 +358,9 @@ BEGIN
         [description] NVARCHAR(MAX) NULL,
         [servicios] NVARCHAR(MAX) NULL,
         [descripcion] NVARCHAR(MAX) NULL,
-        [passenger] NVARCHAR(255) NULL
+        [passenger] NVARCHAR(255) NULL,
+        [providerDueDate] DATETIME2 NULL,
+        [providerInvoice] NVARCHAR(100) NULL
     );
 END;
 
@@ -492,9 +494,17 @@ BEGIN
         [fuente] NVARCHAR(50) NULL,
         [serie] NVARCHAR(50) NULL,
         [consecutivo] NVARCHAR(50) NULL,
-        [dueDate] DATETIME2 NULL
+        [dueDate] DATETIME2 NULL,
+        [isExcelImport] BIT NULL CONSTRAINT DF_Invoices_IsExcelImport DEFAULT 0,
+        [zeusInvoiceNumber] NVARCHAR(100) NULL
     );
 END;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'isExcelImport')
+    ALTER TABLE dbo.[Invoices] ADD [isExcelImport] BIT NULL CONSTRAINT DF_Invoices_IsExcelImport DEFAULT 0;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'zeusInvoiceNumber')
+    ALTER TABLE dbo.[Invoices] ADD [zeusInvoiceNumber] NVARCHAR(100) NULL;
 
 -- 20a. InvoicesProduct
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProduct' AND schema_id = SCHEMA_ID('dbo'))
@@ -527,7 +537,9 @@ BEGIN
         [class] NVARCHAR(100) NULL,
         [ticketTypeId] INT NULL,
         [airline] NVARCHAR(100) NULL,
-        [ticketCode] NVARCHAR(255) NULL
+        [ticketCode] NVARCHAR(255) NULL,
+        [providerDueDate] DATETIME2 NULL,
+        [providerInvoice] NVARCHAR(100) NULL
     );
 END;
 
@@ -1725,6 +1737,22 @@ BEGIN
     );
 END;
 
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InterfaceExtractParam' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[InterfaceExtractParam] (
+        [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        [interfaceId] INT NOT NULL,
+        [fieldCode] VARCHAR(50) NOT NULL,
+        [fieldName] VARCHAR(100) NOT NULL,
+        [prefix] VARCHAR(100) NOT NULL,
+        [delimiter] VARCHAR(20) NULL DEFAULT '-',
+        [startPosition] INT NULL DEFAULT 0,
+        [length] INT NULL DEFAULT 0,
+        [isActive] BIT NOT NULL DEFAULT 1,
+        [createdAt] DATETIME2 NULL DEFAULT GETDATE()
+    );
+END;
+
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ReservaGDS_Detalles' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
     CREATE TABLE dbo.[ReservaGDS_Detalles] (
@@ -2539,6 +2567,12 @@ IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.col
 IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'cd_tiqueteador') ALTER TABLE dbo.[Cotizacion] ADD [cd_tiqueteador] VARCHAR(25) NULL;
 IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tiqueteador') ALTER TABLE dbo.[Cotizacion] ADD [id_tiqueteador] INT NULL;
 IF OBJECT_ID('dbo.Cotizacion') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Cotizacion') AND name = 'id_tiqueteador_Facturador') ALTER TABLE dbo.[Cotizacion] ADD [id_tiqueteador_Facturador] INT NULL;
+
+IF OBJECT_ID('dbo.QuotationProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'providerDueDate') ALTER TABLE dbo.[QuotationProduct] ADD [providerDueDate] DATETIME2 NULL;
+IF OBJECT_ID('dbo.QuotationProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'providerInvoice') ALTER TABLE dbo.[QuotationProduct] ADD [providerInvoice] NVARCHAR(100) NULL;
+
+IF OBJECT_ID('dbo.InvoicesProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'providerDueDate') ALTER TABLE dbo.[InvoicesProduct] ADD [providerDueDate] DATETIME2 NULL;
+IF OBJECT_ID('dbo.InvoicesProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'providerInvoice') ALTER TABLE dbo.[InvoicesProduct] ADD [providerInvoice] NVARCHAR(100) NULL;
 
 PRINT 'Tablas de la base de datos SQL Server estructuradas exitosamente.';
 

@@ -1,4 +1,4 @@
-﻿const path = require('path');
+const path = require('path');
 const dotenv = require('dotenv');
 
 const rootDir = path.join(__dirname, '..');
@@ -83,17 +83,22 @@ async function validateSqlServerOnly() {
     const parsed = parseSQLServerUrl(sqlConn);
 
     const config = {
-        server: parsed.servidor,
+        server: parsed.rawHost || (parsed.servidor.includes('\\') ? parsed.servidor.split('\\')[0] : parsed.servidor),
         database: parsed.base_datos || 'Korex_Pruebas',
         user: parsed.usuario || 'sa',
         password: parsed.clave || 'zzeusagencias',
-        port: parsed.puerto ? parseInt(parsed.puerto) : 1433,
         options: {
             encrypt: false,
             trustServerCertificate: true,
             connectTimeout: 8000
         }
     };
+
+    if (parsed.instanceName || parsed.servidor.includes('\\')) {
+        config.options.instanceName = parsed.instanceName || parsed.servidor.split('\\')[1];
+    } else {
+        config.port = parsed.puerto ? parseInt(parsed.puerto) : 1433;
+    }
 
     console.log(`[SQL SERVER] Conectando a ${config.server}:${config.port}/${config.database}...`);
     let pool = null;

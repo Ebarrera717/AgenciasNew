@@ -102,7 +102,9 @@ export default function ExcelImport() {
                     Comision_Vendedor_Producto: 0,
                     Comision_Tiqueteador_Producto: 0,
                     Combo_Codigos: 'COM-001|COM-002',
-                    Cargo_Principal: ''
+                    Cargo_Principal: '',
+                    Fecha_Vencimiento_Proveedor: '2026-11-25',
+                    Factura_Proveedor: 'FPROV-99881'
                 },
                 {
                     Grupo_Cotizacion: '1',
@@ -133,7 +135,9 @@ export default function ExcelImport() {
                     Comision_Vendedor_Producto: 5,
                     Comision_Tiqueteador_Producto: 2,
                     Combo_Codigos: '',
-                    Cargo_Principal: 'IVA-19'
+                    Cargo_Principal: 'IVA-19',
+                    Fecha_Vencimiento_Proveedor: '',
+                    Factura_Proveedor: ''
                 }
             ];
             filename = 'plantilla_cotizacion.xlsx';
@@ -182,7 +186,9 @@ export default function ExcelImport() {
                     Itinerarios: '',
                     Fuente: 'FAC',
                     Serie: 'A',
-                    Consecutivo: '000123'
+                    Consecutivo: '000123',
+                    Fecha_Vencimiento_Proveedor: '2026-11-25',
+                    Factura_Proveedor: 'FPROV-99881'
                 },
                 {
                     Grupo_Factura: '2',

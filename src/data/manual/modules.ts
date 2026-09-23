@@ -209,7 +209,15 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { name: 'Sucursal / Implant', type: 'Selector', description: 'Asigna la sucursal emisora para definir logos y plantillas.' },
                     { name: 'Vendedor', type: 'Selector', description: 'Asigna el asesor comercial para el cálculo de comisiones de venta.' },
                     { name: 'Productos y Servicios', type: 'Grilla de Ítems', description: 'Permite incorporar vuelos, hoteles, tours o servicios manuales.' },
+                    { name: 'Fecha Vencimiento Proveedor', type: 'Fecha (Opcional)', description: 'Fecha límite de pago o vencimiento emitida por el proveedor del servicio.' },
+                    { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura, recibo o soporte entregado por el proveedor.' },
+                    { name: 'Variables Adicionales', type: 'Campos Dinámicos', description: 'Variables adicionales requeridas. Muestra un distintivo "Obligatoria" si el cliente seleccionado la tiene configurada para cotización.' },
                     { name: 'Pasajeros e Itinerarios', type: 'Detalle de Ítem', description: 'Especifica nombres, documentos, fechas de viaje y trayectos.' }
+                ],
+                businessRules: [
+                    'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para cotizaciones, el sistema validará en el formulario y en base de datos que todos los productos contengan un valor válido antes de permitir guardar.',
+                    'En importaciones de cotizaciones desde Excel, si falta alguna variable obligatoria para cotización, el proceso se detendrá indicando el error específico por grupo de productos.',
+                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor se pueden diligenciar manualmente en la pantalla y cargar masivamente desde las plantillas de Excel.'
                 ],
                 steps: [
                     {
@@ -219,8 +227,8 @@ export const MANUAL_MODULES: ManualModule[] = [
                     },
                     {
                         number: 2,
-                        title: 'Agregar Servicios o Productos',
-                        description: 'Haga clic en "+ Agregar Producto", especifique el tipo de servicio, costo y precio de venta.'
+                        title: 'Agregar Servicios o Productos y Variables',
+                        description: 'Haga clic en "+ Agregar Producto", especifique el tipo de servicio, costo, precio de venta, fecha de vencimiento y factura del proveedor, y complete las variables adicionales requeridas.'
                     },
                     {
                         number: 3,
@@ -242,23 +250,32 @@ export const MANUAL_MODULES: ManualModule[] = [
             {
                 code: 'FAC-01',
                 name: 'Emisión e Historial de Facturas',
-                summary: 'Gestión del historial de facturación de venta y estado contable.',
-                concept: 'Registra los movimientos contables de venta, cartera, cuentas por cobrar e impuestos a partir de las cotizaciones aprobadas. La asignación de cuentas contables para Cargos sigue la prioridad estricta en 3 niveles: 1) Tipo de Servicio, 2) Concepto de Facturación, 3) Cargo. Para Impuestos, la cuenta se asigna de forma directa desde la tabla de Impuestos.',
+                summary: 'Gestión del historial de facturación de venta, validación de variables obligatorias y estado contable.',
+                concept: 'Registra los movimientos contables de venta, cartera, cuentas por cobrar e impuestos a partir de las cotizaciones aprobadas o facturación directa. La asignación de cuentas contables para Cargos sigue la prioridad estricta en 3 niveles: 1) Tipo de Servicio, 2) Concepto de Facturación, 3) Cargo. Para Impuestos, la cuenta se asigna de forma directa desde la tabla de Impuestos. Valida de forma estricta las variables adicionales obligatorias para factura definidas en el cliente y almacena la información del proveedor (Fecha de Vencimiento y Factura Proveedor).',
                 fields: [
                     { name: 'Buscador de Facturas', type: 'Texto', description: 'Busca facturas por número de consecutivo, cliente o estado.' },
-                    { name: 'Estado Contable', type: 'Indicador', description: 'Muestra el estado de la factura (Nuevo, Facturado, Cancelado).' },
-                    { name: 'Forma de Pago', type: 'Selector', description: 'Define la modalidad de pago (Efectivo, Tarjeta, Transferencia, Crédito).' }
+                    { name: 'Factura Zeus ERP', type: 'Insignia Alfanumérica', description: 'Muestra el número consecutivo oficial generado en Zeus ERP (ej. 6600000056) para facturas importadas desde Excel o emitidas que hayan sido exportadas al ERP.' },
+                    { name: 'Estado Contable', type: 'Indicador', description: 'Muestra el estado de la factura (Nuevo, Facturado, Exportado, Cancelado).' },
+                    { name: 'Forma de Pago', type: 'Selector', description: 'Define la modalidad de pago (Efectivo, Tarjeta, Transferencia, Crédito).' },
+                    { name: 'Fecha Vencimiento Proveedor', type: 'Fecha (Opcional)', description: 'Fecha límite de pago al proveedor del ítem facturado.' },
+                    { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura o documento del proveedor asociado al producto.' },
+                    { name: 'Variables Adicionales de Factura', type: 'Campos Dinámicos', description: 'Variables adicionales requeridas con distintivo "Obligatoria" si el cliente la exige para facturas.' }
+                ],
+                businessRules: [
+                    'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para facturas, el formulario web y el Stored Procedure bloquearán la emisión si algún ítem carece de dicha variable.',
+                    'En importaciones de facturas desde Excel, el sistema valida que las variables obligatorias de factura vengan informadas en la columna de variables o en las columnas dinámicas correspondientes.',
+                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor son persistidos en base de datos y pueden ser editados en el formulario web o importados masivamente vía Excel.'
                 ],
                 steps: [
                     {
                         number: 1,
-                        title: 'Facturar desde Cotización',
-                        description: 'En el historial de cotizaciones, ubique una propuesta aprobada y presione "Facturar".'
+                        title: 'Facturar desde Cotización o Nueva Factura',
+                        description: 'En el historial de cotizaciones ubique una propuesta aprobada y presione "Facturar", o cree una nueva factura directa.'
                     },
                     {
                         number: 2,
-                        title: 'Confirmar Datos de Pago y Emitir',
-                        description: 'Verifique la forma de pago y emita la factura oficial.'
+                        title: 'Confirmar Datos, Variables de Factura y Emitir',
+                        description: 'Verifique los valores, complete las variables adicionales obligatorias de factura y emita la factura oficial.'
                     }
                 ]
             },
@@ -443,16 +460,23 @@ export const MANUAL_MODULES: ManualModule[] = [
                 code: 'MAE-04',
                 masterCode: 'Client',
                 name: 'Maestro de Clientes',
-                summary: 'Base de datos de clientes individuales y corporativos con NIT/Cédula y contactos.',
-                concept: 'Almacena la información de los clientes para agilizar la emisión de cotizaciones y facturas contables.',
+                summary: 'Base de datos de clientes individuales y corporativos con NIT/Cédula, contactos y variables obligatorias independientes para Cotizaciones y Facturas.',
+                concept: 'Almacena la información de los clientes para agilizar la emisión de cotizaciones y facturas contables. Permite configurar selectivamente qué variables adicionales (MasterVariable) son de carácter obligatorio al emitir Cotizaciones (casilla azul) o Facturas (casilla verde), tanto en formularios manuales como en importaciones masivas desde Excel.',
                 fields: [
                     { name: 'Nombre / Razón Social', type: 'Texto', description: 'Nombre completo o razón social del cliente.' },
                     { name: 'Documento / NIT', type: 'Texto Único', description: 'Cédula o NIT único para facturación.' },
                     { name: 'Información de Contacto', type: 'Texto / Email', description: 'Teléfonos, dirección y correo electrónico de notificación.' },
-                    { name: 'Plazo (Días)', type: 'Numérico', description: 'Días de plazo de crédito concedidos al cliente para el cálculo automático de la fecha de vencimiento en las facturas.' }
+                    { name: 'Plazo (Días)', type: 'Numérico', description: 'Días de plazo de crédito concedidos al cliente para el cálculo automático de la fecha de vencimiento en las facturas.' },
+                    { name: 'Variables Adicionales Obligatorias (Cotización / Factura)', type: 'Doble Casilla de Selección', description: 'Permite seleccionar de forma independiente si cada variable adicional es obligatoria para Cotizaciones (check azul) y/o para Facturas (check verde).' }
+                ],
+                businessRules: [
+                    'Si una variable está marcada como obligatoria para Cotización, ninguna cotización (manual o importada desde Excel) podrá guardarse si los productos no contienen dicha variable con un valor no vacío.',
+                    'Si una variable está marcada como obligatoria para Factura, ninguna factura (manual o importada desde Excel) podrá emitirse si los productos no contienen dicha variable con un valor no vacío.',
+                    'El sistema mantiene 100% de compatibilidad hacia atrás con registros de clientes anteriores que poseían la lista de variables en formato legado.'
                 ],
                 steps: [
-                    { number: 1, title: 'Registrar Cliente', description: 'En la pestaña "Clientes", presione "+ Nuevo Cliente" e ingrese documento, plazo de crédito en días y datos de contacto.' }
+                    { number: 1, title: 'Registrar o Editar Cliente', description: 'En la pestaña "Clientes", presione "+ Nuevo Cliente" o el icono de editar en un cliente existente.' },
+                    { number: 2, title: 'Configurar Variables Obligatorias', description: 'En la sección "Variables Adicionales Obligatorias", marque la columna "Cotización" (azul) y/o "Factura" (verde) según los requerimientos del cliente y presione Guardar.' }
                 ]
             },
             {

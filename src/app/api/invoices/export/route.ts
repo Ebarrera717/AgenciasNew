@@ -199,13 +199,14 @@ export async function POST(req: NextRequest) {
                         const isOk = checkItemSuccess(item);
                         if (isOk && invId > 0) {
                             const rawMsg = getItemMessage(item);
-                            const match = rawMsg.match(/^([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})/i);
-                            const fuente = match ? match[1] : '55';
-                            const serie = match ? match[2] : '33';
-                            const consecutivo = match ? match[3] : null;
+                            const match = rawMsg.match(/([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})/i) || rawMsg.match(/([0-9]{8,10})/i);
+                            const fuente = match && match[2] ? match[1] : '55';
+                            const serie = match && match[2] ? match[2] : '66';
+                            const consecutivo = match ? (match[3] || match[1]) : null;
+                            const zeusNum = (serie && consecutivo) ? (consecutivo.startsWith(serie) ? consecutivo : `${serie}${consecutivo}`) : consecutivo;
                             const pool = await getSQLServerConnection();
                             await pool.request().query(
-                                `UPDATE dbo.[Invoices] SET [state] = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}'` : ''} WHERE id = ${invId}`
+                                `UPDATE dbo.[Invoices] SET [state] = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}', zeusInvoiceNumber = '${zeusNum}'` : ''} WHERE id = ${invId}`
                             );
                             await pool.close();
                         }

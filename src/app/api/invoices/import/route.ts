@@ -98,6 +98,27 @@ function getExcelVariableString(row: any): string {
     return '';
 }
 
+function getExcelPrestadoraCode(row: any): string {
+    if (!row || typeof row !== 'object') return '';
+    const explicit = row.Prestadora_Codigo || row.Prestadora_Cod || row.Prestadora_Co || row.Prestadora ||
+                     row.Hotel_Codigo || row.Hotel_id || row.Hotel ||
+                     row['Prestadora_Codigo'] || row['Prestadora Codigo'] || row['Prestadora_Cod'] ||
+                     row['Prestadora_Co'] || row['Prestadora'] || row['Hotel_Codigo'] || row['Hotel Codigo'] ||
+                     row['Hotel_id'] || row['Hotel'];
+    if (explicit !== undefined && explicit !== null && explicit !== '') {
+        return explicit.toString().trim();
+    }
+    for (const key of Object.keys(row)) {
+        if (/^prestadora/i.test(key.trim()) || /^hotel/i.test(key.trim())) {
+            const val = row[key];
+            if (val !== undefined && val !== null && val.toString().trim() !== '') {
+                return val.toString().trim();
+            }
+        }
+    }
+    return '';
+}
+
 export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const traceCode = generateTraceCode();
@@ -242,6 +263,49 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
+                // Validar variables adicionales obligatorias del cliente para facturas en SQL Server
+                const clientObjRes = await pool.request()
+                    .input('cId', mssql.Int, clientId)
+                    .query(`SELECT mandatoryVariables FROM dbo.[Client] WHERE id = @cId`);
+                if (clientObjRes.recordset && clientObjRes.recordset.length > 0) {
+                    let mvRaw = clientObjRes.recordset[0].mandatoryVariables;
+                    if (typeof mvRaw === 'string') {
+                        try { mvRaw = JSON.parse(mvRaw); } catch (e) {}
+                    }
+                    let reqVarIds: number[] = [];
+                    if (Array.isArray(mvRaw)) {
+                        reqVarIds = [];
+                    } else if (mvRaw && typeof mvRaw === 'object') {
+                        reqVarIds = Array.isArray(mvRaw.invoice) ? mvRaw.invoice : (Array.isArray(mvRaw.invoices) ? mvRaw.invoices : []);
+                    }
+
+                    if (reqVarIds.length > 0) {
+                        for (const itm of items) {
+                            const varStr = getExcelVariableString(itm);
+                            for (const reqId of reqVarIds) {
+                                const varMasterRes = await pool.request()
+                                    .input('vId', mssql.Int, reqId)
+                                    .query(`SELECT id, code, name FROM dbo.[MasterVariable] WHERE id = @vId`);
+                                const vMaster = varMasterRes.recordset?.[0];
+                                const vCode = vMaster?.code?.toLowerCase();
+                                const vName = vMaster?.name || `Variable #${reqId}`;
+
+                                const hasVar = varStr.split('|').some((part: string) => {
+                                    const [c, val] = part.split(':');
+                                    return (c?.trim().toLowerCase() === vCode || c?.trim() === reqId.toString()) && val?.trim();
+                                });
+
+                                if (!hasVar) {
+                                    await pool.close();
+                                    return NextResponse.json({
+                                        message: `ERROR en GRUPO ${groupKey}: El cliente requiere completar la variable adicional "${vName}" en el producto "${itm.Producto_Codigo || itm.Numero_Tiquete || 'Ítem'}".`
+                                    }, { status: 400 });
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // 3. Consecutivo e Internal Number
                 const consecInfo = await getNextTransactionConsecutive('INVOICE', branchId, implantId);
                 const consecVal = first.Consecutivo ? first.Consecutivo.toString().trim() : consecInfo.consecutivoNumber.toString();
@@ -277,10 +341,10 @@ export async function POST(req: NextRequest) {
                     .query(`
                         INSERT INTO dbo.[Invoices] (
                             internalNumber, clientId, currency, exchangeRate, branchId, implantId, sellerId,
-                            ticketPrinterId, baseCommissionable, commissionPercentage, chargesAndTaxes, totalAmount, userId, fuente, serie, consecutivo
+                            ticketPrinterId, baseCommissionable, commissionPercentage, chargesAndTaxes, totalAmount, userId, fuente, serie, consecutivo, isExcelImport
                         ) OUTPUT INSERTED.id VALUES (
                             @internalNumber, @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId,
-                            @ticketPrinterId, @baseCommissionable, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId, @fuente, @serie, @consecutivo
+                            @ticketPrinterId, @baseCommissionable, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId, @fuente, @serie, @consecutivo, 1
                         )
                     `);
 
@@ -304,12 +368,46 @@ export async function POST(req: NextRequest) {
                         if (prRes.recordset && prRes.recordset.length > 0) providerId = prRes.recordset[0].id;
                     }
 
+                    let prestadoraId: number | null = null;
+                    const prestCode = getExcelPrestadoraCode(it);
+                    if (prestCode) {
+                        const prestRes = await pool.request()
+                            .input('code', mssql.VarChar, prestCode)
+                            .query(`SELECT TOP 1 id FROM dbo.[Prestadora] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) = UPPER(@code) OR UPPER(name) LIKE '%' + UPPER(@code) + '%'`);
+                        if (prestRes.recordset && prestRes.recordset.length > 0) {
+                            prestadoraId = prestRes.recordset[0].id;
+                        }
+                    }
+
+                    let ticketTypeId: number | null = null;
+                    const ttCode = (it.Tipo_Tiquete_Codigo || it.Tipo_Tiquete || it.ticketType || '').toString().trim();
+                    if (ttCode) {
+                        const ttRes = await pool.request()
+                            .input('code', mssql.VarChar, ttCode)
+                            .query(`SELECT TOP 1 id FROM dbo.[TicketType] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) = UPPER(@code)`);
+                        if (ttRes.recordset && ttRes.recordset.length > 0) {
+                            ticketTypeId = ttRes.recordset[0].id;
+                        }
+                    }
+
                     const rawPrice = it.Precio_Unitario ?? it['Precio Unitario'] ?? it.Precio ?? it.Valor_Unitario ?? it.Valor ?? '0';
                     let itemPrice = parseFloat(extractNumericValue(rawPrice) || '0');
                     const quantity = parseInt(extractNumericValue(it.Cantidad) || '1', 10);
                     const cost = parseFloat(extractNumericValue(it.Costo) || '0');
                     const checkIn = normalizeDateString(it.CheckIn || it['Check-In'] || '');
                     const checkOut = normalizeDateString(it.CheckOut || it['Check-Out'] || '');
+                    const sellerComm = parseFloat(extractNumericValue(it.Comision_Vendedor_Producto) || '0');
+                    const ticketPrinterComm = parseFloat(extractNumericValue(it.Comision_Tiqueteador_Producto) || '0');
+                    const inNationality = parseInt(extractNumericValue(it.Nacionalidad) || '1', 10);
+                    const ticketCode = (it.Numero_Tiquete || it.Tiquete || it.ticketCode || it.Ticket || '').toString().trim() || null;
+
+                    let nights: number | null = null;
+                    if (checkIn && checkOut) {
+                        const diffTime = Math.abs(new Date(checkOut).getTime() - new Date(checkIn).getTime());
+                        nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    } else if (it.Noches) {
+                        nights = parseInt(extractNumericValue(it.Noches) || '1', 10);
+                    }
 
                     if (checkIn && checkOut && new Date(checkOut).getTime() < new Date(checkIn).getTime()) {
                         await pool.close();
@@ -325,25 +423,40 @@ export async function POST(req: NextRequest) {
                         .input('price', mssql.Float, itemPrice)
                         .input('cost', mssql.Float, cost)
                         .input('providerId', mssql.Int, providerId)
+                        .input('prestadoraId', mssql.Int, prestadoraId)
                         .input('checkInDate', mssql.VarChar, checkIn || null)
                         .input('checkOutDate', mssql.VarChar, checkOut || null)
+                        .input('nights', mssql.Int, nights)
                         .input('paxAdults', mssql.Int, parseInt(extractNumericValue(it.Pax_Adultos) || '1', 10))
                         .input('paxChildren', mssql.Int, parseInt(extractNumericValue(it.Pax_Ninos) || '0', 10))
                         .input('serviceType', mssql.VarChar, it.Tipo_Servicio || null)
                         .input('destination', mssql.VarChar, it.Destino || null)
                         .input('reservationCode', mssql.VarChar, it.Reserva || null)
+                        .input('sellerCommission', mssql.Float, sellerComm)
+                        .input('ticketPrinterCommission', mssql.Float, ticketPrinterComm)
+                        .input('inNationality', mssql.Int, inNationality)
                         .input('servicios', mssql.VarChar, it.Servicios || null)
                         .input('descripcion', mssql.VarChar, it.Descripcion || null)
                         .input('itinerary', mssql.VarChar, it.Itinerario || null)
                         .input('class', mssql.VarChar, it.Clase || null)
                         .input('airline', mssql.VarChar, it.Aerolinea || null)
+                        .input('ticketTypeId', mssql.Int, ticketTypeId)
+                        .input('ticketCode', mssql.VarChar, ticketCode)
+                        .input('providerDueDate', mssql.VarChar, normalizeDateString(it.Fecha_Vencimiento_Proveedor || it.Fecha_Vencimiento || it.Vencimiento_Proveedor || it.providerDueDate || '') || null)
+                        .input('providerInvoice', mssql.VarChar, (it.Factura_Proveedor || it.Factura || it.Factura_Prov || it.providerInvoice || '').toString().trim() || null)
                         .query(`
                             INSERT INTO dbo.[InvoicesProduct] (
-                                invoiceId, productId, quantity, price, cost, providerId, checkInDate, checkOutDate,
-                                paxAdults, paxChildren, serviceType, destination, reservationCode, servicios, descripcion, itinerary, class, airline
+                                invoiceId, productId, quantity, price, cost, providerId, prestadoraId,
+                                checkInDate, checkOutDate, nights, paxAdults, paxChildren,
+                                serviceType, destination, reservationCode, sellerCommission, ticketPrinterCommission,
+                                inNationality, servicios, descripcion, itinerary, class, airline, ticketTypeId, ticketCode,
+                                providerDueDate, providerInvoice
                             ) OUTPUT INSERTED.id VALUES (
-                                @invoiceId, @productId, @quantity, @price, @cost, @providerId, TRY_CAST(@checkInDate AS DATETIME2), TRY_CAST(@checkOutDate AS DATETIME2),
-                                @paxAdults, @paxChildren, @serviceType, @destination, @reservationCode, @servicios, @descripcion, @itinerary, @class, @airline
+                                @invoiceId, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
+                                TRY_CAST(@checkInDate AS DATETIME2), TRY_CAST(@checkOutDate AS DATETIME2), @nights, @paxAdults, @paxChildren,
+                                @serviceType, @destination, @reservationCode, @sellerCommission, @ticketPrinterCommission,
+                                @inNationality, @servicios, @descripcion, @itinerary, @class, @airline, @ticketTypeId, @ticketCode,
+                                TRY_CAST(@providerDueDate AS DATETIME2), @providerInvoice
                             )
                         `);
 
@@ -353,50 +466,77 @@ export async function POST(req: NextRequest) {
                     // Inserción de Impuestos / Cargos / Tarifa (InvoicesProductTax)
                     const itemTaxesToInsert: { taxCode: string; amount: number; isMain: boolean }[] = [];
                     const cargoStr = (it.Cargos_A_Factura || it.Cargo_Principal || '').toString().trim();
-                    if (cargoStr) {
-                        if (cargoStr.includes(':')) {
-                            const parts = cargoStr.split(':');
-                            const tCode = parts[0].trim();
-                            const tAmt = parseFloat(extractNumericValue(parts[1]) || '0');
-                            if (tCode && tAmt > 0) {
-                                itemTaxesToInsert.push({ taxCode: tCode, amount: tAmt, isMain: true });
-                            }
-                        } else {
-                            const tCode = cargoStr;
-                            const tAmt = parseFloat(extractNumericValue(it.Cargos_A_Factura || rawPrice) || '0');
-                            if (tCode && tAmt > 0) {
-                                itemTaxesToInsert.push({ taxCode: tCode, amount: tAmt, isMain: true });
-                            }
-                        }
-                    }
-
                     const taxStr = (it.Impuestos_Nombres_Y_Valores || '').toString().trim();
-                    if (taxStr) {
-                        const tItems = taxStr.split('|');
-                        for (const tItem of tItems) {
-                            if (!tItem.trim() || !tItem.includes(':')) continue;
-                            const parts = tItem.split(':');
-                            const tCode = parts[0].trim();
-                            const tAmt = parseFloat(extractNumericValue(parts[1]) || '0');
+
+                    const parseTaxesString = (str: string, defaultMain: boolean = false) => {
+                        if (!str) return;
+                        const items = str.split('|');
+                        for (let index = 0; index < items.length; index++) {
+                            const item = items[index].trim();
+                            if (!item) continue;
+                            
+                            let tCode = '';
+                            let tAmt = 0;
+                            
+                            if (item.includes(':')) {
+                                const parts = item.split(':');
+                                tCode = parts[0].trim();
+                                tAmt = parseFloat(extractNumericValue(parts.slice(1).join(':')) || '0');
+                            } else {
+                                tCode = defaultMain ? (it.Cargo_Principal || 'TAR') : item;
+                                tAmt = parseFloat(extractNumericValue(item) || '0');
+                            }
+
                             if (tCode && tAmt > 0) {
-                                if (!itemTaxesToInsert.some(x => x.taxCode.toUpperCase() === tCode.toUpperCase())) {
-                                    itemTaxesToInsert.push({ taxCode: tCode, amount: tAmt, isMain: itemTaxesToInsert.length === 0 });
+                                const upperCode = tCode.toUpperCase();
+                                if (!itemTaxesToInsert.some(x => x.taxCode.toUpperCase() === upperCode)) {
+                                    itemTaxesToInsert.push({
+                                        taxCode: tCode,
+                                        amount: tAmt,
+                                        isMain: defaultMain && index === 0
+                                    });
                                 }
                             }
                         }
+                    };
+
+                    parseTaxesString(cargoStr, true);
+                    parseTaxesString(taxStr, false);
+
+                    if (itemTaxesToInsert.length > 0 && !itemTaxesToInsert.some(x => x.isMain)) {
+                        itemTaxesToInsert[0].isMain = true;
                     }
 
                     let mainTaxId: number | null = null;
                     for (const tObj of itemTaxesToInsert) {
                         let chargeAndTaxId: number | null = null;
+                        let valSnapshot = 0;
+                        let valTypeSnapshot = 'MONTO';
+
                         const taxRes = await pool.request()
                             .input('code', mssql.VarChar, tObj.taxCode)
-                            .query(`SELECT TOP 1 id, value, valueType FROM dbo.[ChargeAndTax] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) LIKE '%' + UPPER(@code) + '%'`);
+                            .query(`SELECT TOP 1 id, value, valueType FROM dbo.[ChargeAndTax] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) = UPPER(@code)`);
                         
                         if (taxRes.recordset && taxRes.recordset.length > 0) {
                             chargeAndTaxId = taxRes.recordset[0].id;
-                            const valSnapshot = taxRes.recordset[0].value || 0;
-                            const valTypeSnapshot = taxRes.recordset[0].valueType || 'MONTO';
+                            valSnapshot = taxRes.recordset[0].value || 0;
+                            valTypeSnapshot = taxRes.recordset[0].valueType || 'MONTO';
+                        } else {
+                            // Auto-crear impuesto/cargo si no existe en la maestría
+                            const newTaxRes = await pool.request()
+                                .input('code', mssql.VarChar, tObj.taxCode)
+                                .input('name', mssql.VarChar, tObj.taxCode)
+                                .input('type', mssql.VarChar, tObj.isMain ? 'CHARGE' : 'TAX')
+                                .input('valueType', mssql.VarChar, 'MONTO')
+                                .input('value', mssql.Float, 0)
+                                .query(`INSERT INTO dbo.[ChargeAndTax] (code, name, type, valueType, value, isEditable) OUTPUT INSERTED.id VALUES (@code, @name, @type, @valueType, @value, 1)`);
+                            
+                            if (newTaxRes.recordset && newTaxRes.recordset.length > 0) {
+                                chargeAndTaxId = newTaxRes.recordset[0].id;
+                            }
+                        }
+
+                        if (chargeAndTaxId) {
                             if (tObj.isMain) mainTaxId = chargeAndTaxId;
 
                             await pool.request()
@@ -525,12 +665,24 @@ export async function POST(req: NextRequest) {
                 functionalMessage: dbMessage
             });
 
+            // Exportación opcional a Zeus ERP solo si la regla de parámetro automático está explícitamente habilitada (value === '1')
+            let autoExportResult = null;
+            if (createdIds.length > 0) {
+                try {
+                    const { autoExportInvoiceToZeusERP } = await import('@/lib/zeus-auto-export');
+                    autoExportResult = await autoExportInvoiceToZeusERP(createdIds, actingUserId);
+                } catch (expErr: any) {
+                    console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on SQL Server invoice import:', expErr?.message);
+                }
+            }
+
             return NextResponse.json({
                 message: 'Importación finalizada',
                 detail: dbMessage,
                 importedCount: grouped.size,
                 createdIds,
-                createdConsecutives
+                createdConsecutives,
+                autoExportResult
             });
         }
 
@@ -543,9 +695,9 @@ export async function POST(req: NextRequest) {
             const cargosAFacturaRaw = (row.Cargos_A_Factura || '').toString().trim();
             const cargosAFacturaClean = extractNumericValue(cargosAFacturaRaw);
             
-            let impuestosStr = row.Impuestos_Nombres_Y_Valores || '';
-            if (!impuestosStr && cargosAFacturaRaw.includes(':')) {
-                impuestosStr = cargosAFacturaRaw;
+            let impuestosStr = (row.Impuestos_Nombres_Y_Valores || '').toString().trim();
+            if (cargosAFacturaRaw.includes(':')) {
+                impuestosStr = impuestosStr ? `${cargosAFacturaRaw}|${impuestosStr}` : cargosAFacturaRaw;
             }
 
             const cols = [
@@ -562,7 +714,7 @@ export async function POST(req: NextRequest) {
                 row.Producto_Codigo || '',
                 row.Proveedor_Nombre || '',
                 row.Proveedor_Codigo || '',
-                row.Prestadora_Codigo || row.Hotel_Codigo || row.Hotel_id || '',
+                getExcelPrestadoraCode(row),
                 impuestosStr,
                 getExcelVariableString(row),
                 row.Pasajeros || '',
@@ -591,7 +743,9 @@ export async function POST(req: NextRequest) {
                 row.Itinerarios || '',
                 row.Fuente || '',
                 row.Serie || '',
-                row.Consecutivo || ''
+                row.Consecutivo || '',
+                normalizeDateString(row.Fecha_Vencimiento_Proveedor || row.Fecha_Vencimiento || row.Vencimiento_Proveedor || row.providerDueDate || ''),
+                (row.Factura_Proveedor || row.Factura || row.Factura_Prov || row.providerInvoice || '').toString().trim()
             ];
             return cols.map(c => (c !== undefined && c !== null ? c.toString().replace(/\^/g, ' ') : '')).join('^');
         }).join('\n');
@@ -631,40 +785,11 @@ export async function POST(req: NextRequest) {
         // Exportación opcional a Zeus ERP solo si la regla de parámetro automático está explícitamente habilitada (value === '1')
         let autoExportResult = null;
         if (createdIds.length > 0) {
-            let autoExportParamVal = '0';
             try {
-                const paramRows: any[] = await executePostgresQuery(
-                    `SELECT "value" FROM public."SystemParameter" WHERE "code" = $1`,
-                    ['EnviarFacturasAutoSQLserver']
-                );
-                if (paramRows && paramRows.length > 0) autoExportParamVal = paramRows[0].value;
-            } catch (e) {}
-
-            const shouldExportToZeusERP = autoExportParamVal === '1';
-
-            if (shouldExportToZeusERP) {
-                try {
-                    console.log(`[EXPORT_ZEUS_ERP] Exportando automáticamente a Zeus ERP (IDs: ${createdIdsStr})...`);
-                    const exportResult: any[] = await executePostgresQuery(
-                        `CALL spexportinvoices($1, $2, $3)`,
-                        [createdIdsStr, actingUserId, '']
-                    );
-
-                    const row = exportResult && exportResult.length > 0 ? exportResult[0] : null;
-                    const xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
-
-                    if (xmlStr && typeof xmlStr === 'string' && !xmlStr.startsWith('ERROR')) {
-                        const targetDb = await getZeusERPDatabaseName();
-                        const sqlResult = await executeSQLServerProcedure('spFacturacionesCrear', { xml: xmlStr }, targetDb);
-                        autoExportResult = { success: true, message: 'Exportado automáticamente a SQL Server (Zeus ERP)', sqlResult };
-                        await registerLog(actingUserId, 'INVOICE', 'AUTO_EXPORT_SUCCESS', `ID(s) ${createdIdsStr}: Exportación automática exitosa a SQL Server`, { sqlResult });
-                    } else {
-                        autoExportResult = { success: false, message: `No se generó XML válido de exportación: ${xmlStr}` };
-                    }
-                } catch (expErr: any) {
-                    console.error('[AUTO_EXPORT_INVOICES] Error en exportación a SQL Server:', expErr);
-                    autoExportResult = { success: false, error: expErr.message };
-                }
+                const { autoExportInvoiceToZeusERP } = await import('@/lib/zeus-auto-export');
+                autoExportResult = await autoExportInvoiceToZeusERP(createdIds, actingUserId);
+            } catch (expErr: any) {
+                console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on Postgres invoice import:', expErr?.message);
             }
         }
 

@@ -151,8 +151,19 @@ export async function POST(req: NextRequest) {
             });
         });
 
+        // Intentar auto-exportar a Zeus ERP si el parámetro EnviarFacturacionAutoSQLserver está activo ('1')
+        let autoExportResult = null;
+        if (dbInvoiceId) {
+            try {
+                const { autoExportInvoiceToZeusERP } = await import('@/lib/zeus-auto-export');
+                autoExportResult = await autoExportInvoiceToZeusERP(dbInvoiceId, actingUserId);
+            } catch (expErr: any) {
+                console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning for invoice creation:', expErr?.message);
+            }
+        }
+
         const finalMessage = message && message !== '' ? message : 'SUCCESS: Factura creada correctamente con ID ' + dbInvoiceId;
-        return NextResponse.json({ message: finalMessage, invoice })
+        return NextResponse.json({ message: finalMessage, invoice, autoExportResult })
     } catch (error: any) {
         console.error('Error saving invoice (POST):', error)
         await recordTraceEvent({

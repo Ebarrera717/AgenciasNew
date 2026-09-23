@@ -55,6 +55,8 @@ interface QuotationFormData {
         servicios?: string;
         descripcion?: string;
         passenger?: string;
+        providerDueDate?: string;
+        providerInvoice?: string;
         passengers: { name: string, document: string }[];
         sellerCommission: number;
         ticketPrinterCommission: number;
@@ -230,6 +232,40 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
             const selectedImplant = data?.implants?.find((i: any) => String(i.id) === String(formData.implantId));
             const selectedPrinter = data?.ticketPrinters?.find((t: any) => String(t.id) === String(formData.ticketPrinterId));
             const selectedClient = data?.clients?.find((c: any) => String(c.id) === String(formData.clientId));
+
+            // Validación de variables adicionales obligatorias del cliente para cotizaciones
+            let clientMandatoryIds: any[] = [];
+            if (selectedClient?.mandatoryVariables) {
+                let mv = selectedClient.mandatoryVariables;
+                if (typeof mv === 'string') {
+                    try { mv = JSON.parse(mv); } catch (e) {}
+                }
+                if (Array.isArray(mv)) {
+                    clientMandatoryIds = mv;
+                } else if (mv && typeof mv === 'object') {
+                    clientMandatoryIds = Array.isArray(mv.quotation) ? mv.quotation : (Array.isArray(mv.quotations) ? mv.quotations : []);
+                }
+            }
+
+            if (clientMandatoryIds.length > 0) {
+                for (let i = 0; i < (formData.items || []).length; i++) {
+                    const item = formData.items[i];
+                    const prodName = data?.products?.find((p: any) => String(p.id) === String(item.productId))?.description || `Producto #${i + 1}`;
+                    for (const reqVarId of clientMandatoryIds) {
+                        const vMaster = (data?.variables || []).find((v: any) => String(v.id) === String(reqVarId) || String(v.code) === String(reqVarId));
+                        const varName = vMaster?.name || `Variable #${reqVarId}`;
+                        const assigned = (item.variables || []).find((v: any) => String(v.masterVariableId) === String(vMaster?.id || reqVarId));
+                        if (!assigned || !assigned.value || !assigned.value.trim()) {
+                            alert(`ERROR: El cliente requiere completar la variable adicional "${varName}" en el producto "${prodName}".`);
+                            setSaving(false);
+                            if (printWindow) {
+                                try { printWindow.close(); } catch (e) {}
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
 
             const payload = {
                 ...formData,
@@ -706,6 +742,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                     servicios: p.servicios || p.service || '',
                                     descripcion: p.descripcion || '',
                                     passenger: p.passenger || '',
+                                    providerDueDate: p.providerDueDate ? new Date(p.providerDueDate).toISOString().split('T')[0] : '',
+                                    providerInvoice: p.providerInvoice || '',
                                     passengers: Array.isArray(p.passengers) ? p.passengers : [],
                                     payments: Array.isArray(p.payments) ? p.payments : [],
                                     sellerCommission: p.sellerCommission || 0,
@@ -797,6 +835,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 reservationCode: copyFields && formData.reservationCode ? formData.reservationCode : '', 
                 descripcion: copyFields && formData.manualDescription ? formData.manualDescription : '', 
                 passenger: copyFields && formData.passenger ? formData.passenger : '',
+                providerDueDate: '',
+                providerInvoice: '',
                 passengers: [{ name: '', document: '' }],
                 sellerCommission: 0, ticketPrinterCommission: 0,
                 appliedTaxes: [],
@@ -848,6 +888,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 reservationCode: (copyFields && formData.reservationCode) ? formData.reservationCode : '',
                 descripcion: copyFields && formData.manualDescription ? formData.manualDescription : '',
                 passenger: (copyFields && formData.passenger) ? formData.passenger : '',
+                providerDueDate: '',
+                providerInvoice: '',
                 passengers: [],
                 sellerCommission: 0,
                 ticketPrinterCommission: 0,
@@ -1691,6 +1733,14 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                      <label className="text-[10px] uppercase font-bold text-blue-500">Descripción Manual</label>
                                                      <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-blue-200 dark:border-blue-800 outline-none text-xs" value={item.descripcion || ''} onChange={(e) => updateItem(index, 'descripcion', e.target.value)} placeholder="Descripción manual del producto..." />
                                                  </div>
+                                                 <div className="space-y-1">
+                                                     <label className="text-[10px] uppercase font-bold text-amber-500">F. Venc. Proveedor</label>
+                                                     <input type="date" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.providerDueDate || ''} onChange={(e) => updateItem(index, 'providerDueDate', e.target.value)} />
+                                                 </div>
+                                                 <div className="space-y-1">
+                                                     <label className="text-[10px] uppercase font-bold text-amber-500">Factura Proveedor</label>
+                                                     <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.providerInvoice || ''} onChange={(e) => updateItem(index, 'providerInvoice', e.target.value)} placeholder="Nº Factura Proveedor..." />
+                                                 </div>
                                             </div>
 
                                             <div className="col-span-12 mt-4 flex justify-between items-center bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100 dark:border-blue-800/30">
@@ -2009,10 +2059,14 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                         const selectedClient = data.clients?.find((c: any) => String(c.id) === String(formData.clientId));
                                                         let clientMandatoryIds: any[] = [];
                                                         if (selectedClient?.mandatoryVariables) {
-                                                            if (Array.isArray(selectedClient.mandatoryVariables)) {
-                                                                clientMandatoryIds = selectedClient.mandatoryVariables;
-                                                            } else if (typeof selectedClient.mandatoryVariables === 'string') {
-                                                                try { clientMandatoryIds = JSON.parse(selectedClient.mandatoryVariables); } catch (e) {}
+                                                            let mv = selectedClient.mandatoryVariables;
+                                                            if (typeof mv === 'string') {
+                                                                try { mv = JSON.parse(mv); } catch (e) {}
+                                                            }
+                                                            if (Array.isArray(mv)) {
+                                                                clientMandatoryIds = mv;
+                                                            } else if (mv && typeof mv === 'object') {
+                                                                clientMandatoryIds = Array.isArray(mv.quotation) ? mv.quotation : (Array.isArray(mv.quotations) ? mv.quotations : []);
                                                             }
                                                         }
 
@@ -2034,6 +2088,9 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                         }
 
                                                         return availableVariables.map((vMaster: any) => {
+                                                            const isMandatory = clientMandatoryIds.some(
+                                                                id => String(id) === String(vMaster.id) || String(id) === String(vMaster.code)
+                                                            );
                                                             const assigned = item.variables?.find((v: any) => String(v.masterVariableId) === String(vMaster.id));
                                                             const isSelected = !!assigned;
 
@@ -2059,6 +2116,9 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                                                 }}
                                                                             />
                                                                             <span>{vMaster.name}</span>
+                                                                            {isMandatory && (
+                                                                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">Obligatoria</span>
+                                                                            )}
                                                                             <span className="opacity-50 text-[10px] ml-auto">({vMaster.code})</span>
                                                                         </label>
                                                                     </div>

@@ -18,8 +18,16 @@ BEGIN
     -- Validar Usuario
     IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @User_id)
     BEGIN
-        SELECT 'ERROR: El usuario ' + CAST(@User_id AS VARCHAR) + ' no existe.' AS mensaje_resultado;
-        RETURN;
+        SELECT TOP 1 @User_id = id FROM dbo.[User] WHERE isActive = 1 ORDER BY id ASC;
+        IF @User_id IS NULL
+        BEGIN
+            SELECT TOP 1 @User_id = id FROM dbo.[User] ORDER BY id ASC;
+            IF @User_id IS NULL
+            BEGIN
+                SELECT 'ERROR: No existen usuarios registrados en el sistema.' AS mensaje_resultado;
+                RETURN;
+            END;
+        END;
     END;
 
     -- Parse IDs

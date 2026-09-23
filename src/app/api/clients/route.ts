@@ -75,22 +75,24 @@ export async function POST(req: NextRequest) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                const mVarsStr = mandatoryVariables ? JSON.stringify(mandatoryVariables) : null;
                 const res = await pool.request()
                     .input('name', name || '')
                     .input('document', document || '')
                     .input('contactInfo', contactInfo || null)
                     .input('address', address || null)
+                    .input('mandatoryVariables', mVarsStr)
                     .input('sellerId', sellerId ? parseInt(sellerId) : null)
                     .input('isActive', isAct ? 1 : 0)
                     .input('creditDays', cDays)
                     .query(`
-                        INSERT INTO dbo.[Client] ([name], [document], [contactInfo], [address], [sellerId], [isActive], [creditDays])
+                        INSERT INTO dbo.[Client] ([name], [document], [contactInfo], [address], [mandatoryVariables], [sellerId], [isActive], [creditDays])
                         OUTPUT INSERTED.id
-                        VALUES (@name, @document, @contactInfo, @address, @sellerId, @isActive, @creditDays)
+                        VALUES (@name, @document, @contactInfo, @address, @mandatoryVariables, @sellerId, @isActive, @creditDays)
                     `);
                 await pool.close();
                 const dbClientId = res.recordset[0]?.id;
-                const client = { id: dbClientId, name, document, sellerId, isActive: isAct, creditDays: cDays };
+                const client = { id: dbClientId, name, document, sellerId, isActive: isAct, creditDays: cDays, mandatoryVariables };
                 return NextResponse.json({ message: 'Cliente creado', client });
             } catch (err: any) {
                 if (pool) await pool.close();
@@ -146,22 +148,24 @@ export async function PUT(req: NextRequest) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                const mVarsStr = mandatoryVariables ? JSON.stringify(mandatoryVariables) : null;
                 await pool.request()
                     .input('id', parseInt(id))
                     .input('name', name || '')
                     .input('document', document || '')
                     .input('contactInfo', contactInfo || null)
                     .input('address', address || null)
+                    .input('mandatoryVariables', mVarsStr)
                     .input('sellerId', sellerId ? parseInt(sellerId) : null)
                     .input('isActive', isAct ? 1 : 0)
                     .input('creditDays', cDays)
                     .query(`
                         UPDATE dbo.[Client]
-                        SET [name] = @name, [document] = @document, [contactInfo] = @contactInfo, [address] = @address, [sellerId] = @sellerId, [isActive] = @isActive, [creditDays] = @creditDays
+                        SET [name] = @name, [document] = @document, [contactInfo] = @contactInfo, [address] = @address, [mandatoryVariables] = @mandatoryVariables, [sellerId] = @sellerId, [isActive] = @isActive, [creditDays] = @creditDays
                         WHERE [id] = @id
                     `);
                 await pool.close();
-                const client = { id, name, document, isActive: isAct, creditDays: cDays };
+                const client = { id, name, document, isActive: isAct, creditDays: cDays, mandatoryVariables };
                 return NextResponse.json({ message: 'Cliente actualizado', client });
             } catch (err: any) {
                 if (pool) await pool.close();

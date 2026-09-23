@@ -50,15 +50,7 @@ BEGIN
             cd_cuenta VARCHAR(20) NULL
         );
     END;
-    IF OBJECT_ID('dbo.CargosDesc') IS NOT NULL
-    BEGIN
-        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CargosDesc') AND name = 'cd_cuenta')
-            ALTER TABLE dbo.CargosDesc ADD cd_cuenta VARCHAR(20) NULL;
-
-        UPDATE dbo.CargosDesc 
-        SET cd_cuenta = '28151080' 
-        WHERE (cd_codigo = 'TAR' OR id = 1) AND (cd_cuenta IS NULL OR RTRIM(LTRIM(cd_cuenta)) = '');
-    END;
+    -- CargosDesc cd_cuenta remains NULL for TAR so native Zeus ERP processes total CxP under TiposServicios account in Section 3
 
     IF OBJECT_ID('dbo.parametros') IS NULL
     BEGIN
@@ -2081,11 +2073,19 @@ BEGIN
 							WHILE @@FETCH_STATUS = 0
 							BEGIN
 								-- Validar cuenta del Impuesto (Directo desde ImpRet)
-							IF @sc_id_imptax IS NOT NULL
+							IF @sc_id_imptax IS NOT NULL OR (@sc_codigotax IS NOT NULL AND RTRIM(LTRIM(@sc_codigotax)) <> '')
 							BEGIN
 								DECLARE @tax_acct_val VARCHAR(20) = NULL;
-								SELECT @tax_acct_val = cd_cuenta FROM dbo.ImpRet WHERE id = @sc_id_imptax;
-								IF @tax_acct_val IS NULL OR RTRIM(LTRIM(@tax_acct_val)) = ''
+								DECLARE @bl_cxp_provee BIT = 0;
+								SELECT TOP 1 
+								       @tax_acct_val = cd_cuenta,
+								       @bl_cxp_provee = ISNULL(bl_contabilizarCxPProvee, ISNULL(bl_contabilizar_proveedor, 0))
+								FROM dbo.ImpRet 
+								WHERE (@sc_id_imptax IS NOT NULL AND id = @sc_id_imptax)
+								   OR (cd_codigo = @sc_codigotax);
+
+								-- Si no contabiliza en CXP proveedor (bl_contabilizarCxPProvee = 0) y no tiene cuenta contable, detener y emitir error
+								IF ISNULL(@bl_cxp_provee, 0) = 0 AND (@tax_acct_val IS NULL OR RTRIM(LTRIM(@tax_acct_val)) = '')
 								BEGIN
 									DECLARE @err_tax_msg NVARCHAR(4000) = '❌ Error de Parametrización Contable: El Impuesto "' + ISNULL(@sc_ds_nombretax, 'DESCONOCIDO') + '" no tiene cuenta contable configurada en la tabla de Impuestos (ImpRet). Por favor verifique la parametrización en AgenciasNew o en Zeus ERP antes de continuar.';
 									RAISERROR(@err_tax_msg, 16, 1);
@@ -2126,13 +2126,16 @@ BEGIN
 							WHERE id = @sc_id_carg AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
 						END;
 
-						-- Si ninguno de los 3 niveles tiene cuenta contable, detener y emitir error controlado
+						-- Si ninguno de los 3 niveles tiene cuenta contable, detener y emitir error controlled
 						IF @resolved_account IS NULL OR RTRIM(LTRIM(@resolved_account)) = ''
 						BEGIN
 							DECLARE @err_cargo_msg NVARCHAR(4000) = '❌ Error de Parametrización Contable: No fue posible determinar la cuenta contable para el Cargo/Servicio "' + ISNULL(@sc_ds_nombre, 'DESCONOCIDO') + '". Verifique la parametrización en Tipo de Servicio (' + ISNULL(@gen_ds_tiposservicio, '') + '), Concepto de Facturación o Cargo.';
 							RAISERROR(@err_cargo_msg, 16, 1);
 							RETURN;
 						END;
+
+						-- NOTA: CargosDesc.cd_cuenta permanece NULL para cargos de pasaje/servicio no gravados (TAR) de modo que Zeus ERP agrupe el total CxP en una sola linea al Proveedor
+						-- La cuenta contable resuelta de 3 niveles (@resolved_account) fue validada previamente arriba.
 
 						SET @SrvCargSqlStmt = @SrvCargSqlStmt + CHAR(13) + CHAR(10) + ' EXECUTE dbo.spza_ServicioCargos_Insertar @id_Fac_Servicios = @NewSrvId, @id_cargosdesc = ' + CAST(ISNULL(@sc_id_carg, 1) AS VARCHAR) + ', @ds_cargonm = ''' + ISNULL(@sc_ds_nombre,'') + ''', @am_valor = ' + CAST(ISNULL(@sc_am_valor,0) AS VARCHAR) + ', @am_contado = ' + CAST(ISNULL(@sc_am_contado,0) AS VARCHAR) + ', @am_credito = ' + CAST(ISNULL(@sc_am_credito,0) AS VARCHAR) + ', @bl_noshow = 0, @id_monedas_iata = @id_monedas_iata, @Tcambio = @Tcambio, @SqlStmt = ''' + REPLACE(ISNULL(@SrvImpuestosSqlStmt,''), '''', '''''') + ''';' 
 						
@@ -2334,14 +2337,14 @@ BEGIN
 							@am_valor_descuento = 0,
 							@ds_motivo_descuento = NULL,
 							@Id_CargosDesc_Descuento = NULL,
-							@dt_FechaSalidaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_Fecha_Salida, @gen_dt_salida), 120) + '''', 'NULL') + ',
-							@dt_FechaLlegadaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_Fecha_Llegada, @gen_dt_llegada), 120) + '''', 'NULL') + ',
+							@dt_FechaSalidaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
+							@dt_FechaLlegadaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
 							@cd_localizador = NULL,
 							@cd_VoucherPax = NULL,
 							@am_basecomisionableprov = ' + CAST(ISNULL(@gen_am_basecomisionable,0) AS VARCHAR) + ',
 							@am_porcomisionprov = 0,
-							@cd_NumeFac = NULL,
-							@dt_VenceFac = NULL,
+							@cd_NumeFac = ' + ISNULL('''' + @cd_consecutivo + '''', 'NULL') + ',
+							@dt_VenceFac = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_fechaexped, GETDATE()), 120) + '''', 'NULL') + ',
 							@Id_AcomodacionSrv = NULL,
 							@Id_TipoPlanSrv = NULL,
 							@in_habitaciones = NULL,
@@ -2506,7 +2509,7 @@ BEGIN
 							'@bl_generadaauto = 1,' + CHAR(13) + CHAR(10) +
 							'@ds_CotizacionesId = NULL,' + CHAR(13) + CHAR(10) +
 							'@Id_Cierre = NULL,' + CHAR(13) + CHAR(10) +
-							'@cd_TipoFact = NULL,' + CHAR(13) + CHAR(10) +
+							'@cd_TipoFact = ''FA'',' + CHAR(13) + CHAR(10) +
 							'@id_fac_remisionRelacionada = NULL,' + CHAR(13) + CHAR(10) +
 							'@id_fac_facturaRelacionada = NULL,' + CHAR(13) + CHAR(10) +
 							'@ds_DescripcionFac = ' + ISNULL('''' + REPLACE(@ds_descripcion, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +

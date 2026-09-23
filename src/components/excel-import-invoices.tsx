@@ -109,7 +109,9 @@ export default function ExcelImportInvoices({ onImportSuccess }: { onImportSucce
                 Aerolinea: '',
                 Tipo_Tiquete_Codigo: '',
                 Pagos: '100000:Efectivo:REF-123|100000:Tarjeta:REF-456:2026-12-01:1:1234:AUTH123:VOUCH456:2028-12',
-                Itinerarios: ''
+                Itinerarios: '',
+                Fecha_Vencimiento_Proveedor: '2026-11-25',
+                Factura_Proveedor: 'FPROV-99881'
             },
             {
                 Grupo_Factura: '2',
@@ -151,7 +153,9 @@ export default function ExcelImportInvoices({ onImportSuccess }: { onImportSucce
                 Aerolinea: 'Avianca',
                 Tipo_Tiquete_Codigo: 'TKT-NAC',
                 Pagos: '357000:Efectivo:REF-789',
-                Itinerarios: 'BOG:CTG:Económica:2026-10-15:2026-10-15:1|CTG:BOG:Económica:2026-10-20:2026-10-20:2'
+                Itinerarios: 'BOG:CTG:Económica:2026-10-15:2026-10-15:1|CTG:BOG:Económica:2026-10-20:2026-10-20:2',
+                Fecha_Vencimiento_Proveedor: '2026-10-10',
+                Factura_Proveedor: 'AV-98124'
             }
         ]
         const ws = XLSX.utils.json_to_sheet(templateData)

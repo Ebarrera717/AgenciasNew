@@ -245,7 +245,16 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
             });
         });
 
-        return NextResponse.json({ message: message || 'Factura actualizada', invoice: { id } })
+        // Intentar auto-exportar a Zeus ERP si el parámetro EnviarFacturacionAutoSQLserver está activo ('1')
+        let autoExportResult = null;
+        try {
+            const { autoExportInvoiceToZeusERP } = await import('@/lib/zeus-auto-export');
+            autoExportResult = await autoExportInvoiceToZeusERP(id, actingUserId);
+        } catch (expErr: any) {
+            console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on invoice update:', expErr?.message);
+        }
+
+        return NextResponse.json({ message: message || 'Factura actualizada', invoice: { id }, autoExportResult })
     } catch (error: any) {
         console.error('Error updating invoice (PUT):', error)
         await recordTraceEvent({

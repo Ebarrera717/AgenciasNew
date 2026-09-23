@@ -95,15 +95,27 @@ if (![string]::IsNullOrEmpty($SqlHost) -and ![string]::IsNullOrEmpty($SqlDb) -an
     Write-Log "Usando parametros SQL Server recibidos: Host=$SqlHost, Port=$SqlPort, DB=$SqlDb, User=$SqlUser"
 } else {
     Write-Log "Extrayendo credenciales SQL Server desde .env existente..."
-    if ($DbUrl -match 'sqlserver://([^:]+):([0-9]+);database=([^;]+);user=([^;]+);password=([^;]+)') {
+    $cleanDbUrl = $DbUrl -replace '^(sqlserver|mssql)://', ''
+    $parts = $cleanDbUrl -split ';'
+    $serverPart = $parts[0]
+    
+    if ($serverPart -match '^([^:]+):([0-9]+)$') {
         $SqlHost = $matches[1]
         $SqlPort = $matches[2]
-        $SqlDb = $matches[3]
-        $SqlUser = [System.Uri]::UnescapeDataString($matches[4])
-        $SqlPass = [System.Uri]::UnescapeDataString($matches[5])
     } else {
+        $SqlHost = $serverPart
+        $SqlPort = "1433"
+    }
+    
+    foreach ($part in $parts) {
+        if ($part -match '^(?i)database\s*=\s*(.*)$') { $SqlDb = $matches[1].Trim() }
+        if ($part -match '^(?i)(user|user id|uid)\s*=\s*(.*)$') { $SqlUser = [System.Uri]::UnescapeDataString($matches[2].Trim()) }
+        if ($part -match '^(?i)(password|pwd)\s*=\s*(.*)$') { $SqlPass = [System.Uri]::UnescapeDataString($matches[2].Trim()) }
+    }
+    
+    if ([string]::IsNullOrWhiteSpace($SqlHost) -or [string]::IsNullOrWhiteSpace($SqlDb) -or [string]::IsNullOrWhiteSpace($SqlUser)) {
         Write-Log "ERROR CRITICO: No fue posible parsear el string de conexion SQL Server desde el .env del cliente." "ERROR"
-        Show-Alert "Error de Formato de Conexion" "La cadena de conexion en .env no tiene el formato esperado de SQL Server (sqlserver://host:port;database=...)."
+        Show-Alert "Error de Formato de Conexion" "La cadena de conexion en .env no tiene el formato esperado de SQL Server (sqlserver://host[:port];database=...;user=...;password=...)."
         exit 1
     }
 }
@@ -176,27 +188,33 @@ if ($activeMechanism -eq "TASK_SCHEDULER") {
         }
     }
 } else {
-    # Intentar Windows Service
+    # Intentar Windows Service con protección total contra fallos en SCM
     if (Test-Path ".\install-service.js") {
-        node .\install-service.js >> $LogFile 2>&1
+        try {
+            node .\install-service.js >> $LogFile 2>&1
+        } catch {}
         Start-Sleep -Seconds 3
     }
     
-    $svc = Get-Service -Name "Korex_SQLServer_Service" -ErrorAction SilentlyContinue
-    if (-not $svc) { $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue }
-    if (-not $svc) { $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue }
-    
-    if ($svc) {
-        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 4
-        $svcRefresh = Get-Service -Name $svc.Name
-        if ($svcRefresh.Status -eq 'Running') {
-            $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($chk) {
-                Write-Log "Servicio de Windows SQL Server ($($svc.Name)) activo y escuchando en puerto $OldNextjsPort (PID: $($chk.OwningProcess))."
-                $startedOk = $true
+    try {
+        $svc = Get-Service -Name "Korex_SQLServer_Service" -ErrorAction SilentlyContinue
+        if (-not $svc) { $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue }
+        if (-not $svc) { $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue }
+        
+        if ($svc) {
+            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 4
+            $svcRefresh = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            if ($svcRefresh -and $svcRefresh.Status -eq 'Running') {
+                $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($chk) {
+                    Write-Log "Servicio de Windows SQL Server ($($svc.Name)) activo y escuchando en puerto $OldNextjsPort (PID: $($chk.OwningProcess))."
+                    $startedOk = $true
+                }
             }
         }
+    } catch {
+        Write-Log "Aviso al interactuar con el Servicio Windows SQL Server: $_" "WARN"
     }
     
     # Fallback a Task Scheduler si el servicio fallo al reiniciar

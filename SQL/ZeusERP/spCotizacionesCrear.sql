@@ -384,61 +384,110 @@ BEGIN
         -- 1. Validar Cliente
         IF @val_cd_cliente_codigo IS NOT NULL AND @val_cd_cliente_codigo <> ''
         BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM dbo.[Client] WHERE document = @val_cd_cliente_codigo OR CAST(id AS VARCHAR(25)) = @val_cd_cliente_codigo
-            )
+            IF OBJECT_ID('dbo.CLIENTES', 'U') IS NOT NULL
             BEGIN
-                SELECT 'cliente ' + @val_cd_cliente_codigo + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-                RETURN 1;
+                IF NOT EXISTS (
+                    SELECT 1 FROM dbo.CLIENTES WHERE LTRIM(RTRIM(IDCLIENTE)) = LTRIM(RTRIM(@val_cd_cliente_codigo))
+                )
+                BEGIN
+                    SELECT 'cliente ' + @val_cd_cliente_codigo + ' no existe en Zeus ERP' AS 'Respuesta', 1 AS 'Estado';
+                    RETURN 1;
+                END
+            END
+            ELSE IF OBJECT_ID('dbo.[Client]', 'U') IS NOT NULL
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM dbo.[Client] WHERE document = @val_cd_cliente_codigo OR CAST(id AS VARCHAR(25)) = @val_cd_cliente_codigo
+                )
+                BEGIN
+                    SELECT 'cliente ' + @val_cd_cliente_codigo + ' no existe' AS 'Respuesta', 1 AS 'Estado';
+                    RETURN 1;
+                END
             END
         END
 
         -- 2. Validar Sucursal
         IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
         BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM dbo.[Branch] WHERE code = @val_cd_sucursal OR CAST(id AS VARCHAR(25)) = @val_cd_sucursal
-            )
+            IF OBJECT_ID('dbo.[Branch]', 'U') IS NOT NULL
             BEGIN
-                SELECT 'sucursal ' + @val_cd_sucursal + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-                RETURN 1;
+                IF NOT EXISTS (
+                    SELECT 1 FROM dbo.[Branch] WHERE code = @val_cd_sucursal OR CAST(id AS VARCHAR(25)) = @val_cd_sucursal
+                )
+                BEGIN
+                    SELECT 'sucursal ' + @val_cd_sucursal + ' no existe' AS 'Respuesta', 1 AS 'Estado';
+                    RETURN 1;
+                END
             END
         END
 
-        -- 3. Validar Vendedor
-        IF @val_cd_vendedor IS NOT NULL AND @val_cd_vendedor <> ''
+        -- 3. Validar / Resolver Vendedor
+        IF OBJECT_ID('dbo.MAEVENDE', 'U') IS NOT NULL
         BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM dbo.[Seller] WHERE code = @val_cd_vendedor OR CAST(id AS VARCHAR(25)) = @val_cd_vendedor
-            )
+            IF @val_cd_vendedor IS NOT NULL AND @val_cd_vendedor <> ''
             BEGIN
-                SELECT 'vendedor ' + @val_cd_vendedor + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-                RETURN 1;
+                IF NOT EXISTS (
+                    SELECT 1 FROM dbo.MAEVENDE WHERE LTRIM(RTRIM(IDVENDE)) = LTRIM(RTRIM(@val_cd_vendedor))
+                )
+                BEGIN
+                    SELECT TOP 1 @val_cd_vendedor = IDVENDE FROM dbo.MAEVENDE WHERE IDVENDE = '000';
+                    IF @val_cd_vendedor IS NULL
+                        SELECT TOP 1 @val_cd_vendedor = IDVENDE FROM dbo.MAEVENDE WHERE Deshabilitado = 0 ORDER BY IDVENDE ASC;
+                    IF @val_cd_vendedor IS NULL
+                        SELECT TOP 1 @val_cd_vendedor = IDVENDE FROM dbo.MAEVENDE ORDER BY IDVENDE ASC;
+                END
             END
+            ELSE
+            BEGIN
+                SELECT TOP 1 @val_cd_vendedor = IDVENDE FROM dbo.MAEVENDE WHERE IDVENDE = '000';
+                IF @val_cd_vendedor IS NULL
+                    SELECT TOP 1 @val_cd_vendedor = IDVENDE FROM dbo.MAEVENDE WHERE Deshabilitado = 0 ORDER BY IDVENDE ASC;
+                IF @val_cd_vendedor IS NULL
+                    SELECT TOP 1 @val_cd_vendedor = IDVENDE FROM dbo.MAEVENDE ORDER BY IDVENDE ASC;
+            END
+        END
+        ELSE IF @val_cd_vendedor IS NULL OR @val_cd_vendedor = ''
+        BEGIN
+            SET @val_cd_vendedor = '000';
         END
 
         -- 4. Validar Tiqueteador
         IF @val_cd_tiqueteador IS NOT NULL AND @val_cd_tiqueteador <> ''
         BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM dbo.[TicketPrinter] WHERE code = @val_cd_tiqueteador OR CAST(id AS VARCHAR(25)) = @val_cd_tiqueteador
-            )
+            IF OBJECT_ID('dbo.[TicketPrinter]', 'U') IS NOT NULL
             BEGIN
-                SELECT 'tiqueteador ' + @val_cd_tiqueteador + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-                RETURN 1;
+                IF NOT EXISTS (
+                    SELECT 1 FROM dbo.[TicketPrinter] WHERE code = @val_cd_tiqueteador OR CAST(id AS VARCHAR(25)) = @val_cd_tiqueteador
+                )
+                BEGIN
+                    SELECT 'tiqueteador ' + @val_cd_tiqueteador + ' no existe' AS 'Respuesta', 1 AS 'Estado';
+                    RETURN 1;
+                END
             END
         END
 
         -- 5. Validar Proveedores de Servicios
         DECLARE @invalid_proveedor VARCHAR(25) = NULL;
-        
-        SELECT TOP 1 @invalid_proveedor = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
-        FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios') AS S(node)
-        WHERE S.node.value('cd_proveedores[1]', 'VARCHAR(25)') IS NOT NULL 
-          AND S.node.value('cd_proveedores[1]', 'VARCHAR(25)') <> ''
-          AND NOT EXISTS (
-              SELECT 1 FROM dbo.[Provider] WHERE code = S.node.value('cd_proveedores[1]', 'VARCHAR(25)') OR CAST(id AS VARCHAR(25)) = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
-          );
+        IF OBJECT_ID('dbo.PROVEEDORES', 'U') IS NOT NULL
+        BEGIN
+            SELECT TOP 1 @invalid_proveedor = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
+            FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios') AS S(node)
+            WHERE S.node.value('cd_proveedores[1]', 'VARCHAR(25)') IS NOT NULL 
+              AND S.node.value('cd_proveedores[1]', 'VARCHAR(25)') <> ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM dbo.PROVEEDORES WHERE LTRIM(RTRIM(IDPROVE)) = LTRIM(RTRIM(S.node.value('cd_proveedores[1]', 'VARCHAR(25)')))
+              );
+        END
+        ELSE IF OBJECT_ID('dbo.[Provider]', 'U') IS NOT NULL
+        BEGIN
+            SELECT TOP 1 @invalid_proveedor = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
+            FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios') AS S(node)
+            WHERE S.node.value('cd_proveedores[1]', 'VARCHAR(25)') IS NOT NULL 
+              AND S.node.value('cd_proveedores[1]', 'VARCHAR(25)') <> ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM dbo.[Provider] WHERE code = S.node.value('cd_proveedores[1]', 'VARCHAR(25)') OR CAST(id AS VARCHAR(25)) = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
+              );
+        END
 
         IF @invalid_proveedor IS NOT NULL
         BEGIN
@@ -522,16 +571,16 @@ BEGIN
 			bl_existe
 		)	
         SELECT 
-			id_sucursal = ISNULL(S.id,1),
-			id_implante = I.id,
+			id_sucursal = ISNULL(TRY_CAST(C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)') AS INT), 1),
+			id_implante = TRY_CAST(C.Cotizacion.value('cd_implante[1]','VARCHAR(25)') AS INT),
 			cd_consecutivo = C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)'),
-			id_usuario = ISNULL(U.id,1),
+			id_usuario = ISNULL(TRY_CAST(C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)') AS INT), 1),
 			dt_fechacont = ISNULL(C.Cotizacion.value('dt_fechacont[1]','SMALLDATETIME'),'19000101'),
 			dt_fecha = ISNULL(C.Cotizacion.value('dt_fecha[1]','SMALLDATETIME'),'19000101'),
-			id_usuarioAct = ISNULL(U.id,1),
+			id_usuarioAct = ISNULL(TRY_CAST(C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)') AS INT), 1),
 			dt_fechaAct = ISNULL(C.Cotizacion.value('dt_fechaAct[1]','SMALLDATETIME'),'19000101'),
-			cd_tercero_codigo = ISNULL(CL.document, ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),'')),
-			ds_tercero_nombre = ISNULL(CL.name, ISNULL(C.Cotizacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),'')),
+			cd_tercero_codigo = ISNULL(C.Cotizacion.value('cd_tercero_codigo[1]','VARCHAR(25)'), ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),'')),
+			ds_tercero_nombre = ISNULL(C.Cotizacion.value('ds_tercero_nombre[1]','VARCHAR(250)'), ISNULL(C.Cotizacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),'')),
 			cd_cliente_codigo = ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),''),
 			ds_cliente_nombre = ISNULL(C.Cotizacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),''),
 			ds_cliente_dir = ISNULL(C.Cotizacion.value('ds_cliente_dir[1]','VARCHAR(250)'),''),
@@ -541,9 +590,9 @@ BEGIN
 			ds_cliente_email = ISNULL(C.Cotizacion.value('ds_cliente_email[1]','VARCHAR(60)'),''),
 			ds_cliente_contacto = ISNULL(C.Cotizacion.value('ds_cliente_contacto[1]','VARCHAR(40)'),''),
 			ds_cliente_contacto_email = ISNULL(C.Cotizacion.value('ds_cliente_contacto_email[1]','VARCHAR(60)'),''),
-			id_monedas_IATA = ISNULL(M.id,1),
-			cd_vendedor = ISNULL(C.Cotizacion.value('cd_vendedor[1]','VARCHAR(3)'),''),
-			id_tiqueteador = ISNULL(Tq.id, ISNULL((SELECT TOP 1 id FROM dbo.[TicketPrinter]), 1)),
+			id_monedas_IATA = ISNULL((SELECT TOP 1 id FROM dbo.Monedas_IATA WHERE id = 1), (SELECT TOP 1 id FROM dbo.Monedas_IATA ORDER BY id ASC)),
+			cd_vendedor = ISNULL(@val_cd_vendedor, '000'),
+			id_tiqueteador = ISNULL((SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE id = TRY_CAST(C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(6)') AS INT)), ISNULL((SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE bl_inactivo = 0 ORDER BY id ASC), 1)),
 			bn_anexo = NULL,
 			am_tcambio = ISNULL(C.Cotizacion.value('am_tcambio[1]','SMALLMONEY'),1),
 			am_tcambiousd = ISNULL(C.Cotizacion.value('am_tcambiousd[1]','MONEY'),1),
@@ -551,7 +600,7 @@ BEGIN
 			ds_observacion = ISNULL(C.Cotizacion.value('ds_observacion[1]','VARCHAR(8000)'),''),
 			ds_Campo_libre1 = ISNULL(C.Cotizacion.value('ds_Campo_libre1[1]','VARCHAR(500)'),''),
 			ds_Campo_libre2 = ISNULL(C.Cotizacion.value('ds_Campo_libre2[1]','VARCHAR(500)'),''),
-			id_tipoventa = Tv.id,
+			id_tipoventa = ISNULL((SELECT TOP 1 id FROM dbo.TipoVenta WHERE bl_inactivo = 0), (SELECT TOP 1 id FROM dbo.TipoVenta ORDER BY id ASC)),
 			in_estado = ISNULL(C.Cotizacion.value('in_estado[1]','INT'),1),
 			dt_vence = C.Cotizacion.value('dt_vence[1]','SMALLDATETIME'),
 			Id_Etapa = NULL,
@@ -573,7 +622,7 @@ BEGIN
 			ds_records = '',
 			bl_entregadoCliente = 0,
 			dt_entregadoCliente = NULL,
-			id_sys_entidades = 65,
+			id_sys_entidades = NULL,
 			id_MonedaPagoDestino = NULL,
 			id_FormaPagoDestino = NULL,
 			ds_DocumentoPagoDestino = NULL,
@@ -584,16 +633,8 @@ BEGIN
 			ds_GDS = C.Cotizacion.value('ds_GDS[1]','VARCHAR(2)'),
 			id_Evento = NULL,
 			id_Cotizacion = NULL,
-			bl_existe = CASE WHEN CC.id IS NOT NULL THEN 1 ELSE 0 END 
-        FROM @xmlData.nodes('Cotizaciones/Cotizacion') AS C(Cotizacion)
-		LEFT JOIN dbo.[Branch] S ON (S.code = C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)') OR CAST(S.id AS VARCHAR(25)) = C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)'))
-		LEFT JOIN dbo.[Implant] I ON (I.code = C.Cotizacion.value('cd_implante[1]','VARCHAR(25)') OR CAST(I.id AS VARCHAR(25)) = C.Cotizacion.value('cd_implante[1]','VARCHAR(25)'))
-		LEFT JOIN dbo.[User] U ON (U.email = C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)') OR U.name = C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)'))
-		LEFT JOIN dbo.[Client] CL ON (CL.document = C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)') OR CAST(CL.id AS VARCHAR(25)) = C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'))
-		LEFT JOIN dbo.Monedas_IATA M ON M.cd_codigo=C.Cotizacion.value('cd_monedas_IATA[1]','VARCHAR(3)')
-		LEFT JOIN dbo.[TicketPrinter] Tq ON (Tq.code = C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(6)') OR CAST(Tq.id AS VARCHAR(25)) = C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(6)'))
-		LEFT JOIN dbo.TipoVenta Tv ON Tv.cd_codigo=C.Cotizacion.value('cd_tipoventa[1]','VARCHAR(16)')
-		LEFT JOIN dbo.Cotizacion CC ON CC.cd_consecutivo = C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')		 
+			bl_existe = 0
+        FROM @xmlData.nodes('Cotizaciones/Cotizacion') AS C(Cotizacion)		 
 		
 		INSERT INTO @CotizacionServicios(
 			id_TiposConceptFac ,
@@ -807,8 +848,8 @@ BEGIN
 			id_fac_remisionComision=NULL,
 			id_TarjetaAsistencia=NULL,
 			id_Regiones=NULL,
-			Iden_GDS=6,
-			id_sys_entidades=35,
+			Iden_GDS=NULL,
+			id_sys_entidades=NULL,
 			ds_TipoAuto='',
 			ds_Origen='',
 			ds_DirOrigen='' ,
@@ -1066,10 +1107,14 @@ BEGIN
 		WHILE @@FETCH_STATUS = 0
 		BEGIN
 			SET @c_tax_acct = NULL;
+			DECLARE @c_bl_cxp_provee BIT = 0;
 			IF @c_id_ir IS NOT NULL
-				SELECT TOP 1 @c_tax_acct = cd_cuenta FROM dbo.ImpRet WHERE id = @c_id_ir AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
+				SELECT TOP 1 
+				       @c_tax_acct = cd_cuenta,
+				       @c_bl_cxp_provee = ISNULL(bl_contabilizarCxPProvee, ISNULL(bl_contabilizar_proveedor, 0))
+				FROM dbo.ImpRet WHERE id = @c_id_ir;
 				
-			IF @c_tax_acct IS NULL OR RTRIM(LTRIM(@c_tax_acct)) = ''
+			IF ISNULL(@c_bl_cxp_provee, 0) = 0 AND (@c_tax_acct IS NULL OR RTRIM(LTRIM(@c_tax_acct)) = '')
 			BEGIN
 				CLOSE curCotTaxes;
 				DEALLOCATE curCotTaxes;

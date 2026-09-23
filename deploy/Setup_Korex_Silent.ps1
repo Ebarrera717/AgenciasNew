@@ -311,42 +311,46 @@ Start-Sleep -Seconds 1
 # ESTRATEGIA A (OPCION PRINCIPAL): Windows Service
 Write-Log "--- [ESTRATEGIA A] Intentando registrar Mecanismo Principal: Windows Service (Korex_NextJS) ---"
 if (Test-Path ".\install-service.js") {
-    node .\install-service.js >> $LogFile 2>&1
-    Start-Sleep -Seconds 3
-    
-    $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
-    if (-not $svc) {
-        $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
-    }
-    
-    if ($svc) {
-        Write-Log "Arrancando servicio de Windows $($svc.Name)..."
-        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 4
+    try {
+        node .\install-service.js >> $LogFile 2>&1
+        Start-Sleep -Seconds 3
         
-        $svcRefresh = Get-Service -Name $svc.Name
-        if ($svcRefresh.Status -eq 'Running') {
-            # Verificar si realmente está escuchando en el puerto
-            Start-Sleep -Seconds 2
-            $portCheck = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($portCheck) {
-                Write-Log "Mecanismo Principal [Windows Service] OPERATIVO al 100% en puerto $NextjsPort (PID: $($portCheck.OwningProcess))."
-                $serviceSuccess = $true
-                $executionMechanism = "WINDOWS_SERVICE"
-            }
+        $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
+        if (-not $svc) {
+            $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
         }
         
-        if (-not $serviceSuccess) {
-            Write-Log "Aviso: El servicio $($svc.Name) se registro pero no mantuvo el puerto $NextjsPort en escucha." "WARN"
-            $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
-            if (Test-Path $errLogPath) {
-                $errDetails = Get-Content $errLogPath -Tail 25 | Out-String
-                Write-Log "--- TRAZA DETALLADA DE ERROR DEL SERVICIO WINDOWS ---" "ERROR"
-                Write-Log "$errDetails" "ERROR"
+        if ($svc) {
+            Write-Log "Arrancando servicio de Windows $($svc.Name)..."
+            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 4
+            
+            $svcRefresh = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            if ($svcRefresh -and $svcRefresh.Status -eq 'Running') {
+                # Verificar si realmente está escuchando en el puerto
+                Start-Sleep -Seconds 2
+                $portCheck = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($portCheck) {
+                    Write-Log "Mecanismo Principal [Windows Service] OPERATIVO al 100% en puerto $NextjsPort (PID: $($portCheck.OwningProcess))."
+                    $serviceSuccess = $true
+                    $executionMechanism = "WINDOWS_SERVICE"
+                }
             }
+            
+            if (-not $serviceSuccess) {
+                Write-Log "Aviso: El servicio $($svc.Name) se registro pero no mantuvo el puerto $NextjsPort en escucha." "WARN"
+                $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
+                if (Test-Path $errLogPath) {
+                    $errDetails = Get-Content $errLogPath -Tail 25 | Out-String
+                    Write-Log "--- TRAZA DETALLADA DE ERROR DEL SERVICIO WINDOWS ---" "ERROR"
+                    Write-Log "$errDetails" "ERROR"
+                }
+            }
+        } else {
+            Write-Log "Aviso: No fue posible registrar el Servicio de Windows Korex_NextJS (posible restriccion de politicas corporativas de Windows)." "WARN"
         }
-    } else {
-        Write-Log "Aviso: No fue posible registrar el Servicio de Windows Korex_NextJS (posible restriccion de politicas corporativas de Windows)." "WARN"
+    } catch {
+        Write-Log "Aviso durante la configuracion del Servicio de Windows: $_" "WARN"
     }
 }
 

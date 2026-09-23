@@ -815,6 +815,9 @@ BEGIN
             "citiesId" integer NOT NULL
         );
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'TransactionConsecutive' AND column_name = 'padding') THEN
+        ALTER TABLE public."TransactionConsecutive" ADD COLUMN "padding" integer DEFAULT 4;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Branch' AND column_name = 'id') THEN
         ALTER TABLE public."Branch" ADD COLUMN "id" integer NOT NULL;
     END IF;
@@ -1839,6 +1842,12 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'dueDate') THEN
         ALTER TABLE public."Invoices" ADD COLUMN "dueDate" timestamp without time zone;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'isExcelImport') THEN
+        ALTER TABLE public."Invoices" ADD COLUMN "isExcelImport" boolean DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'zeusInvoiceNumber') THEN
+        ALTER TABLE public."Invoices" ADD COLUMN "zeusInvoiceNumber" character varying(100);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProduct' AND column_name = 'id') THEN
         ALTER TABLE public."InvoicesProduct" ADD COLUMN "id" integer NOT NULL;
@@ -3422,4 +3431,23 @@ END $$;
 INSERT INTO public."Menu" (code, name, action, activo) VALUES ('DIAGNOSTICS', 'Trazabilidad y Diagnóstico', '/dashboard/diagnostics', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
 INSERT INTO public."Master" (code, name, "inactivo") VALUES ('Diagnostics', 'diagnostico', false) ON CONFLICT (code) DO NOTHING;
 INSERT INTO public."SystemParameter" ("code", "name", "value") VALUES ('TRACEABILITY_MODE', 'Modo de Trazabilidad y Diagnóstico', 'OFF') ON CONFLICT ("code") DO NOTHING;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ImpRet') THEN
+        ALTER TABLE public."ImpRet" ADD COLUMN IF NOT EXISTS "bl_contabilizarCxPProvee" boolean DEFAULT false;
+        ALTER TABLE public."ImpRet" ADD COLUMN IF NOT EXISTS "bl_contabilizar_proveedor" boolean DEFAULT false;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationProduct') THEN
+        ALTER TABLE public."QuotationProduct" ADD COLUMN IF NOT EXISTS "providerDueDate" timestamp without time zone;
+        ALTER TABLE public."QuotationProduct" ADD COLUMN IF NOT EXISTS "providerInvoice" character varying(100);
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'InvoicesProduct') THEN
+        ALTER TABLE public."InvoicesProduct" ADD COLUMN IF NOT EXISTS "providerDueDate" timestamp without time zone;
+        ALTER TABLE public."InvoicesProduct" ADD COLUMN IF NOT EXISTS "providerInvoice" character varying(100);
+    END IF;
+END $$;
+
 

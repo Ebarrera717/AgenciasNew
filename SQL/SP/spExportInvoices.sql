@@ -43,8 +43,14 @@ BEGIN
     -- 2. Validación de usuario
     SELECT "name" INTO v_nombre_usuario FROM public."User" WHERE id = User_id;
     IF NOT FOUND THEN
-        mensaje_resultado := 'ERROR: El usuario ' || User_id || ' no existe.';
-        RETURN;
+        SELECT "name", id INTO v_nombre_usuario, User_id FROM public."User" WHERE "isActive" = true ORDER BY id ASC LIMIT 1;
+        IF NOT FOUND THEN
+            SELECT "name", id INTO v_nombre_usuario, User_id FROM public."User" ORDER BY id ASC LIMIT 1;
+            IF NOT FOUND THEN
+                mensaje_resultado := 'ERROR: No existen usuarios registrados en el sistema.';
+                RETURN;
+            END IF;
+        END IF;
     END IF;
 
     -- 2.0 Pre-validación: Cliente deshabilitado
@@ -632,7 +638,7 @@ BEGIN
         0 AS am_basecomisionable,
         0 AS am_porcomision,
         '' AS cd_tiposconceptfac,
-        COALESCE(NULLIF(TRIM(ep."billingConcept"), ''), NULLIF(TRIM(pr."billingConcept"), ''), '') AS cd_conceptofacturacion,
+        COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') AS cd_conceptofacturacion,
         COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
         SUBSTRING(COALESCE(prov.code, prov.name, ''), 1, 25) AS cd_proveedores,
         SUBSTRING(COALESCE(ep."servicios", ''), 1, 250) AS ds_servicio,
@@ -798,20 +804,22 @@ BEGIN
             ) THEN 0
             ELSE ROUND(
                 (
-                    t."explicitAmount" +
-                    CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
-                        COALESCE((
-                            SELECT SUM(sub_t."explicitAmount")
-                            FROM public."InvoicesProductTax" sub_t
-                            JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
-                            WHERE sub_t."invoiceProductId" = t."invoiceProductId"
-                              AND sub_t."isMain" = false
-                              AND sub_ct."targetTaxId" = ct.id
-                        ), 0)
-                    ELSE 0 END
-                ) * 
-                COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId" AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
-                NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId"), 0),
+                    (
+                        t."explicitAmount" +
+                        CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                            COALESCE((
+                                SELECT SUM(sub_t."explicitAmount")
+                                FROM public."InvoicesProductTax" sub_t
+                                JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                                WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                                  AND sub_t."isMain" = false
+                                  AND sub_ct."targetTaxId" = ct.id
+                            ), 0)
+                        ELSE 0 END
+                    ) * 
+                    COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId" AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                    NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId"), 0)
+                )::numeric,
                 2
             )
         END AS am_contado,
@@ -852,20 +860,22 @@ BEGIN
                 ) -
                 ROUND(
                     (
-                        t."explicitAmount" +
-                        CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
-                            COALESCE((
-                                SELECT SUM(sub_t."explicitAmount")
-                                FROM public."InvoicesProductTax" sub_t
-                                JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
-                                WHERE sub_t."invoiceProductId" = t."invoiceProductId"
-                                  AND sub_t."isMain" = false
-                                  AND sub_ct."targetTaxId" = ct.id
-                            ), 0)
-                        ELSE 0 END
-                    ) * 
-                    COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId" AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
-                    NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId"), 0),
+                        (
+                            t."explicitAmount" +
+                            CASE WHEN (t."isMain" = true OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name ILIKE '%TARIFA%') THEN
+                                COALESCE((
+                                    SELECT SUM(sub_t."explicitAmount")
+                                    FROM public."InvoicesProductTax" sub_t
+                                    JOIN public."ChargeAndTax" sub_ct ON sub_t."chargeAndTaxId" = sub_ct.id
+                                    WHERE sub_t."invoiceProductId" = t."invoiceProductId"
+                                      AND sub_t."isMain" = false
+                                      AND sub_ct."targetTaxId" = ct.id
+                                ), 0)
+                            ELSE 0 END
+                        ) * 
+                        COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId" AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                        NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = t."invoiceProductId"), 0)
+                    )::numeric,
                     2
                 )
             )

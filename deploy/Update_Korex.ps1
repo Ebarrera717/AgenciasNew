@@ -279,23 +279,27 @@ if ($activeMechanism -eq "TASK_SCHEDULER") {
     }
 } else {
     # Intentar Windows Service
-    $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
-    if (-not $svc) {
-        $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
-    }
-    
-    if ($svc) {
-        Write-Log "Iniciando Servicio de Windows $($svc.Name)..."
-        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 4
-        $svcRefresh = Get-Service -Name $svc.Name
-        if ($svcRefresh.Status -eq 'Running') {
-            $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($chk) {
-                Write-Log "Servicio de Windows $($svc.Name) activo y escuchando en puerto $NextjsPort (PID: $($chk.OwningProcess))."
-                $startedOk = $true
+    try {
+        $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
+        if (-not $svc) {
+            $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
+        }
+        
+        if ($svc) {
+            Write-Log "Iniciando Servicio de Windows $($svc.Name)..."
+            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 4
+            $svcRefresh = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            if ($svcRefresh -and $svcRefresh.Status -eq 'Running') {
+                $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($chk) {
+                    Write-Log "Servicio de Windows $($svc.Name) activo y escuchando en puerto $NextjsPort (PID: $($chk.OwningProcess))."
+                    $startedOk = $true
+                }
             }
         }
+    } catch {
+        Write-Log "Aviso al interactuar con el Servicio Windows: $_" "WARN"
     }
     
     # Si fallo el servicio en actualizacion, fallback a Task Scheduler

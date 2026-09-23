@@ -214,8 +214,8 @@ if ($iisSvc) {
             Write-DiagLog "Intentando autoreparacion: Iniciando servicio W3SVC..." "WARN"
             Start-Service -Name W3SVC -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 2
-            $iisSvc = Get-Service -Name W3SVC
-            if ($iisSvc.Status -eq "Running") {
+            $iisSvc = Get-Service -Name W3SVC -ErrorAction SilentlyContinue
+            if ($iisSvc -and $iisSvc.Status -eq "Running") {
                 Add-TestResult "TEST-IIS-001" "Servicio IIS (W3SVC)" "OK" "Servicio iniciado con exito" "W3SVC Running" "ADVERTENCIA" "Start-Service W3SVC" "CORREGIDO"
             } else {
                 Add-TestResult "TEST-IIS-001" "Servicio IIS (W3SVC)" "ERROR" "Servicio detenido ($([string]$iisSvc.Status))" "W3SVC Running" "CRITICO" "Start-Service W3SVC" "NO CORREGIDO" "Inicie el servicio de Administracion Web de IIS en services.msc."
@@ -340,7 +340,12 @@ try {
     }
 } catch {}
 
-if ($svc -and $svc.Status -eq "Running" -and $backendPortActive) {
+$svcIsRunning = $false
+try {
+    if ($svc -and $svc.Status -eq "Running") { $svcIsRunning = $true }
+} catch {}
+
+if ($svcIsRunning -and $backendPortActive) {
     Add-TestResult "TEST-PROC-001" "Mecanismo de Ejecución Activo (Windows Service)" "OK" "Servicio $($svc.Name) en ejecución y escuchando en puerto $NextjsPort (PID: $backendPid)" "Servicio o Tarea en ejecución" "OK" "Verificación de servicio" "N/A"
 } elseif ($taskExists -and $backendPortActive) {
     Add-TestResult "TEST-PROC-001" "Mecanismo de Ejecución Activo (Task Scheduler)" "OK" "Tarea '$taskName' activa ($taskState) y escuchando en puerto $NextjsPort (PID: $backendPid)" "Servicio o Tarea en ejecución" "OK" "Verificación de tarea programada" "N/A"
@@ -354,13 +359,15 @@ if ($svc -and $svc.Status -eq "Running" -and $backendPortActive) {
         
         # 1. Intentar Servicio si existe
         if ($svc) {
-            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 3
-            $svcRef = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
-            if ($svcRef -and $svcRef.Status -eq "Running") {
-                $bConn2 = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($bConn2) { $repaired = $true; $backendPid = $bConn2.OwningProcess }
-            }
+            try {
+                Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 3
+                $svcRef = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+                if ($svcRef -and $svcRef.Status -eq "Running") {
+                    $bConn2 = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                    if ($bConn2) { $repaired = $true; $backendPid = $bConn2.OwningProcess }
+                }
+            } catch {}
         }
         
         # 2. Si no reparó, intentar Task Scheduler

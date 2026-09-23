@@ -266,51 +266,55 @@ Start-Sleep -Seconds 1
 # ESTRATEGIA A (OPCION PRINCIPAL): Windows Service
 Write-Log "--- [ESTRATEGIA A] Intentando registrar Mecanismo Principal: Windows Service (Korex_NextJS) ---"
 if (Test-Path "$TargetDir\install-service.js") {
-    Set-Location $TargetDir
-    node .\install-service.js >> $LogFile 2>&1
-    Start-Sleep -Seconds 3
-    
-    $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
-    if (-not $svc) {
-        $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
-    }
-    
-    if (-not $svc -and (Test-Path "$TargetDir\daemon\korex_nextjs.exe")) {
-        Write-Log "Verificando servicio en SCM con daemon/korex_nextjs.exe..."
-        Start-Process -FilePath "$TargetDir\daemon\korex_nextjs.exe" -ArgumentList "install" -Wait -NoNewWindow -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 2
+    try {
+        Set-Location $TargetDir
+        node .\install-service.js >> $LogFile 2>&1
+        Start-Sleep -Seconds 3
+        
         $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
-        if (-not $svc) { $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue }
-    }
-    
-    if ($svc) {
-        Write-Log "Iniciando Servicio de Windows $($svc.Name)..."
-        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 4
+        if (-not $svc) {
+            $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
+        }
         
-        $svcRefresh = Get-Service -Name $svc.Name
-        if ($svcRefresh.Status -eq 'Running') {
-            # Verificar escucha real en puerto
+        if (-not $svc -and (Test-Path "$TargetDir\daemon\korex_nextjs.exe")) {
+            Write-Log "Verificando servicio en SCM con daemon/korex_nextjs.exe..."
+            Start-Process -FilePath "$TargetDir\daemon\korex_nextjs.exe" -ArgumentList "install" -Wait -NoNewWindow -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 2
-            $portCheck = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($portCheck) {
-                Write-Log "Mecanismo Principal [Windows Service] OPERATIVO al 100% en puerto $NextjsPort (PID: $($portCheck.OwningProcess))."
-                $serviceSuccess = $true
-                $executionMechanism = "WINDOWS_SERVICE"
-            }
+            $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
+            if (-not $svc) { $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue }
         }
         
-        if (-not $serviceSuccess) {
-            Write-Log "Aviso: El servicio $($svc.Name) se registro pero no mantuvo el puerto $NextjsPort en escucha." "WARN"
-            $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
-            if (Test-Path $errLogPath) {
-                $errDetails = Get-Content $errLogPath -Tail 25 | Out-String
-                Write-Log "--- TRAZA DETALLADA DE ERROR DEL SERVICIO WINDOWS (SQL SERVER) ---" "ERROR"
-                Write-Log "$errDetails" "ERROR"
+        if ($svc) {
+            Write-Log "Iniciando Servicio de Windows $($svc.Name)..."
+            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 4
+            
+            $svcRefresh = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            if ($svcRefresh -and $svcRefresh.Status -eq 'Running') {
+                # Verificar escucha real en puerto
+                Start-Sleep -Seconds 2
+                $portCheck = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($portCheck) {
+                    Write-Log "Mecanismo Principal [Windows Service] OPERATIVO al 100% en puerto $NextjsPort (PID: $($portCheck.OwningProcess))."
+                    $serviceSuccess = $true
+                    $executionMechanism = "WINDOWS_SERVICE"
+                }
             }
+            
+            if (-not $serviceSuccess) {
+                Write-Log "Aviso: El servicio $($svc.Name) se registro pero no mantuvo el puerto $NextjsPort en escucha." "WARN"
+                $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
+                if (Test-Path $errLogPath) {
+                    $errDetails = Get-Content $errLogPath -Tail 25 | Out-String
+                    Write-Log "--- TRAZA DETALLADA DE ERROR DEL SERVICIO WINDOWS (SQL SERVER) ---" "ERROR"
+                    Write-Log "$errDetails" "ERROR"
+                }
+            }
+        } else {
+            Write-Log "Aviso: No fue posible registrar el Servicio de Windows en SQL Server (posible restriccion de politicas corporativas de Windows)." "WARN"
         }
-    } else {
-        Write-Log "Aviso: No fue posible registrar el Servicio de Windows en SQL Server (posible restriccion de politicas corporativas de Windows)." "WARN"
+    } catch {
+        Write-Log "Aviso al configurar Servicio de Windows: $_" "WARN"
     }
 }
 

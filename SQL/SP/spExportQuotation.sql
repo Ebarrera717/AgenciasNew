@@ -42,8 +42,14 @@ BEGIN
     -- 2. Validación de usuario
     SELECT "name" INTO v_nombre_usuario FROM public."User" WHERE id = User_id;
     IF NOT FOUND THEN
-        mensaje_resultado := 'ERROR: El usuario ' || User_id || ' no existe.';
-        RETURN;
+        SELECT "name", id INTO v_nombre_usuario, User_id FROM public."User" WHERE "isActive" = true ORDER BY id ASC LIMIT 1;
+        IF NOT FOUND THEN
+            SELECT "name", id INTO v_nombre_usuario, User_id FROM public."User" ORDER BY id ASC LIMIT 1;
+            IF NOT FOUND THEN
+                mensaje_resultado := 'ERROR: No existen usuarios registrados en el sistema.';
+                RETURN;
+            END IF;
+        END IF;
     END IF;
 
     -- 3. Crear Tablas Temporales (ESQUEMA COMPLETO)
@@ -461,7 +467,7 @@ BEGIN
     )
     SELECT 
         COALESCE(pr."type", '') as cd_TiposConceptFac, 
-        COALESCE(NULLIF(TRIM(qp."billingConcept"), ''), NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') as cd_ConceptoFacturacion, 
+        COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') as cd_ConceptoFacturacion, 
         COALESCE(NULLIF(TRIM(qp."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') as cd_TiposServicio, 
         q.cd_consecutivo as cd_Cotizacion,
         '' as cd_fac_factura, 

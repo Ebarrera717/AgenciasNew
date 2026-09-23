@@ -87,6 +87,13 @@ export async function GET(req: NextRequest) {
             let pool;
             try {
                 pool = await getSQLServerConnection();
+                await pool.request().query(`
+                    IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = 'EncriptarClaves')
+                    BEGIN
+                        INSERT INTO dbo.[SystemParameter] ([code], [name], [value])
+                        VALUES ('EncriptarClaves', 'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0');
+                    END;
+                `);
                 const res = await pool.request().query(`
                     SELECT [id], [code], [name], [value]
                     FROM dbo.[SystemParameter]
@@ -99,6 +106,11 @@ export async function GET(req: NextRequest) {
                 throw err;
             }
         }
+        await prisma.$queryRawUnsafe(`
+            INSERT INTO public."SystemParameter" (code, name, value)
+            VALUES ('EncriptarClaves', 'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0')
+            ON CONFLICT (code) DO NOTHING;
+        `).catch(() => {});
         const parameters = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnParameterListar()`)
         return NextResponse.json(paginateArray(req, parameters, p => [p.code, p.name, p.value]))
     } catch (error) {

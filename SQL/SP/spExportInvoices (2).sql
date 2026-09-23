@@ -42,8 +42,14 @@ BEGIN
     -- 2. Validación de usuario
     SELECT "name" INTO v_nombre_usuario FROM public."User" WHERE id = User_id;
     IF NOT FOUND THEN
-        mensaje_resultado := 'ERROR: El usuario ' || User_id || ' no existe.';
-        RETURN;
+        SELECT "name", id INTO v_nombre_usuario, User_id FROM public."User" WHERE "isActive" = true ORDER BY id ASC LIMIT 1;
+        IF NOT FOUND THEN
+            SELECT "name", id INTO v_nombre_usuario, User_id FROM public."User" ORDER BY id ASC LIMIT 1;
+            IF NOT FOUND THEN
+                mensaje_resultado := 'ERROR: No existen usuarios registrados en el sistema.';
+                RETURN;
+            END IF;
+        END IF;
     END IF;
 
     -- 3. Crear Tablas Temporales

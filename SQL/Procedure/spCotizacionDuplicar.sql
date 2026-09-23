@@ -99,13 +99,15 @@ BEGIN
             "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
             "serviceType", "destination", "reservationCode", "sellerCommission",
             "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger"
+            "service", "servicios", "descripcion", "passenger",
+            "providerDueDate", "providerInvoice"
         ) VALUES (
             v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
             v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
             v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
             v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
+            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger",
+            v_orig_qp."providerDueDate", v_orig_qp."providerInvoice"
         ) RETURNING id INTO v_new_qp_id;
 
         -- Duplicar Pasajeros del producto

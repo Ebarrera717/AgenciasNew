@@ -158,7 +158,16 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
             });
         });
 
-        return NextResponse.json({ message: message || 'Cotización actualizada', quotation: { id } })
+        // Intentar auto-exportar a Zeus ERP si el parámetro EnviarCotizacionesAutoSQLserver está activo ('1')
+        let autoExportResult = null;
+        try {
+            const { autoExportQuotationToZeusERP } = await import('@/lib/zeus-auto-export');
+            autoExportResult = await autoExportQuotationToZeusERP(id, actingUserId);
+        } catch (expErr: any) {
+            console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on update:', expErr?.message);
+        }
+
+        return NextResponse.json({ message: message || 'Cotización actualizada', quotation: { id }, autoExportResult })
     } catch (error: any) {
         console.error('Error updating quotation (PUT):', error)
         return NextResponse.json({ message: 'Error al actualizar la cotización: ' + (error.message || 'Error desconocido') }, { status: 500 })

@@ -81,6 +81,9 @@ BEGIN
                             'service', COALESCE(qp.service, qp.servicios),
                             'servicios', COALESCE(qp.servicios, qp.service),
                             'descripcion', qp.descripcion,
+                            'passenger', qp.passenger,
+                            'providerDueDate', qp."providerDueDate",
+                            'providerInvoice', qp."providerInvoice",
                             'passengers', COALESCE((
                                 SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'name', qpax.name, 'document', qpax.document))
                                 FROM public."QuotationProductPassenger" qpax

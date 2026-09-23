@@ -1,4 +1,4 @@
-CREATE OR ALTER PROCEDURE [dbo].[spza_Factura_Contabilizar] 
+CREATE   PROCEDURE [dbo].[spza_Factura_Contabilizar] 
 	-- Parametros del procedimiento
 	@id_usuario 			INT,
 	@id_factura 			INT,
@@ -1716,37 +1716,84 @@ Begin
 								iditem,				
 								descritra,
 								valortra,
-								cliprv
+								cliprv,
+								indcpitra,
+								tipofac,
+								vencefac,
+								numefac
 							)
-						Select 	@@SPID,
-								codicta = 	CASE 
-												WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta
-												Else c.cd_cuenta 
-								   			End,	
-								IdTercero = CASE 	WHEN @LlevarCliTerContabil = 'S' Then @idtercero
-													WHEN dbo.fnza_GetCatFinanciera(CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta Else c.cd_cuenta End) = 4 THEN p.IdTercero 
-													Else @idtercero End,	
-								f.cd_auxiliar,
-								case when dbo.fnza_ManejaCenCo (CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta Else c.cd_cuenta End) = 1 then ISNULL(f.cd_cencosto,@cd_cencoSucursal) Else '' End AS 'idcenco', /*rgelis 2012/09/04 req.10397*/
-								f.cd_item,				
-								LEFT(rtrim(fc.ds_cargonm)+ ': '+rtrim(f.ds_servicio),40),
-								sum(fc.am_valor)*-1,
-								IdCliProve = CASE 	WHEN @LlevarCliTerContabil = 'S' Then @idcliente
-													WHEN dbo.fnza_GetCatFinanciera(CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta Else c.cd_cuenta End) = 4 THEN p.IDPROVE 
-													Else @idtercero End
-							From dbo.Fac_Servicios f 
-								INNER JOIN dbo.conceptofacturacion cf on (cf.id = f.id_ConceptoFacturacion)
-								LEFT JOIN dbo.PROVEEDORES p On (f.cd_proveedores = p.IDPROVE)					
-								INNER JOIN dbo.Fac_ServiciosCargos fc On (f.id = fc.id_Fac_Servicios)
-								INNER JOIN dbo.CargosDesc c On (c.id=fc.id_cargosdesc)		 
-								LEFT JOIN dbo.Cargos_BU cb On (c.id=cb.id_cargo AND cb.id_cargo = fc.id)				
-							Where f.id_fac_factura = @id_factura 
-								AND abs(fc.am_valor)<>0
-								AND dbo.fnza_CargoManejaCuenta(fc.id_cargosdesc)=1
-								AND f.id_TiposConceptFac = 2
-								AND cf.bl_llevarAlIngreso = 0
-								--AND isnull(cb.cd_bu,@Bu)=@Bu 
-							GROUP BY c.cd_cuenta,cb.cd_cuenta,fc.ds_cargonm,f.ds_servicio,p.IdTercero,p.IDPROVE,f.cd_auxiliar,f.cd_cencosto,f.cd_item
+						SELECT 
+							SPID,
+							t.codicta,
+							t.nittra,
+							t.cd_auxiliar,
+							t.idcenco,
+							t.cd_item,
+							t.descritra,
+							t.valortra,
+							t.cliprv,
+							m.indcpicta AS 'indcpitra',
+							CASE WHEN m.indcpicta IN (1, 2, 3, 6) THEN @TipoDocumento ELSE NULL END AS 'tipofac',
+							CASE WHEN m.indcpicta IN (1, 2, 3, 6) THEN (CASE WHEN RTRIM(ISNULL(t.cd_NumeFac,''))<>'' THEN dbo.fnza_Get_FECHDCTO(t.dt_VenceFac) ELSE @vencefac END) ELSE NULL END AS 'vencefac',
+							CASE WHEN m.indcpicta IN (1, 2, 3, 6) THEN (CASE WHEN RTRIM(ISNULL(t.cd_NumeFac,''))<>'' THEN t.cd_NumeFac ELSE @NUMDOCTRA END) ELSE NULL END AS 'numefac'
+						FROM (
+							Select 	SPID = @@SPID,
+									codicta = 	CASE 
+													WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta
+													WHEN ts.cd_cuenta IS NOT NULL AND ts.cd_cuenta<>'' THEN ts.cd_cuenta
+													WHEN cf.cd_cuenta IS NOT NULL AND cf.cd_cuenta<>'' THEN cf.cd_cuenta
+													Else c.cd_cuenta 
+												End,	
+									nittra = CASE 	WHEN EXISTS (
+															SELECT 1 FROM dbo.Fac_ServiciosImpuestos fi_chk
+															INNER JOIN dbo.ImpRet ir_chk ON ir_chk.id = fi_chk.id_ImpRet
+															INNER JOIN dbo.Fac_ServiciosCargos fc_chk ON fc_chk.id = fi_chk.id_FacServiciosCargos
+															WHERE fc_chk.id_Fac_Servicios = f.id AND ir_chk.bl_contabilizarCxPProvee = 1
+														) AND dbo.fnza_GetCatFinanciera(CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta WHEN ts.cd_cuenta IS NOT NULL AND ts.cd_cuenta<>'' THEN ts.cd_cuenta WHEN cf.cd_cuenta IS NOT NULL AND cf.cd_cuenta<>'' THEN cf.cd_cuenta Else c.cd_cuenta End) = 4 
+														THEN ISNULL(p.IdTercero, @idtercero)
+														WHEN @LlevarCliTerContabil = 'S' Then @idtercero
+														WHEN dbo.fnza_GetCatFinanciera(CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta WHEN ts.cd_cuenta IS NOT NULL AND ts.cd_cuenta<>'' THEN ts.cd_cuenta WHEN cf.cd_cuenta IS NOT NULL AND cf.cd_cuenta<>'' THEN cf.cd_cuenta Else c.cd_cuenta End) = 4 THEN p.IdTercero 
+														Else @idtercero End,	
+									f.cd_auxiliar,
+									idcenco = case when dbo.fnza_ManejaCenCo (CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta WHEN ts.cd_cuenta IS NOT NULL AND ts.cd_cuenta<>'' THEN ts.cd_cuenta WHEN cf.cd_cuenta IS NOT NULL AND cf.cd_cuenta<>'' THEN cf.cd_cuenta Else c.cd_cuenta End) = 1 then ISNULL(f.cd_cencosto,@cd_cencoSucursal) Else '' End,
+									f.cd_item,				
+									descritra = CASE WHEN EXISTS (
+															SELECT 1 FROM dbo.Fac_ServiciosImpuestos fi_chk
+															INNER JOIN dbo.ImpRet ir_chk ON ir_chk.id = fi_chk.id_ImpRet
+															INNER JOIN dbo.Fac_ServiciosCargos fc_chk ON fc_chk.id = fi_chk.id_FacServiciosCargos
+															WHERE fc_chk.id_Fac_Servicios = f.id AND ir_chk.bl_contabilizarCxPProvee = 1
+														) AND dbo.fnza_GetCatFinanciera(CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta WHEN ts.cd_cuenta IS NOT NULL AND ts.cd_cuenta<>'' THEN ts.cd_cuenta WHEN cf.cd_cuenta IS NOT NULL AND cf.cd_cuenta<>'' THEN cf.cd_cuenta Else c.cd_cuenta End) = 4 
+														THEN LEFT('CxP: '+rtrim(p.RAZONCIAL),40) 
+														ELSE LEFT(rtrim(fc.ds_cargonm)+ ': '+rtrim(f.ds_servicio),40) END,
+									valortra = sum(fc.am_valor)*-1,
+									cliprv = CASE 	WHEN EXISTS (
+															SELECT 1 FROM dbo.Fac_ServiciosImpuestos fi_chk
+															INNER JOIN dbo.ImpRet ir_chk ON ir_chk.id = fi_chk.id_ImpRet
+															INNER JOIN dbo.Fac_ServiciosCargos fc_chk ON fc_chk.id = fi_chk.id_FacServiciosCargos
+															WHERE fc_chk.id_Fac_Servicios = f.id AND ir_chk.bl_contabilizarCxPProvee = 1
+														) AND dbo.fnza_GetCatFinanciera(CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta WHEN ts.cd_cuenta IS NOT NULL AND ts.cd_cuenta<>'' THEN ts.cd_cuenta WHEN cf.cd_cuenta IS NOT NULL AND cf.cd_cuenta<>'' THEN cf.cd_cuenta Else c.cd_cuenta End) = 4 
+														THEN ISNULL(p.IDPROVE, @idcliente)
+														WHEN @LlevarCliTerContabil = 'S' Then @idcliente
+														WHEN dbo.fnza_GetCatFinanciera(CASE WHEN cb.cd_cuenta IS NOT NULL AND cb.cd_cuenta<>'' THEN cb.cd_cuenta WHEN ts.cd_cuenta IS NOT NULL AND ts.cd_cuenta<>'' THEN ts.cd_cuenta WHEN cf.cd_cuenta IS NOT NULL AND cf.cd_cuenta<>'' THEN cf.cd_cuenta Else c.cd_cuenta End) = 4 THEN p.IDPROVE 
+														Else @idtercero End,
+									f.cd_NumeFac,
+									f.dt_VenceFac,
+									f.id AS id_fac_servicio
+								From dbo.Fac_Servicios f 
+									INNER JOIN dbo.conceptofacturacion cf on (cf.id = f.id_ConceptoFacturacion)
+									LEFT JOIN dbo.TiposServicios ts On (ts.id = f.id_TiposServicio)
+									LEFT JOIN dbo.PROVEEDORES p On (f.cd_proveedores = p.IDPROVE)					
+									INNER JOIN dbo.Fac_ServiciosCargos fc On (f.id = fc.id_Fac_Servicios)
+									INNER JOIN dbo.CargosDesc c On (c.id=fc.id_cargosdesc)		 
+									LEFT JOIN dbo.Cargos_BU cb On (c.id=cb.id_cargo AND cb.id_cargo = fc.id)				
+								Where f.id_fac_factura = @id_factura 
+									AND abs(fc.am_valor)<>0
+									AND dbo.fnza_CargoManejaCuenta(fc.id_cargosdesc)=1
+									AND f.id_TiposConceptFac = 2
+									AND cf.bl_llevarAlIngreso = 0
+								GROUP BY c.cd_cuenta, cb.cd_cuenta, ts.cd_cuenta, cf.cd_cuenta, fc.ds_cargonm, f.ds_servicio, p.IdTercero, p.RAZONCIAL, p.IDPROVE, f.cd_auxiliar, f.cd_cencosto, f.cd_item, f.cd_NumeFac, f.dt_VenceFac, f.id
+						) AS T
+						INNER JOIN MAECONT m ON m.CODICTA = t.CODICTA
 			
 					--3.2) Insertando registros de Impuestos de servicios con cuentas parametrizadas	
 					--xyz

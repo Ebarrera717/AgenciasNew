@@ -32,6 +32,16 @@ DECLARE
     v_existing_invoice_number TEXT;
     v_temp_msg TEXT;
     v_decimals INT;
+    -- Variables para validación de variables obligatorias específicas del cliente
+    v_client_id INT;
+    v_client_mandatory_vars JSONB;
+    v_client_var_id_text TEXT;
+    v_req_var_id INT;
+    v_req_var_name TEXT;
+    v_item_json JSONB;
+    v_item_prod_id INT;
+    v_item_prod_desc TEXT;
+    v_has_var BOOLEAN;
 BEGIN
     -- Validaciones
     IF NOT EXISTS (SELECT 1 FROM public."Invoices" WHERE id = p_id) THEN
@@ -49,8 +59,57 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Validación de variables obligatorias específicas del cliente para Facturas
+    v_client_id := NULLIF(p_data->>'clientId', '')::INT;
+    IF v_client_id IS NOT NULL THEN
+        SELECT "mandatoryVariables" INTO v_client_mandatory_vars
+        FROM public."Client"
+        WHERE id = v_client_id;
+
+        IF v_client_mandatory_vars IS NOT NULL THEN
+            IF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars ? 'invoice' AND jsonb_typeof(v_client_mandatory_vars->'invoice') = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars->'invoice';
+            ELSIF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars ? 'invoices' AND jsonb_typeof(v_client_mandatory_vars->'invoices') = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars->'invoices';
+            ELSE
+                v_client_mandatory_vars := '[]'::JSONB;
+            END IF;
+        END IF;
+
+        IF v_client_mandatory_vars IS NOT NULL AND jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
+            FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars)
+            LOOP
+                v_req_var_id := v_client_var_id_text::INT;
+                
+                SELECT "name" INTO v_req_var_name FROM public."MasterVariable" WHERE id = v_req_var_id;
+                v_req_var_name := COALESCE(v_req_var_name, 'Variable #' || v_req_var_id);
+
+                FOR v_item_json IN SELECT jsonb_array_elements(p_data->'items')
+                LOOP
+                    v_item_prod_id := NULLIF(v_item_json->>'productId', '')::INT;
+                    IF v_item_prod_id IS NOT NULL THEN
+                        SELECT "description" INTO v_item_prod_desc FROM public."Product" WHERE id = v_item_prod_id;
+                    ELSE
+                        v_item_prod_desc := NULL;
+                    END IF;
+                    v_item_prod_desc := COALESCE(v_item_prod_desc, COALESCE(v_item_json->>'description', COALESCE(v_item_json->>'itemDescription', COALESCE(v_item_json->>'ticketCode', 'Producto #' || COALESCE(v_item_prod_id::TEXT, '1')))));
+
+                    SELECT EXISTS (
+                        SELECT 1 FROM jsonb_to_recordset(v_item_json->'variables') AS v("masterVariableId" INT, value TEXT)
+                        WHERE v."masterVariableId" = v_req_var_id AND NULLIF(trim(v.value), '') IS NOT NULL
+                    ) INTO v_has_var;
+
+                    IF NOT v_has_var THEN
+                        p_mensaje_resultado := 'ERROR: El cliente requiere completar la variable adicional "' || v_req_var_name || '" en el producto "' || v_item_prod_desc || '".';
+                        RETURN;
+                    END IF;
+                END LOOP;
+            END LOOP;
+        END IF;
+    END IF;
+
     -- Obtener decimales de la moneda
-    v_decimals := public.fn_obtener_decimales_moneda(p_data->>'currency');
+    v_decimals := COALESCE(public.fn_obtener_decimales_moneda(p_data->>'currency'), 2);
 
     UPDATE public."Invoices" SET
         "clientId" = NULLIF(p_data->>'clientId', '')::INT,
@@ -61,12 +120,12 @@ BEGIN
         "sellerId" = NULLIF(p_data->>'sellerId', '')::INT,
         "ticketPrinterId" = NULLIF(p_data->>'ticketPrinterId', '')::INT,
         "commissionPercentage" = NULLIF(p_data->>'commissionPercentage', '')::FLOAT,
-        "chargesAndTaxes" = ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision,
-        "totalAmount" = ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision,
+        "chargesAndTaxes" = COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0.0),
+        "totalAmount" = COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0.0),
         "state" = COALESCE(p_data->>'state', 'Nuevo'),
         "date" = CURRENT_TIMESTAMP,
         "fuente" = NULLIF(p_data->>'fuente', ''),
-        "serie" = NULLIF(p_data->>'fuente', ''),
+        "serie" = NULLIF(p_data->>'serie', ''),
         "consecutivo" = NULLIF(p_data->>'consecutivo', '')
     WHERE id = p_id;
 
@@ -87,7 +146,8 @@ BEGIN
                       "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
                       "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
                       "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "inNationality" INT,
-                      "servicios" TEXT, "itemDescription" TEXT, "itinerary" TEXT, "class" TEXT, "airline" TEXT, "ticketTypeId" TEXT, "payments" JSONB, "itinerariesItineraryList" JSONB
+                      "servicios" TEXT, "itemDescription" TEXT, "itinerary" TEXT, "class" TEXT, "airline" TEXT, "ticketTypeId" TEXT, "payments" JSONB, "itinerariesItineraryList" JSONB,
+                      "providerDueDate" TEXT, "providerInvoice" TEXT
                   )
     LOOP
         -- 1. Lógica de Producto Al Vuelo
@@ -141,11 +201,12 @@ BEGIN
             "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
             "serviceType", "destination", "reservationCode", "sellerCommission", 
             "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "servicios", "descripcion", "itinerary", "class", "airline", "ticketTypeId"
+            "servicios", "descripcion", "itinerary", "class", "airline", "ticketTypeId",
+            "providerDueDate", "providerInvoice"
         ) VALUES (
-            p_id, v_real_product_id, NULLIF(TRIM(v_item."ticketCode"), ''), v_item.quantity, 
-            ROUND(v_item.price::numeric, v_decimals)::double precision, 
-            ROUND(v_item.cost::numeric, v_decimals)::double precision, 
+            p_id, v_real_product_id, NULLIF(TRIM(v_item."ticketCode"), ''), COALESCE(v_item.quantity, 1), 
+            COALESCE(ROUND(v_item.price::numeric, v_decimals)::double precision, 0), 
+            COALESCE(ROUND(v_item.cost::numeric, v_decimals)::double precision, 0), 
             NULLIF(v_item."providerId", '')::INT, NULLIF(v_item."prestadoraId", '')::INT,
             CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
             CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
@@ -154,7 +215,9 @@ BEGIN
             ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
             ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
             NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
-            v_item."servicios", COALESCE(v_item."itemDescription", v_item."description"), v_item."itinerary", v_item."class", v_item."airline", NULLIF(v_item."ticketTypeId", '')::INT
+            v_item."servicios", COALESCE(v_item."itemDescription", v_item."description"), v_item."itinerary", v_item."class", v_item."airline", NULLIF(v_item."ticketTypeId", '')::INT,
+            CASE WHEN v_item."providerDueDate" IS NOT NULL AND v_item."providerDueDate" <> '' THEN v_item."providerDueDate"::TIMESTAMP ELSE NULL END,
+            v_item."providerInvoice"
         ) RETURNING id INTO v_invoice_product_id;
 
         IF v_item.passengers IS NOT NULL THEN
@@ -220,12 +283,20 @@ BEGIN
 
     -- Calcular y actualizar el totalAmount
     UPDATE public."Invoices"
-    SET "totalAmount" = ROUND((COALESCE("chargesAndTaxes", 0) + (
-        SELECT COALESCE(SUM(ipt."explicitAmount"), 0)
-        FROM public."InvoicesProductTax" ipt
-        JOIN public."InvoicesProduct" ip ON ipt."invoiceProductId" = ip.id
-        WHERE ip."invoiceId" = p_id
-    ))::numeric, v_decimals)::double precision
+    SET "totalAmount" = ROUND((
+        COALESCE((
+            SELECT SUM(COALESCE(ip."price" * ip."quantity", 0))
+            FROM public."InvoicesProduct" ip
+            WHERE ip."invoiceId" = p_id
+        ), 0)
+        + COALESCE("chargesAndTaxes", 0) 
+        + COALESCE((
+            SELECT SUM(ipt."explicitAmount")
+            FROM public."InvoicesProductTax" ipt
+            JOIN public."InvoicesProduct" ip ON ipt."invoiceProductId" = ip.id
+            WHERE ip."invoiceId" = p_id
+        ), 0)
+    )::numeric, v_decimals)::double precision
     WHERE id = p_id;
 
     p_mensaje_resultado := 'SUCCESS: Factura ' || p_id || ' actualizada correctamente.';

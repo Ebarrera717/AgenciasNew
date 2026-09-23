@@ -117,7 +117,9 @@ BEGIN
         itinerarios_str TEXT, --40
         fuente TEXT, --41
         serie TEXT, --42
-        consecutivo TEXT --43
+        consecutivo TEXT, --43
+        provider_due_date TIMESTAMP, --44
+        provider_invoice TEXT --45
     ) ON COMMIT DROP;
 
     DELETE FROM tmp_import_invoice_rows;
@@ -158,7 +160,7 @@ BEGIN
                 destino, tipo_servicio, reserva, com_vendedor, com_tiqueteador, combos_str,
                 nacionalidad, cargo_principal_cd, costo, servicios, descripcion, itinerary,
                 class, airline, tipo_tiquete_cd, pagos_str, itinerarios_str,
-                fuente, serie, consecutivo
+                fuente, serie, consecutivo, provider_due_date, provider_invoice
             ) VALUES (
                 TRIM(v_cols[1]), -- grupo 
                 TRIM(v_cols[2]), -- cliente_doc 
@@ -202,7 +204,9 @@ BEGIN
                 TRIM(v_cols[40]),  -- itinerarios_str
                 TRIM(v_cols[41]),  -- fuente
                 TRIM(v_cols[42]),  -- serie
-                TRIM(v_cols[43])   -- consecutivo
+                TRIM(v_cols[43]),  -- consecutivo
+                CASE WHEN TRIM(v_cols[44]) <> '' THEN REPLACE(TRIM(v_cols[44]), '/', '-')::TIMESTAMP ELSE NULL END, -- provider_due_date
+                NULLIF(TRIM(v_cols[45]), '') -- provider_invoice
             );
         EXCEPTION WHEN OTHERS THEN
             DECLARE
@@ -279,6 +283,48 @@ BEGIN
         SELECT id INTO v_implant_id FROM public."Implant" WHERE LOWER(code) = LOWER(v_invoice_record.implant_cd);
         SELECT id INTO v_seller_id FROM public."Seller" WHERE LOWER(code) = LOWER(v_invoice_record.vendedor_cd);
         SELECT id INTO v_ticket_printer_id FROM public."TicketPrinter" WHERE LOWER(code) = LOWER(v_invoice_record.tiqueteador_cd);
+
+        -- Validación de variables obligatorias del cliente para facturas
+        DECLARE
+            v_client_mandatory_vars JSONB;
+            v_client_var_id_text TEXT;
+            v_req_var_id INT;
+            v_req_var_name TEXT;
+            v_req_var_code TEXT;
+            v_check_prod RECORD;
+        BEGIN
+            SELECT "mandatoryVariables" INTO v_client_mandatory_vars FROM public."Client" WHERE id = v_client_id;
+            IF v_client_mandatory_vars IS NOT NULL THEN
+                IF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars ? 'invoice' AND jsonb_typeof(v_client_mandatory_vars->'invoice') = 'array' THEN
+                    v_client_mandatory_vars := v_client_mandatory_vars->'invoice';
+                ELSIF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars ? 'invoices' AND jsonb_typeof(v_client_mandatory_vars->'invoices') = 'array' THEN
+                    v_client_mandatory_vars := v_client_mandatory_vars->'invoices';
+                ELSE
+                    v_client_mandatory_vars := '[]'::JSONB;
+                END IF;
+            END IF;
+
+            IF v_client_mandatory_vars IS NOT NULL AND jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
+                FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars) LOOP
+                    v_req_var_id := v_client_var_id_text::INT;
+                    SELECT "name", "code" INTO v_req_var_name, v_req_var_code FROM public."MasterVariable" WHERE id = v_req_var_id;
+                    v_req_var_name := COALESCE(v_req_var_name, 'Variable #' || v_req_var_id);
+
+                    FOR v_check_prod IN SELECT * FROM tmp_import_invoice_rows WHERE grupo = v_invoice_record.grupo LOOP
+                        IF v_check_prod.variables_str IS NULL OR NOT EXISTS (
+                            SELECT 1 FROM unnest(string_to_array(v_check_prod.variables_str, '|')) AS var_item
+                            WHERE (
+                                LOWER(TRIM(split_part(var_item, ':', 1))) = LOWER(TRIM(COALESCE(v_req_var_code, '')))
+                                OR LOWER(TRIM(split_part(var_item, ':', 1))) = LOWER(TRIM(v_req_var_id::TEXT))
+                            ) AND NULLIF(TRIM(substr(var_item, length(split_part(var_item, ':', 1)) + 2)), '') IS NOT NULL
+                        ) THEN
+                            p_mensaje_resultado := 'ERROR en GRUPO ' || v_invoice_record.grupo || ': El cliente requiere completar la variable adicional "' || v_req_var_name || '" en el producto "' || COALESCE(v_check_prod.producto_cd, COALESCE(v_check_prod.tiquete_cd, 'Ítem')) || '".';
+                            RETURN;
+                        END IF;
+                    END LOOP;
+                END LOOP;
+            END IF;
+        END;
 
         -- Asignar número consecutivo interno
         IF v_invoice_record.consecutivo IS NOT NULL AND TRIM(v_invoice_record.consecutivo) <> '' THEN
@@ -383,7 +429,12 @@ BEGIN
                 SELECT id INTO v_provider_id FROM public."Provider" WHERE LOWER(code) = LOWER(v_product_record.proveedor_cd);
             END IF;
 
-            SELECT id INTO v_prestadora_id FROM public."Prestadora" WHERE LOWER(code) = LOWER(v_product_record.prestadora_cd);
+            v_prestadora_id := NULL;
+            IF v_product_record.prestadora_cd IS NOT NULL AND TRIM(v_product_record.prestadora_cd) <> '' THEN
+                SELECT id INTO v_prestadora_id FROM public."Prestadora" 
+                WHERE LOWER(code) = LOWER(TRIM(v_product_record.prestadora_cd)) OR LOWER(name) = LOWER(TRIM(v_product_record.prestadora_cd))
+                LIMIT 1;
+            END IF;
 
             v_main_tax_id := NULL;
             IF v_product_record.cargo_principal_cd <> '' THEN
@@ -426,7 +477,9 @@ BEGIN
                     "itinerary" = COALESCE(v_product_record.itinerary, "itinerary"),
                     "class" = COALESCE(v_product_record.class, "class"),
                     "airline" = COALESCE(v_product_record.airline, "airline"),
-                    "ticketTypeId" = COALESCE(v_ticket_type_id, "ticketTypeId")
+                    "ticketTypeId" = COALESCE(v_ticket_type_id, "ticketTypeId"),
+                    "providerDueDate" = COALESCE(v_product_record.provider_due_date, "providerDueDate"),
+                    "providerInvoice" = COALESCE(v_product_record.provider_invoice, "providerInvoice")
                 WHERE id = v_ip_id;
 
                 -- Eliminar impuestos base del combo si hay overrides en Excel
@@ -442,7 +495,8 @@ BEGIN
                     "invoiceId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId", 
                     "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren", 
                     "serviceType", "destination", "reservationCode", "sellerCommission", "ticketPrinterCommission",
-                    "comboId", "mainTaxId", "inNationality", "servicios", "descripcion", "itinerary", "class", "airline", "ticketTypeId"
+                    "comboId", "mainTaxId", "inNationality", "servicios", "descripcion", "itinerary", "class", "airline", "ticketTypeId",
+                    "providerDueDate", "providerInvoice"
                 ) VALUES (
                     v_invoice_id, v_product_id, COALESCE(v_product_record.cantidad, 1), 
                     ROUND(COALESCE(v_product_record.precio, 0)::numeric, v_decimals)::double precision, 
@@ -457,7 +511,8 @@ BEGIN
                     ROUND(COALESCE(v_product_record.com_vendedor, 0)::numeric, v_decimals)::double precision, 
                     ROUND(COALESCE(v_product_record.com_tiqueteador, 0)::numeric, v_decimals)::double precision,
                     NULL, v_main_tax_id, COALESCE(v_product_record.nacionalidad, 1),
-                    v_product_record.servicios, v_product_record.descripcion, v_product_record.itinerary, v_product_record.class, v_product_record.airline, v_ticket_type_id
+                    v_product_record.servicios, v_product_record.descripcion, v_product_record.itinerary, v_product_record.class, v_product_record.airline, v_ticket_type_id,
+                    v_product_record.provider_due_date, v_product_record.provider_invoice
                 ) RETURNING id INTO v_ip_id;
             END IF;
 
@@ -467,7 +522,15 @@ BEGIN
             IF v_product_record.impuestos_str IS NOT NULL AND v_product_record.impuestos_str <> '' THEN
                 FOREACH v_tax_item IN ARRAY string_to_array(v_product_record.impuestos_str, '|') LOOP
                     v_tax_parts := string_to_array(v_tax_item, ':');
-                    SELECT id INTO v_tax_id FROM public."ChargeAndTax" WHERE LOWER(code) = LOWER(TRIM(v_tax_parts[1]));
+                    v_tax_id := NULL;
+                    SELECT id INTO v_tax_id FROM public."ChargeAndTax" WHERE LOWER(code) = LOWER(TRIM(v_tax_parts[1])) OR LOWER(name) = LOWER(TRIM(v_tax_parts[1]));
+                    
+                    IF v_tax_id IS NULL AND TRIM(v_tax_parts[1]) <> '' THEN
+                        INSERT INTO public."ChargeAndTax" ("code", "name", "type", "valueType", "value", "isEditable")
+                        VALUES (TRIM(v_tax_parts[1]), TRIM(v_tax_parts[1]), 'TAX', 'MONTO', 0, true)
+                        RETURNING id INTO v_tax_id;
+                    END IF;
+
                     IF v_tax_id IS NOT NULL THEN
                         INSERT INTO public."InvoicesProductTax" (
                             "invoiceProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
