@@ -1,400 +1,554 @@
 ---
 name: correcciones-permanencia-proteccion
-description: SKILL obligatorio de control de cambios, regresión y trazabilidad para garantizar que ninguna corrección, ajuste o solución validada sea eliminada, sobrescrita, degradada o pierda su comportamiento en desarrollos posteriores.
+description: SKILL MAESTRO universal y obligatorio para la prevención de regresiones, protección permanente de correcciones validadas y garantía de no eliminación o alteración de funcionalidades, configuraciones, parámetros y comportamientos en Korex (PostgreSQL y SQL Server).
 ---
 
-# SKILL OBLIGATORIO – CONTROL, PERMANENCIA Y PROTECCIÓN DE CORRECCIONES
+# SKILL MAESTRO — CONTROL DE REGRESIONES Y PROTECCIÓN DE CORRECCIONES
 
 ## 1. OBJETIVO
 
-Garantizar que ninguna corrección, ajuste, funcionalidad o solución previamente implementada y validada sea eliminada, reemplazada, degradada o pierda su comportamiento como consecuencia de desarrollos posteriores.
+Establecer un mecanismo obligatorio para impedir que una corrección, funcionalidad, configuración o comportamiento previamente desarrollado y validado en Korex sea perdido, sobrescrito, eliminado, alterado o vuelva a presentar el mismo error como consecuencia de nuevos desarrollos.
 
-El objetivo principal es evitar:
+Esta regla aplica a TODO el proyecto Korex y no únicamente a casos particulares.
 
-* Correcciones que desaparecen.
-* Funcionalidades que vuelven a presentar errores ya solucionados.
-* Código que es sobrescrito accidentalmente.
-* SPs, funciones, tablas o componentes que pierden cambios anteriores.
-* Correcciones realizadas en un motor de base de datos que no son trasladadas al otro.
-* Regresiones ocasionadas por nuevos desarrollos.
-* Repetición innecesaria de trabajos ya realizados.
-* Pérdida de tiempo reconstruyendo soluciones que ya habían sido implementadas.
+El objetivo principal es:
 
-Esta regla es **PERMANENTE y OBLIGATORIA** para todo el proyecto.
+> **NO REPETIR TRABAJO YA REALIZADO.**
+
+Una vez solucionado y validado un problema, debe quedar protegido para que las futuras versiones de Korex verifiquen automáticamente que la solución continúa funcionando.
 
 ---
 
-## 2. REGLA PRINCIPAL
+## 2. REGLA FUNDAMENTAL
 
-### NINGUNA CORRECCIÓN VALIDADA PUEDE PERDERSE.
+Toda corrección realizada en Korex debe convertirse en una **prueba de regresión permanente**.
 
-Una corrección que haya sido implementada y validada debe considerarse parte del comportamiento oficial del sistema.
+El ciclo obligatorio será:
 
-Ningún desarrollo posterior puede eliminarla o modificar su comportamiento sin:
+**Problema → Corrección → Identificación de causa raíz → Prueba → Validación → Protección permanente → Regresión en futuras versiones**
 
-1. Identificar explícitamente la corrección existente.
-2. Analizar el impacto del nuevo cambio.
-3. Justificar técnicamente la modificación.
-4. Mantener el comportamiento anterior cuando siga siendo requerido.
-5. Actualizar las pruebas correspondientes.
-6. Ejecutar nuevamente la prueba de regresión.
-7. Registrar el cambio.
+Una corrección NO se considera completamente terminada simplemente porque funciona después de modificar el código.
 
-Está **PROHIBIDO** asumir que un comportamiento anterior puede eliminarse simplemente porque no aparece mencionado en el nuevo requerimiento.
+Debe garantizarse que:
+
+* continúa funcionando posteriormente;
+* no es sobrescrita por otro desarrollo;
+* no es eliminada por una migración;
+* no es modificada por un instalador;
+* no es modificada por un actualizador;
+* no es afectada por otro script;
+* no es reemplazada por una configuración anterior;
+* funciona en PostgreSQL;
+* funciona en SQL Server;
+* funciona después de instalar;
+* funciona después de actualizar.
 
 ---
 
-## 3. ANTES DE MODIFICAR CUALQUIER COSA
+## 3. ALCANCE GENERAL
 
-Antes de realizar un desarrollo o corrección, el agente DEBE investigar:
+Esta política debe aplicarse a TODOS los componentes de Korex:
 
-* Código existente.
-* SPs existentes.
-* Funciones existentes.
-* Tablas.
-* Vistas.
-* Triggers.
+### Aplicación
+
+* Frontend.
+* Backend.
+* APIs.
+* Servicios.
+* Procesos automáticos.
 * Validaciones.
-* Reglas de negocio.
-* Configuraciones.
-* Integraciones.
-* Correcciones anteriores.
-* Pruebas existentes.
-* Casos de regresión existentes.
-* Documentación del proyecto.
-* Historial de cambios disponible.
+* Formularios.
+* Reportes.
+* Exportaciones.
+* Importaciones.
+* Interfaces externas.
+* Procesos programados.
 
-**NO** se debe comenzar directamente modificando código.
+### Base de datos
 
-Primero se debe determinar:
-
-> ¿Qué existe actualmente y qué comportamiento debe preservarse?
-
----
-
-## 4. INVENTARIO DE CORRECCIONES
-
-Cada corrección importante debe quedar identificada mediante un registro permanente.
-
-El registro debe contener como mínimo:
-
-* ID de corrección (`COR-XXXX`).
-* Fecha.
-* Descripción del problema.
-* Causa identificada.
-* Solución implementada.
-* Archivos modificados.
-* SPs modificados.
-* Funciones modificadas.
-* Tablas involucradas.
-* Motor afectado (PostgreSQL / SQL Server / Ambos).
-* Evidencia de prueba.
-* Resultado esperado.
-* Resultado obtenido.
-* Estado (VALIDADA / EN PROCESO / REGRESIÓN).
-* Prueba de regresión asociada (`TEST-REG-XXXX`).
-
----
-
-## 5. TODA CORRECCIÓN VALIDADA SE CONVIERTE EN UNA PRUEBA DE REGRESIÓN
-
-Esta es una regla crítica.
-
-Cada vez que una corrección sea validada, debe crearse o actualizarse automáticamente una prueba en la suite del sistema que compruebe que dicha corrección continúa funcionando.
-
-Mientras esta prueba continúe pasando en la suite automatizada (`node scripts/validate_full_suite.js`), se demuestra que la corrección sigue protegida.
-
----
-
-## 6. NINGÚN DESARROLLO SE CONSIDERA TERMINADO SIN REGRESIÓN
-
-Después de realizar cualquier cambio, se debe comprobar:
-
-### A. Funcionalidad nueva
-¿El nuevo requerimiento funciona?
-
-### B. Corrección original
-¿La corrección que existía antes continúa funcionando?
-
-### C. Funcionalidades relacionadas
-¿El cambio afectó otras funcionalidades?
-
-### D. Base de datos
-¿Se conservaron SPs, funciones, tablas, restricciones, índices y demás objetos existentes?
-
-### E. Integraciones
-¿Continúan funcionando las integraciones existentes (Zeus ERP, interfaces, exportaciones)?
-
-### F. PostgreSQL
-¿Continúa funcionando correctamente?
-
-### G. SQL Server
-¿Continúa funcionando correctamente?
-
-Un desarrollo **NO** puede marcarse como terminado solamente porque la nueva funcionalidad funciona.
-
----
-
-## 7. REGLA DE NO SOBRESCRITURA
-
-Está prohibido reemplazar archivos, SPs, funciones o componentes completos sin revisar previamente las modificaciones existentes.
-
-Especialmente:
-* Stored Procedures.
-* Functions.
-* Views.
+* Tablas.
+* Columnas.
+* Índices.
+* Constraints.
+* SP.
+* Funciones.
 * Triggers.
-* Migrations.
-* Servicios / API Routes.
-* Componentes frontend.
-* Configuraciones.
+* Vistas.
+* Parámetros.
+* Datos iniciales.
+* Migraciones.
+* Scripts.
+* Jobs.
+* Procesos automáticos.
 
-Antes de reemplazar un objeto se debe comparar:
-```text
-VERSIÓN ACTUAL + CAMBIOS PREVIOS + NUEVO CAMBIO = VERSIÓN CONSERVADA
-```
-El resultado debe conservar todos los comportamientos requeridos.
+### Configuración
 
----
+* Parámetros del sistema.
+* Variables de configuración.
+* `.env`.
+* Configuración SQL.
+* Configuración de interfaces.
+* Configuración de procesos automáticos.
 
-## 8. REGLA DE PRESERVACIÓN DE LÓGICA
+### Instaladores
 
-Cuando se modifique una función o procedimiento existente, **NO** se debe reconstruir desde cero sin analizar su comportamiento actual.
+* Setup PostgreSQL.
+* Setup SQL Server.
+* Scripts de instalación.
+* Creación de estructuras.
+* Carga de parámetros.
+* Scripts posteriores a instalación.
 
-La lógica existente debe considerarse protegida.
+### Actualizadores
 
-Si el nuevo requerimiento necesita modificarla:
-1. Identificar la lógica existente.
-2. Identificar la nueva lógica.
-3. Integrar ambas de manera aditiva.
-4. Ejecutar las pruebas anteriores.
-5. Ejecutar las nuevas pruebas.
+* Actualizador PostgreSQL.
+* Actualizador SQL Server.
+* Migraciones.
+* Scripts de actualización.
+* Copias de archivos.
+* Configuración.
 
-El nuevo desarrollo debe ser **ADITIVO** siempre que técnicamente sea posible.
+### Infraestructura
 
----
-
-## 9. CAMBIOS QUE ELIMINAN COMPORTAMIENTO
-
-Si un nuevo requerimiento aparentemente entra en conflicto con una funcionalidad existente, **NO** eliminar automáticamente la funcionalidad anterior.
-
-Debe marcarse:
-### CONFLICTO DE REQUERIMIENTOS
-
-Y documentar:
-* Comportamiento actual.
-* Nuevo comportamiento solicitado.
-* Funcionalidad que podría perderse.
-* Impacto.
-* Alternativas.
-* Decisión requerida.
-
-No se debe eliminar una funcionalidad existente simplemente porque el nuevo requerimiento no la menciona.
+* PostgreSQL.
+* SQL Server.
+* Servicios.
+* Procesos auxiliares.
+* Integraciones.
 
 ---
 
-## 10. PROTECCIÓN DE BASE DE DATOS
+## 4. CADA CORRECCIÓN DEBE GENERAR UNA PRUEBA DE REGRESIÓN
 
-Los objetos de base de datos son parte del código del sistema y deben mantenerse bajo control de cambios.
+Cuando se encuentre y corrija cualquier problema, se debe crear una prueba que permita detectar si ese mismo problema vuelve a aparecer.
 
-Toda modificación debe estar representada mediante scripts/migrations versionados (`SQL/Table/Alter_New_Columns.sql`, `SQL/SP/`, `SQL/SqlServer/`).
+Ejemplos:
 
-Debe poder determinarse:
-* Qué objeto existía.
-* Qué cambio se realizó.
-* Cuándo se realizó.
-* Por qué se realizó.
-* Qué versión lo contiene.
-* Qué pruebas lo validan.
+* Un parámetro que se estaba ignorando.
+* Un SP que generaba información incorrecta.
+* Una tabla que no se creaba.
+* Una función que fallaba.
+* Un proceso que no generaba movimientos.
+* Una factura que no se enviaba.
+* Un reporte que mostraba información incorrecta.
+* Una validación que no funcionaba.
+* Un instalador que sobrescribía información.
+* Un actualizador que modificaba configuración.
+* Una interfaz que dejaba de funcionar.
 
-No se deben realizar modificaciones manuales permanentes en una base de datos que no queden posteriormente reflejadas en el mecanismo oficial de instalación/migración (`node deploy/gen_schema_json.js`, `deploy/sync_zeus_erp.js`).
-
----
-
-## 11. POSTGRESQL Y SQL SERVER
-
-Como el proyecto soporta oficialmente PostgreSQL y SQL Server:
-
-Toda corrección relacionada con base de datos debe analizarse para **AMBOS** motores.
-
-Debe determinarse:
-* Implementación PostgreSQL.
-* Implementación SQL Server.
-* Diferencias necesarias.
-* Pruebas PostgreSQL.
-* Pruebas SQL Server.
-
-Una corrección no se considera completamente terminada si funciona solamente en uno de los motores.
-
-Además, debe mantenerse la regla de aislamiento:
-- **SI SE ESTÁ EJECUTANDO CON POSTGRESQL:** solamente PostgreSQL puede ser modificado y consultado en operaciones runtime.
-- **SI SE ESTÁ EJECUTANDO CON SQL SERVER:** solamente SQL Server puede ser modificado y consultado en operaciones runtime.
-
-Nunca realizar modificaciones ocultas o simultáneas en el motor no seleccionado durante la ejecución.
+Todos estos casos deben convertirse en pruebas permanentes.
 
 ---
 
-## 12. CONTROL ANTES DE FINALIZAR UN DESARROLLO
+## 5. NO EXISTEN "CORRECCIONES TEMPORALES"
 
-Antes de declarar una tarea como **FINALIZADA**, el agente debe realizar obligatoriamente este checklist:
+Una modificación manual en una base de datos o servidor puede utilizarse para investigar o confirmar un problema, pero NO constituye una solución definitiva.
 
-- [ ] Revisé el comportamiento existente.
-- [ ] Identifiqué correcciones anteriores relacionadas.
-- [ ] No eliminé funcionalidades existentes.
-- [ ] No sobrescribí accidentalmente cambios anteriores.
-- [ ] Implementé el nuevo requerimiento.
-- [ ] Probé la nueva funcionalidad.
-- [ ] Ejecuté las pruebas de regresión (`node scripts/validate_full_suite.js`).
-- [ ] Verifiqué los SPs relacionados.
-- [ ] Verifiqué las funciones relacionadas.
-- [ ] Verifiqué las tablas relacionadas.
-- [ ] Verifiqué las validaciones.
-- [ ] Verifiqué las integraciones afectadas (Zeus ERP, exportación, etc.).
-- [ ] Probé PostgreSQL.
-- [ ] Probé SQL Server.
-- [ ] Actualicé las pruebas correspondientes.
-- [ ] Registré la corrección/cambio.
-- [ ] Confirmé que las correcciones anteriores continúan funcionando.
+Toda solución definitiva debe quedar incorporada en el mecanismo correspondiente.
 
-Solo después de completar este proceso se puede considerar **FINALIZADO** el desarrollo.
+Por ejemplo:
+
+Si se modifica manualmente un parámetro y el problema desaparece, se debe determinar:
+
+* por qué tenía el valor incorrecto;
+* quién lo modificó;
+* qué script lo estableció;
+* si un instalador lo sobrescribe;
+* si un actualizador lo modifica;
+* si existe otra fuente de configuración;
+* si el código está leyendo otra ubicación;
+* si existe duplicidad de configuración.
+
+La solución definitiva debe corregir la causa y no únicamente el resultado.
 
 ---
 
-## 13. PROHIBICIÓN DE "REHACER SIN REVISAR"
+## 6. PROTECCIÓN CONTRA REGRESIONES
 
-Si el agente encuentra una funcionalidad que aparentemente debe volver a desarrollarse, primero debe verificar si ya existe una implementación anterior.
+Antes de aprobar cualquier cambio nuevo, Korex debe ejecutar las pruebas existentes.
 
-Está prohibido:
-* Crear nuevamente una solución que ya existe.
-* Reemplazar una solución existente sin analizarla.
-* Eliminar una implementación porque "parece innecesaria".
-* Crear un nuevo SP cuando ya existe uno que cumple parcialmente la función sin analizarlo.
-* Modificar una funcionalidad sin revisar sus pruebas anteriores.
+Esto significa que:
 
-Flujo obligatorio:
-```text
-BUSCAR → ANALIZAR → PRESERVAR → MODIFICAR → PROBAR
-```
+> **Los nuevos desarrollos deben probarse contra todo lo que ya funcionaba.**
 
----
-
-## 14. REGISTRO DE REGRESIONES
-
-Si una corrección anteriormente solucionada vuelve a fallar, debe registrarse inmediatamente como **REGRESIÓN** (`REG-XXXX`).
+No se debe probar únicamente la funcionalidad nueva.
 
 Ejemplo:
-```text
-REG-0007
-Corrección afectada: COR-0021
-Descripción: Una modificación realizada en el módulo de cotizaciones provocó que nuevamente se permitiera guardar información sin las validaciones implementadas anteriormente.
-Causa: Cambio en SP utilizado por el proceso de guardado.
-Acción: Restaurar comportamiento anterior e integrar correctamente el nuevo requerimiento.
-Prueba de protección: TEST-REG-COT-001.
-```
+
+Se desarrolla una nueva funcionalidad de facturación.
+
+No basta con probar facturación.
+
+También deben ejecutarse las pruebas relacionadas con:
+
+* cotizaciones;
+* facturas;
+* exportaciones;
+* interfaces;
+* parámetros;
+* movimientos;
+* maestros;
+* usuarios;
+* permisos;
+* reportes;
+* procesos automáticos;
+* y todas las demás regresiones existentes.
 
 ---
 
-## 15. REPORTE DE CADA DESARROLLO
+## 7. LAS PRUEBAS DE REGRESIÓN SON ACUMULATIVAS
 
-Al finalizar un desarrollo, debe generarse un resumen técnico con:
+Las pruebas NO deben eliminarse simplemente porque el problema ya fue solucionado.
 
-1. **CAMBIO REALIZADO**: Qué se modificó.
-2. **CORRECCIONES PRESERVADAS**: Qué correcciones existentes fueron verificadas.
-3. **ARCHIVOS AFECTADOS**: Lista de archivos modificados.
-4. **BASE DE DATOS**: SPs, funciones, tablas, vistas, triggers, índices, etc.
-5. **POSTGRESQL**: Resultado de pruebas.
-6. **SQL SERVER**: Resultado de pruebas.
-7. **REGRESIONES**: Cantidad de pruebas ejecutadas y resultado.
-8. **RIESGOS**: Cambios que puedan afectar otras funcionalidades.
-9. **RESULTADO**: APROBADO o REQUIERE CORRECCIÓN.
-
----
-
-## 16. REGLA DE BLOQUEO
-
-Si durante un desarrollo se detecta que una corrección anterior dejó de funcionar:
-
-**NO** se debe continuar marcando el desarrollo como finalizado.
-
-El estado debe declararse como:
-> **BLOQUEADO – REGRESIÓN DETECTADA**
-
-El agente debe:
-1. Identificar la corrección afectada.
-2. Identificar qué cambio provocó la regresión.
-3. Corregir la regresión.
-4. Ejecutar nuevamente las pruebas de regresión.
-5. Confirmar que la funcionalidad nueva también continúa funcionando.
-
----
-
-## 17. PROTECCIÓN CONTRA PÉRDIDA DE CAMBIOS
-
-El proyecto debe mantener mecanismos de versionamiento y trazabilidad suficientes para poder identificar y recuperar modificaciones anteriores.
-
-Cada desarrollo debe estar asociado a:
-* ID de requerimiento.
-* ID de corrección (`COR-XXXX`).
-* Commit / versión en Git.
-* Fecha.
-* Archivos modificados.
-* Scripts de BD.
-* Pruebas de regresión.
-* Resultado de pruebas.
-
-Nunca depender exclusivamente de la memoria del desarrollador o del agente.
-
----
-
-## 18. REGLA FUNDAMENTAL PARA AGENTES DE IA
-
-Antes de modificar cualquier parte del proyecto, el agente debe asumir:
-
-> *"El código existente puede contener correcciones importantes que no aparecen explícitamente en el requerimiento actual."*
+Cada corrección importante agrega una nueva prueba al conjunto existente.
 
 Por lo tanto:
-* **NO** modificar por suposición.
-* **NO** eliminar por desconocimiento.
-* **NO** reemplazar sin comparar.
-* **NO** reconstruir sin investigar.
-* **NO** considerar terminado sin pruebas de regresión.
+
+Versión 1: 10 pruebas.  
+Versión 2: 10 pruebas anteriores + 3 nuevas = 13.  
+Versión 3: 13 anteriores + 5 nuevas = 18.  
+
+Y así sucesivamente.
+
+El conjunto de pruebas debe crecer y proteger el conocimiento acumulado del proyecto.
 
 ---
 
-## 19. PRINCIPIO FINAL
+## 8. VALIDACIÓN DE CÓDIGO, BASE DE DATOS Y CONFIGURACIÓN
 
-El proyecto debe evolucionar acumulando funcionalidades y correcciones, **NO** perdiéndolas.
+Cuando una prueba falle, se debe investigar todas las posibles fuentes del cambio.
 
-La regla dorada es:
-```text
-  NUEVO DESARROLLO
-+ CORRECCIONES EXISTENTES
-+ PRUEBAS EXISTENTES
-+ NUEVAS PRUEBAS
-= NUEVA VERSIÓN PROTEGIDA
-```
+La validación debe revisar como mínimo:
 
-Nunca:
-```text
-  NUEVO DESARROLLO
-- CORRECCIONES ANTERIORES
-= REGRESIÓN (PROHIBIDO)
-```
+* código fuente;
+* scripts;
+* migraciones;
+* SP;
+* funciones;
+* tablas;
+* parámetros;
+* datos iniciales;
+* configuración;
+* instaladores;
+* actualizadores;
+* procesos automáticos;
+* archivos de configuración;
+* dependencias.
+
+No asumir que el problema está únicamente en el código.
 
 ---
 
-## 20. CRITERIO OBLIGATORIO DE ACEPTACIÓN
+## 9. DETECCIÓN DE SOBRESCRITURAS
 
-Una tarea solamente puede considerarse **FINALIZADA** cuando se pueda demostrar:
+Toda nueva versión debe identificar operaciones que puedan sobrescribir configuraciones o información existente.
 
-1. El nuevo requerimiento funciona.
-2. Las correcciones anteriores relacionadas continúan funcionando.
-3. No se eliminaron comportamientos existentes sin autorización.
-4. Las pruebas de regresión pasan (`node scripts/validate_full_suite.js`).
-5. PostgreSQL fue validado.
-6. SQL Server fue validado.
-7. Los cambios quedaron registrados.
-8. La solución puede reproducirse desde el código / migrations / scripts oficiales.
+Se deben revisar especialmente:
 
-Si cualquiera de estos puntos falla:
-> **NO FINALIZAR EL DESARROLLO.**
+* INSERT;
+* UPDATE;
+* DELETE;
+* MERGE;
+* UPSERT;
+* DROP;
+* CREATE;
+* ALTER;
+* reemplazo de archivos;
+* copia de configuraciones;
+* regeneración de parámetros;
+* inicialización de datos.
+
+Cuando exista riesgo de sobrescribir información existente, debe determinarse si la operación es realmente necesaria y si respeta las reglas de protección del sistema.
+
+---
+
+## 10. PROTECCIÓN DE CONFIGURACIONES EXISTENTES
+
+Las configuraciones existentes deben conservarse salvo que exista un requerimiento explícito para modificarlas.
+
+Esto incluye especialmente configuraciones de producción.
+
+El proceso de actualización debe diferenciar claramente entre:
+
+### Configuración nueva
+Puede crearse cuando no existe.
+
+### Configuración existente
+Debe conservarse.
+
+### Configuración que requiere migración
+Debe migrarse explícitamente y con respaldo.
+
+### Configuración protegida
+No puede modificarse automáticamente.
+
+Esto aplica también al `.env`, el cual tiene su propia regla obligatoria de protección.
+
+---
+
+## 11. VALIDACIÓN DOBLE DE BASE DE DATOS
+
+Toda corrección y nuevo desarrollo que tenga impacto en base de datos debe validarse en:
+
+### PostgreSQL
+
+Y también en:
+
+### SQL Server
+
+No se permite asumir que porque funciona en un motor funcionará automáticamente en el otro.
+
+Se deben validar:
+
+* tablas;
+* SP;
+* funciones;
+* consultas;
+* parámetros;
+* transacciones;
+* índices;
+* tipos de datos;
+* restricciones;
+* procesos automáticos;
+* rendimiento;
+* instalación;
+* actualización.
+
+---
+
+## 12. AISLAMIENTO DE MOTORES
+
+Cuando se esté trabajando con SQL Server:
+
+**NO se debe modificar, crear ni generar accidentalmente objetos PostgreSQL.**
+
+Cuando se esté trabajando con PostgreSQL:
+
+**NO se debe modificar, crear ni generar accidentalmente objetos SQL Server.**
+
+Los instaladores y actualizadores deben permanecer completamente separados por motor.
+
+---
+
+## 13. VALIDACIÓN DEL INSTALADOR
+
+Cada versión debe probarse mediante una instalación limpia.
+
+Debe verificarse:
+
+* estructura de base de datos;
+* parámetros;
+* configuración;
+* SP;
+* funciones;
+* tablas;
+* archivos;
+* permisos;
+* procesos;
+* funcionalidades existentes.
+
+Después de instalar se deben ejecutar nuevamente las pruebas de regresión.
+
+---
+
+## 14. VALIDACIÓN DEL ACTUALIZADOR
+
+Cada versión debe probarse también sobre una instalación existente.
+
+Debe verificarse:
+
+* que los archivos correctos sean actualizados;
+* que la base de datos sea actualizada;
+* que las configuraciones existentes sean conservadas;
+* que el `.env` no sea alterado;
+* que no se elimine información;
+* que no se pierdan parámetros;
+* que no desaparezcan SP;
+* que no desaparezcan funciones;
+* que no se alteren funcionalidades existentes.
+
+Después de actualizar se deben ejecutar nuevamente todas las pruebas de regresión.
+
+---
+
+## 15. PRUEBA DE "ANTES Y DESPUÉS"
+
+Cuando sea técnicamente posible, el sistema de pruebas debe comparar:
+
+### Antes de la actualización
+
+* parámetros;
+* objetos;
+* estructuras;
+* configuraciones;
+* funcionalidades protegidas.
+
+### Después de la actualización
+
+Volver a verificar los mismos elementos.
+
+Cualquier diferencia inesperada debe generar una alerta.
+
+---
+
+## 16. CONTROL DE CAMBIOS
+
+Cada versión debe generar un registro de:
+
+* archivos modificados;
+* SP modificados;
+* funciones modificadas;
+* tablas modificadas;
+* parámetros modificados;
+* migraciones ejecutadas;
+* configuraciones modificadas;
+* nuevas funcionalidades;
+* correcciones realizadas.
+
+Esto permite determinar posteriormente qué cambio pudo generar una regresión.
+
+---
+
+## 17. PRUEBAS AUTOMÁTICAS DESDE EL PROPIO PROYECTO
+
+Korex debe contar con un proceso ejecutable desde el proyecto que permita ejecutar automáticamente las pruebas (`node scripts/validate_full_suite.js`).
+
+El proceso debe:
+
+1. Identificar el motor seleccionado.
+2. Ejecutar las pruebas correspondientes.
+3. Validar base de datos.
+4. Validar aplicación.
+5. Validar procesos.
+6. Ejecutar pruebas de regresión acumulativas.
+7. Detectar diferencias.
+8. Registrar errores.
+9. Generar un reporte.
+10. Indicar claramente PASS o FAIL.
+
+Cuando corresponda, debe ejecutar el conjunto de pruebas tanto para PostgreSQL como para SQL Server.
+
+---
+
+## 18. BLOQUEO DE ENTREGA
+
+Si una prueba de regresión falla:
+
+**LA VERSIÓN NO DEBE CONSIDERARSE APROBADA.**
+
+El proceso debe mostrar:
+
+`REGRESIÓN DETECTADA`
+
+e indicar:
+
+* prueba fallida;
+* funcionalidad afectada;
+* versión;
+* motor;
+* evidencia;
+* posible causa;
+* objeto involucrado.
+
+No se debe ocultar ni ignorar una prueba fallida para permitir la entrega.
+
+---
+
+## 19. REPORTE DE REGRESIONES
+
+Cada ejecución debe generar un reporte con:
+
+### Información general
+
+* versión;
+* fecha;
+* hora;
+* ambiente;
+* motor de base de datos.
+
+### Resultados
+
+* pruebas ejecutadas;
+* pruebas aprobadas;
+* pruebas fallidas;
+* pruebas nuevas;
+* regresiones detectadas.
+
+### Cambios
+
+* código;
+* SP;
+* funciones;
+* tablas;
+* parámetros;
+* configuraciones;
+* archivos.
+
+### Resultado
+
+`APROBADO` o `NO APROBADO`.
+
+---
+
+## 20. CAUSA RAÍZ OBLIGATORIA
+
+Cuando una regresión sea detectada, no basta con volver a corregir el problema.
+
+Se debe identificar:
+
+1. Qué funcionaba anteriormente.
+2. Qué dejó de funcionar.
+3. Qué cambio ocurrió entre ambas versiones.
+4. Qué componente produjo la regresión.
+5. Por qué las pruebas anteriores no la detectaron.
+6. Qué prueba nueva o mejora de prueba debe incorporarse para impedir que vuelva a ocurrir.
+
+---
+
+## 21. REGLA DE NO REPETICIÓN
+
+Cada vez que el equipo tenga que solucionar nuevamente un problema que ya había sido solucionado, debe considerarse una **falla del mecanismo de regresión**.
+
+En ese caso no solamente debe corregirse el problema funcional.
+
+También debe mejorarse el sistema de pruebas para evitar una tercera ocurrencia.
+
+Principio obligatorio:
+
+> **UN PROBLEMA CORREGIDO NO DEBE VOLVER A SER DESCUBIERTO COMO SI FUERA UN PROBLEMA NUEVO.**
+
+---
+
+## 22. CRITERIO FINAL DE CALIDAD
+
+Una versión de Korex solamente podrá considerarse lista cuando:
+
+* las nuevas funcionalidades funcionan;
+* las correcciones funcionan;
+* las pruebas de regresión funcionan;
+* PostgreSQL funciona;
+* SQL Server funciona;
+* la instalación funciona;
+* la actualización funciona;
+* las configuraciones protegidas permanecen intactas;
+* no existen regresiones conocidas;
+* los errores detectados están documentados;
+* el reporte automático indica resultado satisfactorio.
+
+---
+
+# PRINCIPIO MAESTRO
+
+## "TODO LO QUE SE CORRIGE, SE PROTEGE."
+
+No se debe depender de que un desarrollador recuerde una corrección anterior.
+
+No se debe depender de una prueba manual realizada ayer.
+
+No se debe depender de que una persona recuerde qué parámetro fue modificado.
+
+El proyecto debe conservar ese conocimiento mediante:
+
+**pruebas automáticas + pruebas de regresión + control de cambios + validación de instalación + validación de actualización + validación PostgreSQL + validación SQL Server.**
+
+El objetivo es que Korex pueda evolucionar sin destruir accidentalmente lo que ya fue construido y validado.

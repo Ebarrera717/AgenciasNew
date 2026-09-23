@@ -139,6 +139,18 @@ runTest('TEST-MASTER-SKILL-REGISTRATION', () => {
     }
 });
 
+// 8. Verificar Skill Maestro de Control de Regresiones en .agents/skills/correcciones-permanencia-proteccion/SKILL.md
+runTest('TEST-MASTER-REGRESSION-SKILL-REGISTRATION', () => {
+    const skillPath = path.join(ROOT_DIR, '.agents', 'skills', 'correcciones-permanencia-proteccion', 'SKILL.md');
+    if (!fs.existsSync(skillPath)) {
+        throw new Error('No se encontró el archivo .agents/skills/correcciones-permanencia-proteccion/SKILL.md.');
+    }
+    const content = fs.readFileSync(skillPath, 'utf8');
+    if (!content.includes('CONTROL DE REGRESIONES Y PROTECCIÓN DE CORRECCIONES') || !content.includes('TODO LO QUE SE CORRIGE, SE PROTEGE')) {
+        throw new Error('El archivo SKILL.md no contiene la declaración completa del Principio Maestro "TODO LO QUE SE CORRIGE, SE PROTEGE".');
+    }
+});
+
 console.log('\n================================================================');
 console.log(`  RESUMEN DE PRUEBAS SKILL MAESTRO (ID 74163):`);
 console.log(`  Total: ${totalTests} | ✅ Pasaron: ${passedTests} | ❌ Fallaron: ${totalTests - passedTests}`);

@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-09-23T00:34:37.514Z
+-- Fecha de Generación: 2026-09-23T15:50:08.236Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -4644,40 +4644,6 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    IF OBJECT_ID('dbo.ImpRet', 'U') IS NULL
-    BEGIN
-        CREATE TABLE dbo.ImpRet (
-            id INT IDENTITY(1,1) PRIMARY KEY,
-            cd_codigo VARCHAR(20) NOT NULL,
-            ds_nombre VARCHAR(250) NULL,
-            cd_cuenta VARCHAR(20) NULL,
-            am_porcentaje NUMERIC(5,2) NULL DEFAULT 0,
-            in_tipo CHAR(1) NULL DEFAULT 'I',
-            Id_cargo_dep INT NULL,
-            bl_IVA BIT NULL DEFAULT 0
-        );
-        IF NOT EXISTS (SELECT 1 FROM dbo.ImpRet WHERE id = 1)
-        BEGIN
-            SET IDENTITY_INSERT dbo.ImpRet ON;
-            INSERT INTO dbo.ImpRet (id, cd_codigo, ds_nombre, cd_cuenta, am_porcentaje, in_tipo, bl_IVA)
-            VALUES (1, '01', 'IVA 19%', '240805', 19.00, 'I', 1);
-            SET IDENTITY_INSERT dbo.ImpRet OFF;
-        END
-    END
-    ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo')
-    BEGIN
-        ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
-    END;
-
-    IF OBJECT_ID('dbo.CargosDesc', 'U') IS NULL
-    BEGIN
-        CREATE TABLE dbo.CargosDesc (
-            id INT IDENTITY(1,1) PRIMARY KEY,
-            cd_codigo VARCHAR(20) NOT NULL,
-            ds_nombre VARCHAR(250) NULL
-        );
-    END;
-
     BEGIN TRY
         DECLARE @xmlData XML;
 
@@ -6450,42 +6416,6 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT OFF;
 
-    IF OBJECT_ID('dbo.ImpRet') IS NULL
-    BEGIN
-        CREATE TABLE dbo.ImpRet (
-            id INT IDENTITY(1,1) PRIMARY KEY,
-            cd_codigo VARCHAR(20) NOT NULL,
-            ds_nombre VARCHAR(250) NULL,
-            cd_cuenta VARCHAR(20) NULL,
-            am_porcentaje NUMERIC(5,2) NULL DEFAULT 0,
-            in_tipo CHAR(1) NULL DEFAULT 'I',
-            Id_cargo_dep INT NULL,
-            bl_IVA BIT NULL DEFAULT 0
-        );
-        IF NOT EXISTS (SELECT 1 FROM dbo.ImpRet WHERE id = 1)
-        BEGIN
-            SET IDENTITY_INSERT dbo.ImpRet ON;
-            INSERT INTO dbo.ImpRet (id, cd_codigo, ds_nombre, cd_cuenta, am_porcentaje, in_tipo, bl_IVA)
-            VALUES (1, '01', 'IVA 19%', '240805', 19.00, 'I', 1);
-            SET IDENTITY_INSERT dbo.ImpRet OFF;
-        END
-    END
-    ELSE IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo')
-    BEGIN
-        ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
-    END;
-
-    IF OBJECT_ID('dbo.CargosDesc') IS NULL
-    BEGIN
-        CREATE TABLE dbo.CargosDesc (
-            id INT IDENTITY(1,1) PRIMARY KEY,
-            cd_codigo VARCHAR(20) NOT NULL,
-            ds_nombre VARCHAR(250) NULL,
-            cd_cuenta VARCHAR(20) NULL
-        );
-    END;
-    -- CargosDesc cd_cuenta remains NULL for TAR so native Zeus ERP processes total CxP under TiposServicios account in Section 3
-
     IF OBJECT_ID('dbo.parametros') IS NULL
     BEGIN
         CREATE TABLE dbo.parametros (
@@ -7878,12 +7808,12 @@ BEGIN
 					(SELECT TOP 1 id FROM dbo.CargosDesc WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.Cargo.value('cd_codigo[1]', 'VARCHAR(20)'))) OR RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(C.Cargo.value('ds_nombre[1]', 'VARCHAR(100)')))),
 					ISNULL(
 						(SELECT TOP 1 id FROM dbo.CargosDesc WHERE cd_codigo = 'TAR'),
-						CASE WHEN CD.id IS NOT NULL THEN CD.id ELSE ISNULL(IR.Id_cargo_dep, 1) END
+						CASE WHEN CD.id IS NOT NULL THEN CD.id ELSE 1 END
 					)
 				)
 			),
 			id_imp=IR.id, 
-			bl_iva=ISNULL(IR.bl_IVA,0),
+			bl_iva=ISNULL(C.Cargo.value('bl_iva[1]', 'BIT'), 0),
 			in_orden=ISNULL(C.Cargo.value('in_orden[1]', 'INT'),0)
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/CargosImpuestos') C(Cargo)
 		LEFT JOIN dbo.CargosDesc CD ON CD.cd_codigo=C.Cargo.value('cd_codigo[1]', 'VARCHAR(20)') AND C.Cargo.value('cd_tipo[1]', 'CHAR(1)') IN ('C','D')
@@ -8512,11 +8442,23 @@ BEGIN
 								DECLARE @tax_acct_val VARCHAR(20) = NULL;
 								DECLARE @bl_cxp_provee BIT = 0;
 								SELECT TOP 1 
-								       @tax_acct_val = cd_cuenta,
-								       @bl_cxp_provee = ISNULL(bl_contabilizarCxPProvee, ISNULL(bl_contabilizar_proveedor, 0))
+								       @tax_acct_val = cd_cuenta
 								FROM dbo.ImpRet 
 								WHERE (@sc_id_imptax IS NOT NULL AND id = @sc_id_imptax)
 								   OR (cd_codigo = @sc_codigotax);
+
+								IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'bl_contabilizarCxPProvee')
+								BEGIN
+								    EXEC sp_executesql N'SELECT TOP 1 @val = ISNULL(bl_contabilizarCxPProvee, 0) FROM dbo.ImpRet WHERE (@id IS NOT NULL AND id = @id) OR (cd_codigo = @code)',
+								        N'@id INT, @code VARCHAR(20), @val BIT OUTPUT',
+								        @id = @sc_id_imptax, @code = @sc_codigotax, @val = @bl_cxp_provee OUTPUT;
+								END
+								ELSE IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'bl_contabilizar_proveedor')
+								BEGIN
+								    EXEC sp_executesql N'SELECT TOP 1 @val = ISNULL(bl_contabilizar_proveedor, 0) FROM dbo.ImpRet WHERE (@id IS NOT NULL AND id = @id) OR (cd_codigo = @code)',
+								        N'@id INT, @code VARCHAR(20), @val BIT OUTPUT',
+								        @id = @sc_id_imptax, @code = @sc_codigotax, @val = @bl_cxp_provee OUTPUT;
+								END;
 
 								-- Si no contabiliza en CXP proveedor (bl_contabilizarCxPProvee = 0) y no tiene cuenta contable, detener y emitir error
 								IF ISNULL(@bl_cxp_provee, 0) = 0 AND (@tax_acct_val IS NULL OR RTRIM(LTRIM(@tax_acct_val)) = '')
