@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-09-23T15:50:08.236Z
+-- Fecha de Generación: 2026-09-23T16:48:55.015Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -8780,6 +8780,7 @@ BEGIN
 				BEGIN TRY
 					DECLARE @ReturnCode INT;
 					DECLARE @FacturaExecSqlStmt NVARCHAR(MAX);
+					DECLARE @MaxFacIdBefore INT = ISNULL((SELECT MAX(id) FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)), 0);
 
 					DECLARE @ZML_VariablesStr VARCHAR(MAX) = NULL;
 					
@@ -8932,7 +8933,16 @@ BEGIN
 						DECLARE @resSerie VARCHAR(10) = NULL;
 						DECLARE @resConsecutivo VARCHAR(20) = NULL;
 
-						IF @cd_cliente IS NOT NULL AND TRIM(@cd_cliente) <> ''
+						SELECT TOP 1 
+							@resFuente = LTRIM(RTRIM(cd_fuente)),
+							@resSerie = LTRIM(RTRIM(cd_serie)),
+							@resConsecutivo = LTRIM(RTRIM(cd_consecutivo))
+						FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)
+						WHERE id > @MaxFacIdBefore
+						  AND (@cd_cliente IS NULL OR TRIM(@cd_cliente) = '' OR cd_tercero_codigo = LTRIM(RTRIM(@cd_cliente)))
+						ORDER BY id ASC;
+
+						IF @resConsecutivo IS NULL
 						BEGIN
 							SELECT TOP 1 
 								@resFuente = LTRIM(RTRIM(cd_fuente)),

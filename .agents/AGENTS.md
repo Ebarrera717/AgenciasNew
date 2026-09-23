@@ -256,4 +256,17 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 - **Desencriptación Segura sin Errores**: Todo proceso que consulte `ClaveSQLServer` para conectar a Zeus ERP (`getSQLServerConnection()`) desencripta transparentemente el valor antes de abrir la conexión, evitando fallos independientemente del estado del interruptor.
 - **Herramienta CLI y Pruebas Automatizadas**: Todo cambio debe superar `node scripts/encrypt_password.js --test`, `node scripts/validate_password_encryption_suite.js` y las 10 capas de `node scripts/validate_full_suite.js`.
 
+---
+
+## 18. Regla Obligatoria de Versionamiento, Releases, Trazabilidad, Validación y Changelog (`versioning-release-changelog`)
+
+- **Política Oficial KOREX-VERSIONAMIENTO-001**: Todo release y control de cambios en Korex debe cumplir estrictamente las 44 directivas del documento maestro [`docs/KOREX_VERSIONAMIENTO_RELEASES_CHANGELOG.md`](file:///f:/Proyectos/AgenciasNew/docs/KOREX_VERSIONAMIENTO_RELEASES_CHANGELOG.md) y el Skill [`versioning-release-changelog`](file:///f:/Proyectos/AgenciasNew/.agents/skills/versioning-release-changelog/SKILL.md).
+- **Inmutabilidad Absoluta y SemVer 2.0.0**: Toda versión publicada (`MAJOR.MINOR.PATCH`) es inmutable. Queda estrictamente prohibido republicar bajo nombres como *"corregida"*, *"definitiva"* o *"final"*. Todo cambio incrementa la versión y genera un Build único (`YYYYMMDD.NN`).
+- **Gobernanza Dual del CHANGELOG**:
+  - **CHANGELOG Interno (`CHANGELOG.md`)**: Ficha técnica completa por ID de cambio (`KRX-YYYY-NNNNN`), detallando componentes afectados, motores, pruebas, estado de los 4 procesos de empaquetado y control de regresiones.
+  - **Informe de Cambios y Validación para Cliente (UAT)**: Documento estructurado sin rutas internas ni commits, orientado a personas y diseñado como **Ficha de Prueba y Aceptación** con pasos concretos de verificación y casilla de aprobación (`[ ] APROBADO / [ ] OBSERVADO`).
+- **Validación Multibase Obligatoria**: Ninguna versión se libera sin verificar PostgreSQL y SQL Server de forma 100% aislada.
+- **Validación Automatizada Continua**: Se debe ejecutar obligatoriamente `node scripts/release_changelog_manager.js --validate` y las 11 capas de `node scripts/validate_full_suite.js`.
+
+
 

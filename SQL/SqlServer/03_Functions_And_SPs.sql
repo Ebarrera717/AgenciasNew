@@ -4973,6 +4973,7 @@ BEGIN
 				BEGIN TRY
 					DECLARE @ReturnCode INT;
 					DECLARE @FacturaExecSqlStmt NVARCHAR(MAX);
+					DECLARE @MaxFacIdBefore INT = ISNULL((SELECT MAX(id) FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)), 0);
 
 					DECLARE @ZML_VariablesStr VARCHAR(MAX) = NULL;
 					
@@ -5125,7 +5126,16 @@ BEGIN
 						DECLARE @resSerie VARCHAR(10) = NULL;
 						DECLARE @resConsecutivo VARCHAR(20) = NULL;
 
-						IF @cd_cliente IS NOT NULL AND TRIM(@cd_cliente) <> ''
+						SELECT TOP 1 
+							@resFuente = LTRIM(RTRIM(cd_fuente)),
+							@resSerie = LTRIM(RTRIM(cd_serie)),
+							@resConsecutivo = LTRIM(RTRIM(cd_consecutivo))
+						FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)
+						WHERE id > @MaxFacIdBefore
+						  AND (@cd_cliente IS NULL OR TRIM(@cd_cliente) = '' OR cd_tercero_codigo = LTRIM(RTRIM(@cd_cliente)))
+						ORDER BY id ASC;
+
+						IF @resConsecutivo IS NULL
 						BEGIN
 							SELECT TOP 1 
 								@resFuente = LTRIM(RTRIM(cd_fuente)),
