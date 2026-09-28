@@ -72,28 +72,13 @@ BEGIN
     -- 2.1 Pre-validación en Korex: Conceptos de Facturación y Clasificación de Servicio
     SELECT 'ERROR: La factura ' || COALESCE(e."internalNumber", 'FAC-' || e.id::text) || 
            ' contiene el producto ''' || COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') || 
-           ''' que no tiene asignado un Concepto de Facturación en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
+           ''' que no tiene asignado un Concepto de Facturación ni Clasificación de Servicio en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
     INTO v_err_concept
     FROM public."InvoicesProduct" ep
     JOIN public."Invoices" e ON ep."invoiceId" = e.id
     LEFT JOIN public."Product" pr ON ep."productId" = pr.id
     WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[])
       AND COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), '') = ''
-    LIMIT 1;
-
-    IF v_err_concept IS NOT NULL AND v_err_concept <> '' THEN
-        mensaje_resultado := v_err_concept;
-        RETURN;
-    END IF;
-
-    SELECT 'ERROR: La factura ' || COALESCE(e."internalNumber", 'FAC-' || e.id::text) || 
-           ' contiene el producto ''' || COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') || 
-           ''' que no tiene asignada una Clasificación de Servicio en Korex. Por favor asígnela en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
-    INTO v_err_concept
-    FROM public."InvoicesProduct" ep
-    JOIN public."Invoices" e ON ep."invoiceId" = e.id
-    LEFT JOIN public."Product" pr ON ep."productId" = pr.id
-    WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[])
       AND COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') = ''
     LIMIT 1;
 
@@ -389,6 +374,22 @@ BEGIN
 		cd_codigo CHAR(25)
 	) ON COMMIT DROP;
 
+	CREATE TEMP TABLE IF NOT EXISTS Fac_Servicios_TiposFacturacionHoteles(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		id_factura INT,
+		id_item INT,
+		in_tipoitem INT,
+		cd_TiposFacturacionHoteles varchar(25),
+		ds_TiposFacturacionHoteles varchar(100),
+		in_cantidad INT,
+		am_valor NUMERIC(18, 2),
+		am_contado NUMERIC(18, 2),
+		am_credito NUMERIC(18, 2),
+		cd_cargosdesc varchar(25),
+		ds_cargonm varchar(100),
+		id_cargosdesc INT
+	) ON COMMIT DROP;
+
     -- 4. Poblar Tabla Facturacion
     INSERT INTO Facturacion (
 		id_factura, cd_fuente, cd_serie, cd_consecutivo, cd_usuario, cd_sucursal, cd_implante, 
@@ -641,7 +642,7 @@ BEGIN
         COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') AS cd_conceptofacturacion,
         COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
         SUBSTRING(COALESCE(prov.code, prov.name, ''), 1, 25) AS cd_proveedores,
-        SUBSTRING(COALESCE(ep."servicios", ''), 1, 250) AS ds_servicio,
+        SUBSTRING(COALESCE(NULLIF(TRIM(ep."servicios"), ''), NULLIF(TRIM(ep."descripcion"), ''), NULLIF(TRIM(pr.description), ''), ''), 1, 250) AS ds_servicio,
         (
             COALESCE(ep.price, 0) +
             COALESCE((
@@ -946,6 +947,70 @@ BEGIN
     JOIN Item itm ON v."invoiceProductId" = itm.id_referencia_origen
     JOIN Facturacion f ON itm.id_factura = f.id_factura;
 
+    -- 10.1. Poblar Tabla Fac_Servicios_TiposFacturacionHoteles
+    INSERT INTO Fac_Servicios_TiposFacturacionHoteles (
+        id_factura,
+        id_item,
+        in_tipoitem,
+        cd_TiposFacturacionHoteles,
+        ds_TiposFacturacionHoteles,
+        in_cantidad,
+        am_valor,
+        am_contado,
+        am_credito,
+        cd_cargosdesc,
+        ds_cargonm,
+        id_cargosdesc
+    )
+    SELECT
+        f.id_factura,
+        itm.id_item,
+        3 AS in_tipoitem,
+        'NCH' AS cd_TiposFacturacionHoteles,
+        'Noches' AS ds_TiposFacturacionHoteles,
+        COALESCE(ep.quantity, 1) AS in_cantidad,
+        COALESCE(ep.price, 0) AS am_valor,
+        CASE 
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+            ) THEN COALESCE(ep.price * ep.quantity, 0)
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+            ) THEN 0
+            ELSE ROUND(
+                (COALESCE(ep.price * ep.quantity, 0) * 
+                COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id), 0))::numeric, 2
+            )
+        END AS am_contado,
+        CASE 
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+            ) THEN 0
+            WHEN NOT EXISTS (
+                SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+            ) THEN COALESCE(ep.price * ep.quantity, 0)
+            ELSE (
+                COALESCE(ep.price * ep.quantity, 0) - 
+                ROUND(
+                    (COALESCE(ep.price * ep.quantity, 0) * 
+                    COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                    NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id), 0))::numeric, 2
+                )
+            )
+        END AS am_credito,
+        COALESCE(ct_main.code, 'TAR') AS cd_cargosdesc,
+        COALESCE(ct_main.name, 'TARIFA') AS ds_cargonm,
+        COALESCE(ct_main.id, 1) AS id_cargosdesc
+    FROM public."InvoicesProduct" ep
+    JOIN Item itm ON ep.id = itm.id_item
+    JOIN Facturacion f ON itm.id_factura = f.id_factura
+    LEFT JOIN public."ChargeAndTax" ct_main ON ct_main.id = ep."mainTaxId";
+
     -- 11. Generar XML
     SELECT xmlroot(
         xmlelement(name "Facturaciones",
@@ -1066,6 +1131,19 @@ BEGIN
                                     )
                                     FROM Variables v
                                     WHERE v.id_item = s.id_item AND v.in_tipoitem = s.in_tipoitem
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "TiposFacturacionHoteles",
+                                            xmlforest(
+                                                tf.id_factura, tf.id_item, tf.in_tipoitem, tf.cd_TiposFacturacionHoteles,
+                                                tf.ds_TiposFacturacionHoteles, tf.in_cantidad, tf.am_valor, tf.am_contado,
+                                                tf.am_credito, tf.cd_cargosdesc, tf.ds_cargonm, tf.id_cargosdesc
+                                            )
+                                        )
+                                    )
+                                    FROM Fac_Servicios_TiposFacturacionHoteles tf
+                                    WHERE tf.id_item = s.id_item
                                 )
                             )
                         )

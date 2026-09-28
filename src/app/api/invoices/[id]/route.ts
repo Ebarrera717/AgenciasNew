@@ -38,18 +38,39 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
                 const products = productsRaw.map((p: any) => ({
                     ...p,
                     ticketCode: p.ticketCode || null,
-                    appliedTaxes: taxesRaw.filter((t: any) => t.invoiceProductId === p.id),
+                    appliedTaxes: taxesRaw.filter((t: any) => t.invoiceProductId === p.id).map((t: any) => ({
+                        ...t,
+                        id: t.chargeAndTaxId || t.id,
+                        chargeAndTaxId: t.chargeAndTaxId || t.id,
+                        name: t.taxName || t.name,
+                        code: t.taxCode || t.code,
+                        explicitAmount: t.explicitAmount != null ? t.explicitAmount : (t.amount ?? 0),
+                        amount: t.explicitAmount != null ? t.explicitAmount : (t.amount ?? 0)
+                    })),
                     passengers: paxesRaw.filter((px: any) => px.invoiceProductId === p.id),
-                    variables: varsRaw.filter((v: any) => v.invoiceProductId === p.id),
+                    variables: varsRaw.filter((v: any) => v.invoiceProductId === p.id).map((v: any) => ({
+                        ...v,
+                        masterVariableId: v.masterVariableId,
+                        code: v.variableCode || v.code,
+                        name: v.variableName || v.name,
+                        value: v.value
+                    })),
                     payments: pymtsRaw.filter((pm: any) => pm.invoiceProductId === p.id),
                     itinerariesItineraryList: itinsRaw.filter((it: any) => it.invoiceProductId === p.id),
-                    product: { id: p.productId, name: p.productName, code: p.productCode }
+                    product: { id: p.productId, description: p.productDescription || p.productName, name: p.productName, code: p.productCode },
+                    provider: { id: p.providerId, name: p.providerName, code: p.providerCode },
+                    prestadora: { id: p.prestadoraId, name: p.prestadoraName, code: p.prestadoraCode }
                 }));
 
                 const invoice = {
                     ...invoiceRow,
                     products,
-                    combos: combosRaw
+                    combos: combosRaw.map((c: any) => ({
+                        id: c.comboId || c.id,
+                        comboId: c.comboId || c.id,
+                        name: c.comboName,
+                        combo: { id: c.comboId || c.id, name: c.comboName }
+                    }))
                 };
 
                 return NextResponse.json(invoice);
@@ -252,9 +273,19 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
             autoExportResult = await autoExportInvoiceToZeusERP(id, actingUserId);
         } catch (expErr: any) {
             console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on invoice update:', expErr?.message);
+            autoExportResult = { exported: true, success: false, message: expErr?.message };
         }
 
-        return NextResponse.json({ message: message || 'Factura actualizada', invoice: { id }, autoExportResult })
+        let finalMessage = message || 'Factura actualizada';
+        if (autoExportResult && autoExportResult.exported) {
+            if (autoExportResult.success) {
+                finalMessage += ` | Auto-exportada a Zeus ERP: ${autoExportResult.message || 'Éxito'}`;
+            } else {
+                finalMessage += ` | ⚠️ Observación en Zeus ERP: ${autoExportResult.message || 'No se pudo completar el envío automático'}`;
+            }
+        }
+
+        return NextResponse.json({ message: finalMessage, invoice: { id }, autoExportResult })
     } catch (error: any) {
         console.error('Error updating invoice (PUT):', error)
         await recordTraceEvent({

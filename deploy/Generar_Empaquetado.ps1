@@ -122,12 +122,14 @@ Write-Host "`n[4/5] Ensamblando Assets y Bases de Datos..." -ForegroundColor Yel
 Copy-Item ".\deploy\install-service.js" -Destination $ReleaseDir -Force
 Copy-Item ".\deploy\Setup_Korex.ps1" -Destination $ReleaseDir -Force
 Copy-Item ".\deploy\Update_Korex.ps1" -Destination $ReleaseDir -Force
+Copy-Item ".\deploy\Update_Korex_SQLServer.ps1" -Destination $ReleaseDir -Force
 Copy-Item ".\deploy\db_installer.js" -Destination $ReleaseDir -Force
 Copy-Item ".\deploy\web.config" -Destination $ReleaseDir -Force
 
-# Herramientas Administrativas (Limpieza de Movimientos y Activar Licencia)
+# Herramientas Administrativas (Limpieza de Movimientos, Activar Licencia y Actualización Directa)
 if (Test-Path ".\Limpiar_Movimientos_Produccion.bat") { Copy-Item ".\Limpiar_Movimientos_Produccion.bat" -Destination $ReleaseDir -Force }
 if (Test-Path ".\ActivarLicencia.bat") { Copy-Item ".\ActivarLicencia.bat" -Destination $ReleaseDir -Force }
+if (Test-Path ".\Actualizar_Korex_SQLServer.bat") { Copy-Item ".\Actualizar_Korex_SQLServer.bat" -Destination $ReleaseDir -Force }
 
 # Garantizar que GenerarLicencia NO viaje al cliente final por seguridad
 if (Test-Path "$ReleaseDir\GenerarLicencia.bat") { Remove-Item "$ReleaseDir\GenerarLicencia.bat" -Force }
@@ -137,6 +139,8 @@ if (Test-Path ".\deploy\clean_movement_tables.js") { Copy-Item ".\deploy\clean_m
 if (Test-Path ".\deploy\Korex_Diagnostics_Engine.ps1") { Copy-Item ".\deploy\Korex_Diagnostics_Engine.ps1" -Destination "$ReleaseDir\deploy" -Force }
 if (Test-Path ".\deploy\Korex_Performance_Engine.ps1") { Copy-Item ".\deploy\Korex_Performance_Engine.ps1" -Destination "$ReleaseDir\deploy" -Force }
 if (Test-Path ".\deploy\task_scheduler_manager.ps1") { Copy-Item ".\deploy\task_scheduler_manager.ps1" -Destination "$ReleaseDir\deploy" -Force }
+if (Test-Path ".\deploy\update_db_sqlserver.js") { Copy-Item ".\deploy\update_db_sqlserver.js" -Destination "$ReleaseDir\deploy" -Force }
+if (Test-Path ".\deploy\Update_Korex_SQLServer.ps1") { Copy-Item ".\deploy\Update_Korex_SQLServer.ps1" -Destination "$ReleaseDir\deploy" -Force }
 
 if (!(Test-Path "$ReleaseDir\scripts")) { New-Item -ItemType Directory -Path "$ReleaseDir\scripts" | Out-Null }
 if (Test-Path ".\scripts\activar-licencia.js") { Copy-Item ".\scripts\activar-licencia.js" -Destination "$ReleaseDir\scripts" -Force }

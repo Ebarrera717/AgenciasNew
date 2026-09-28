@@ -44,17 +44,35 @@ VALUES (
 ON CONFLICT (email) DO NOTHING;
 
 -- 4.1 Usuario Superadministrador (Contraseña: 123456789)
-INSERT INTO public."User" (email, name, "passwordHash", "roleId", "branchId")
+INSERT INTO public."User" (email, name, "passwordHash", "roleId", "branchId", "isActive")
 VALUES (
     'ebarrera@zagencias.com',
-    'Superadministrador',
-    '$2b$10$EvqWyDZ9b/rcMCNNuSdplOyS/NooFO.keByM/UsOgJ6Zy8tgqSYxS',
-    (SELECT id FROM public."Role" WHERE name = 'Superadministrador'),
-    (SELECT id FROM public."Branch" WHERE code = 'BOG')
+    'Eduardo Barrera',
+    '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+    (SELECT id FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%' LIMIT 1),
+    (SELECT id FROM public."Branch" WHERE code = 'BOG' LIMIT 1),
+    true
 )
 ON CONFLICT (email) DO UPDATE SET
+    "name" = EXCLUDED."name",
     "passwordHash" = EXCLUDED."passwordHash",
-    "roleId" = EXCLUDED."roleId";
+    "roleId" = EXCLUDED."roleId",
+    "isActive" = true;
+
+INSERT INTO public."User" (email, name, "passwordHash", "roleId", "branchId", "isActive")
+VALUES (
+    'ebarrrera@zagencias.com',
+    'Eduardo Barrera',
+    '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+    (SELECT id FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%' LIMIT 1),
+    (SELECT id FROM public."Branch" WHERE code = 'BOG' LIMIT 1),
+    true
+)
+ON CONFLICT (email) DO UPDATE SET
+    "name" = EXCLUDED."name",
+    "passwordHash" = EXCLUDED."passwordHash",
+    "roleId" = EXCLUDED."roleId",
+    "isActive" = true;
 
 
 -- 5. Productos
@@ -1418,3 +1436,5 @@ INSERT INTO public."Master" (code, name, "inactivo") VALUES ('Diagnostics', 'dia
 INSERT INTO public."Menu" (code, name, action, activo) VALUES ('DIAGNOSTICS', 'Trazabilidad y Diagnóstico', '/dashboard/diagnostics', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('TRACEABILITY_MODE', 'Modo de Trazabilidad y Diagnóstico', 'OFF') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1') ON CONFLICT (code) DO NOTHING;

@@ -88,7 +88,7 @@ BEGIN
         id integer NOT NULL,
         code character varying(10) NOT NULL,
         name character varying(150) NOT NULL,
-        "citiesId" integer NOT NULL
+        "citiesId" integer
     );
     CREATE SEQUENCE IF NOT EXISTS public."Airports_id_seq"
         START WITH 1
@@ -397,7 +397,7 @@ BEGIN
         id integer NOT NULL,
         code character varying(10) NOT NULL,
         name character varying(100) NOT NULL,
-        "countriesId" integer NOT NULL,
+        "countriesId" integer,
         statecode character varying(25),
         iata character varying(10)
     );

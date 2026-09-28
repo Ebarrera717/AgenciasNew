@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Save, Trash2, Plus, ChevronDown, Calendar, Users, Globe, DollarSign, Briefcase, Hotel as HotelIcon, Tag, Tags, Percent, Calculator, ArrowRight, Loader2, FileDown, Paperclip, FileText, Download, X, Printer, CreditCard, Receipt, Plane, AlertCircle, Send, CheckCircle2 } from 'lucide-react'
+import { Save, Trash2, Plus, ChevronDown, Calendar, Users, Globe, DollarSign, Briefcase, Hotel as HotelIcon, Tag, Tags, Percent, Calculator, ArrowRight, Loader2, FileDown, Paperclip, FileText, Download, X, Printer, CreditCard, Receipt, Plane, AlertCircle, Send, CheckCircle2, Archive, FileSpreadsheet, FileImage, User, Clock, History, Eye } from 'lucide-react'
+import JSZip from 'jszip'
 import { format, differenceInDays } from 'date-fns'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -12,6 +13,7 @@ import ItemPaymentModal from '@/app/dashboard/invoices/new/ItemPaymentModal'
 import GlobalPaymentModal from '@/app/dashboard/invoices/new/GlobalPaymentModal'
 import QuotationInvoiceModal from '../QuotationInvoiceModal'
 import ManualServicesModal, { ManualServiceItem } from './ManualServicesModal'
+import QuotationHistoryDetailModal from '../QuotationHistoryDetailModal'
 
 
 interface QuotationFormData {
@@ -207,11 +209,17 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
     const [isGlobalPaymentOpen, setIsGlobalPaymentOpen] = useState(false)
     const [isManualServicesModalOpen, setIsManualServicesModalOpen] = useState(false)
     const [attachments, setAttachments] = useState<any[]>([])
+    const [pendingAttachments, setPendingAttachments] = useState<any[]>([])
     const [uploadingAttachment, setUploadingAttachment] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null)
+    const [downloadingZip, setDownloadingZip] = useState(false)
+    const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<(number | string)[]>([])
     const [focusedTax, setFocusedTax] = useState<{ itemIdx: number, taxId: number, rawValue?: string } | null>(null)
     const [focusedField, setFocusedField] = useState<{ itemIdx?: number, field: string, rawValue?: string } | null>(null)
     const [activeGeneralTab, setActiveGeneralTab] = useState<'info' | 'history'>('info')
     const [stateHistoryList, setStateHistoryList] = useState<any[]>([])
+    const [selectedHistoryItemForDetail, setSelectedHistoryItemForDetail] = useState<any | null>(null)
+    const [isHistoryDetailModalOpen, setIsHistoryDetailModalOpen] = useState(false)
     const router = useRouter()
 
     const activeCurrency = data?.currencies?.find((c: any) => c.code === formData.currency);
@@ -361,9 +369,27 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 }
             }
 
+            const targetId = result.quotation?.id || quotationId;
+
+            // Si hay adjuntos pendientes cargados antes de guardar la cotización, subirlos automáticamente
+            if (targetId && pendingAttachments.length > 0) {
+                try {
+                    await fetch(`/api/quotations/${targetId}/attachments`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-Id': loggedUser.id?.toString() || ''
+                        },
+                        body: JSON.stringify({ files: pendingAttachments })
+                    });
+                    setPendingAttachments([]);
+                } catch (attErr) {
+                    console.error('Error subiendo adjuntos pendientes:', attErr);
+                }
+            }
+
             if (downloadPdf && printWindow) {
                 try {
-                    const targetId = result.quotation?.id || quotationId;
                     if (targetId) {
                         printWindow.location.href = `/dashboard/quotations/print?idIni=${targetId}&idFin=${targetId}`;
                     } else {
@@ -405,15 +431,37 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
     }
 
     const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file || !quotationId) return
+        const fileList = e.target.files
+        if (!fileList || fileList.length === 0) return
 
+        const files = Array.from(fileList)
         setUploadingAttachment(true)
+        setUploadProgress({ current: 0, total: files.length })
+
         try {
-            const reader = new FileReader()
-            reader.readAsDataURL(file)
-            reader.onload = async () => {
-                const base64 = reader.result as string
+            const processedFiles: Array<{ id: string; fileName: string; fileType: string; fileSize: number; fileUrl: string; isPending?: boolean }> = []
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i]
+                setUploadProgress({ current: i + 1, total: files.length })
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader()
+                    reader.onload = () => resolve(reader.result as string)
+                    reader.onerror = reject
+                    reader.readAsDataURL(file)
+                })
+
+                processedFiles.push({
+                    id: 'pending_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    fileName: file.name,
+                    fileType: file.type || 'application/octet-stream',
+                    fileSize: file.size,
+                    fileUrl: base64,
+                    isPending: true
+                })
+            }
+
+            if (quotationId) {
                 const loggedUser = JSON.parse(localStorage.getItem('user') || '{}');
                 const res = await fetch(`/api/quotations/${quotationId}/attachments`, {
                     method: 'POST',
@@ -421,31 +469,35 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                         'Content-Type': 'application/json',
                         'X-User-Id': loggedUser.id?.toString() || ''
                     },
-                    body: JSON.stringify({
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        fileUrl: base64
-                    })
+                    body: JSON.stringify({ files: processedFiles })
                 })
 
                 if (res.ok) {
                     fetchAttachments()
                 } else {
                     const result = await res.json()
-                    alert(result.message || 'Error al cargar adjunto')
+                    alert(result.message || 'Error al cargar adjunto(s)')
                 }
+            } else {
+                setPendingAttachments(prev => [...prev, ...processedFiles])
             }
         } catch (err) {
             console.error(err)
-            alert('Error al procesar el archivo')
+            alert('Error al procesar el archivo o archivos seleccionados')
         } finally {
             setUploadingAttachment(false)
+            setUploadProgress(null)
             e.target.value = ''
         }
     }
 
-    const handleDeleteAttachment = async (id: number) => {
+    const handleDeleteAttachment = async (id: number | string) => {
+        if (typeof id === 'string' && id.startsWith('pending_')) {
+            setPendingAttachments(prev => prev.filter(att => att.id !== id))
+            setSelectedAttachmentIds(prev => prev.filter(attId => attId !== id))
+            return
+        }
+
         if (!confirm('¿Estás seguro de eliminar este adjunto?')) return
         const loggedUser = JSON.parse(localStorage.getItem('user') || '{}');
         try {
@@ -456,12 +508,45 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 }
             })
             if (res.ok) {
+                setSelectedAttachmentIds(prev => prev.filter(attId => attId !== id))
                 fetchAttachments()
             }
         } catch (err) {
             console.error(err)
             alert('Error al eliminar adjunto')
         }
+    }
+
+    const handleDeleteSelectedAttachments = async () => {
+        if (selectedAttachmentIds.length === 0) return
+        if (!confirm(`¿Estás seguro de eliminar los ${selectedAttachmentIds.length} adjuntos seleccionados?`)) return
+        
+        const pendingToDelete = selectedAttachmentIds.filter(id => typeof id === 'string' && id.startsWith('pending_'))
+        const serverToDelete = selectedAttachmentIds.filter(id => typeof id === 'number' || (typeof id === 'string' && !id.startsWith('pending_')))
+
+        if (pendingToDelete.length > 0) {
+            setPendingAttachments(prev => prev.filter(att => !pendingToDelete.includes(att.id)))
+        }
+
+        if (serverToDelete.length > 0 && quotationId) {
+            const loggedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            try {
+                const res = await fetch(`/api/quotations/${quotationId}/attachments?attachmentIds=${serverToDelete.join(',')}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-User-Id': loggedUser.id?.toString() || ''
+                    }
+                })
+                if (res.ok) {
+                    fetchAttachments()
+                }
+            } catch (err) {
+                console.error(err)
+                alert('Error al eliminar adjuntos seleccionados')
+            }
+        }
+
+        setSelectedAttachmentIds([])
     }
 
     const handleDownloadAttachment = (attachment: any) => {
@@ -471,6 +556,63 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+    }
+
+    const handleDownloadZip = async (itemsToDownload?: any[]) => {
+        const allAtts = [...pendingAttachments, ...attachments]
+        const list = itemsToDownload && itemsToDownload.length > 0 ? itemsToDownload : allAtts
+        if (!list || list.length === 0) return
+
+        setDownloadingZip(true)
+        try {
+            const zip = new JSZip()
+            const nameCounts: Record<string, number> = {}
+
+            for (const att of list) {
+                let name = att.fileName || `adjunto_${att.id}`
+                if (nameCounts[name]) {
+                    const extIndex = name.lastIndexOf('.')
+                    const ext = extIndex !== -1 ? name.substring(extIndex) : ''
+                    const base = extIndex !== -1 ? name.substring(0, extIndex) : name
+                    name = `${base}_(${nameCounts[name]})${ext}`
+                    nameCounts[att.fileName]++
+                } else {
+                    nameCounts[name] = 1
+                }
+
+                const base64Data = att.fileUrl.includes(';base64,') ? att.fileUrl.split(';base64,')[1] : att.fileUrl
+                zip.file(name, base64Data, { base64: true })
+            }
+
+            const content = await zip.generateAsync({ type: 'blob' })
+            const url = URL.createObjectURL(content)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `Adjuntos_Cotizacion_${quotationId}.zip`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+        } catch (err) {
+            console.error('Error al generar archivo ZIP:', err)
+            alert('Error al descargar los adjuntos en lote (ZIP)')
+        } finally {
+            setDownloadingZip(false)
+        }
+    }
+
+    const getAttachmentIcon = (fileType: string = '', fileName: string = '') => {
+        const ext = fileName.split('.').pop()?.toLowerCase() || ''
+        if (fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+            return <FileImage className="w-4 h-4 text-emerald-500 shrink-0" />
+        }
+        if (['xls', 'xlsx', 'csv'].includes(ext)) {
+            return <FileSpreadsheet className="w-4 h-4 text-green-600 shrink-0" />
+        }
+        if (fileType.includes('pdf') || ext === 'pdf') {
+            return <FileText className="w-4 h-4 text-red-500 shrink-0" />
+        }
+        return <FileText className="w-4 h-4 text-blue-500 shrink-0" />
     }
 
     // Get unique taxes that have been applied anywhere, and sum their amounts (redirecting taxes with targetTaxId)
@@ -1383,45 +1525,86 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                         ) : (
                             <div className="space-y-4">
                                 {stateHistoryList.length === 0 ? (
-                                    <div className="text-center py-8 text-zinc-450 dark:text-zinc-550 font-semibold text-sm">
-                                        No hay historial de cambios de estado registrado.
+                                    <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 font-semibold text-sm">
+                                        <History className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto mb-2" />
+                                        No hay historial de cambios o modificaciones registrado.
                                     </div>
                                 ) : (
                                     <div className="border border-zinc-100 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-inner bg-zinc-50/50 dark:bg-zinc-950/20">
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left border-collapse text-xs">
-                                                <thead>
+                                                 <thead>
                                                     <tr className="bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 font-bold text-zinc-500 uppercase tracking-wider text-[10px]">
-                                                        <th className="px-5 py-3">Estado</th>
-                                                        <th className="px-5 py-3">Comentario</th>
+                                                        <th className="px-5 py-3">Estado / Acción</th>
+                                                        <th className="px-5 py-3">Detalle / Modificación</th>
                                                         <th className="px-5 py-3">Fecha y Hora</th>
-                                                        <th className="px-5 py-3">Usuario</th>
+                                                        <th className="px-5 py-3">Usuario que Modificó</th>
+                                                        <th className="px-5 py-3 text-right">Detalle</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
-                                                    {stateHistoryList.map((h: any) => (
-                                                        <tr key={h.id} className="hover:bg-zinc-100/30 dark:hover:bg-zinc-800/10 text-zinc-700 dark:text-zinc-300">
-                                                            <td className="px-5 py-3">
-                                                                <span className={cn(
-                                                                    "px-2.5 py-1 rounded-full font-bold uppercase tracking-wider text-[9px] border",
-                                                                    h.state === 'NUEVO' ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400' :
-                                                                    h.state === 'ENVIADO' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400' :
-                                                                    'bg-zinc-50 dark:bg-zinc-500/10 border-zinc-200 dark:border-zinc-500/20 text-zinc-600 dark:text-zinc-400'
-                                                                )}>
-                                                                    {h.state}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-5 py-3 italic font-semibold max-w-[200px] truncate" title={h.description}>
-                                                                {h.description || 'Sin comentarios.'}
-                                                            </td>
-                                                            <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 font-bold">
-                                                                {new Date(h.createdAt).toLocaleString()}
-                                                            </td>
-                                                            <td className="px-5 py-3 font-semibold text-zinc-900 dark:text-zinc-250">
-                                                                {h.userName || 'Sistema'}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
+                                                    {stateHistoryList.map((h: any) => {
+                                                        const s = (h.state || '').toUpperCase()
+                                                        const isNuevo = s === 'NUEVO'
+                                                        const isMod = s === 'MODIFICADO' || s === 'EDICION'
+                                                        const isAprob = s === 'APROBADO' || s === 'ENVIADO'
+                                                        const isFact = s === 'FACTURADO'
+                                                        const isCancel = s === 'CANCELADO' || s === 'ANULADO'
+
+                                                        const badgeStyle = isNuevo
+                                                            ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400'
+                                                            : isMod
+                                                            ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                            : isAprob
+                                                            ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                                            : isFact
+                                                            ? 'bg-teal-50 dark:bg-teal-500/10 border-teal-200 dark:border-teal-500/20 text-teal-600 dark:text-teal-400'
+                                                            : isCancel
+                                                            ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400'
+                                                            : 'bg-zinc-50 dark:bg-zinc-500/10 border-zinc-200 dark:border-zinc-500/20 text-zinc-600 dark:text-zinc-400'
+
+                                                        return (
+                                                            <tr key={h.id} className="hover:bg-zinc-100/30 dark:hover:bg-zinc-800/10 text-zinc-700 dark:text-zinc-300">
+                                                                <td className="px-5 py-3">
+                                                                    <span className={cn(
+                                                                        "px-2.5 py-1 rounded-full font-bold uppercase tracking-wider text-[9px] border inline-block",
+                                                                        badgeStyle
+                                                                    )}>
+                                                                        {h.state || 'MODIFICADO'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-5 py-3 font-medium max-w-[280px] truncate" title={h.description}>
+                                                                    {h.description || 'Sin comentarios.'}
+                                                                </td>
+                                                                <td className="px-5 py-3 text-zinc-500 dark:text-zinc-400 font-semibold whitespace-nowrap">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                                                        <span>{new Date(h.createdAt).toLocaleString()}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-5 py-3 font-semibold text-zinc-900 dark:text-zinc-200 whitespace-nowrap">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                                        <span>{h.userName || 'Sistema'}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-5 py-3 text-right whitespace-nowrap">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setSelectedHistoryItemForDetail(h);
+                                                                            setIsHistoryDetailModalOpen(true);
+                                                                        }}
+                                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 font-bold text-[11px] transition-all cursor-pointer shadow-sm hover:scale-[1.02] border border-blue-200/60 dark:border-blue-800/60"
+                                                                        title="Consultar datos guardados de esta versión"
+                                                                    >
+                                                                        <Eye className="w-3.5 h-3.5 text-blue-500" />
+                                                                        Consultar Detalle
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -2336,58 +2519,196 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                         </div>
                     </div>
 
-                    {quotationId && (
-                        <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm mt-8">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-bold flex items-center gap-2 dark:text-white">
-                                    <Paperclip className="w-4 h-4 text-blue-500" />
-                                    Adjuntos
-                                </h3>
-                                <label className="cursor-pointer bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all hover:bg-blue-100">
-                                    {uploadingAttachment ? <Loader2 className="animate-spin w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                                    Cargar
-                                    <input type="file" className="hidden" onChange={handleUploadAttachment} disabled={uploadingAttachment} />
-                                </label>
-                            </div>
+                    {(() => {
+                        const allAttachments = [...pendingAttachments, ...attachments];
+                        return (
+                            <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm mt-8">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <Paperclip className="w-4 h-4 text-blue-500" />
+                                        <h3 className="text-sm font-bold dark:text-white">
+                                            Adjuntos
+                                        </h3>
+                                        {allAttachments.length > 0 && (
+                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                                {allAttachments.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {allAttachments.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDownloadZip()}
+                                                disabled={downloadingZip}
+                                                title="Descargar todos los adjuntos en un archivo comprimido (.ZIP)"
+                                                className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                                            >
+                                                {downloadingZip ? (
+                                                    <>
+                                                        <Loader2 className="animate-spin w-3 h-3" />
+                                                        Comprimiendo...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Archive className="w-3 h-3" />
+                                                        Bajar Todo (.ZIP)
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+                                        <label className="cursor-pointer bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40">
+                                            {uploadingAttachment ? (
+                                                <>
+                                                    <Loader2 className="animate-spin w-3 h-3" />
+                                                    {uploadProgress ? `Cargando ${uploadProgress.current}/${uploadProgress.total}...` : 'Cargando...'}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Plus className="w-3 h-3" />
+                                                    Subir Lote
+                                                </>
+                                            )}
+                                            <input
+                                                type="file"
+                                                multiple
+                                                className="hidden"
+                                                onChange={handleUploadAttachment}
+                                                disabled={uploadingAttachment}
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
 
-                            {attachments.length === 0 ? (
-                                <div className="text-center py-6 border border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl">
-                                    <FileText className="w-8 h-8 text-zinc-200 dark:text-zinc-800 mx-auto mb-2" />
-                                    <p className="text-zinc-400 text-[10px]">Sin documentos.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {attachments.map((att) => (
-                                        <div key={att.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 group">
-                                            <div className="flex items-center gap-2 overflow-hidden flex-1">
-                                                <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                                                <div className="overflow-hidden">
-                                                    <p className="text-[11px] font-bold truncate dark:text-white" title={att.fileName}>{att.fileName}</p>
-                                                    <p className="text-[9px] text-zinc-400">{(att.fileSize / 1024).toFixed(0)} KB</p>
+                                {allAttachments.length === 0 ? (
+                                    <div className="text-center py-6 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                                        <FileText className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto mb-2" />
+                                        <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Sin documentos adjuntos.</p>
+                                        <p className="text-zinc-400 dark:text-zinc-500 text-[10px] mt-1">Haz clic en &quot;Subir Lote&quot; para seleccionar uno o varios archivos antes o después de guardar.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {/* Batch Selection Action Bar */}
+                                        <div className="flex items-center justify-between px-3 py-2 bg-zinc-100/80 dark:bg-zinc-800/60 rounded-xl text-[11px] text-zinc-600 dark:text-zinc-400">
+                                            <label className="flex items-center gap-2 cursor-pointer font-medium select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={allAttachments.length > 0 && selectedAttachmentIds.length === allAttachments.length}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedAttachmentIds(allAttachments.map(a => a.id))
+                                                        } else {
+                                                            setSelectedAttachmentIds([])
+                                                        }
+                                                    }}
+                                                    className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                                />
+                                                <span>Seleccionar todos ({allAttachments.length})</span>
+                                            </label>
+
+                                            {selectedAttachmentIds.length > 0 && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-semibold text-blue-600 dark:text-blue-400 text-[10px]">
+                                                        {selectedAttachmentIds.length} selecc.
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const selectedItems = allAttachments.filter(a => selectedAttachmentIds.includes(a.id))
+                                                            handleDownloadZip(selectedItems)
+                                                        }}
+                                                        disabled={downloadingZip}
+                                                        className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                                        title="Bajar seleccionados en .ZIP"
+                                                    >
+                                                        <Archive className="w-3 h-3" /> Bajar ({selectedAttachmentIds.length})
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleDeleteSelectedAttachments}
+                                                        className="px-2 py-1 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 hover:bg-red-200 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                                        title="Eliminar seleccionados"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" /> Borrar
+                                                    </button>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-1 ml-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDownloadAttachment(att)}
-                                                    className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md text-zinc-500 dark:text-zinc-400"
-                                                >
-                                                    <Download className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteAttachment(att.id)}
-                                                    className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md text-red-400"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
+                                            )}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
+
+                                        {/* Attachments List */}
+                                        <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                                            {allAttachments.map((att) => {
+                                                const isSelected = selectedAttachmentIds.includes(att.id)
+                                                return (
+                                                    <div
+                                                        key={att.id}
+                                                        className={cn(
+                                                            "flex items-center justify-between p-2.5 rounded-xl border transition-all group",
+                                                            isSelected
+                                                                ? "bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800"
+                                                                : "bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-2.5 overflow-hidden flex-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedAttachmentIds(prev => [...prev, att.id])
+                                                                    } else {
+                                                                        setSelectedAttachmentIds(prev => prev.filter(id => id !== att.id))
+                                                                    }
+                                                                }}
+                                                                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 shrink-0"
+                                                            />
+                                                            {getAttachmentIcon(att.fileType, att.fileName)}
+                                                            <div className="overflow-hidden min-w-0 flex-1">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <p className="text-[11px] font-bold truncate dark:text-white" title={att.fileName}>
+                                                                        {att.fileName}
+                                                                    </p>
+                                                                    {att.isPending && (
+                                                                        <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded shrink-0">
+                                                                            Por guardar
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-[9px] text-zinc-400">
+                                                                    {att.fileSize > 1024 * 1024
+                                                                        ? `${(att.fileSize / (1024 * 1024)).toFixed(2)} MB`
+                                                                        : `${(att.fileSize / 1024).toFixed(0)} KB`}
+                                                                    {att.createdAt ? ` • ${new Date(att.createdAt).toLocaleDateString()}` : ' • Se guardará con la cotización'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 ml-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDownloadAttachment(att)}
+                                                                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md text-zinc-600 dark:text-zinc-300 transition-all cursor-pointer"
+                                                                title="Descargar este archivo"
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteAttachment(att.id)}
+                                                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md text-red-500 transition-all cursor-pointer"
+                                                                title="Eliminar este archivo"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
             <GlobalPaymentModal
@@ -2404,6 +2725,15 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 services={formData.manualServices || []}
                 onChange={(updatedServices) => setFormData({ ...formData, manualServices: updatedServices })}
                 currency={formData.currency}
+            />
+            <QuotationHistoryDetailModal
+                isOpen={isHistoryDetailModalOpen}
+                onClose={() => {
+                    setIsHistoryDetailModalOpen(false);
+                    setSelectedHistoryItemForDetail(null);
+                }}
+                historyItem={selectedHistoryItemForDetail}
+                quotationNumber={(formData as any).consecutivo || quotationId}
             />
         </form >
     )

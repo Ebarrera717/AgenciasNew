@@ -1,4 +1,3 @@
-
 CREATE OR ALTER PROCEDURE [dbo].[spExportInvoices]
     @Envoices_id VARCHAR(MAX),
     @User_id INT = 1
@@ -50,15 +49,14 @@ BEGIN
         RETURN;
     END;
 
-    -- 0.1 Pre-validación: Cliente deshabilitado o inexistente en Zeus ERP
+    -- 0.1 Pre-validación: Cliente deshabilitado en Korex
     DECLARE @err_client VARCHAR(MAX) = '';
     SELECT TOP 1 
-        @err_client = 'ERROR: El cliente "' + ISNULL(c.name, 'DESCONOCIDO') + '" (NIT/Tercero ' + ISNULL(c.document, '') + ') no existe o se encuentra deshabilitado en Zeus ERP. Debe habilitarlo en el maestro de clientes de Zeus ERP antes de exportar la factura.'
+        @err_client = 'ERROR: El cliente "' + ISNULL(c.name, 'DESCONOCIDO') + '" (NIT/Tercero ' + ISNULL(c.document, '') + ') se encuentra deshabilitado en Korex. Debe habilitarlo en el maestro de clientes de Korex antes de exportar la factura.'
     FROM dbo.[Invoices] e
     JOIN dbo.[Client] c ON e.clientId = c.id
-    LEFT JOIN ZeusAgencias_23.dbo.CLIENTES zc ON LTRIM(RTRIM(zc.IDCLIENTE)) = LTRIM(RTRIM(c.document))
     WHERE e.id IN (SELECT id FROM @idsTable)
-      AND (zc.IDCLIENTE IS NULL OR zc.Deshabilitado = 1 OR zc.BLOQUEO = 1);
+      AND c.isActive = 0;
 
     IF @err_client IS NOT NULL AND @err_client <> ''
     BEGIN
@@ -72,27 +70,12 @@ BEGIN
     SELECT TOP 1 
         @v_err_concept = 'ERROR: La factura ' + ISNULL(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
                          ' contiene el producto ''' + ISNULL(ep.descripcion, ISNULL(pr.description, 'SIN NOMBRE')) + 
-                         ''' que no tiene asignado un Concepto de Facturación en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
+                         ''' que no tiene asignado un Concepto de Facturación ni Clasificación de Servicio en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
     FROM dbo.[InvoicesProduct] ep
     JOIN dbo.[Invoices] e ON ep.invoiceId = e.id
     LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
     WHERE e.id IN (SELECT id FROM @idsTable)
-      AND ISNULL(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), '') = '';
-
-    IF @v_err_concept IS NOT NULL AND @v_err_concept <> ''
-    BEGIN
-        SELECT @v_err_concept AS mensaje_resultado;
-        RETURN;
-    END;
-
-    SELECT TOP 1 
-        @v_err_concept = 'ERROR: La factura ' + ISNULL(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
-                         ' contiene el producto ''' + ISNULL(ep.descripcion, ISNULL(pr.description, 'SIN NOMBRE')) + 
-                         ''' que no tiene asignada una Clasificación de Servicio en Korex. Por favor asígnela en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
-    FROM dbo.[InvoicesProduct] ep
-    JOIN dbo.[Invoices] e ON ep.invoiceId = e.id
-    LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
-    WHERE e.id IN (SELECT id FROM @idsTable)
+      AND ISNULL(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), '') = ''
       AND ISNULL(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), ISNULL(NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), '')) = '';
 
     IF @v_err_concept IS NOT NULL AND @v_err_concept <> ''
@@ -119,15 +102,15 @@ BEGIN
             SUBSTRING(ISNULL(c.name, ''), 1, 100) AS [ds_tercero_nombre],
             SUBSTRING(ISNULL(c.document, ''), 1, 15) AS [cd_cliente_codigo],
             SUBSTRING(ISNULL(c.name, ''), 1, 100) AS [ds_cliente_nombre],
-            COALESCE(NULLIF(RTRIM(zc.DIRECCION), ''), SUBSTRING(ISNULL(c.address, ''), 1, 150)) AS [ds_cliente_dir],
-            COALESCE(NULLIF(RTRIM(zc.CIUDAD), ''), '') AS [ds_cliente_ciudad],
-            COALESCE(NULLIF(RTRIM(zc.TELEFONO), ''), '') AS [ds_cliente_tel],
-            COALESCE(NULLIF(RTRIM(zc.DIRECCION), ''), SUBSTRING(ISNULL(c.address, ''), 1, 150)) AS [ds_cliente_dirdesp],
-            COALESCE(NULLIF(RTRIM(zc.EMAIL), ''), '') AS [ds_cliente_email],
+            SUBSTRING(ISNULL(c.address, ''), 1, 150) AS [ds_cliente_dir],
+            '' AS [ds_cliente_ciudad],
+            '' AS [ds_cliente_tel],
+            SUBSTRING(ISNULL(c.address, ''), 1, 150) AS [ds_cliente_dirdesp],
+            '' AS [ds_cliente_email],
             SUBSTRING(ISNULL(c.name, ''), 1, 100) AS [ds_cliente_contacto],
-            COALESCE(NULLIF(RTRIM(zc.EMAIL), ''), '') AS [ds_cliente_contacto_email],
+            '' AS [ds_cliente_contacto_email],
             ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
-            COALESCE(NULLIF(RTRIM(zc.IDVENDE), ''), SUBSTRING(ISNULL(s.code, 'OFP'), 1, 5)) AS [cd_vendedor],
+            SUBSTRING(ISNULL(s.code, 'OFP'), 1, 5) AS [cd_vendedor],
             SUBSTRING(ISNULL(tp.code, '01'), 1, 6) AS [cd_tiqueteador],
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [am_tcambiousd],
@@ -263,10 +246,10 @@ BEGIN
                     AS DECIMAL(18,2)) AS [am_basecomisionable],
                     CAST(0 AS DECIMAL(18,2)) AS [am_porcomision],
                     '2' AS [cd_tiposconceptfac],
-                    LTRIM(RTRIM(pr.billingConcept)) AS [cd_conceptofacturacion],
-                    COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), '')) AS [cd_tiposservicio],
+                    COALESCE(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), 'FAC', '01') AS [cd_conceptofacturacion],
+                    COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), 'HOTEL', '01') AS [cd_tiposservicio],
                     SUBSTRING(ISNULL(prv.code, '01'), 1, 25) AS [cd_proveedores],
-                    SUBSTRING(ISNULL(ep.descripcion, ISNULL(pr.description, '')), 1, 250) AS [ds_servicio],
+                    SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(ep.servicios)), ''), NULLIF(LTRIM(RTRIM(ep.descripcion)), ''), NULLIF(LTRIM(RTRIM(pr.description)), ''), ''), 1, 250) AS [ds_servicio],
                     CAST(
                         (
                             ISNULL(ep.price * ep.quantity, 0) +
@@ -516,8 +499,63 @@ BEGIN
                         JOIN dbo.[MasterVariable] mv ON ipv.masterVariableId = mv.id
                         WHERE ipv.invoiceProductId = ep.id
                         FOR XML PATH('Variables'), TYPE
+                    ),
+                    -- Sub-nodo: TiposFacturacionHoteles (para desglose de tarifas por noche/unidad en hoteles y servicios)
+                    (
+                        SELECT 
+                            e.id AS [id_factura],
+                            ep.id AS [id_item],
+                            3 AS [in_tipoitem],
+                            'NCH' AS [cd_tiposfacturacionhoteles],
+                            'Noches' AS [ds_tiposfacturacionhoteles],
+                            ISNULL(ep.quantity, 1) AS [in_cantidad],
+                            CAST(ISNULL(ep.price, 0) AS DECIMAL(18,2)) AS [am_valor],
+                            CASE 
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%')
+                                ) THEN CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2))
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
+                                ) THEN CAST(0 AS DECIMAL(18,2))
+                                ELSE CAST(
+                                    ROUND(
+                                        ISNULL(ep.price * ep.quantity, 0) * 
+                                        ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
+                                        NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
+                                    , 2) AS DECIMAL(18,2)
+                                )
+                            END AS [am_contado],
+                            CASE 
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%')
+                                ) THEN CAST(0 AS DECIMAL(18,2))
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
+                                ) THEN CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2))
+                                ELSE CAST(
+                                    (
+                                        ISNULL(ep.price * ep.quantity, 0) - 
+                                        ROUND(
+                                            ISNULL(ep.price * ep.quantity, 0) * 
+                                            ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
+                                            NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
+                                        , 2)
+                                    ) AS DECIMAL(18,2)
+                                )
+                            END AS [am_credito],
+                            ISNULL(ct_main.code, 'TAR') AS [cd_cargosdesc],
+                            ISNULL(ct_main.name, 'TARIFA') AS [ds_cargonm],
+                            ISNULL(ct_main.id, 1) AS [id_cargosdesc]
+                        FROM (SELECT 1 AS dummy) d
+                        LEFT JOIN dbo.[ChargeAndTax] ct_main ON ct_main.id = ep.mainTaxId
+                        FOR XML PATH('TiposFacturacionHoteles'), TYPE
                     )
                 FROM dbo.[InvoicesProduct] ep
+                LEFT JOIN dbo.[ChargeAndTax] ct_main ON ep.mainTaxId = ct_main.id
                 LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
                 LEFT JOIN dbo.[Provider] prv ON ep.providerId = prv.id
                 LEFT JOIN dbo.[InvoicesProductPasenger] pax1 ON pax1.id = (
@@ -527,9 +565,8 @@ BEGIN
                 FOR XML PATH('Item'), TYPE
             )
         FROM dbo.[Invoices] e
-        JOIN dbo.[Client] c ON e.clientId = c.id
-        LEFT JOIN ZeusAgencias_23.dbo.CLIENTES zc ON LTRIM(RTRIM(zc.IDCLIENTE)) = LTRIM(RTRIM(c.document))
-        JOIN dbo.[Branch] b ON e.branchId = b.id
+        LEFT JOIN dbo.[Client] c ON e.clientId = c.id
+        LEFT JOIN dbo.[Branch] b ON e.branchId = b.id
         LEFT JOIN dbo.[Implant] imp ON e.implantId = imp.id
         LEFT JOIN dbo.[Seller] s ON e.sellerId = s.id
         LEFT JOIN dbo.[User] u ON e.userId = u.id
@@ -551,4 +588,4 @@ BEGIN
 
     SELECT @mensaje_resultado AS mensaje_resultado;
 END;
-    
+GO

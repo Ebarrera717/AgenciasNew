@@ -1,6 +1,7 @@
 [Setup]
+AppId={{64F92526-34A6-4783-B330-3AD921EEB575}}
 AppName=Korex AgenciasNew (Actualizador SQL Server)
-AppVersion=1.0
+AppVersion=1.0.0
 AppPublisher=Korex Corporation
 DefaultDirName=F:\Korex_Sistema_SQLServer
 DefaultGroupName=Korex
@@ -15,6 +16,12 @@ DisableDirPage=no
 UsePreviousAppDir=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 ArchitecturesAllowed=x64compatible
+VersionInfoVersion=1.0.0.0
+VersionInfoCompany=Korex Corporation
+VersionInfoDescription=Korex Platform Update (SQL Server)
+VersionInfoCopyright=Copyright (C) 2026 Korex Corporation
+VersionInfoProductName=Korex AgenciasNew
+VersionInfoProductVersion=1.0.0.0
 
 [Files]
 Source: "F:\Proyectos\AgenciasNew\RELEASE_KOREX\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env, *.env.*, .env, *.bak*"

@@ -551,6 +551,23 @@ BEGIN
 			ds_valor VARCHAR(500) COLLATE DATABASE_DEFAULT, cd_codigo VARCHAR(25) COLLATE DATABASE_DEFAULT
 		);
 
+		CREATE TABLE #TmpTiposFacturacionHoteles (
+			id INT IDENTITY(1,1) PRIMARY KEY,
+			id_facturacion INT,
+			id_item INT,
+			in_tipoitem INT,
+			cd_TiposFacturacionHoteles VARCHAR(25) COLLATE DATABASE_DEFAULT,
+			ds_TiposFacturacionHoteles VARCHAR(100) COLLATE DATABASE_DEFAULT,
+			Id_TiposFacturacionHoteles INT,
+			in_cantidad INT,
+			am_valor MONEY,
+			am_contado MONEY,
+			am_credito MONEY,
+			cd_cargosdesc VARCHAR(25) COLLATE DATABASE_DEFAULT,
+			ds_cargonm VARCHAR(100) COLLATE DATABASE_DEFAULT,
+			id_cargosdesc INT
+		);
+
 		CREATE TABLE #GenerarConceptosAuto (
 			id_ConceptoFacturacion INT,
 			cd_ConceptoFacturacion VARCHAR(50) COLLATE DATABASE_DEFAULT,
@@ -1461,6 +1478,28 @@ BEGIN
 			ds_valor=ISNULL(V.Var.value('ds_valor[1]', 'VARCHAR(500)'),''),
 			cd_codigo=ISNULL(V.Var.value('cd_codigo[1]', 'VARCHAR(25)'),'')
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/Variables') V(Var);
+
+		DELETE FROM #TmpTiposFacturacionHoteles;
+		INSERT INTO #TmpTiposFacturacionHoteles (
+			id_facturacion, id_item, in_tipoitem, cd_TiposFacturacionHoteles, ds_TiposFacturacionHoteles, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, cd_cargosdesc, ds_cargonm, id_cargosdesc
+		)
+		SELECT 
+			id_facturacion = ISNULL(H.Htl.value('id_factura[1]', 'INT'), 0),
+			id_item = ISNULL(H.Htl.value('id_item[1]', 'INT'), 0),
+			in_tipoitem = ISNULL(H.Htl.value('in_tipoitem[1]', 'INT'), 0),
+			cd_TiposFacturacionHoteles = ISNULL(H.Htl.value('cd_tiposfacturacionhoteles[1]', 'VARCHAR(25)'), 'NCH'),
+			ds_TiposFacturacionHoteles = ISNULL(H.Htl.value('ds_tiposfacturacionhoteles[1]', 'VARCHAR(100)'), 'Noches'),
+			Id_TiposFacturacionHoteles = ISNULL(TF.id, 5),
+			in_cantidad = ISNULL(H.Htl.value('in_cantidad[1]', 'INT'), 1),
+			am_valor = ISNULL(H.Htl.value('am_valor[1]', 'MONEY'), 0),
+			am_contado = ISNULL(H.Htl.value('am_contado[1]', 'MONEY'), 0),
+			am_credito = ISNULL(H.Htl.value('am_credito[1]', 'MONEY'), 0),
+			cd_cargosdesc = ISNULL(H.Htl.value('cd_cargosdesc[1]', 'VARCHAR(25)'), 'TAR'),
+			ds_cargonm = ISNULL(CD.ds_nombre, ISNULL(H.Htl.value('ds_cargonm[1]', 'VARCHAR(100)'), 'Tarifa')),
+			id_cargosdesc = ISNULL(CD.id, 1)
+		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/TiposFacturacionHoteles') H(Htl)
+		LEFT JOIN dbo.TiposFacturacionHoteles TF ON TF.cd_codigo = ISNULL(H.Htl.value('cd_tiposfacturacionhoteles[1]', 'VARCHAR(25)'), 'NCH')
+		LEFT JOIN dbo.CargosDesc CD ON CD.cd_codigo = ISNULL(H.Htl.value('cd_cargosdesc[1]', 'VARCHAR(25)'), 'TAR');
 	
 	
 	--While 1 = 1
@@ -2252,7 +2291,50 @@ BEGIN
 						IF @calc_noches IS NULL OR @calc_noches <= 0 SET @calc_noches = 1;
 						DECLARE @calc_dias INT = @calc_noches;
 
-						SET @SrvSqlStmt = @SrvVarsSqlStmt + @SrvCargSqlStmt + @SrvFpSqlStmt + @SrvProvSqlStmt;
+						-- Build TiposFacturacionHoteles SQL
+						SET @SrvHtlSqlStmt = '';
+						DECLARE @th_id_tiposfacturacionhoteles INT, @th_in_cantidad INT, @th_am_valor MONEY, @th_am_contado MONEY, @th_am_credito MONEY, @th_id_cargosdesc INT, @th_ds_cargonm VARCHAR(100);
+						DECLARE curItemSrvHtl CURSOR LOCAL FAST_FORWARD FOR
+						SELECT Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, id_cargosdesc, ds_cargonm
+						FROM #TmpTiposFacturacionHoteles
+						WHERE id_item = @gen_id_item;
+
+						OPEN curItemSrvHtl;
+						FETCH NEXT FROM curItemSrvHtl INTO @th_id_tiposfacturacionhoteles, @th_in_cantidad, @th_am_valor, @th_am_contado, @th_am_credito, @th_id_cargosdesc, @th_ds_cargonm;
+						WHILE @@FETCH_STATUS = 0
+						BEGIN
+							SET @SrvHtlSqlStmt = @SrvHtlSqlStmt + CHAR(13) + CHAR(10) + 
+								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
+								' VALUES (@NewSrvId, NULL, ' + CAST(ISNULL(@th_id_tiposfacturacionhoteles, 5) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_in_cantidad, 1) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_am_valor, 0) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_am_contado, 0) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_am_credito, 0) AS VARCHAR) + ', NULL, ' +
+								CAST(ISNULL(@th_id_cargosdesc, 1) AS VARCHAR) + ', ''' +
+								REPLACE(ISNULL(@th_ds_cargonm, 'Tarifa'), '''', '''''') + ''');';
+							FETCH NEXT FROM curItemSrvHtl INTO @th_id_tiposfacturacionhoteles, @th_in_cantidad, @th_am_valor, @th_am_contado, @th_am_credito, @th_id_cargosdesc, @th_ds_cargonm;
+						END;
+						CLOSE curItemSrvHtl;
+						DEALLOCATE curItemSrvHtl;
+
+						-- Fallback si no vinieron TiposFacturacionHoteles en el XML pero el ítem es de servicio/hotel
+						IF ISNULL(@SrvHtlSqlStmt, '') = '' AND @calc_noches IS NOT NULL
+						BEGIN
+							DECLARE @fb_cargoid INT = 1;
+							DECLARE @fb_cargonm VARCHAR(100) = 'Tarifa';
+							SELECT TOP 1 @fb_cargoid = id_carg, @fb_cargonm = ds_nombre FROM #TmpFacturaCargos WHERE id_item = @gen_id_item AND cd_tipo IN ('C','D') ORDER BY in_orden ASC;
+							IF @fb_cargoid IS NULL SET @fb_cargoid = 1;
+							IF @fb_cargonm IS NULL SET @fb_cargonm = 'Tarifa';
+
+							SET @SrvHtlSqlStmt = CHAR(13) + CHAR(10) + 
+								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
+								' VALUES (@NewSrvId, NULL, 5, ' + CAST(ISNULL(@calc_noches, 1) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@gen_am_tarifa / NULLIF(@calc_noches, 0), @gen_am_tarifa) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@gen_am_tarifa, 0) AS VARCHAR) + ', 0, NULL, ' +
+								CAST(@fb_cargoid AS VARCHAR) + ', ''' + REPLACE(@fb_cargonm, '''', '''''') + ''');';
+						END;
+
+						SET @SrvSqlStmt = @SrvVarsSqlStmt + @SrvCargSqlStmt + @SrvFpSqlStmt + @SrvProvSqlStmt + @SrvHtlSqlStmt;
 						
 						SET @SqlStmt = @SqlStmt + CHAR(13) + CHAR(10) + '
 						DECLARE @NewSrvId_' + CAST(@ItemIndex AS VARCHAR) + ' INT;
@@ -2286,8 +2368,8 @@ BEGIN
 							@in_edad = NULL,
 							@cd_voucher = NULL,
 							@in_cantpax = 1,
-							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
-							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
+							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
+							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
 							@ds_destino = ''' + ISNULL(@gen_cd_destino, '') + ''',
 							@id_gds = '+ CAST(ISNULL(@gen_id_gds,1) AS VARCHAR) + ',
 							@am_basecomisionable = ' + CAST(ISNULL(@gen_am_basecomisionable,0) AS VARCHAR) + ',

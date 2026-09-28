@@ -15,18 +15,29 @@ export async function POST(req: NextRequest) {
         const pgProcedure = exportType === 'INVOICE' ? 'spExportInvoices' : 'spExportQuotation';
         const mssqlProcedure = exportType === 'INVOICE' ? 'spFacturacionesCrear' : 'spCotizacionesCrear';
 
-        // 1. Obtener XML desde Postgres
-        const result = await executePostgresQuery(
-            `CALL public.${pgProcedure}($1, $2, $3)`,
-            [idsStr, userId ? Number(userId) : 0, '']
-        )
-
-        const row = result && result.length > 0 ? result[0] : null;
-        let xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
+        // 1. Obtener XML (dual motor support)
+        let xmlStr = '';
+        const { isSQLServerMode } = await import('@/lib/sqlserver');
+        if (isSQLServerMode()) {
+            const sqlResult = await executeSQLServerProcedure(pgProcedure, {
+                [exportType === 'INVOICE' ? 'Envoices_id' : 'Quotation_id']: idsStr,
+                User_id: userId ? Number(userId) : 0
+            });
+            xmlStr = Array.isArray(sqlResult) && sqlResult.length > 0
+                ? (sqlResult[0]?.mensaje_resultado || sqlResult[0]?.xml || '')
+                : '';
+        } else {
+            const result = await executePostgresQuery(
+                `CALL public.${pgProcedure}($1, $2, $3)`,
+                [idsStr, userId ? Number(userId) : 0, '']
+            );
+            const row = result && result.length > 0 ? result[0] : null;
+            xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
+        }
         
         if (!xmlStr || typeof xmlStr !== 'string') {
-            await registerLog(userId, exportType, 'EXPORT_ERROR', 'No se generó XML desde Postgres', { ids: idsStr });
-            return NextResponse.json({ message: 'Error en generación de XML Postgres' }, { status: 500 })
+            await registerLog(userId, exportType, 'EXPORT_ERROR', 'No se generó XML para cotizaciones', { ids: idsStr });
+            return NextResponse.json({ message: 'Error en generación de XML de cotización' }, { status: 500 })
         }
 
         // 2. Integración Directa con SQL Server (Nueva versión)

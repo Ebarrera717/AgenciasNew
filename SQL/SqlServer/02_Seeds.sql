@@ -67,6 +67,9 @@ BEGIN
     INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarFacturacionAutoSQLserver', N'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', N'0');
 END;
 
+-- Unificación y limpieza de parámetros duplicados de facturación automática
+DELETE FROM dbo.[SystemParameter] WHERE [code] IN (N'EnviarFacturasAutoSQLserver', N'EnviarFacturaAutoSQLserver', N'EnviarFacturacionAuto', N'EnviarFacturasAuto');
+
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'ModoFacturacionAuto')
 BEGIN
     INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ModoFacturacionAuto', N'Modo de Facturación Automática (Zeus/Local)', N'FALSE');
@@ -241,11 +244,21 @@ IF @SuperAdminRoleId IS NULL
 IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE [email] = N'ebarrera@zagencias.com')
 BEGIN
     INSERT INTO dbo.[User] ([name], [email], [passwordHash], [roleId], [isActive])
-    VALUES (N'Eduardo Barrera', N'ebarrera@zagencias.com', N'$2b$10$e1v0/9V8ZPVqejcqarQfq.hDLlKuva.M/mNsSUxOTefeyuUTqoaW2', @SuperAdminRoleId, 1);
+    VALUES (N'Eduardo Barrera', N'ebarrera@zagencias.com', N'$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', @SuperAdminRoleId, 1);
 END
 ELSE
 BEGIN
-    UPDATE dbo.[User] SET [roleId] = @SuperAdminRoleId WHERE [email] = N'ebarrera@zagencias.com';
+    UPDATE dbo.[User] SET [passwordHash] = N'$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', [roleId] = @SuperAdminRoleId, [isActive] = 1 WHERE [email] = N'ebarrera@zagencias.com';
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE [email] = N'ebarrrera@zagencias.com')
+BEGIN
+    INSERT INTO dbo.[User] ([name], [email], [passwordHash], [roleId], [isActive])
+    VALUES (N'Eduardo Barrera', N'ebarrrera@zagencias.com', N'$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', @SuperAdminRoleId, 1);
+END
+ELSE
+BEGIN
+    UPDATE dbo.[User] SET [passwordHash] = N'$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', [roleId] = @SuperAdminRoleId, [isActive] = 1 WHERE [email] = N'ebarrrera@zagencias.com';
 END;
 
 IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE [email] = N'rubiel1985@msn.com')
@@ -1199,3 +1212,6 @@ IF NOT EXISTS (SELECT 1 FROM dbo.[Airports] WHERE [code] = N'BAQ') INSERT INTO d
 -- 7.4 Formas de Pago (2 registros)
 IF NOT EXISTS (SELECT 1 FROM dbo.[Payment] WHERE [code] = N'EFE') INSERT INTO dbo.[Payment] ([code], [name], [isActive]) VALUES (N'EFE', N'Efectivo', 1);
 IF NOT EXISTS (SELECT 1 FROM dbo.[Payment] WHERE [code] = N'TC') INSERT INTO dbo.[Payment] ([code], [name], [isActive]) VALUES (N'TC', N'Tarjeta De Credito', 1);
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = 'PERMITIR_COTIZACION_SIN_PRODUCTOS')
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1');

@@ -54,7 +54,24 @@ BEGIN
             SET @ticketPrinterId = NULL;
 
         DECLARE @internalNum NVARCHAR(100) = NULL;
-        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @consecutivo_formateado = @internalNum OUTPUT;
+        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @internalNum OUTPUT;
+
+        -- Parámetro del Sistema para permitir o no cotizaciones sin productos
+        DECLARE @permitirSinProductos NVARCHAR(50) = (
+            SELECT TOP 1 [value]
+            FROM dbo.[SystemParameter]
+            WHERE code IN ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'PermitirCotizacionSinProductos')
+        );
+        IF @permitirSinProductos IS NULL SET @permitirSinProductos = '1';
+
+        IF JSON_QUERY(@p_data, '$.items') IS NULL OR NOT EXISTS (SELECT 1 FROM OPENJSON(@p_data, '$.items'))
+        BEGIN
+            IF @permitirSinProductos NOT IN ('1', 'true', 'TRUE', 't', 'SI', 'si')
+            BEGIN
+                SET @p_mensaje_resultado = N'ERROR: La cotización debe tener al menos un producto.';
+                RETURN;
+            END
+        END
 
         -- Validación de variables adicionales obligatorias del cliente para cotizaciones
         IF @clientId IS NOT NULL

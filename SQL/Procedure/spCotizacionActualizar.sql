@@ -60,6 +60,7 @@ DECLARE
     v_valor_base DOUBLE PRECISION;
     v_decimals INT;
     v_acting_user_id INT := NULL;
+    v_permitir_sin_productos TEXT := '1';
 BEGIN
     -- Resolución segura de p_acting_user_id para evitar violación de Quotation_userId_fkey
     IF p_acting_user_id IS NOT NULL THEN
@@ -86,92 +87,106 @@ BEGIN
         RETURN;
     END IF;
 
-    IF p_data->'items' IS NULL OR jsonb_array_length(p_data->'items') = 0 THEN
-        p_mensaje_resultado := 'ERROR: La cotización debe tener al menos un producto.';
-        RETURN;
+    -- Parámetro del Sistema para permitir o no cotizaciones sin productos
+    SELECT COALESCE(value, '1') INTO v_permitir_sin_productos
+    FROM public."SystemParameter"
+    WHERE code IN ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'PermitirCotizacionSinProductos')
+    LIMIT 1;
+
+    IF v_permitir_sin_productos IS NULL THEN
+        v_permitir_sin_productos := '1';
     END IF;
 
-    IF EXISTS (
-        SELECT 1 FROM jsonb_to_recordset(p_data->'items') AS x("productId" INT, "mainTaxId" TEXT)
-        WHERE "productId" IS NULL OR NULLIF("mainTaxId", '') IS NULL
-    ) THEN
-        p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto y un Cargo Principal seleccionado.';
-        RETURN;
+    IF p_data->'items' IS NULL OR jsonb_array_length(COALESCE(p_data->'items', '[]'::jsonb)) = 0 THEN
+        IF v_permitir_sin_productos NOT IN ('1', 'true', 'TRUE', 't', 'SI', 'si') THEN
+            p_mensaje_resultado := 'ERROR: La cotización debe tener al menos un producto.';
+            RETURN;
+        END IF;
+    ELSE
+        IF EXISTS (
+            SELECT 1 FROM jsonb_to_recordset(p_data->'items') AS x("productId" INT, "mainTaxId" TEXT)
+            WHERE "productId" IS NULL OR NULLIF("mainTaxId", '') IS NULL
+        ) THEN
+            p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto y un Cargo Principal seleccionado.';
+            RETURN;
+        END IF;
     END IF;
 
     -- Validación de campos obligatorios dinámicos por producto
-    FOR v_val_item IN SELECT jsonb_array_elements(p_data->'items')
-    LOOP
-        v_val_prod_id := (v_val_item->>'productId')::INT;
-        
-        SELECT "mandatoryFields", "description" 
-        INTO v_mandatory_fields, v_prod_desc 
-        FROM public."Product" 
-        WHERE id = v_val_prod_id;
+    IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 THEN
+        FOR v_val_item IN SELECT jsonb_array_elements(p_data->'items')
+        LOOP
+            v_val_prod_id := (v_val_item->>'productId')::INT;
+            
+            SELECT "mandatoryFields", "description" 
+            INTO v_mandatory_fields, v_prod_desc 
+            FROM public."Product" 
+            WHERE id = v_val_prod_id;
 
-        v_prod_desc := COALESCE(v_prod_desc, 'Producto #' || v_val_prod_id);
+            v_prod_desc := COALESCE(v_prod_desc, 'Producto #' || v_val_prod_id);
 
-        IF v_mandatory_fields IS NOT NULL AND jsonb_typeof(v_mandatory_fields) = 'array' THEN
-            FOR v_field_key IN SELECT jsonb_array_elements_text(v_mandatory_fields)
-            LOOP
-                v_model := split_part(v_field_key, '.', 1);
-                v_field_name := split_part(v_field_key, '.', 2);
+            IF v_mandatory_fields IS NOT NULL AND jsonb_typeof(v_mandatory_fields) = 'array' THEN
+                FOR v_field_key IN SELECT jsonb_array_elements_text(v_mandatory_fields)
+                LOOP
+                    v_model := split_part(v_field_key, '.', 1);
+                    v_field_name := split_part(v_field_key, '.', 2);
 
-                IF v_model = 'Quotation' THEN
-                    IF NULLIF(p_data->>v_field_name, '') IS NULL THEN
-                        p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo general "' || v_field_name || '".';
-                        RETURN;
-                    END IF;
-                ELSIF v_model = 'QuotationProduct' THEN
-                    v_json_field_name := v_field_name;
-                    IF v_field_name = 'checkInDate' THEN
-                        v_json_field_name := 'checkIn';
-                    ELSIF v_field_name = 'checkOutDate' THEN
-                        v_json_field_name := 'checkOut';
-                    ELSIF v_field_name = 'description' THEN
-                        v_json_field_name := 'descripcion';
-                    ELSIF v_field_name = 'service' THEN
-                        IF NULLIF(v_val_item->>'service', '') IS NULL AND v_val_item->>'servicios' IS NOT NULL THEN
-                            v_json_field_name := 'servicios';
-                        END IF;
-                    END IF;
-
-                    IF v_field_name = 'passengers' THEN
-                        v_has_passengers := FALSE;
-                        v_has_empty_pax_name := FALSE;
-                        
-                        IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
-                            SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
-                            SELECT EXISTS (
-                                SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p(name TEXT)
-                                WHERE p.name IS NULL OR trim(p.name) = ''
-                            ) INTO v_has_empty_pax_name;
-                        END IF;
-
-                        IF NOT v_has_passengers OR v_has_empty_pax_name THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pasajero con su nombre.';
+                    IF v_model = 'Quotation' THEN
+                        IF NULLIF(p_data->>v_field_name, '') IS NULL THEN
+                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo general "' || v_field_name || '".';
                             RETURN;
                         END IF;
-                    ELSIF v_field_name = 'payments' THEN
-                        v_has_payments := FALSE;
-                        IF v_val_item->'payments' IS NOT NULL AND jsonb_typeof(v_val_item->'payments') = 'array' THEN
-                            SELECT COALESCE(jsonb_array_length(v_val_item->'payments') > 0, FALSE) INTO v_has_payments;
+                    ELSIF v_model = 'QuotationProduct' THEN
+                        v_json_field_name := v_field_name;
+                        IF v_field_name = 'checkInDate' THEN
+                            v_json_field_name := 'checkIn';
+                        ELSIF v_field_name = 'checkOutDate' THEN
+                            v_json_field_name := 'checkOut';
+                        ELSIF v_field_name = 'description' THEN
+                            v_json_field_name := 'descripcion';
+                        ELSIF v_field_name = 'service' THEN
+                            IF NULLIF(v_val_item->>'service', '') IS NULL AND v_val_item->>'servicios' IS NOT NULL THEN
+                                v_json_field_name := 'servicios';
+                            END IF;
                         END IF;
 
-                        IF NOT v_has_payments THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pago.';
-                            RETURN;
-                        END IF;
-                    ELSE
-                        IF NULLIF(v_val_item->>v_json_field_name, '') IS NULL THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo "' || v_field_name || '".';
-                            RETURN;
+                        IF v_field_name = 'passengers' THEN
+                            v_has_passengers := FALSE;
+                            v_has_empty_pax_name := FALSE;
+                            
+                            IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
+                                SELECT EXISTS (
+                                    SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p(name TEXT)
+                                    WHERE p.name IS NULL OR trim(p.name) = ''
+                                ) INTO v_has_empty_pax_name;
+                            END IF;
+
+                            IF NOT v_has_passengers OR v_has_empty_pax_name THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pasajero con su nombre.';
+                                RETURN;
+                            END IF;
+                        ELSIF v_field_name = 'payments' THEN
+                            v_has_payments := FALSE;
+                            IF v_val_item->'payments' IS NOT NULL AND jsonb_typeof(v_val_item->'payments') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'payments') > 0, FALSE) INTO v_has_payments;
+                            END IF;
+
+                            IF NOT v_has_payments THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pago.';
+                                RETURN;
+                            END IF;
+                        ELSE
+                            IF NULLIF(v_val_item->>v_json_field_name, '') IS NULL THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo "' || v_field_name || '".';
+                                RETURN;
+                            END IF;
                         END IF;
                     END IF;
-                END IF;
-            END LOOP;
-        END IF;
-    END LOOP;
+                END LOOP;
+            END IF;
+        END LOOP;
+    END IF;
 
     -- Validación de variables obligatorias específicas del cliente para cotizaciones
     v_client_id := NULLIF(p_data->>'clientId', '')::INT;
@@ -193,7 +208,7 @@ BEGIN
             v_client_mandatory_vars := '[]'::jsonb;
         END IF;
 
-        IF jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
+        IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 AND jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
             FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars)
             LOOP
                 v_req_var_id := v_client_var_id_text::INT;
@@ -250,10 +265,27 @@ BEGIN
         "manualDescription" = p_data->>'manualDescription'
     WHERE id = p_id;
 
-    -- Insertar historial de estado si cambia
-    IF COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', 'Nuevo') THEN
-        INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
-        VALUES (p_id, COALESCE(p_data->>'state', 'Nuevo'), p_data->>'stateDescription', CURRENT_TIMESTAMP, v_acting_user_id);
+    -- Insertar historial de estado y modificación con usuario, fecha, hora y metadata de cambios
+    IF COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', v_old_state, 'Nuevo') THEN
+        INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId", "metadata")
+        VALUES (
+            p_id, 
+            COALESCE(p_data->>'state', 'Nuevo'), 
+            COALESCE(NULLIF(p_data->>'stateDescription', ''), 'Cambio de estado a ' || COALESCE(p_data->>'state', 'Nuevo')), 
+            CURRENT_TIMESTAMP, 
+            v_acting_user_id,
+            p_data
+        );
+    ELSE
+        INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId", "metadata")
+        VALUES (
+            p_id, 
+            'MODIFICADO', 
+            COALESCE(NULLIF(p_data->>'stateDescription', ''), 'Modificación de cotización y actualización de datos'), 
+            CURRENT_TIMESTAMP, 
+            v_acting_user_id,
+            p_data
+        );
     END IF;
 
     DELETE FROM public."QuotationCombo" WHERE "quotationId" = p_id;
@@ -283,7 +315,7 @@ BEGIN
     END IF;
 
     DELETE FROM public."QuotationProduct" WHERE "quotationId" = p_id;
-    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_data->'items') AS x(
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(COALESCE(p_data->'items', '[]'::jsonb)) AS x(
                       "productId" INT, "productCode" TEXT, quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
                       "providerCode" TEXT, "prestadoraCode" TEXT,
                       "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,

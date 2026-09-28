@@ -1400,3 +1400,5 @@ INSERT INTO public."Master" (code, name, "inactivo") VALUES ('Diagnostics', 'dia
 INSERT INTO public."Menu" (code, name, action, activo) VALUES ('DIAGNOSTICS', 'Trazabilidad y Diagnóstico', '/dashboard/diagnostics', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('TRACEABILITY_MODE', 'Modo de Trazabilidad y Diagnóstico', 'OFF') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1') ON CONFLICT (code) DO NOTHING;

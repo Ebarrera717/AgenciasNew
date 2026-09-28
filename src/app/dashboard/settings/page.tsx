@@ -841,20 +841,20 @@ export default function SettingsPage() {
         try {
             if (tab === 'aeropuertos') {
                 const res = await safeFetch('/api/config/cities');
-                setCities(Array.isArray(res) ? res : []);
+                setCities(Array.isArray(res) ? res : (res?.data || []));
             } else if (tab === 'prestadoras' || tab === 'proveedores') {
                 const [pRes, ptRes] = await Promise.all([
                     safeFetch('/api/providers'),
                     safeFetch('/api/provider-types')
                 ]);
-                setProviders(Array.isArray(pRes) ? pRes : []);
-                setProviderTypes(Array.isArray(ptRes) ? ptRes : []);
+                setProviders(Array.isArray(pRes) ? pRes : (pRes?.data || []));
+                setProviderTypes(Array.isArray(ptRes) ? ptRes : (ptRes?.data || []));
             } else if (tab === 'ciudades') {
                 const res = await safeFetch('/api/config/countries');
-                setCountries(Array.isArray(res) ? res : []);
+                setCountries(Array.isArray(res) ? res : (res?.data || []));
             } else if (tab === 'paises') {
                 const res = await safeFetch('/api/config/currencies');
-                setCurrencies(Array.isArray(res) ? res : []);
+                setCurrencies(Array.isArray(res) ? res : (res?.data || []));
             } else if (tab === 'productos') {
                 const [ttRes, taxRes] = await Promise.all([
                     safeFetch('/api/config/ticket-types'),
@@ -1205,6 +1205,18 @@ export default function SettingsPage() {
                 })
             } else if (activeTab === 'impuestos') {
                 setFormData({ ...item, orden: item.orden ?? 0 })
+            } else if (activeTab === 'ciudades') {
+                setFormData({
+                    ...item,
+                    countriesId: item.countriesId ? item.countriesId.toString() : '',
+                    statecode: item.statecode || '',
+                    iata: item.iata || ''
+                })
+            } else if (activeTab === 'aeropuertos') {
+                setFormData({
+                    ...item,
+                    citiesId: item.citiesId ? item.citiesId.toString() : ''
+                })
             } else {
                 setFormData({ ...item })
             }
@@ -2127,6 +2139,8 @@ export default function SettingsPage() {
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
+                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">País</th>
+                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">IATA</th>
                                             {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
@@ -2134,6 +2148,7 @@ export default function SettingsPage() {
                                         <>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Código</th>
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Nombre</th>
+                                            <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest">Ciudad</th>
                                             {renderEstadoTh()}
                                             <th className="px-8 py-5 text-xs font-bold text-zinc-400 uppercase tracking-widest text-right">Acciones</th>
                                         </>
@@ -2582,6 +2597,25 @@ export default function SettingsPage() {
                                                         {item.branch.name}
                                                     </span>
                                                 ) : <span className="text-zinc-400 text-xs italic">No asignada</span>}
+                                            </td>
+                                        )}
+                                        {activeTab === 'ciudades' && (
+                                            <>
+                                                <td className="px-8 py-6">
+                                                    <span className="text-zinc-600 dark:text-zinc-300 font-medium">
+                                                        {item.countryName || item.Country?.name || item.country || '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-6 font-mono text-xs text-zinc-500">
+                                                    {item.iata || '-'}
+                                                </td>
+                                            </>
+                                        )}
+                                        {activeTab === 'aeropuertos' && (
+                                            <td className="px-8 py-6">
+                                                <span className="text-zinc-600 dark:text-zinc-300 font-medium">
+                                                    {item.cityName || item.City?.name || item.city || '-'}
+                                                </span>
                                             </td>
                                         )}
                                         {activeTab === 'tipos-proveedores' && (
@@ -4260,11 +4294,39 @@ export default function SettingsPage() {
                                         <>
                                             <Input label="Código (Único)" value={formData.code || ''} onChange={(v: string) => setFormData({ ...formData, code: v })} required placeholder="Ej. BOG" />
                                             <Input label="Nombre de la Ciudad" value={formData.name || ''} onChange={(v: string) => setFormData({ ...formData, name: v })} required placeholder="Ej. Bogotá" />
+                                            <div>
+                                                <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-1.5 pl-1">País (Opcional)</label>
+                                                <select
+                                                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                    value={formData.countriesId || ''}
+                                                    onChange={(e) => setFormData({ ...formData, countriesId: e.target.value })}
+                                                >
+                                                    <option value="">-- Sin País Asignado --</option>
+                                                    {(countries || []).map((c: any) => (
+                                                        <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <Input label="Código Estado / Dpto (Opcional)" value={formData.statecode || ''} onChange={(v: string) => setFormData({ ...formData, statecode: v })} placeholder="Ej. CUN o DC" />
+                                            <Input label="Código IATA (Opcional)" value={formData.iata || ''} onChange={(v: string) => setFormData({ ...formData, iata: v })} placeholder="Ej. BOG" />
                                         </>
                                     ) : activeTab === 'aeropuertos' ? (
                                         <>
                                             <Input label="Código (Único)" value={formData.code || ''} onChange={(v: string) => setFormData({ ...formData, code: v })} required placeholder="Ej. BOG" />
                                             <Input label="Nombre del Aeropuerto" value={formData.name || ''} onChange={(v: string) => setFormData({ ...formData, name: v })} required placeholder="Ej. El Dorado" />
+                                            <div>
+                                                <label className="block text-xs font-black text-zinc-400 uppercase tracking-widest mb-1.5 pl-1">Ciudad (Opcional)</label>
+                                                <select
+                                                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                    value={formData.citiesId || ''}
+                                                    onChange={(e) => setFormData({ ...formData, citiesId: e.target.value })}
+                                                >
+                                                    <option value="">-- Sin Ciudad Asignada --</option>
+                                                    {(cities || []).map((ct: any) => (
+                                                        <option key={ct.id} value={ct.id}>{ct.name} ({ct.code})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </>
                                     ) : activeTab === 'tipos-tiquetes' ? (
                                         <>

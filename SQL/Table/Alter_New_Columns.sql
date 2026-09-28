@@ -1029,7 +1029,7 @@ BEGIN
         ALTER TABLE public."Airports" ADD COLUMN "name" character varying(150) NOT NULL;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Airports' AND column_name = 'citiesId') THEN
-        ALTER TABLE public."Airports" ADD COLUMN "citiesId" integer NOT NULL;
+        ALTER TABLE public."Airports" ADD COLUMN "citiesId" integer;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Attachment' AND column_name = 'id') THEN
         ALTER TABLE public."Attachment" ADD COLUMN "id" integer NOT NULL;
@@ -1514,7 +1514,7 @@ BEGIN
         ALTER TABLE public."Cities" ADD COLUMN "name" character varying(100) NOT NULL;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Cities' AND column_name = 'countriesId') THEN
-        ALTER TABLE public."Cities" ADD COLUMN "countriesId" integer NOT NULL;
+        ALTER TABLE public."Cities" ADD COLUMN "countriesId" integer;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Cities' AND column_name = 'statecode') THEN
         ALTER TABLE public."Cities" ADD COLUMN "statecode" character varying(25);
@@ -3351,7 +3351,7 @@ INSERT INTO public."Menu" (code, name, action, activo) VALUES ('REPORTES', 'Repo
 
 INSERT INTO public."Menu" (code, name, action, activo) VALUES ('EJECUCIONES', 'Ejecuciones', '/dashboard/executions', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
 
--- Siembra obligatoria de Rol SUPERADMINISTRADOR y asignación a ebarrera@zagencias.com
+-- Siembra obligatoria de Rol SUPERADMINISTRADOR y asignación fija a ebarrera@zagencias.com y ebarrrera@zagencias.com (password: admin123)
 DO $$
 DECLARE
     v_super_role_id INT;
@@ -3365,9 +3365,31 @@ BEGIN
         SELECT id INTO v_super_role_id FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%' LIMIT 1;
 
         IF v_super_role_id IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'User') THEN
-            UPDATE public."User"
-            SET "roleId" = v_super_role_id
-            WHERE email = 'ebarrera@zagencias.com';
+            -- 1. ebarrera@zagencias.com
+            IF NOT EXISTS (SELECT 1 FROM public."User" WHERE LOWER(email) = 'ebarrera@zagencias.com') THEN
+                INSERT INTO public."User" (name, email, "passwordHash", "roleId", "isActive")
+                VALUES ('Eduardo Barrera', 'ebarrera@zagencias.com', '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', v_super_role_id, true);
+            ELSE
+                UPDATE public."User"
+                SET "name" = 'Eduardo Barrera',
+                    "passwordHash" = '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+                    "roleId" = v_super_role_id,
+                    "isActive" = true
+                WHERE LOWER(email) = 'ebarrera@zagencias.com';
+            END IF;
+
+            -- 2. ebarrrera@zagencias.com
+            IF NOT EXISTS (SELECT 1 FROM public."User" WHERE LOWER(email) = 'ebarrrera@zagencias.com') THEN
+                INSERT INTO public."User" (name, email, "passwordHash", "roleId", "isActive")
+                VALUES ('Eduardo Barrera', 'ebarrrera@zagencias.com', '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', v_super_role_id, true);
+            ELSE
+                UPDATE public."User"
+                SET "name" = 'Eduardo Barrera',
+                    "passwordHash" = '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+                    "roleId" = v_super_role_id,
+                    "isActive" = true
+                WHERE LOWER(email) = 'ebarrrera@zagencias.com';
+            END IF;
         END IF;
     END IF;
 END $$;
@@ -3448,6 +3470,23 @@ BEGIN
         ALTER TABLE public."InvoicesProduct" ADD COLUMN IF NOT EXISTS "providerDueDate" timestamp without time zone;
         ALTER TABLE public."InvoicesProduct" ADD COLUMN IF NOT EXISTS "providerInvoice" character varying(100);
     END IF;
+
+    -- Nullable foreign keys for Cities and Airports
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Cities' AND column_name = 'countriesId' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."Cities" ALTER COLUMN "countriesId" DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Airports' AND column_name = 'citiesId' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."Airports" ALTER COLUMN "citiesId" DROP NOT NULL;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationStateHistory' AND column_name = 'metadata') THEN
+        ALTER TABLE public."QuotationStateHistory" ADD COLUMN "metadata" jsonb;
+    END IF;
 END $$;
 
 
+
+-- Unificación y limpieza de parámetros de envío automático de facturas
+DELETE FROM public."SystemParameter" WHERE code IN ('EnviarFacturasAutoSQLserver', 'EnviarFacturaAutoSQLserver', 'EnviarFacturacionAuto', 'EnviarFacturasAuto');
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1') ON CONFLICT (code) DO NOTHING;

@@ -21,6 +21,17 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 echo.
+echo Ejecutando KorexValidator Oficial (Pre-Build SQL Server)...
+node "%~dp0scripts\korex_validator.js" --engine=sqlserver --phase=pre-build
+if %errorlevel% neq 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO: KorexValidator emitio dictamen [NO GO]. Instalador SQL Server CANCELADO.
+    echo ===============================================================================
+    pause
+    exit /b %errorlevel%
+)
+echo.
 
 set /p COMPILAR_NEXT="Desea compilar el sitio web (Next.js)? (S/N) [S]: "
 set "ARGS_EMPAQUETAR="

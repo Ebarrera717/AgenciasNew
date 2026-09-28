@@ -159,10 +159,18 @@ export async function POST(req: NextRequest) {
                 autoExportResult = await autoExportInvoiceToZeusERP(dbInvoiceId, actingUserId);
             } catch (expErr: any) {
                 console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning for invoice creation:', expErr?.message);
+                autoExportResult = { exported: true, success: false, message: expErr?.message };
             }
         }
 
-        const finalMessage = message && message !== '' ? message : 'SUCCESS: Factura creada correctamente con ID ' + dbInvoiceId;
+        let finalMessage = message && message !== '' ? message : 'SUCCESS: Factura creada correctamente con ID ' + dbInvoiceId;
+        if (autoExportResult && autoExportResult.exported) {
+            if (autoExportResult.success) {
+                finalMessage += ` | Auto-exportada a Zeus ERP: ${autoExportResult.message || 'Éxito'}`;
+            } else {
+                finalMessage += ` | ⚠️ Observación en Zeus ERP: ${autoExportResult.message || 'No se pudo completar el envío automático'}`;
+            }
+        }
         return NextResponse.json({ message: finalMessage, invoice, autoExportResult })
     } catch (error: any) {
         console.error('Error saving invoice (POST):', error)

@@ -57,6 +57,23 @@ BEGIN
         IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
             SET @ticketPrinterId = NULL;
 
+        -- Parámetro del Sistema para permitir o no cotizaciones sin productos
+        DECLARE @permitirSinProductos NVARCHAR(50) = (
+            SELECT TOP 1 [value]
+            FROM dbo.[SystemParameter]
+            WHERE code IN ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'PermitirCotizacionSinProductos')
+        );
+        IF @permitirSinProductos IS NULL SET @permitirSinProductos = '1';
+
+        IF JSON_QUERY(@p_data, '$.items') IS NULL OR NOT EXISTS (SELECT 1 FROM OPENJSON(@p_data, '$.items'))
+        BEGIN
+            IF @permitirSinProductos NOT IN ('1', 'true', 'TRUE', 't', 'SI', 'si')
+            BEGIN
+                SET @p_mensaje_resultado = N'ERROR: La cotización debe tener al menos un producto.';
+                RETURN;
+            END
+        END
+
         -- Validación de variables adicionales obligatorias del cliente para cotizaciones
         IF @clientId IS NOT NULL
         BEGIN
@@ -313,12 +330,26 @@ BEGIN
                 chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotalUpd)
             WHERE id = @p_id;
         END
-        ELSE IF @totalAmount > 0
+        -- Registrar modificación en el historial de estados con usuario, fecha y hora
+        DECLARE @oldState NVARCHAR(50);
+        SELECT @oldState = state FROM dbo.[Quotation] WHERE id = @p_id;
+
+        DECLARE @histState NVARCHAR(50);
+        DECLARE @histDesc NVARCHAR(MAX);
+
+        IF @state IS NOT NULL AND @oldState IS NOT NULL AND @oldState <> @state
         BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @totalAmount
-            WHERE id = @p_id;
+            SET @histState = @state;
+            SET @histDesc = ISNULL(@stateDescription, CONCAT(N'Cambio de estado a ', @state));
         END
+        ELSE
+        BEGIN
+            SET @histState = N'MODIFICADO';
+            SET @histDesc = ISNULL(@stateDescription, N'Modificación de cotización y actualización de datos');
+        END;
+
+        INSERT INTO dbo.[QuotationStateHistory] (quotationId, [state], [description], createdAt, userId, [metadata])
+        VALUES (@p_id, @histState, @histDesc, GETDATE(), @actingUserId, @p_data);
 
         COMMIT TRANSACTION;
 

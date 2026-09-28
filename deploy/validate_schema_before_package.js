@@ -204,11 +204,21 @@ async function validateAndPrepareSchema(customConnStr) {
       `);
       fixedSeqCount++;
     }
+    // Sincronizar valor actual de la secuencia al MAX(id) para prevenir colisiones PK
+    try {
+      const seqRes = await client.query(`SELECT pg_get_serial_sequence('public."${tbl}"', 'id') as seq;`);
+      const seq = seqRes.rows[0]?.seq;
+      if (seq) {
+        await client.query(`SELECT setval('${seq}', GREATEST(COALESCE((SELECT MAX(id) FROM public."${tbl}"), 1), 1));`);
+      }
+    } catch (e) {
+      // Ignorar si la tabla no tiene secuencia serial estándar
+    }
   }
   if (fixedSeqCount > 0) {
-    console.log(`  [OK] Se fijó la secuencia autoincremental en ${fixedSeqCount} tabla(s).`);
+    console.log(`  [OK] Se fijó la secuencia autoincremental en ${fixedSeqCount} tabla(s) y se sincronizaron sus valores actuales.`);
   } else {
-    console.log("  [OK] Todas las tablas cuentan con secuencias autoincrementales ('nextval') en sus llaves primarias.");
+    console.log("  [OK] Todas las tablas cuentan con secuencias autoincrementales ('nextval') y valores sincronizados.");
   }
 
   // 2.5.5 Verificación y Siembra Automática de Secuencias Personalizadas (nextval en SPs)

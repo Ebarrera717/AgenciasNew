@@ -17,9 +17,31 @@ IF OBJECT_ID('dbo.Facturas', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.
 GO
 IF OBJECT_ID('dbo.Facturas', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Facturas') AND name = 'id_tiqueteador') ALTER TABLE dbo.Facturas ADD id_tiqueteador INT NULL;
 GO
-IF OBJECT_ID('dbo.TipoProveedores', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TipoProveedores') AND name = 'ds_descrip') ALTER TABLE dbo.TipoProveedores ADD ds_descrip VARCHAR(250) NULL;
+IF OBJECT_ID('dbo.ConceptoFacturacion', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ConceptoFacturacion') AND name = 'id_TiposConceptoFacturacion') ALTER TABLE dbo.ConceptoFacturacion ADD id_TiposConceptoFacturacion INT NULL DEFAULT 2;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ConceptoFacturacion') AND name = 'cd_cuenta') ALTER TABLE dbo.ConceptoFacturacion ADD cd_cuenta VARCHAR(20) NULL;
+END;
 GO
-IF OBJECT_ID('dbo.ConceptoFacturacion', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ConceptoFacturacion') AND name = 'id_TiposConceptoFacturacion') ALTER TABLE dbo.ConceptoFacturacion ADD id_TiposConceptoFacturacion INT NULL DEFAULT 2;
+IF OBJECT_ID('dbo.PROVEEDORES', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.PROVEEDORES') AND name = 'bl_inactivo') ALTER TABLE dbo.PROVEEDORES ADD bl_inactivo BIT NULL DEFAULT 0;
+GO
+IF OBJECT_ID('dbo.MAEVENDE', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MAEVENDE') AND name = 'IDVENDE') ALTER TABLE dbo.MAEVENDE ADD IDVENDE VARCHAR(20) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MAEVENDE') AND name = 'Deshabilitado') ALTER TABLE dbo.MAEVENDE ADD Deshabilitado BIT NULL DEFAULT 0;
+END;
+GO
+IF OBJECT_ID('dbo.CLIENTES', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CLIENTES') AND name = 'bl_inactivo') ALTER TABLE dbo.CLIENTES ADD bl_inactivo BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CLIENTES') AND name = 'IDVENDE') ALTER TABLE dbo.CLIENTES ADD IDVENDE VARCHAR(20) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.Tiqueteadores', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Tiqueteadores') AND name = 'bl_inactivo') ALTER TABLE dbo.Tiqueteadores ADD bl_inactivo BIT NULL DEFAULT 0;
+GO
+IF OBJECT_ID('dbo.TipoVenta', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TipoVenta') AND name = 'bl_inactivo') ALTER TABLE dbo.TipoVenta ADD bl_inactivo BIT NULL DEFAULT 0;
+GO
+IF OBJECT_ID('dbo.CargosDesc', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CargosDesc') AND name = 'cd_cuenta') ALTER TABLE dbo.CargosDesc ADD cd_cuenta VARCHAR(20) NULL;
 GO
 IF OBJECT_ID('dbo.VariableDefinicionMaestro', 'U') IS NOT NULL
 BEGIN
@@ -33,6 +55,87 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'IDEN') ALTER TABLE dbo.VariableDefinicion ADD IDEN INT NULL;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'Codigo') ALTER TABLE dbo.VariableDefinicion ADD Codigo VARCHAR(50) NULL;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'Nombre') ALTER TABLE dbo.VariableDefinicion ADD Nombre VARCHAR(250) NULL;
+END;
+GO
+
+-- Safeguards para dbo.Invoices y detalles
+IF OBJECT_ID('dbo.Invoices', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'fuente') ALTER TABLE dbo.Invoices ADD fuente VARCHAR(20) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'serie') ALTER TABLE dbo.Invoices ADD serie VARCHAR(20) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'consecutivo') ALTER TABLE dbo.Invoices ADD consecutivo VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'isExcelImport') ALTER TABLE dbo.Invoices ADD isExcelImport BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'zeusInvoiceNumber') ALTER TABLE dbo.Invoices ADD zeusInvoiceNumber VARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'state') ALTER TABLE dbo.Invoices ADD state VARCHAR(50) NULL DEFAULT 'NUEVO';
+END;
+GO
+IF OBJECT_ID('dbo.InvoicesProductPayment', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPayment') AND name = 'creditCardId') ALTER TABLE dbo.InvoicesProductPayment ADD creditCardId INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPayment') AND name = 'authorizationCode') ALTER TABLE dbo.InvoicesProductPayment ADD authorizationCode VARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPayment') AND name = 'voucher') ALTER TABLE dbo.InvoicesProductPayment ADD voucher VARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPayment') AND name = 'cardNumber') ALTER TABLE dbo.InvoicesProductPayment ADD cardNumber VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPayment') AND name = 'expirationDate') ALTER TABLE dbo.InvoicesProductPayment ADD expirationDate VARCHAR(50) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.InvoicesProduct', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'ticketCode') ALTER TABLE dbo.InvoicesProduct ADD ticketCode VARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'mainTaxId') ALTER TABLE dbo.InvoicesProduct ADD mainTaxId INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'inNationality') ALTER TABLE dbo.InvoicesProduct ADD inNationality INT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'servicios') ALTER TABLE dbo.InvoicesProduct ADD servicios VARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'descripcion') ALTER TABLE dbo.InvoicesProduct ADD descripcion VARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'itinerary') ALTER TABLE dbo.InvoicesProduct ADD itinerary VARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'class') ALTER TABLE dbo.InvoicesProduct ADD class VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'airline') ALTER TABLE dbo.InvoicesProduct ADD airline VARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'ticketTypeId') ALTER TABLE dbo.InvoicesProduct ADD ticketTypeId INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'providerDueDate') ALTER TABLE dbo.InvoicesProduct ADD providerDueDate DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'providerInvoice') ALTER TABLE dbo.InvoicesProduct ADD providerInvoice VARCHAR(100) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.InvoicesProductTax', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'rate') ALTER TABLE dbo.InvoicesProductTax ADD rate FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'explicitAmount') ALTER TABLE dbo.InvoicesProductTax ADD explicitAmount FLOAT NULL DEFAULT 0;
+END;
+GO
+IF OBJECT_ID('dbo.QuotationProductTax', 'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
+END;
+GO
+IF OBJECT_ID('dbo.InvoicesProductVariable', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductVariable') AND name = 'masterVariableId') ALTER TABLE dbo.InvoicesProductVariable ADD masterVariableId INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductVariable') AND name = 'value') ALTER TABLE dbo.InvoicesProductVariable ADD value VARCHAR(MAX) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.InvoicesProductPasenger', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPasenger') AND name = 'name') ALTER TABLE dbo.InvoicesProductPasenger ADD name VARCHAR(250) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPasenger') AND name = 'document') ALTER TABLE dbo.InvoicesProductPasenger ADD document VARCHAR(50) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.InvoicesProductItinerary', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'orden') ALTER TABLE dbo.InvoicesProductItinerary ADD orden INT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'origin') ALTER TABLE dbo.InvoicesProductItinerary ADD origin VARCHAR(10) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'destination') ALTER TABLE dbo.InvoicesProductItinerary ADD destination VARCHAR(10) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'class') ALTER TABLE dbo.InvoicesProductItinerary ADD class VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'checkInDate') ALTER TABLE dbo.InvoicesProductItinerary ADD checkInDate DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'checkOutDate') ALTER TABLE dbo.InvoicesProductItinerary ADD checkOutDate DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'terminal') ALTER TABLE dbo.InvoicesProductItinerary ADD terminal VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'prestadoraCode') ALTER TABLE dbo.InvoicesProductItinerary ADD prestadoraCode VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'farebasis') ALTER TABLE dbo.InvoicesProductItinerary ADD farebasis VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'Numflight') ALTER TABLE dbo.InvoicesProductItinerary ADD Numflight VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'Typeflight') ALTER TABLE dbo.InvoicesProductItinerary ADD Typeflight VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'amount') ALTER TABLE dbo.InvoicesProductItinerary ADD amount FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductItinerary') AND name = 'co2') ALTER TABLE dbo.InvoicesProductItinerary ADD co2 FLOAT NULL DEFAULT 0;
+END;
+GO
+IF OBJECT_ID('dbo.InvoicesProductCombo', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductCombo') AND name = 'comboId') ALTER TABLE dbo.InvoicesProductCombo ADD comboId INT NULL;
 END;
 GO
 
@@ -110,6 +213,125 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_descrip') ALTER TABLE dbo.CotizacionServicios ADD ds_descrip VARCHAR(4000) NULL;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_servicio') ALTER TABLE dbo.CotizacionServicios ADD ds_servicio VARCHAR(250) NULL;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'ds_tiposervnm') ALTER TABLE dbo.CotizacionServicios ADD ds_tiposervnm VARCHAR(50) NULL;
+END;
+GO
+
+-- Safeguards para dbo.PreQuotation y dbo.PreQuotationStateHistory
+IF OBJECT_ID('dbo.PreQuotation', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.[PreQuotation] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PreQuotation PRIMARY KEY,
+        [consecutivo] INT NOT NULL CONSTRAINT UQ_PreQuotation_Consecutivo UNIQUE,
+        [clientNameText] NVARCHAR(255) NULL,
+        [clientId] INT NULL,
+        [headerDescription] NVARCHAR(MAX) NULL,
+        [providerId] INT NULL,
+        [ticketPrinterId] INT NULL,
+        [sellerId] INT NULL,
+        [branchId] INT NULL,
+        [preQuotationType] NVARCHAR(100) NULL CONSTRAINT DF_PreQuotation_Type DEFAULT N'General',
+        [quotationNotice] NVARCHAR(MAX) NULL,
+        [noticeResponse] NVARCHAR(MAX) NULL,
+        [startDate] DATETIME2 NULL,
+        [endDate] DATETIME2 NULL,
+        [customFields] NVARCHAR(MAX) NULL CONSTRAINT DF_PreQuotation_CustomFields DEFAULT N'{}',
+        [state] NVARCHAR(50) NULL CONSTRAINT DF_PreQuotation_State DEFAULT N'POR COTIZAR',
+        [convertedQuotationId] INT NULL,
+        [convertedAt] DATETIME2 NULL,
+        [convertedUserId] INT NULL,
+        [userId] INT NULL,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_PreQuotation_CreatedAt DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NULL CONSTRAINT DF_PreQuotation_UpdatedAt DEFAULT GETDATE()
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.PreQuotationStateHistory', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.[PreQuotationStateHistory] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PreQuotationStateHistory PRIMARY KEY,
+        [preQuotationId] INT NOT NULL CONSTRAINT FK_PreQuotationStateHistory_PreQuotation REFERENCES dbo.[PreQuotation]([id]) ON DELETE CASCADE,
+        [state] NVARCHAR(50) NOT NULL,
+        [description] NVARCHAR(MAX) NULL,
+        [userId] INT NULL,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_PreQuotationStateHistory_CreatedAt DEFAULT GETDATE()
+    );
+END;
+GO
+
+-- Safeguards para dbo.QuotationProductTax y dbo.QuotationProductPayment
+IF OBJECT_ID('dbo.QuotationProductTax', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'rate') ALTER TABLE dbo.QuotationProductTax ADD rate FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'explicitAmount') ALTER TABLE dbo.QuotationProductTax ADD explicitAmount FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueSnapshot FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueTypeSnapshot VARCHAR(50) NULL DEFAULT 'PERCENTAGE';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'isMain') ALTER TABLE dbo.QuotationProductTax ADD isMain BIT NULL DEFAULT 0;
+END;
+GO
+
+IF OBJECT_ID('dbo.QuotationProductPayment', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductPayment') AND name = 'creditCardId') ALTER TABLE dbo.QuotationProductPayment ADD creditCardId INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductPayment') AND name = 'authorizationCode') ALTER TABLE dbo.QuotationProductPayment ADD authorizationCode VARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductPayment') AND name = 'voucher') ALTER TABLE dbo.QuotationProductPayment ADD voucher VARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductPayment') AND name = 'cardNumber') ALTER TABLE dbo.QuotationProductPayment ADD cardNumber VARCHAR(50) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductPayment') AND name = 'expirationDate') ALTER TABLE dbo.QuotationProductPayment ADD expirationDate VARCHAR(50) NULL;
+END;
+GO
+
+-- Safeguards para dbo.Quotation y detalles
+IF OBJECT_ID('dbo.Quotation', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'updatedAt') ALTER TABLE dbo.Quotation ADD updatedAt DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'copyFieldsToProducts') ALTER TABLE dbo.Quotation ADD copyFieldsToProducts BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'costoTotal') ALTER TABLE dbo.Quotation ADD costoTotal FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'valorBase') ALTER TABLE dbo.Quotation ADD valorBase FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'utilidad') ALTER TABLE dbo.Quotation ADD utilidad FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'comisionTotalPercentage') ALTER TABLE dbo.Quotation ADD comisionTotalPercentage FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'comisionFreelancePercentage') ALTER TABLE dbo.Quotation ADD comisionFreelancePercentage FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'comisionFreelanceValue') ALTER TABLE dbo.Quotation ADD comisionFreelanceValue FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'comisionPropiaPercentage') ALTER TABLE dbo.Quotation ADD comisionPropiaPercentage FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'comisionPropiaValue') ALTER TABLE dbo.Quotation ADD comisionPropiaValue FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'comisionUtilidadPercentage') ALTER TABLE dbo.Quotation ADD comisionUtilidadPercentage FLOAT NULL DEFAULT 0;
+END;
+GO
+IF OBJECT_ID('dbo.QuotationProduct', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'service') ALTER TABLE dbo.QuotationProduct ADD service NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'servicios') ALTER TABLE dbo.QuotationProduct ADD servicios NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'descripcion') ALTER TABLE dbo.QuotationProduct ADD descripcion NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'description') ALTER TABLE dbo.QuotationProduct ADD description NVARCHAR(MAX) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'providerDueDate') ALTER TABLE dbo.QuotationProduct ADD providerDueDate DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'providerInvoice') ALTER TABLE dbo.QuotationProduct ADD providerInvoice NVARCHAR(100) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'inNationality') ALTER TABLE dbo.QuotationProduct ADD inNationality INT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'mainTaxId') ALTER TABLE dbo.QuotationProduct ADD mainTaxId INT NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'sellerCommission') ALTER TABLE dbo.QuotationProduct ADD sellerCommission FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'ticketPrinterCommission') ALTER TABLE dbo.QuotationProduct ADD ticketPrinterCommission FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'comboId') ALTER TABLE dbo.QuotationProduct ADD comboId INT NULL;
+END;
+GO
+IF OBJECT_ID('dbo.QuotationManualService', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.[QuotationManualService] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationManualService PRIMARY KEY,
+        [quotationId] INT NOT NULL CONSTRAINT FK_QuotationManualService_Quotation REFERENCES dbo.[Quotation]([id]) ON DELETE CASCADE,
+        [providerName] NVARCHAR(255) NULL,
+        [serviceName] NVARCHAR(255) NULL,
+        [cost] FLOAT NULL CONSTRAINT DF_QuotationManualService_Cost DEFAULT 0,
+        [salePrice] FLOAT NULL CONSTRAINT DF_QuotationManualService_SalePrice DEFAULT 0,
+        [utility] FLOAT NULL CONSTRAINT DF_QuotationManualService_Utility DEFAULT 0,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_QuotationManualService_CreatedAt DEFAULT GETDATE()
+    );
+END;
+GO
+IF OBJECT_ID('dbo.QuotationCombo', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.[QuotationCombo] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationCombo PRIMARY KEY,
+        [quotationId] INT NOT NULL CONSTRAINT FK_QuotationCombo_Quotation REFERENCES dbo.[Quotation]([id]) ON DELETE CASCADE,
+        [comboId] INT NOT NULL
+    );
 END;
 GO
 
@@ -497,85 +719,6 @@ BEGIN
 END;
 GO
 
--- 2.16. spCotizacionListar
-IF OBJECT_ID('dbo.spCotizacionListar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionListar;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionListar
-    @p_internalNumber NVARCHAR(50) = NULL,
-    @p_clientId INT = NULL,
-    @p_branchId INT = NULL,
-    @p_state NVARCHAR(25) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT
-        q.[id],
-        q.[internalNumber],
-        q.[date],
-        q.[clientId],
-        c.[name] AS [clientName],
-        c.[document] AS [clientDocument],
-        q.[currency],
-        q.[exchangeRate],
-        q.[branchId],
-        b.[name] AS [branchName],
-        q.[totalAmount],
-        ISNULL(q.[state], N'Nuevo') AS [state],
-        q.[userId],
-        u.[name] AS [userName]
-    FROM dbo.[Quotation] q
-    LEFT JOIN dbo.[Client] c ON q.[clientId] = c.[id]
-    LEFT JOIN dbo.[Branch] b ON q.[branchId] = b.[id]
-    LEFT JOIN dbo.[User] u ON q.[userId] = u.[id]
-    WHERE (@p_internalNumber IS NULL OR q.[internalNumber] LIKE '%' + TRIM(@p_internalNumber) + '%')
-      AND (@p_clientId IS NULL OR q.[clientId] = @p_clientId)
-      AND (@p_branchId IS NULL OR q.[branchId] = @p_branchId)
-      AND (@p_state IS NULL OR q.[state] = @p_state)
-    ORDER BY q.[id] DESC;
-END;
-GO
-
--- 2.17. spInvoicesListar
-IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spInvoicesListar;
-GO
-
-CREATE PROCEDURE dbo.spInvoicesListar
-    @p_internalNumber NVARCHAR(100) = NULL,
-    @p_clientId INT = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT 
-        i.[id], 
-        i.[internalNumber], 
-        i.[date], 
-        i.[dueDate],
-        i.[clientId], 
-        c.[name] AS [clientName], 
-        c.[document] AS [clientDocument],
-        i.[currency], 
-        i.[totalAmount], 
-        ISNULL(i.[state], N'NUEVO') AS [state],
-        ISNULL(i.[isExcelImport], 0) AS [isExcelImport],
-        i.[zeusInvoiceNumber],
-        i.[fuente],
-        i.[serie],
-        i.[consecutivo],
-        (SELECT TOP 1 pax.name FROM dbo.InvoicesProduct ip JOIN dbo.InvoicesProductPasenger pax ON pax.invoiceProductId = ip.id WHERE ip.invoiceId = i.id AND pax.name IS NOT NULL AND pax.name <> '') AS [paxName],
-        (SELECT TOP 1 ISNULL(prov.name, ip.providerInvoice) FROM dbo.InvoicesProduct ip LEFT JOIN dbo.Provider prov ON ip.providerId = prov.id WHERE ip.invoiceId = i.id AND (prov.name IS NOT NULL OR ip.providerInvoice IS NOT NULL)) AS [providerName],
-        (SELECT MIN(ip.checkInDate) FROM dbo.InvoicesProduct ip WHERE ip.invoiceId = i.id) AS [checkInDate],
-        (SELECT MAX(ip.checkOutDate) FROM dbo.InvoicesProduct ip WHERE ip.invoiceId = i.id) AS [checkOutDate]
-    FROM dbo.[Invoices] i
-    LEFT JOIN dbo.[Client] c ON i.[clientId] = c.[id]
-    WHERE (@p_internalNumber IS NULL OR i.[internalNumber] LIKE '%' + TRIM(@p_internalNumber) + '%')
-      AND (@p_clientId IS NULL OR i.[clientId] = @p_clientId)
-    ORDER BY i.[id] DESC;
-END;
-GO
-
 -- 2.18. spParameterListar
 IF OBJECT_ID('dbo.spParameterListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spParameterListar;
@@ -809,9 +952,2374 @@ BEGIN
 END;
 GO
 
+-- 2.25. spInvoicesObtener
+IF OBJECT_ID('dbo.spInvoicesObtener', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spInvoicesObtener;
+GO
+
+CREATE PROCEDURE dbo.spInvoicesObtener
+    @p_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Recordset 0: Cabecera Invoices
+    SELECT 
+        i.[id],
+        i.[internalNumber],
+        i.[date],
+        i.[dueDate],
+        i.[clientId],
+        c.[name] AS [clientName],
+        c.[document] AS [clientDocument],
+        i.[currency],
+        i.[exchangeRate],
+        i.[branchId],
+        b.[name] AS [branchName],
+        i.[implantId],
+        imp.[name] AS [implantName],
+        i.[sellerId],
+        s.[name] AS [sellerName],
+        i.[ticketPrinterId],
+        tp.[name] AS [ticketPrinterName],
+        i.[baseCommissionable],
+        i.[commissionPercentage],
+        i.[chargesAndTaxes],
+        i.[totalAmount],
+        i.[userId],
+        u.[name] AS [userName],
+        ISNULL(i.[state], N'NUEVO') AS [state],
+        i.[fuente],
+        i.[serie],
+        i.[consecutivo],
+        ISNULL(i.[isExcelImport], 0) AS [isExcelImport],
+        i.[zeusInvoiceNumber]
+    FROM dbo.[Invoices] i
+    LEFT JOIN dbo.[Client] c ON i.[clientId] = c.[id]
+    LEFT JOIN dbo.[Branch] b ON i.[branchId] = b.[id]
+    LEFT JOIN dbo.[Implant] imp ON i.[implantId] = imp.[id]
+    LEFT JOIN dbo.[Seller] s ON i.[sellerId] = s.[id]
+    LEFT JOIN dbo.[TicketPrinter] tp ON i.[ticketPrinterId] = tp.[id]
+    LEFT JOIN dbo.[User] u ON i.[userId] = u.[id]
+    WHERE i.[id] = @p_id;
+
+    -- Recordset 1: InvoicesProduct
+    SELECT 
+        ip.[id],
+        ip.[invoiceId],
+        ip.[productId],
+        p.[description] AS [productName],
+        p.[description] AS [productDescription],
+        p.[code] AS [productCode],
+        ip.[ticketCode],
+        ip.[quantity],
+        ip.[price],
+        ip.[cost],
+        ip.[providerId],
+        prov.[name] AS [providerName],
+        prov.[code] AS [providerCode],
+        ip.[prestadoraId],
+        prest.[name] AS [prestadoraName],
+        prest.[code] AS [prestadoraCode],
+        ip.[checkInDate],
+        ip.[checkOutDate],
+        ip.[nights],
+        ip.[paxAdults],
+        ip.[paxChildren],
+        ip.[serviceType],
+        ip.[destination],
+        ip.[reservationCode],
+        ip.[sellerCommission],
+        ip.[ticketPrinterCommission],
+        ip.[comboId],
+        ip.[mainTaxId],
+        ip.[inNationality],
+        ip.[servicios],
+        ip.[descripcion],
+        ip.[itinerary],
+        ip.[class],
+        ip.[airline],
+        ip.[ticketTypeId],
+        ip.[providerDueDate],
+        ip.[providerInvoice]
+    FROM dbo.[InvoicesProduct] ip
+    LEFT JOIN dbo.[Product] p ON ip.[productId] = p.[id]
+    LEFT JOIN dbo.[Provider] prov ON ip.[providerId] = prov.[id]
+    LEFT JOIN dbo.[Prestadora] prest ON ip.[prestadoraId] = prest.[id]
+    WHERE ip.[invoiceId] = @p_id
+    ORDER BY ip.[id] ASC;
+
+    -- Recordset 2: InvoicesProductTax
+    SELECT 
+        ipt.[id],
+        ipt.[invoiceProductId],
+        ipt.[chargeAndTaxId],
+        ct.[code] AS [taxCode],
+        ct.[name] AS [taxName],
+        ct.[type] AS [taxType],
+        ct.[valueType] AS [taxValueType],
+        ISNULL(ipt.[explicitAmount], 0) AS [explicitAmount],
+        ISNULL(ipt.[explicitAmount], 0) AS [amount],
+        ISNULL(ipt.[rate], 0) AS [rate]
+    FROM dbo.[InvoicesProductTax] ipt
+    JOIN dbo.[InvoicesProduct] ip ON ipt.[invoiceProductId] = ip.[id]
+    LEFT JOIN dbo.[ChargeAndTax] ct ON ipt.[chargeAndTaxId] = ct.[id]
+    WHERE ip.[invoiceId] = @p_id
+    ORDER BY ipt.[id] ASC;
+
+    -- Recordset 3: InvoicesProductPasenger
+    SELECT 
+        ipp.[id],
+        ipp.[invoiceProductId],
+        ipp.[name],
+        ipp.[document]
+    FROM dbo.[InvoicesProductPasenger] ipp
+    JOIN dbo.[InvoicesProduct] ip ON ipp.[invoiceProductId] = ip.[id]
+    WHERE ip.[invoiceId] = @p_id
+    ORDER BY ipp.[id] ASC;
+
+    -- Recordset 4: InvoicesProductVariable
+    SELECT 
+        ipv.[id],
+        ipv.[invoiceProductId],
+        ipv.[masterVariableId],
+        mv.[code] AS [variableCode],
+        mv.[name] AS [variableName],
+        ipv.[value]
+    FROM dbo.[InvoicesProductVariable] ipv
+    JOIN dbo.[InvoicesProduct] ip ON ipv.[invoiceProductId] = ip.[id]
+    LEFT JOIN dbo.[MasterVariable] mv ON ipv.[masterVariableId] = mv.[id]
+    WHERE ip.[invoiceId] = @p_id
+    ORDER BY ipv.[id] ASC;
+
+    -- Recordset 5: InvoicesProductPayment
+    SELECT 
+        ippay.[id],
+        ippay.[invoiceProductId],
+        ippay.[amount],
+        ippay.[paymentMethod],
+        ippay.[date],
+        ippay.[reference],
+        ippay.[creditCardId],
+        ippay.[authorizationCode],
+        ippay.[voucher],
+        ippay.[cardNumber],
+        ippay.[expirationDate]
+    FROM dbo.[InvoicesProductPayment] ippay
+    JOIN dbo.[InvoicesProduct] ip ON ippay.[invoiceProductId] = ip.[id]
+    WHERE ip.[invoiceId] = @p_id
+    ORDER BY ippay.[id] ASC;
+
+    -- Recordset 6: InvoicesProductItinerary
+    SELECT 
+        ipi.[id],
+        ipi.[invoiceProductId],
+        ipi.[orden],
+        ipi.[origin],
+        ipi.[destination],
+        ipi.[class],
+        ipi.[checkInDate],
+        ipi.[checkOutDate],
+        ipi.[terminal],
+        ipi.[prestadoraCode],
+        ipi.[farebasis],
+        ipi.[Numflight],
+        ipi.[Typeflight],
+        ipi.[amount],
+        ipi.[co2]
+    FROM dbo.[InvoicesProductItinerary] ipi
+    JOIN dbo.[InvoicesProduct] ip ON ipi.[invoiceProductId] = ip.[id]
+    WHERE ip.[invoiceId] = @p_id
+    ORDER BY ipi.[orden] ASC, ipi.[id] ASC;
+
+    -- Recordset 7: InvoicesProductCombo
+    SELECT 
+        ipc.[id],
+        ipc.[invoiceId],
+        ipc.[comboId],
+        cmb.[name] AS [comboName]
+    FROM dbo.[InvoicesProductCombo] ipc
+    LEFT JOIN dbo.[Combo] cmb ON ipc.[comboId] = cmb.[id]
+    WHERE ipc.[invoiceId] = @p_id
+    ORDER BY ipc.[id] ASC;
+END;
+GO
+
+-- 2.26. spInvoicesCrear
+IF OBJECT_ID('dbo.spInvoicesCrear', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spInvoicesCrear;
+GO
+
+CREATE PROCEDURE dbo.spInvoicesCrear
+    @p_data NVARCHAR(MAX),
+    @p_acting_user_id INT = 1,
+    @p_invoice_id INT = NULL OUTPUT,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Invoices])
+        BEGIN
+            DBCC CHECKIDENT ('dbo.[Invoices]', RESEED, 0);
+        END
+
+        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
+        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
+        DECLARE @exchangeRate FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
+        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
+        DECLARE @implantId INT = JSON_VALUE(@p_data, '$.implantId');
+        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
+        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
+        DECLARE @totalAmount FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
+        DECLARE @baseCommissionable FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
+        DECLARE @chargesAndTaxes FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
+        DECLARE @commissionPercentage FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
+        DECLARE @fuente NVARCHAR(20) = ISNULL(JSON_VALUE(@p_data, '$.fuente'), 'FAC');
+        DECLARE @serie NVARCHAR(20) = JSON_VALUE(@p_data, '$.serie');
+        DECLARE @consecutivo NVARCHAR(50) = JSON_VALUE(@p_data, '$.consecutivo');
+        DECLARE @date DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.date') AS DATETIME2);
+        DECLARE @dueDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.dueDate') AS DATETIME2);
+
+        IF @date IS NULL SET @date = GETDATE();
+        IF @dueDate IS NULL SET @dueDate = @date;
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
+            SET @clientId = NULL;
+        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
+            SET @branchId = NULL;
+        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
+            SET @sellerId = NULL;
+        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
+            SET @implantId = NULL;
+        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
+            SET @ticketPrinterId = NULL;
+
+        IF @consecutivo IS NULL OR LTRIM(RTRIM(@consecutivo)) = ''
+        BEGIN
+            EXEC dbo.spObtenerSiguienteConsecutivo N'INVOICE', @branchId, @implantId, @consecutivo OUTPUT;
+        END
+
+        DECLARE @internalNumber NVARCHAR(100) = CASE 
+            WHEN @serie IS NOT NULL AND LTRIM(RTRIM(@serie)) <> '' THEN CONCAT(@serie, '-', @consecutivo)
+            ELSE @consecutivo
+        END;
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.[Invoices] (
+            [internalNumber], [date], [dueDate], [clientId], [currency], [exchangeRate],
+            [branchId], [implantId], [sellerId], [ticketPrinterId],
+            [baseCommissionable], [commissionPercentage], [chargesAndTaxes],
+            [totalAmount], [userId], [state], [fuente], [serie], [consecutivo], [isExcelImport]
+        ) VALUES (
+            @internalNumber, @date, @dueDate, @clientId, @currency, @exchangeRate,
+            @branchId, @implantId, @sellerId, @ticketPrinterId,
+            @baseCommissionable, @commissionPercentage, @chargesAndTaxes,
+            @totalAmount, @actingUserId, N'NUEVO', @fuente, @serie, @consecutivo, 0
+        );
+
+        SET @p_invoice_id = SCOPE_IDENTITY();
+
+        -- Inserción de Combos
+        IF JSON_QUERY(@p_data, '$.combos') IS NOT NULL
+        BEGIN
+            INSERT INTO dbo.[InvoicesProductCombo] ([invoiceId], [comboId])
+            SELECT @p_invoice_id, CAST(JSON_VALUE(value, '$.comboId') AS INT)
+            FROM OPENJSON(@p_data, '$.combos')
+            WHERE JSON_VALUE(value, '$.comboId') IS NOT NULL;
+        END;
+
+        -- Inserción de Items (InvoicesProduct)
+        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
+        BEGIN
+            DECLARE item_cursor CURSOR LOCAL FAST_FORWARD FOR
+            SELECT [key], [value]
+            FROM OPENJSON(@p_data, '$.items');
+
+            OPEN item_cursor;
+            DECLARE @itemKey NVARCHAR(50), @itemJson NVARCHAR(MAX);
+
+            FETCH NEXT FROM item_cursor INTO @itemKey, @itemJson;
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                DECLARE @prodId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.productId') AS INT);
+                DECLARE @provId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.providerId') AS INT);
+                DECLARE @prestId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.prestadoraId') AS INT);
+                DECLARE @ticketCode NVARCHAR(100) = JSON_VALUE(@itemJson, '$.ticketCode');
+                DECLARE @qty INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.quantity') AS INT), 1);
+                DECLARE @price FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.price') AS FLOAT), 0);
+                DECLARE @cost FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.cost') AS FLOAT), 0);
+                DECLARE @checkIn DATETIME2 = TRY_CAST(JSON_VALUE(@itemJson, '$.checkIn') AS DATETIME2);
+                DECLARE @checkOut DATETIME2 = TRY_CAST(JSON_VALUE(@itemJson, '$.checkOut') AS DATETIME2);
+                DECLARE @nights INT = TRY_CAST(JSON_VALUE(@itemJson, '$.nights') AS INT);
+                DECLARE @paxAdults INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.paxAdults') AS INT), 1);
+                DECLARE @paxChildren INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.paxChildren') AS INT), 0);
+                DECLARE @srvType NVARCHAR(100) = JSON_VALUE(@itemJson, '$.serviceType');
+                DECLARE @dest NVARCHAR(250) = JSON_VALUE(@itemJson, '$.destination');
+                DECLARE @resCode NVARCHAR(100) = JSON_VALUE(@itemJson, '$.reservationCode');
+                DECLARE @sComm FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.sellerCommission') AS FLOAT), 0);
+                DECLARE @tpComm FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.ticketPrinterCommission') AS FLOAT), 0);
+                DECLARE @comboId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.comboId') AS INT);
+                DECLARE @mainTaxId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.mainTaxId') AS INT);
+                DECLARE @inNat INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.inNationality') AS INT), 1);
+                DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@itemJson, '$.servicios');
+                DECLARE @descripcion NVARCHAR(MAX) = ISNULL(JSON_VALUE(@itemJson, '$.descripcion'), JSON_VALUE(@itemJson, '$.itemDescription'));
+                DECLARE @itin NVARCHAR(MAX) = JSON_VALUE(@itemJson, '$.itinerary');
+                DECLARE @class NVARCHAR(50) = JSON_VALUE(@itemJson, '$.class');
+                DECLARE @airline NVARCHAR(100) = JSON_VALUE(@itemJson, '$.airline');
+                DECLARE @ticketTypeId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.ticketTypeId') AS INT);
+                DECLARE @provDueDate DATETIME2 = TRY_CAST(JSON_VALUE(@itemJson, '$.providerDueDate') AS DATETIME2);
+                DECLARE @provInvoice NVARCHAR(100) = JSON_VALUE(@itemJson, '$.providerInvoice');
+
+                IF @prodId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Product] WHERE id = @prodId) SET @prodId = NULL;
+                IF @provId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @provId) SET @provId = NULL;
+                IF @prestId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestId) SET @prestId = NULL;
+                IF @ticketTypeId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketType] WHERE id = @ticketTypeId) SET @ticketTypeId = NULL;
+
+                INSERT INTO dbo.[InvoicesProduct] (
+                    [invoiceId], [productId], [ticketCode], [quantity], [price], [cost],
+                    [providerId], [prestadoraId], [checkInDate], [checkOutDate], [nights],
+                    [paxAdults], [paxChildren], [serviceType], [destination], [reservationCode],
+                    [sellerCommission], [ticketPrinterCommission], [comboId], [mainTaxId], [inNationality],
+                    [servicios], [descripcion], [itinerary], [class], [airline], [ticketTypeId],
+                    [providerDueDate], [providerInvoice]
+                ) VALUES (
+                    @p_invoice_id, @prodId, @ticketCode, @qty, @price, @cost,
+                    @provId, @prestId, @checkIn, @checkOut, @nights,
+                    @paxAdults, @paxChildren, @srvType, @dest, @resCode,
+                    @sComm, @tpComm, @comboId, @mainTaxId, @inNat,
+                    @servicios, @descripcion, @itin, @class, @airline, @ticketTypeId,
+                    @provDueDate, @provInvoice
+                );
+
+                DECLARE @newIpId INT = SCOPE_IDENTITY();
+
+                -- Impuestos del Item
+                IF JSON_QUERY(@itemJson, '$.appliedTaxes') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductTax] ([invoiceProductId], [chargeAndTaxId], [explicitAmount], [rate])
+                    SELECT 
+                        @newIpId,
+                        TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) AS INT),
+                        ISNULL(TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.explicitAmount'), JSON_VALUE(tax.value, '$.amount')) AS FLOAT), 0),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.rate') AS FLOAT), 0)
+                    FROM OPENJSON(@itemJson, '$.appliedTaxes') AS tax
+                    WHERE ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) IS NOT NULL;
+                END;
+
+                -- Pasajeros del Item
+                IF JSON_QUERY(@itemJson, '$.passengers') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [document])
+                    SELECT @newIpId, JSON_VALUE(pax.value, '$.name'), JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@itemJson, '$.passengers') AS pax;
+                END;
+
+                -- Variables del Item
+                IF JSON_QUERY(@itemJson, '$.variables') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductVariable] ([invoiceProductId], [masterVariableId], [value])
+                    SELECT 
+                        @newIpId,
+                        TRY_CAST(JSON_VALUE(vr.value, '$.masterVariableId') AS INT),
+                        JSON_VALUE(vr.value, '$.value')
+                    FROM OPENJSON(@itemJson, '$.variables') AS vr
+                    WHERE JSON_VALUE(vr.value, '$.masterVariableId') IS NOT NULL;
+                END;
+
+                -- Pagos del Item
+                IF JSON_QUERY(@itemJson, '$.payments') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductPayment] (
+                        [invoiceProductId], [amount], [paymentMethod], [date], [reference],
+                        [creditCardId], [authorizationCode], [voucher], [cardNumber], [expirationDate]
+                    )
+                    SELECT 
+                        @newIpId,
+                        ISNULL(TRY_CAST(JSON_VALUE(pay.value, '$.amount') AS FLOAT), 0),
+                        JSON_VALUE(pay.value, '$.paymentMethod'),
+                        TRY_CAST(JSON_VALUE(pay.value, '$.date') AS DATETIME2),
+                        JSON_VALUE(pay.value, '$.reference'),
+                        TRY_CAST(JSON_VALUE(pay.value, '$.creditCardId') AS INT),
+                        JSON_VALUE(pay.value, '$.authorizationCode'),
+                        JSON_VALUE(pay.value, '$.voucher'),
+                        JSON_VALUE(pay.value, '$.cardNumber'),
+                        JSON_VALUE(pay.value, '$.expirationDate')
+                    FROM OPENJSON(@itemJson, '$.payments') AS pay;
+                END;
+
+                -- Itinerarios del Item
+                IF JSON_QUERY(@itemJson, '$.itinerariesItineraryList') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductItinerary] (
+                        [invoiceProductId], [orden], [origin], [destination], [class],
+                        [checkInDate], [checkOutDate], [terminal], [prestadoraCode], [farebasis],
+                        [Numflight], [Typeflight], [amount], [co2]
+                    )
+                    SELECT 
+                        @newIpId,
+                        ISNULL(TRY_CAST(JSON_VALUE(itin.value, '$.orden') AS INT), 1),
+                        JSON_VALUE(itin.value, '$.origin'),
+                        JSON_VALUE(itin.value, '$.destination'),
+                        JSON_VALUE(itin.value, '$.class'),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.checkInDate') AS DATETIME2),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.checkOutDate') AS DATETIME2),
+                        JSON_VALUE(itin.value, '$.terminal'),
+                        JSON_VALUE(itin.value, '$.prestadoraCode'),
+                        JSON_VALUE(itin.value, '$.farebasis'),
+                        JSON_VALUE(itin.value, '$.Numflight'),
+                        JSON_VALUE(itin.value, '$.Typeflight'),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.amount') AS FLOAT),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.co2') AS FLOAT)
+                    FROM OPENJSON(@itemJson, '$.itinerariesItineraryList') AS itin;
+                END;
+
+                FETCH NEXT FROM item_cursor INTO @itemKey, @itemJson;
+            END;
+
+            CLOSE item_cursor;
+            DEALLOCATE item_cursor;
+        END;
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Factura creada exitosamente con ID ', @p_invoice_id, N' y consecutivo ', @internalNumber);
+        SELECT @p_invoice_id AS p_invoice_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_invoice_id = 0;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT @p_invoice_id AS p_invoice_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.27. spInvoicesActualizar
+IF OBJECT_ID('dbo.spInvoicesActualizar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spInvoicesActualizar;
+GO
+
+CREATE PROCEDURE dbo.spInvoicesActualizar
+    @p_id INT,
+    @p_data NVARCHAR(MAX),
+    @p_acting_user_id INT = 1,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Invoices] WHERE id = @p_id)
+        BEGIN
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: La factura con ID ', @p_id, N' no existe.');
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END;
+
+        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
+        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
+        DECLARE @exchangeRate FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
+        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
+        DECLARE @implantId INT = JSON_VALUE(@p_data, '$.implantId');
+        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
+        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
+        DECLARE @totalAmount FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
+        DECLARE @baseCommissionable FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
+        DECLARE @chargesAndTaxes FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
+        DECLARE @commissionPercentage FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
+        DECLARE @fuente NVARCHAR(20) = JSON_VALUE(@p_data, '$.fuente');
+        DECLARE @serie NVARCHAR(20) = JSON_VALUE(@p_data, '$.serie');
+        DECLARE @consecutivo NVARCHAR(50) = JSON_VALUE(@p_data, '$.consecutivo');
+        DECLARE @date DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.date') AS DATETIME2);
+        DECLARE @dueDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.dueDate') AS DATETIME2);
+        DECLARE @state NVARCHAR(50) = ISNULL(JSON_VALUE(@p_data, '$.state'), N'NUEVO');
+
+        IF @date IS NULL SET @date = GETDATE();
+        IF @dueDate IS NULL SET @dueDate = @date;
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
+            SET @clientId = NULL;
+        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
+            SET @branchId = NULL;
+        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
+            SET @sellerId = NULL;
+        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
+            SET @implantId = NULL;
+        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
+            SET @ticketPrinterId = NULL;
+
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.[Invoices]
+        SET [clientId] = ISNULL(@clientId, [clientId]),
+            [currency] = ISNULL(@currency, [currency]),
+            [exchangeRate] = ISNULL(@exchangeRate, [exchangeRate]),
+            [branchId] = @branchId,
+            [implantId] = @implantId,
+            [sellerId] = @sellerId,
+            [ticketPrinterId] = @ticketPrinterId,
+            [totalAmount] = @totalAmount,
+            [baseCommissionable] = @baseCommissionable,
+            [chargesAndTaxes] = @chargesAndTaxes,
+            [commissionPercentage] = @commissionPercentage,
+            [fuente] = ISNULL(@fuente, [fuente]),
+            [serie] = ISNULL(@serie, [serie]),
+            [consecutivo] = ISNULL(@consecutivo, [consecutivo]),
+            [date] = @date,
+            [dueDate] = @dueDate,
+            [state] = @state
+        WHERE id = @p_id;
+
+        -- Limpieza de detalles anteriores
+        DELETE FROM dbo.[InvoicesProductTax] WHERE invoiceProductId IN (SELECT id FROM dbo.[InvoicesProduct] WHERE invoiceId = @p_id);
+        DELETE FROM dbo.[InvoicesProductPasenger] WHERE invoiceProductId IN (SELECT id FROM dbo.[InvoicesProduct] WHERE invoiceId = @p_id);
+        DELETE FROM dbo.[InvoicesProductVariable] WHERE invoiceProductId IN (SELECT id FROM dbo.[InvoicesProduct] WHERE invoiceId = @p_id);
+        DELETE FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId IN (SELECT id FROM dbo.[InvoicesProduct] WHERE invoiceId = @p_id);
+        DELETE FROM dbo.[InvoicesProductItinerary] WHERE invoiceProductId IN (SELECT id FROM dbo.[InvoicesProduct] WHERE invoiceId = @p_id);
+        DELETE FROM dbo.[InvoicesProductCombo] WHERE invoiceId = @p_id;
+        DELETE FROM dbo.[InvoicesProduct] WHERE invoiceId = @p_id;
+
+        -- Inserción de Combos
+        IF JSON_QUERY(@p_data, '$.combos') IS NOT NULL
+        BEGIN
+            INSERT INTO dbo.[InvoicesProductCombo] ([invoiceId], [comboId])
+            SELECT @p_id, CAST(JSON_VALUE(value, '$.comboId') AS INT)
+            FROM OPENJSON(@p_data, '$.combos')
+            WHERE JSON_VALUE(value, '$.comboId') IS NOT NULL;
+        END;
+
+        -- Inserción de Items (InvoicesProduct)
+        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
+        BEGIN
+            DECLARE item_cursor CURSOR LOCAL FAST_FORWARD FOR
+            SELECT [key], [value]
+            FROM OPENJSON(@p_data, '$.items');
+
+            OPEN item_cursor;
+            DECLARE @itemKey NVARCHAR(50), @itemJson NVARCHAR(MAX);
+
+            FETCH NEXT FROM item_cursor INTO @itemKey, @itemJson;
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                DECLARE @prodId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.productId') AS INT);
+                DECLARE @provId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.providerId') AS INT);
+                DECLARE @prestId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.prestadoraId') AS INT);
+                DECLARE @ticketCode NVARCHAR(100) = JSON_VALUE(@itemJson, '$.ticketCode');
+                DECLARE @qty INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.quantity') AS INT), 1);
+                DECLARE @price FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.price') AS FLOAT), 0);
+                DECLARE @cost FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.cost') AS FLOAT), 0);
+                DECLARE @checkIn DATETIME2 = TRY_CAST(JSON_VALUE(@itemJson, '$.checkIn') AS DATETIME2);
+                DECLARE @checkOut DATETIME2 = TRY_CAST(JSON_VALUE(@itemJson, '$.checkOut') AS DATETIME2);
+                DECLARE @nights INT = TRY_CAST(JSON_VALUE(@itemJson, '$.nights') AS INT);
+                DECLARE @paxAdults INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.paxAdults') AS INT), 1);
+                DECLARE @paxChildren INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.paxChildren') AS INT), 0);
+                DECLARE @srvType NVARCHAR(100) = JSON_VALUE(@itemJson, '$.serviceType');
+                DECLARE @dest NVARCHAR(250) = JSON_VALUE(@itemJson, '$.destination');
+                DECLARE @resCode NVARCHAR(100) = JSON_VALUE(@itemJson, '$.reservationCode');
+                DECLARE @sComm FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.sellerCommission') AS FLOAT), 0);
+                DECLARE @tpComm FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.ticketPrinterCommission') AS FLOAT), 0);
+                DECLARE @comboId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.comboId') AS INT);
+                DECLARE @mainTaxId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.mainTaxId') AS INT);
+                DECLARE @inNat INT = ISNULL(TRY_CAST(JSON_VALUE(@itemJson, '$.inNationality') AS INT), 1);
+                DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@itemJson, '$.servicios');
+                DECLARE @descripcion NVARCHAR(MAX) = ISNULL(JSON_VALUE(@itemJson, '$.descripcion'), JSON_VALUE(@itemJson, '$.itemDescription'));
+                DECLARE @itin NVARCHAR(MAX) = JSON_VALUE(@itemJson, '$.itinerary');
+                DECLARE @class NVARCHAR(50) = JSON_VALUE(@itemJson, '$.class');
+                DECLARE @airline NVARCHAR(100) = JSON_VALUE(@itemJson, '$.airline');
+                DECLARE @ticketTypeId INT = TRY_CAST(JSON_VALUE(@itemJson, '$.ticketTypeId') AS INT);
+                DECLARE @provDueDate DATETIME2 = TRY_CAST(JSON_VALUE(@itemJson, '$.providerDueDate') AS DATETIME2);
+                DECLARE @provInvoice NVARCHAR(100) = JSON_VALUE(@itemJson, '$.providerInvoice');
+
+                IF @prodId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Product] WHERE id = @prodId) SET @prodId = NULL;
+                IF @provId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @provId) SET @provId = NULL;
+                IF @prestId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestId) SET @prestId = NULL;
+                IF @ticketTypeId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketType] WHERE id = @ticketTypeId) SET @ticketTypeId = NULL;
+
+                INSERT INTO dbo.[InvoicesProduct] (
+                    [invoiceId], [productId], [ticketCode], [quantity], [price], [cost],
+                    [providerId], [prestadoraId], [checkInDate], [checkOutDate], [nights],
+                    [paxAdults], [paxChildren], [serviceType], [destination], [reservationCode],
+                    [sellerCommission], [ticketPrinterCommission], [comboId], [mainTaxId], [inNationality],
+                    [servicios], [descripcion], [itinerary], [class], [airline], [ticketTypeId],
+                    [providerDueDate], [providerInvoice]
+                ) VALUES (
+                    @p_id, @prodId, @ticketCode, @qty, @price, @cost,
+                    @provId, @prestId, @checkIn, @checkOut, @nights,
+                    @paxAdults, @paxChildren, @srvType, @dest, @resCode,
+                    @sComm, @tpComm, @comboId, @mainTaxId, @inNat,
+                    @servicios, @descripcion, @itin, @class, @airline, @ticketTypeId,
+                    @provDueDate, @provInvoice
+                );
+
+                DECLARE @newIpId INT = SCOPE_IDENTITY();
+
+                -- Impuestos del Item
+                IF JSON_QUERY(@itemJson, '$.appliedTaxes') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductTax] ([invoiceProductId], [chargeAndTaxId], [explicitAmount], [rate])
+                    SELECT 
+                        @newIpId,
+                        TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) AS INT),
+                        ISNULL(TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.explicitAmount'), JSON_VALUE(tax.value, '$.amount')) AS FLOAT), 0),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.rate') AS FLOAT), 0)
+                    FROM OPENJSON(@itemJson, '$.appliedTaxes') AS tax
+                    WHERE ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) IS NOT NULL;
+                END;
+
+                -- Pasajeros del Item
+                IF JSON_QUERY(@itemJson, '$.passengers') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [document])
+                    SELECT @newIpId, JSON_VALUE(pax.value, '$.name'), JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@itemJson, '$.passengers') AS pax;
+                END;
+
+                -- Variables del Item
+                IF JSON_QUERY(@itemJson, '$.variables') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductVariable] ([invoiceProductId], [masterVariableId], [value])
+                    SELECT 
+                        @newIpId,
+                        TRY_CAST(JSON_VALUE(vr.value, '$.masterVariableId') AS INT),
+                        JSON_VALUE(vr.value, '$.value')
+                    FROM OPENJSON(@itemJson, '$.variables') AS vr
+                    WHERE JSON_VALUE(vr.value, '$.masterVariableId') IS NOT NULL;
+                END;
+
+                -- Pagos del Item
+                IF JSON_QUERY(@itemJson, '$.payments') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductPayment] (
+                        [invoiceProductId], [amount], [paymentMethod], [date], [reference],
+                        [creditCardId], [authorizationCode], [voucher], [cardNumber], [expirationDate]
+                    )
+                    SELECT 
+                        @newIpId,
+                        ISNULL(TRY_CAST(JSON_VALUE(pay.value, '$.amount') AS FLOAT), 0),
+                        JSON_VALUE(pay.value, '$.paymentMethod'),
+                        TRY_CAST(JSON_VALUE(pay.value, '$.date') AS DATETIME2),
+                        JSON_VALUE(pay.value, '$.reference'),
+                        TRY_CAST(JSON_VALUE(pay.value, '$.creditCardId') AS INT),
+                        JSON_VALUE(pay.value, '$.authorizationCode'),
+                        JSON_VALUE(pay.value, '$.voucher'),
+                        JSON_VALUE(pay.value, '$.cardNumber'),
+                        JSON_VALUE(pay.value, '$.expirationDate')
+                    FROM OPENJSON(@itemJson, '$.payments') AS pay;
+                END;
+
+                -- Itinerarios del Item
+                IF JSON_QUERY(@itemJson, '$.itinerariesItineraryList') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[InvoicesProductItinerary] (
+                        [invoiceProductId], [orden], [origin], [destination], [class],
+                        [checkInDate], [checkOutDate], [terminal], [prestadoraCode], [farebasis],
+                        [Numflight], [Typeflight], [amount], [co2]
+                    )
+                    SELECT 
+                        @newIpId,
+                        ISNULL(TRY_CAST(JSON_VALUE(itin.value, '$.orden') AS INT), 1),
+                        JSON_VALUE(itin.value, '$.origin'),
+                        JSON_VALUE(itin.value, '$.destination'),
+                        JSON_VALUE(itin.value, '$.class'),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.checkInDate') AS DATETIME2),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.checkOutDate') AS DATETIME2),
+                        JSON_VALUE(itin.value, '$.terminal'),
+                        JSON_VALUE(itin.value, '$.prestadoraCode'),
+                        JSON_VALUE(itin.value, '$.farebasis'),
+                        JSON_VALUE(itin.value, '$.Numflight'),
+                        JSON_VALUE(itin.value, '$.Typeflight'),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.amount') AS FLOAT),
+                        TRY_CAST(JSON_VALUE(itin.value, '$.co2') AS FLOAT)
+                    FROM OPENJSON(@itemJson, '$.itinerariesItineraryList') AS itin;
+                END;
+
+                FETCH NEXT FROM item_cursor INTO @itemKey, @itemJson;
+            END;
+
+            CLOSE item_cursor;
+            DEALLOCATE item_cursor;
+        END;
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Factura actualizada exitosamente (ID ', @p_id, N')');
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.28. spInvoicesEliminar
+IF OBJECT_ID('dbo.spInvoicesEliminar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spInvoicesEliminar;
+GO
+
+CREATE PROCEDURE dbo.spInvoicesEliminar
+    @p_id INT,
+    @p_acting_user_id INT = 1,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Invoices] WHERE id = @p_id)
+        BEGIN
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: La factura con ID ', @p_id, N' no existe.');
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END;
+
+        UPDATE dbo.[Invoices]
+        SET [state] = N'ANULADO'
+        WHERE id = @p_id;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Factura anulada exitosamente (ID ', @p_id, N')');
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.29. spInvoicesListar
+IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spInvoicesListar;
+GO
+
+CREATE PROCEDURE dbo.spInvoicesListar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        i.[id],
+        i.[internalNumber],
+        i.[date],
+        i.[dueDate],
+        i.[clientId],
+        c.[name] AS [clientName],
+        c.[document] AS [clientDocument],
+        ISNULL(NULLIF(i.[totalAmount], 0), 0) AS [totalAmount],
+        ISNULL(i.[currency], 'COP') AS [currency],
+        ISNULL(i.[state], 'NUEVO') AS [state],
+        ISNULL(i.[isExcelImport], 0) AS [isExcelImport],
+        i.[zeusInvoiceNumber],
+        i.[fuente],
+        i.[serie],
+        i.[consecutivo],
+        (
+            SELECT TOP 1 ipp.[name]
+            FROM dbo.[InvoicesProduct] ip
+            JOIN dbo.[InvoicesProductPasenger] ipp ON ipp.[invoiceProductId] = ip.[id]
+            WHERE ip.[invoiceId] = i.[id] AND ipp.[name] IS NOT NULL AND ipp.[name] <> ''
+        ) AS [paxName],
+        (
+            SELECT TOP 1 ISNULL(prest.[name], prov.[name])
+            FROM dbo.[InvoicesProduct] ip
+            LEFT JOIN dbo.[Prestadora] prest ON ip.[prestadoraId] = prest.[id]
+            LEFT JOIN dbo.[Provider] prov ON ip.[providerId] = prov.[id]
+            WHERE ip.[invoiceId] = i.[id] AND (prest.[name] IS NOT NULL OR prov.[name] IS NOT NULL)
+        ) AS [providerName],
+        (
+            SELECT MIN(ip.[checkInDate])
+            FROM dbo.[InvoicesProduct] ip
+            WHERE ip.[invoiceId] = i.[id]
+        ) AS [checkInDate],
+        (
+            SELECT MAX(ip.[checkOutDate])
+            FROM dbo.[InvoicesProduct] ip
+            WHERE ip.[invoiceId] = i.[id]
+        ) AS [checkOutDate]
+    FROM dbo.[Invoices] i
+    LEFT JOIN dbo.[Client] c ON i.[clientId] = c.[id]
+    ORDER BY i.[date] DESC, i.[id] DESC;
+END;
+GO
+
+-- 2.30. spPreCotizacionListar
+IF OBJECT_ID('dbo.spPreCotizacionListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spPreCotizacionListar;
+GO
+
+CREATE PROCEDURE dbo.spPreCotizacionListar
+    @p_search NVARCHAR(250) = NULL,
+    @p_state NVARCHAR(50) = NULL,
+    @p_branch_id INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        pq.[id],
+        pq.[consecutivo],
+        pq.[branchId],
+        b.[name] AS [branchName],
+        pq.[clientId],
+        c.[name] AS [clientName],
+        pq.[clientNameText],
+        pq.[sellerId],
+        s.[name] AS [sellerName],
+        pq.[ticketPrinterId],
+        tp.[name] AS [ticketPrinterName],
+        pq.[providerId],
+        prov.[name] AS [providerName],
+        pq.[headerDescription],
+        pq.[quotationNotice],
+        pq.[noticeResponse],
+        pq.[preQuotationType],
+        pq.[startDate],
+        pq.[endDate],
+        pq.[state],
+        pq.[customFields],
+        pq.[convertedQuotationId],
+        pq.[convertedUserId],
+        cu.[name] AS [convertedUserName],
+        pq.[convertedAt],
+        pq.[createdAt],
+        pq.[updatedAt],
+        pq.[userId],
+        u.[name] AS [userName]
+    FROM dbo.[PreQuotation] pq
+    LEFT JOIN dbo.[Branch] b ON pq.[branchId] = b.[id]
+    LEFT JOIN dbo.[Client] c ON pq.[clientId] = c.[id]
+    LEFT JOIN dbo.[Seller] s ON pq.[sellerId] = s.[id]
+    LEFT JOIN dbo.[TicketPrinter] tp ON pq.[ticketPrinterId] = tp.[id]
+    LEFT JOIN dbo.[Provider] prov ON pq.[providerId] = prov.[id]
+    LEFT JOIN dbo.[User] u ON pq.[userId] = u.[id]
+    LEFT JOIN dbo.[User] cu ON pq.[convertedUserId] = cu.[id]
+    WHERE 
+        (@p_search IS NULL OR LTRIM(RTRIM(@p_search)) = '' OR 
+         CAST(pq.[consecutivo] AS NVARCHAR(50)) LIKE '%' + @p_search + '%' OR
+         pq.[clientNameText] LIKE '%' + @p_search + '%' OR
+         c.[name] LIKE '%' + @p_search + '%' OR
+         pq.[headerDescription] LIKE '%' + @p_search + '%' OR
+         pq.[quotationNotice] LIKE '%' + @p_search + '%')
+        AND (@p_state IS NULL OR LTRIM(RTRIM(@p_state)) = '' OR pq.[state] = @p_state)
+        AND (@p_branch_id IS NULL OR @p_branch_id = 0 OR pq.[branchId] = @p_branch_id)
+    ORDER BY pq.[id] DESC;
+END;
+GO
+
+-- 2.31. spPreCotizacionCrear
+IF OBJECT_ID('dbo.spPreCotizacionCrear', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spPreCotizacionCrear;
+GO
+
+CREATE PROCEDURE dbo.spPreCotizacionCrear
+    @p_data NVARCHAR(MAX),
+    @p_acting_user_id INT = 1,
+    @p_pre_quotation_id INT = NULL OUTPUT,
+    @p_consecutivo INT = NULL OUTPUT,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[PreQuotation])
+        BEGIN
+            DBCC CHECKIDENT ('dbo.[PreQuotation]', RESEED, 0);
+        END;
+
+        DECLARE @branchId INT = TRY_CAST(JSON_VALUE(@p_data, '$.branchId') AS INT);
+        DECLARE @clientId INT = TRY_CAST(JSON_VALUE(@p_data, '$.clientId') AS INT);
+        DECLARE @clientNameText NVARCHAR(250) = JSON_VALUE(@p_data, '$.clientNameText');
+        DECLARE @sellerId INT = TRY_CAST(JSON_VALUE(@p_data, '$.sellerId') AS INT);
+        DECLARE @ticketPrinterId INT = TRY_CAST(JSON_VALUE(@p_data, '$.ticketPrinterId') AS INT);
+        DECLARE @providerId INT = TRY_CAST(JSON_VALUE(@p_data, '$.providerId') AS INT);
+        DECLARE @headerDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.headerDescription');
+        DECLARE @quotationNotice NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.quotationNotice');
+        DECLARE @preQuotationType NVARCHAR(100) = JSON_VALUE(@p_data, '$.preQuotationType');
+        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
+        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
+        DECLARE @customFields NVARCHAR(MAX) = JSON_QUERY(@p_data, '$.customFields');
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
+            SET @clientId = NULL;
+        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
+            SET @branchId = NULL;
+        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
+            SET @sellerId = NULL;
+        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
+            SET @ticketPrinterId = NULL;
+        IF @providerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerId)
+            SET @providerId = NULL;
+
+        DECLARE @nextConsecutivo INT = (SELECT ISNULL(MAX(consecutivo), 0) + 1 FROM dbo.[PreQuotation]);
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.[PreQuotation] (
+            consecutivo, branchId, clientId, clientNameText, sellerId, ticketPrinterId, providerId,
+            headerDescription, quotationNotice, preQuotationType, startDate, endDate,
+            [state], customFields, createdAt, updatedAt, userId
+        ) VALUES (
+            @nextConsecutivo, @branchId, @clientId, @clientNameText, @sellerId, @ticketPrinterId, @providerId,
+            @headerDescription, @quotationNotice, @preQuotationType, @startDate, @endDate,
+            N'PENDIENTE', @customFields, GETDATE(), GETDATE(), @actingUserId
+        );
+
+        SET @p_pre_quotation_id = SCOPE_IDENTITY();
+        SET @p_consecutivo = @nextConsecutivo;
+
+        INSERT INTO dbo.[PreQuotationStateHistory] (preQuotationId, [state], [description], createdAt, userId)
+        VALUES (@p_pre_quotation_id, N'PENDIENTE', N'Creación de pre-cotización', GETDATE(), @actingUserId);
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Pre-Cotización #', @p_consecutivo, N' creada correctamente');
+        SELECT @p_pre_quotation_id AS p_pre_quotation_id, @p_consecutivo AS p_consecutivo, @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_pre_quotation_id = 0;
+        SET @p_consecutivo = 0;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT 0 AS p_pre_quotation_id, 0 AS p_consecutivo, @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.32. spPreCotizacionConvertir
+IF OBJECT_ID('dbo.spPreCotizacionConvertir', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spPreCotizacionConvertir;
+GO
+
+CREATE PROCEDURE dbo.spPreCotizacionConvertir
+    @p_pre_quotation_id INT,
+    @p_quotation_id INT = NULL,
+    @p_acting_user_id INT = 1,
+    @p_notice_response NVARCHAR(MAX) = NULL,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[PreQuotation] WHERE id = @p_pre_quotation_id)
+        BEGIN
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: Pre-Cotización con ID ', @p_pre_quotation_id, N' no existe');
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END;
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        BEGIN TRANSACTION;
+
+        IF @p_quotation_id IS NOT NULL AND @p_quotation_id > 0
+        BEGIN
+            UPDATE dbo.[PreQuotation]
+            SET [state] = N'CONVERTIDA',
+                convertedQuotationId = @p_quotation_id,
+                convertedUserId = @actingUserId,
+                convertedAt = GETDATE(),
+                noticeResponse = ISNULL(@p_notice_response, noticeResponse),
+                updatedAt = GETDATE()
+            WHERE id = @p_pre_quotation_id;
+
+            INSERT INTO dbo.[PreQuotationStateHistory] (preQuotationId, [state], [description], createdAt, userId)
+            VALUES (@p_pre_quotation_id, N'CONVERTIDA', CONCAT(N'Convertida a Cotización #', @p_quotation_id), GETDATE(), @actingUserId);
+
+            SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Pre-Cotización convertida exitosamente a Cotización #', @p_quotation_id);
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.[PreQuotation]
+            SET noticeResponse = ISNULL(@p_notice_response, noticeResponse),
+                updatedAt = GETDATE()
+            WHERE id = @p_pre_quotation_id;
+
+            IF @p_notice_response IS NOT NULL AND TRIM(@p_notice_response) <> ''
+            BEGIN
+                INSERT INTO dbo.[PreQuotationStateHistory] (preQuotationId, [state], [description], createdAt, userId)
+                VALUES (@p_pre_quotation_id, N'RESPUESTA_DUDA', CONCAT(N'Respuesta/Duda: ', @p_notice_response), GETDATE(), @actingUserId);
+            END;
+
+            SET @p_mensaje_resultado = N'SUCCESS: Respuesta / Duda registrada en la Pre-Cotización correctamente.';
+        END;
+
+        COMMIT TRANSACTION;
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.33. spPreCotizacionEliminar
+IF OBJECT_ID('dbo.spPreCotizacionEliminar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spPreCotizacionEliminar;
+GO
+
+CREATE PROCEDURE dbo.spPreCotizacionEliminar
+    @p_id INT,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[PreQuotation] WHERE id = @p_id)
+        BEGIN
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: Pre-Cotización no encontrada con ID ', @p_id);
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END;
+
+        BEGIN TRANSACTION;
+        DELETE FROM dbo.[PreQuotationStateHistory] WHERE preQuotationId = @p_id;
+        DELETE FROM dbo.[PreQuotation] WHERE id = @p_id;
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Pre-Cotización #', @p_id, N' eliminada correctamente');
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.34. spCotizacionListar
+IF OBJECT_ID('dbo.spCotizacionListar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionListar;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionListar
+    @p_referencia NVARCHAR(100) = NULL,
+    @p_fecha_desde DATE = NULL,
+    @p_fecha_hasta DATE = NULL,
+    @p_cliente NVARCHAR(250) = NULL,
+    @p_elaborado_por NVARCHAR(250) = NULL,
+    @p_monto_total FLOAT = NULL,
+    @p_estado NVARCHAR(50) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        q.[id],
+        q.[internalNumber],
+        q.[date],
+        q.[clientId],
+        c.[name] AS [clientName],
+        c.[document] AS [clientDocument],
+        q.[currency],
+        q.[exchangeRate],
+        ISNULL(NULLIF(q.[totalAmount], 0), 0) AS [totalAmount],
+        ISNULL(q.[state], N'NUEVO') AS [state],
+        q.[stateDescription],
+        q.[stateUpdatedAt],
+        q.[userId],
+        u.[name] AS [userName],
+        (
+            SELECT c.[id], c.[name], c.[document]
+            FROM dbo.[Client] c
+            WHERE c.[id] = q.[clientId]
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        ) AS [clientJson],
+        (
+            SELECT u.[id], u.[name]
+            FROM dbo.[User] u
+            WHERE u.[id] = q.[userId]
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        ) AS [userJson],
+        (
+            SELECT 
+                qp.[id],
+                qp.[productId],
+                qp.[providerId],
+                qp.[prestadoraId],
+                qp.[quantity],
+                qp.[price],
+                qp.[checkInDate],
+                qp.[checkOutDate],
+                qp.[inNationality],
+                qp.[mainTaxId],
+                (
+                    SELECT p.[id], p.[description]
+                    FROM dbo.[Product] p
+                    WHERE p.[id] = qp.[productId]
+                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+                ) AS [productJson],
+                (
+                    SELECT prov.[id], prov.[name]
+                    FROM dbo.[Provider] prov
+                    WHERE prov.[id] = qp.[providerId]
+                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+                ) AS [providerJson],
+                (
+                    SELECT prest.[id], prest.[name]
+                    FROM dbo.[Prestadora] prest
+                    WHERE prest.[id] = qp.[prestadoraId]
+                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+                ) AS [prestadoraJson],
+                (
+                    SELECT qpax.[id], qpax.[name], qpax.[document]
+                    FROM dbo.[QuotationProductPassenger] qpax
+                    WHERE qpax.[quotationProductId] = qp.[id]
+                    FOR JSON PATH
+                ) AS [passengersJson],
+                (
+                    SELECT qvar.[id], qvar.[masterVariableId], qvar.[value]
+                    FROM dbo.[QuotationProductVariable] qvar
+                    WHERE qvar.[quotationProductId] = qp.[id]
+                    FOR JSON PATH
+                ) AS [variablesJson],
+                (
+                    SELECT qpt.[chargeAndTaxId], qpt.[explicitAmount], qpt.[isMain]
+                    FROM dbo.[QuotationProductTax] qpt
+                    WHERE qpt.[quotationProductId] = qp.[id]
+                    FOR JSON PATH
+                ) AS [appliedTaxesJson]
+            FROM dbo.[QuotationProduct] qp
+            WHERE qp.[quotationId] = q.[id]
+            FOR JSON PATH
+        ) AS [productsJson]
+    FROM dbo.[Quotation] q
+    LEFT JOIN dbo.[Client] c ON q.[clientId] = c.[id]
+    LEFT JOIN dbo.[User] u ON q.[userId] = u.[id]
+    WHERE 
+        (@p_referencia IS NULL OR CAST(q.[id] AS NVARCHAR(50)) LIKE '%' + @p_referencia + '%' OR q.[internalNumber] LIKE '%' + @p_referencia + '%')
+        AND (@p_fecha_desde IS NULL OR CAST(q.[date] AS DATE) >= @p_fecha_desde)
+        AND (@p_fecha_hasta IS NULL OR CAST(q.[date] AS DATE) <= @p_fecha_hasta)
+        AND (@p_cliente IS NULL OR LTRIM(RTRIM(@p_cliente)) = '' OR c.[name] LIKE '%' + @p_cliente + '%')
+        AND (@p_elaborado_por IS NULL OR LTRIM(RTRIM(@p_elaborado_por)) = '' OR u.[name] LIKE '%' + @p_elaborado_por + '%')
+        AND (@p_monto_total IS NULL OR q.[totalAmount] = @p_monto_total)
+        AND (@p_estado IS NULL OR LTRIM(RTRIM(@p_estado)) = '' OR q.[state] LIKE '%' + @p_estado + '%')
+    ORDER BY q.[date] DESC;
+END;
+GO
+
+-- 2.35. spCotizacionHistorial
+IF OBJECT_ID('dbo.spCotizacionHistorial', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionHistorial;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionHistorial
+    @p_referencia NVARCHAR(100) = NULL,
+    @p_fecha_desde DATE = NULL,
+    @p_fecha_hasta DATE = NULL,
+    @p_cliente NVARCHAR(250) = NULL,
+    @p_elaborado_por NVARCHAR(250) = NULL,
+    @p_monto_total FLOAT = NULL,
+    @p_estado NVARCHAR(50) = NULL,
+    @p_reserva NVARCHAR(100) = NULL,
+    @p_pasajero NVARCHAR(250) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT 
+        q.[id],
+        q.[internalNumber],
+        q.[date],
+        c.[name] AS [clientName],
+        u.[name] AS [userName],
+        q.[totalAmount],
+        q.[currency],
+        ISNULL(q.[state], N'NUEVO') AS [state],
+        q.[stateDescription],
+        q.[destination],
+        q.[startDate],
+        q.[endDate],
+        q.[passenger],
+        q.[reservationCode]
+    FROM dbo.[Quotation] q
+    LEFT JOIN dbo.[Client] c ON q.[clientId] = c.[id]
+    LEFT JOIN dbo.[User] u ON q.[userId] = u.[id]
+    WHERE 
+        (@p_referencia IS NULL OR CAST(q.[id] AS NVARCHAR(50)) LIKE '%' + @p_referencia + '%' OR q.[internalNumber] LIKE '%' + @p_referencia + '%')
+        AND (@p_fecha_desde IS NULL OR CAST(q.[date] AS DATE) >= @p_fecha_desde)
+        AND (@p_fecha_hasta IS NULL OR CAST(q.[date] AS DATE) <= @p_fecha_hasta)
+        AND (@p_cliente IS NULL OR LTRIM(RTRIM(@p_cliente)) = '' OR c.[name] LIKE '%' + @p_cliente + '%')
+        AND (@p_elaborado_por IS NULL OR LTRIM(RTRIM(@p_elaborado_por)) = '' OR u.[name] LIKE '%' + @p_elaborado_por + '%')
+        AND (@p_monto_total IS NULL OR q.[totalAmount] = @p_monto_total)
+        AND (@p_estado IS NULL OR LTRIM(RTRIM(@p_estado)) = '' OR q.[state] LIKE '%' + @p_estado + '%')
+        AND (@p_reserva IS NULL OR LTRIM(RTRIM(@p_reserva)) = '' OR q.[reservationCode] LIKE '%' + @p_reserva + '%')
+        AND (@p_pasajero IS NULL OR LTRIM(RTRIM(@p_pasajero)) = '' OR q.[passenger] LIKE '%' + @p_pasajero + '%')
+    ORDER BY q.[date] DESC;
+END;
+GO
+
+-- 2.36. spCotizacionObtener
+IF OBJECT_ID('dbo.spCotizacionObtener', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionObtener;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionObtener
+    @p_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        q.[id],
+        q.[internalNumber],
+        q.[date],
+        q.[clientId],
+        q.[currency],
+        q.[exchangeRate],
+        q.[branchId],
+        q.[implantId],
+        q.[sellerId],
+        q.[ticketPrinterId],
+        q.[commissionPercentage],
+        q.[chargesAndTaxes],
+        q.[totalAmount],
+        q.[destination],
+        q.[startDate],
+        q.[endDate],
+        q.[passenger],
+        q.[paxAdults],
+        q.[paxChildren],
+        q.[reservationCode],
+        q.[copyFieldsToProducts],
+        q.[manualDescription],
+        ISNULL(q.[state], N'Nuevo') AS [state],
+        q.[stateDescription],
+        q.[stateUpdatedAt],
+        (
+            SELECT c.[id], c.[name], c.[document]
+            FROM dbo.[Client] c
+            WHERE c.[id] = q.[clientId]
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        ) AS [clientJson],
+        (
+            SELECT s.[id], s.[name], s.[code]
+            FROM dbo.[Seller] s
+            WHERE s.[id] = q.[sellerId]
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        ) AS [sellerJson],
+        (
+            SELECT b.[id], b.[name], b.[code]
+            FROM dbo.[Branch] b
+            WHERE b.[id] = q.[branchId]
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        ) AS [branchJson],
+        (
+            SELECT imp.[id], imp.[name], imp.[code]
+            FROM dbo.[Implant] imp
+            WHERE imp.[id] = q.[implantId]
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        ) AS [implantJson],
+        (
+            SELECT tp.[id], tp.[name], tp.[code]
+            FROM dbo.[TicketPrinter] tp
+            WHERE tp.[id] = q.[ticketPrinterId]
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        ) AS [ticketPrinterJson],
+        (
+            SELECT 
+                qp.[id],
+                qp.[productId],
+                qp.[providerId],
+                qp.[prestadoraId],
+                qp.[quantity],
+                qp.[price],
+                qp.[cost],
+                qp.[checkInDate],
+                qp.[checkOutDate],
+                qp.[nights],
+                qp.[paxAdults],
+                qp.[paxChildren],
+                qp.[serviceType],
+                qp.[destination],
+                qp.[reservationCode],
+                qp.[sellerCommission],
+                qp.[ticketPrinterCommission],
+                qp.[comboId],
+                qp.[mainTaxId],
+                qp.[inNationality],
+                qp.[service],
+                qp.[servicios],
+                qp.[descripcion],
+                qp.[passenger],
+                qp.[providerDueDate],
+                qp.[providerInvoice],
+                (
+                    SELECT p.[id], p.[description], p.[code]
+                    FROM dbo.[Product] p
+                    WHERE p.[id] = qp.[productId]
+                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+                ) AS [productJson],
+                (
+                    SELECT prov.[id], prov.[name], prov.[code]
+                    FROM dbo.[Provider] prov
+                    WHERE prov.[id] = qp.[providerId]
+                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+                ) AS [providerJson],
+                (
+                    SELECT prest.[id], prest.[name], prest.[code]
+                    FROM dbo.[Prestadora] prest
+                    WHERE prest.[id] = qp.[prestadoraId]
+                    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+                ) AS [prestadoraJson],
+                (
+                    SELECT qpax.[id], qpax.[name], qpax.[document]
+                    FROM dbo.[QuotationProductPassenger] qpax
+                    WHERE qpax.[quotationProductId] = qp.[id]
+                    FOR JSON PATH
+                ) AS [passengersJson],
+                (
+                    SELECT qvar.[id], qvar.[masterVariableId], qvar.[value]
+                    FROM dbo.[QuotationProductVariable] qvar
+                    WHERE qvar.[quotationProductId] = qp.[id]
+                    FOR JSON PATH
+                ) AS [variablesJson],
+                (
+                    SELECT qpt.[id], qpt.[chargeAndTaxId], qpt.[explicitAmount] AS [amount], qpt.[explicitAmount], ct.[code] AS [taxCode], ct.[name] AS [taxName]
+                    FROM dbo.[QuotationProductTax] qpt
+                    LEFT JOIN dbo.[ChargeAndTax] ct ON qpt.[chargeAndTaxId] = ct.[id]
+                    WHERE qpt.[quotationProductId] = qp.[id]
+                    FOR JSON PATH
+                ) AS [appliedTaxesJson],
+                (
+                    SELECT qpmt.[id], qpmt.[amount], qpmt.[paymentMethod], qpmt.[date], qpmt.[reference], qpmt.[creditCardId], qpmt.[cardNumber], qpmt.[authorizationCode], qpmt.[voucher], qpmt.[expirationDate]
+                    FROM dbo.[QuotationProductPayment] qpmt
+                    WHERE qpmt.[quotationProductId] = qp.[id]
+                    FOR JSON PATH
+                ) AS [paymentsJson]
+            FROM dbo.[QuotationProduct] qp
+            WHERE qp.[quotationId] = q.[id]
+            FOR JSON PATH
+        ) AS [productsJson],
+        (
+            SELECT qc.[comboId] AS [id], qc.[comboId], cmb.[name]
+            FROM dbo.[QuotationCombo] qc
+            LEFT JOIN dbo.[Combo] cmb ON qc.[comboId] = cmb.[id]
+            WHERE qc.[quotationId] = q.[id]
+            FOR JSON PATH
+        ) AS [combosJson],
+        (
+            SELECT ms.[id], ms.[serviceName] AS [name], ms.[serviceName], ms.[salePrice] AS [amount], ms.[salePrice], ms.[cost], ms.[utility], ms.[providerName]
+            FROM dbo.[QuotationManualService] ms
+            WHERE ms.[quotationId] = q.[id]
+            FOR JSON PATH
+        ) AS [manualServicesJson],
+        (
+            SELECT sh.[id], sh.[quotationId], sh.[state], sh.[description], sh.[userId], u.[name] AS [userName], sh.[createdAt]
+            FROM dbo.[QuotationStateHistory] sh
+            LEFT JOIN dbo.[User] u ON sh.[userId] = u.[id]
+            WHERE sh.[quotationId] = q.[id]
+            ORDER BY sh.[id] ASC
+            FOR JSON PATH
+        ) AS [stateHistoryJson]
+    FROM dbo.[Quotation] q
+    WHERE q.[id] = @p_id;
+END;
+GO
+
+-- 2.37. spCotizacionCrear
+IF OBJECT_ID('dbo.spCotizacionCrear', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionCrear;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionCrear
+    @p_data NVARCHAR(MAX),
+    @p_acting_user_id INT = 1,
+    @p_quotation_id INT = NULL OUTPUT,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])
+        BEGIN
+            DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);
+        END;
+
+        DECLARE @clientId INT = TRY_CAST(JSON_VALUE(@p_data, '$.clientId') AS INT);
+        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
+        DECLARE @exchangeRate FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
+        DECLARE @branchId INT = TRY_CAST(JSON_VALUE(@p_data, '$.branchId') AS INT);
+        DECLARE @implantId INT = TRY_CAST(JSON_VALUE(@p_data, '$.implantId') AS INT);
+        DECLARE @sellerId INT = TRY_CAST(JSON_VALUE(@p_data, '$.sellerId') AS INT);
+        DECLARE @ticketPrinterId INT = TRY_CAST(JSON_VALUE(@p_data, '$.ticketPrinterId') AS INT);
+        DECLARE @totalAmount FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
+        DECLARE @baseCommissionable FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
+        DECLARE @chargesAndTaxes FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
+        DECLARE @commissionPercentage FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
+        DECLARE @destination NVARCHAR(250) = JSON_VALUE(@p_data, '$.destination');
+        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
+        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
+        DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
+        DECLARE @paxAdults INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxAdults') AS INT);
+        DECLARE @paxChildren INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxChildren') AS INT);
+        DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
+        DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
+            SET @clientId = NULL;
+        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
+            SET @branchId = NULL;
+        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
+            SET @sellerId = NULL;
+        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
+            SET @implantId = NULL;
+        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
+            SET @ticketPrinterId = NULL;
+
+        DECLARE @internalNum NVARCHAR(100) = NULL;
+        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @internalNum OUTPUT;
+
+        -- Validación de variables adicionales obligatorias del cliente para cotizaciones
+        IF @clientId IS NOT NULL
+        BEGIN
+            DECLARE @clientMandatoryVarsJson NVARCHAR(MAX) = (SELECT mandatoryVariables FROM dbo.[Client] WHERE id = @clientId);
+            IF @clientMandatoryVarsJson IS NOT NULL AND ISJSON(@clientMandatoryVarsJson) = 1
+            BEGIN
+                DECLARE @reqVarList TABLE (varId INT);
+                IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotation') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotation') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END
+                ELSE IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotations') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotations') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END
+                ELSE IF JSON_VALUE(@clientMandatoryVarsJson, '$[0]') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson) WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END;
+
+                IF EXISTS (SELECT 1 FROM @reqVarList)
+                BEGIN
+                    DECLARE @reqVarId INT;
+                    DECLARE req_var_cur CURSOR LOCAL FAST_FORWARD FOR
+                    SELECT varId FROM @reqVarList;
+
+                    OPEN req_var_cur;
+                    FETCH NEXT FROM req_var_cur INTO @reqVarId;
+
+                    WHILE @@FETCH_STATUS = 0
+                    BEGIN
+                        DECLARE @reqVarName NVARCHAR(250) = (SELECT [name] FROM dbo.[MasterVariable] WHERE id = @reqVarId);
+                        SET @reqVarName = ISNULL(@reqVarName, CONCAT(N'Variable #', @reqVarId));
+
+                        IF EXISTS (
+                            SELECT 1
+                            FROM OPENJSON(@p_data, '$.items') AS itm
+                            OUTER APPLY (
+                                SELECT COUNT(1) AS cnt
+                                FROM OPENJSON(itm.[value], '$.variables') AS v
+                                WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
+                                  AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
+                            ) vars
+                            WHERE ISNULL(vars.cnt, 0) = 0
+                        )
+                        BEGIN
+                            DECLARE @missingProdDesc NVARCHAR(250) = (
+                                SELECT TOP 1 ISNULL(p.[description], CONCAT(N'Producto #', ISNULL(TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS NVARCHAR(50)), '1')))
+                                FROM OPENJSON(@p_data, '$.items') AS itm
+                                LEFT JOIN dbo.[Product] p ON p.id = TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS INT)
+                                OUTER APPLY (
+                                    SELECT COUNT(1) AS cnt
+                                    FROM OPENJSON(itm.[value], '$.variables') AS v
+                                    WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
+                                      AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
+                                ) vars
+                                WHERE ISNULL(vars.cnt, 0) = 0
+                            );
+
+                            SET @p_mensaje_resultado = CONCAT(N'ERROR: El cliente requiere completar la variable adicional "', @reqVarName, N'" en el producto "', ISNULL(@missingProdDesc, N'Producto'), N'".');
+                            CLOSE req_var_cur;
+                            DEALLOCATE req_var_cur;
+                            RETURN;
+                        END;
+
+                        FETCH NEXT FROM req_var_cur INTO @reqVarId;
+                    END;
+
+                    CLOSE req_var_cur;
+                    DEALLOCATE req_var_cur;
+                END;
+            END;
+        END;
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.[Quotation] (
+            internalNumber, [date], clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
+            baseCommissionable, chargesAndTaxes, totalAmount, commissionPercentage, userId, state, stateDescription, stateUpdatedAt,
+            destination, startDate, endDate, passenger, paxAdults, paxChildren, reservationCode, manualDescription
+        ) VALUES (
+            ISNULL(@internalNum, N'TEMP'), GETDATE(), @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId, @ticketPrinterId,
+            @baseCommissionable, @chargesAndTaxes, @totalAmount, @commissionPercentage, @actingUserId, N'NUEVO', N'Creación de cotización', GETDATE(),
+            @destination, @startDate, @endDate, @passenger, @paxAdults, @paxChildren, @reservationCode, @manualDescription
+        );
+
+        SET @p_quotation_id = SCOPE_IDENTITY();
+
+        IF @internalNum IS NULL OR @internalNum = N'TEMP'
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET internalNumber = CAST(@p_quotation_id AS NVARCHAR(50))
+            WHERE id = @p_quotation_id;
+        END;
+
+        INSERT INTO dbo.[QuotationStateHistory] (quotationId, state, [description], createdAt, userId)
+        VALUES (@p_quotation_id, N'NUEVO', N'Creación de cotización', GETDATE(), @actingUserId);
+
+        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
+        BEGIN
+            DECLARE @item_val NVARCHAR(MAX);
+            DECLARE item_cur CURSOR LOCAL FAST_FORWARD FOR
+            SELECT [value] FROM OPENJSON(@p_data, '$.items');
+
+            OPEN item_cur;
+            FETCH NEXT FROM item_cur INTO @item_val;
+
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                DECLARE @productId INT = TRY_CAST(JSON_VALUE(@item_val, '$.productId') AS INT);
+                DECLARE @quantity INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.quantity') AS INT), 1);
+                DECLARE @price FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.price') AS FLOAT), 0);
+                DECLARE @cost FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.cost') AS FLOAT), 0);
+                DECLARE @providerId INT = TRY_CAST(JSON_VALUE(@item_val, '$.providerId') AS INT);
+                DECLARE @prestadoraId INT = TRY_CAST(JSON_VALUE(@item_val, '$.prestadoraId') AS INT);
+                DECLARE @checkInDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkIn') AS DATETIME2);
+                DECLARE @checkOutDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkOut') AS DATETIME2);
+                DECLARE @nights INT = TRY_CAST(JSON_VALUE(@item_val, '$.nights') AS INT);
+                DECLARE @paxAdultsItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxAdults') AS INT);
+                DECLARE @paxChildrenItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxChildren') AS INT);
+                DECLARE @serviceType NVARCHAR(250) = JSON_VALUE(@item_val, '$.serviceType');
+                DECLARE @destinationItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.destination');
+                DECLARE @reservationCodeItem NVARCHAR(100) = JSON_VALUE(@item_val, '$.reservationCode');
+                DECLARE @sellerCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.sellerCommission') AS FLOAT);
+                DECLARE @ticketPrinterCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.ticketPrinterCommission') AS FLOAT);
+                DECLARE @comboId INT = TRY_CAST(JSON_VALUE(@item_val, '$.comboId') AS INT);
+                DECLARE @mainTaxId INT = TRY_CAST(JSON_VALUE(@item_val, '$.mainTaxId') AS INT);
+                DECLARE @inNationality INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.inNationality') AS INT), 1);
+                DECLARE @service NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.service');
+                DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.servicios');
+                DECLARE @descripcion NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.descripcion');
+                DECLARE @passengerItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.passenger');
+                DECLARE @providerDueDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.providerDueDate') AS DATETIME2);
+                DECLARE @providerInvoice NVARCHAR(100) = JSON_VALUE(@item_val, '$.providerInvoice');
+
+                IF @providerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerId) SET @providerId = NULL;
+                IF @prestadoraId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraId) SET @prestadoraId = NULL;
+
+                DECLARE @qp_id INT;
+                INSERT INTO dbo.[QuotationProduct] (
+                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
+                    checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
+                    reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
+                    service, servicios, descripcion, description, passenger, providerDueDate, providerInvoice
+                ) VALUES (
+                    @p_quotation_id, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
+                    @checkInDate, @checkOutDate, @nights, @paxAdultsItem, @paxChildrenItem, @serviceType, @destinationItem,
+                    @reservationCodeItem, @sellerCommission, @ticketPrinterCommission, @comboId, @mainTaxId, @inNationality,
+                    @service, @servicios, @descripcion, @descripcion, @passengerItem, @providerDueDate, @providerInvoice
+                );
+                SET @qp_id = SCOPE_IDENTITY();
+
+                -- Insert Applied Taxes (QuotationProductTax)
+                IF JSON_QUERY(@item_val, '$.appliedTaxes') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
+                    SELECT
+                        @qp_id,
+                        TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.explicitAmount') AS FLOAT), ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.amount') AS FLOAT), 0)),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT), 0),
+                        ISNULL(JSON_VALUE(tax.value, '$.valueTypeSnapshot'), 'FIXED'),
+                        CASE WHEN TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) = @mainTaxId OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
+                    FROM OPENJSON(@item_val, '$.appliedTaxes') AS tax
+                    WHERE TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) IS NOT NULL;
+                END;
+
+                -- Insert Passengers (QuotationProductPassenger)
+                IF JSON_QUERY(@item_val, '$.passengers') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
+                    SELECT
+                        @qp_id,
+                        JSON_VALUE(pax.value, '$.name'),
+                        JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@item_val, '$.passengers') AS pax
+                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
+                END;
+
+                -- Insert Variables (QuotationProductVariable)
+                IF JSON_QUERY(@item_val, '$.variables') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, value)
+                    SELECT
+                        @qp_id,
+                        TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT),
+                        JSON_VALUE(v.value, '$.value')
+                    FROM OPENJSON(@item_val, '$.variables') AS v
+                    WHERE TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT) IS NOT NULL;
+                END;
+
+                -- Insert Payments (QuotationProductPayment)
+                IF JSON_QUERY(@item_val, '$.payments') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPayment] (
+                        quotationProductId, amount, paymentMethod, date, reference, creditCardId, cardNumber, authorizationCode, voucher, expirationDate
+                    )
+                    SELECT
+                        @qp_id,
+                        ISNULL(TRY_CAST(JSON_VALUE(pmt.value, '$.amount') AS FLOAT), 0),
+                        JSON_VALUE(pmt.value, '$.paymentMethod'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.date') AS DATETIME2),
+                        JSON_VALUE(pmt.value, '$.reference'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.creditCardId') AS INT),
+                        JSON_VALUE(pmt.value, '$.cardNumber'),
+                        JSON_VALUE(pmt.value, '$.authorizationCode'),
+                        JSON_VALUE(pmt.value, '$.voucher'),
+                        JSON_VALUE(pmt.value, '$.expirationDate')
+                    FROM OPENJSON(@item_val, '$.payments') AS pmt;
+                END;
+
+                FETCH NEXT FROM item_cur INTO @item_val;
+            END;
+
+            CLOSE item_cur;
+            DEALLOCATE item_cur;
+        END;
+
+        -- Recalculate totalAmount if 0 or missing
+        DECLARE @calcTotal FLOAT = (
+            SELECT SUM(ISNULL(qpt.explicitAmount, 0))
+            FROM dbo.[QuotationProductTax] qpt
+            JOIN dbo.[QuotationProduct] qp ON qpt.quotationProductId = qp.id
+            WHERE qp.quotationId = @p_quotation_id
+        );
+        IF @calcTotal IS NULL OR @calcTotal = 0
+        BEGIN
+            SET @calcTotal = (
+                SELECT SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1))
+                FROM dbo.[QuotationProduct] qp
+                WHERE qp.quotationId = @p_quotation_id
+            );
+        END;
+
+        IF @calcTotal IS NOT NULL AND @calcTotal > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @calcTotal,
+                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotal),
+                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotal)
+            WHERE id = @p_quotation_id;
+        END
+        ELSE IF @totalAmount > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @totalAmount
+            WHERE id = @p_quotation_id;
+        END;
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Cotización creada correctamente con ID ', @p_quotation_id);
+        SELECT @p_quotation_id AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT 0 AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.38. spCotizacionActualizar
+IF OBJECT_ID('dbo.spCotizacionActualizar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionActualizar;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionActualizar
+    @p_id INT,
+    @p_data NVARCHAR(MAX),
+    @p_acting_user_id INT = 1,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE id = @p_id)
+        BEGIN
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: Cotización ', @p_id, N' no existe.');
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END;
+
+        DECLARE @clientId INT = TRY_CAST(JSON_VALUE(@p_data, '$.clientId') AS INT);
+        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
+        DECLARE @exchangeRate FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
+        DECLARE @branchId INT = TRY_CAST(JSON_VALUE(@p_data, '$.branchId') AS INT);
+        DECLARE @implantId INT = TRY_CAST(JSON_VALUE(@p_data, '$.implantId') AS INT);
+        DECLARE @sellerId INT = TRY_CAST(JSON_VALUE(@p_data, '$.sellerId') AS INT);
+        DECLARE @ticketPrinterId INT = TRY_CAST(JSON_VALUE(@p_data, '$.ticketPrinterId') AS INT);
+        DECLARE @totalAmount FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
+        DECLARE @baseCommissionable FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
+        DECLARE @chargesAndTaxes FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
+        DECLARE @commissionPercentage FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
+        DECLARE @state NVARCHAR(50) = ISNULL(JSON_VALUE(@p_data, '$.state'), N'NUEVO');
+        DECLARE @stateDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.stateDescription');
+        DECLARE @destination NVARCHAR(250) = JSON_VALUE(@p_data, '$.destination');
+        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
+        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
+        DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
+        DECLARE @paxAdults INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxAdults') AS INT);
+        DECLARE @paxChildren INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxChildren') AS INT);
+        DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
+        DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
+
+        DECLARE @actingUserId INT = @p_acting_user_id;
+        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
+            SET @actingUserId = NULL;
+
+        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
+            SET @clientId = NULL;
+        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
+            SET @branchId = NULL;
+        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
+            SET @sellerId = NULL;
+        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
+            SET @implantId = NULL;
+        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
+            SET @ticketPrinterId = NULL;
+
+        -- Validación de variables adicionales obligatorias del cliente para cotizaciones
+        IF @clientId IS NOT NULL
+        BEGIN
+            DECLARE @clientMandatoryVarsJson NVARCHAR(MAX) = (SELECT mandatoryVariables FROM dbo.[Client] WHERE id = @clientId);
+            IF @clientMandatoryVarsJson IS NOT NULL AND ISJSON(@clientMandatoryVarsJson) = 1
+            BEGIN
+                DECLARE @reqVarList TABLE (varId INT);
+                IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotation') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotation') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END
+                ELSE IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotations') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotations') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END
+                ELSE IF JSON_VALUE(@clientMandatoryVarsJson, '$[0]') IS NOT NULL
+                BEGIN
+                    INSERT INTO @reqVarList (varId)
+                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson) WHERE TRY_CAST([value] AS INT) IS NOT NULL;
+                END;
+
+                IF EXISTS (SELECT 1 FROM @reqVarList)
+                BEGIN
+                    DECLARE @reqVarId INT;
+                    DECLARE req_var_cur CURSOR LOCAL FAST_FORWARD FOR
+                    SELECT varId FROM @reqVarList;
+
+                    OPEN req_var_cur;
+                    FETCH NEXT FROM req_var_cur INTO @reqVarId;
+
+                    WHILE @@FETCH_STATUS = 0
+                    BEGIN
+                        DECLARE @reqVarName NVARCHAR(250) = (SELECT [name] FROM dbo.[MasterVariable] WHERE id = @reqVarId);
+                        SET @reqVarName = ISNULL(@reqVarName, CONCAT(N'Variable #', @reqVarId));
+
+                        IF EXISTS (
+                            SELECT 1
+                            FROM OPENJSON(@p_data, '$.items') AS itm
+                            OUTER APPLY (
+                                SELECT COUNT(1) AS cnt
+                                FROM OPENJSON(itm.[value], '$.variables') AS v
+                                WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
+                                  AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
+                            ) vars
+                            WHERE ISNULL(vars.cnt, 0) = 0
+                        )
+                        BEGIN
+                            DECLARE @missingProdDesc NVARCHAR(250) = (
+                                SELECT TOP 1 ISNULL(p.[description], CONCAT(N'Producto #', ISNULL(TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS NVARCHAR(50)), '1')))
+                                FROM OPENJSON(@p_data, '$.items') AS itm
+                                LEFT JOIN dbo.[Product] p ON p.id = TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS INT)
+                                OUTER APPLY (
+                                    SELECT COUNT(1) AS cnt
+                                    FROM OPENJSON(itm.[value], '$.variables') AS v
+                                    WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
+                                      AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
+                                ) vars
+                                WHERE ISNULL(vars.cnt, 0) = 0
+                            );
+
+                            SET @p_mensaje_resultado = CONCAT(N'ERROR: El cliente requiere completar la variable adicional "', @reqVarName, N'" en el producto "', ISNULL(@missingProdDesc, N'Producto'), N'".');
+                            CLOSE req_var_cur;
+                            DEALLOCATE req_var_cur;
+                            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+                            RETURN;
+                        END;
+
+                        FETCH NEXT FROM req_var_cur INTO @reqVarId;
+                    END;
+
+                    CLOSE req_var_cur;
+                    DEALLOCATE req_var_cur;
+                END;
+            END;
+        END;
+
+        BEGIN TRANSACTION;
+
+        UPDATE dbo.[Quotation]
+        SET
+            clientId = @clientId,
+            currency = @currency,
+            exchangeRate = @exchangeRate,
+            branchId = ISNULL(@branchId, branchId),
+            implantId = @implantId,
+            sellerId = @sellerId,
+            ticketPrinterId = @ticketPrinterId,
+            totalAmount = @totalAmount,
+            baseCommissionable = @baseCommissionable,
+            chargesAndTaxes = @chargesAndTaxes,
+            commissionPercentage = @commissionPercentage,
+            state = @state,
+            stateDescription = ISNULL(@stateDescription, stateDescription),
+            stateUpdatedAt = GETDATE(),
+            destination = @destination,
+            startDate = @startDate,
+            endDate = @endDate,
+            passenger = @passenger,
+            paxAdults = @paxAdults,
+            paxChildren = @paxChildren,
+            reservationCode = @reservationCode,
+            manualDescription = @manualDescription
+        WHERE id = @p_id;
+
+        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
+        BEGIN
+            DELETE FROM dbo.[QuotationProductTax] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProductPassenger] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProductVariable] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProductPayment] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+            DELETE FROM dbo.[QuotationProduct] WHERE quotationId = @p_id;
+
+            DECLARE @item_val_upd NVARCHAR(MAX);
+            DECLARE item_cur_upd CURSOR LOCAL FAST_FORWARD FOR
+            SELECT [value] FROM OPENJSON(@p_data, '$.items');
+
+            OPEN item_cur_upd;
+            FETCH NEXT FROM item_cur_upd INTO @item_val_upd;
+
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                DECLARE @productIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.productId') AS INT);
+                DECLARE @quantityUpd INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.quantity') AS INT), 1);
+                DECLARE @priceUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.price') AS FLOAT), 0);
+                DECLARE @costUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.cost') AS FLOAT), 0);
+                DECLARE @providerIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.providerId') AS INT);
+                DECLARE @prestadoraIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.prestadoraId') AS INT);
+                DECLARE @checkInDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.checkIn') AS DATETIME2);
+                DECLARE @checkOutDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.checkOut') AS DATETIME2);
+                DECLARE @nightsUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.nights') AS INT);
+                DECLARE @paxAdultsItemUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.paxAdults') AS INT);
+                DECLARE @paxChildrenItemUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.paxChildren') AS INT);
+                DECLARE @serviceTypeUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.serviceType');
+                DECLARE @destinationItemUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.destination');
+                DECLARE @reservationCodeItemUpd NVARCHAR(100) = JSON_VALUE(@item_val_upd, '$.reservationCode');
+                DECLARE @sellerCommissionUpd FLOAT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.sellerCommission') AS FLOAT);
+                DECLARE @ticketPrinterCommissionUpd FLOAT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.ticketPrinterCommission') AS FLOAT);
+                DECLARE @comboIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.comboId') AS INT);
+                DECLARE @mainTaxIdUpd INT = TRY_CAST(JSON_VALUE(@item_val_upd, '$.mainTaxId') AS INT);
+                DECLARE @inNationalityUpd INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val_upd, '$.inNationality') AS INT), 1);
+                DECLARE @serviceUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.service');
+                DECLARE @serviciosUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.servicios');
+                DECLARE @descripcionUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.descripcion');
+                DECLARE @passengerItemUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.passenger');
+                DECLARE @providerDueDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.providerDueDate') AS DATETIME2);
+                DECLARE @providerInvoiceUpd NVARCHAR(100) = JSON_VALUE(@item_val_upd, '$.providerInvoice');
+
+                IF @providerIdUpd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerIdUpd) SET @providerIdUpd = NULL;
+                IF @prestadoraIdUpd IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraIdUpd) SET @prestadoraIdUpd = NULL;
+
+                DECLARE @qp_id_upd INT;
+                INSERT INTO dbo.[QuotationProduct] (
+                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
+                    checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
+                    reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
+                    service, servicios, descripcion, description, passenger, providerDueDate, providerInvoice
+                ) VALUES (
+                    @p_id, @productIdUpd, @quantityUpd, @priceUpd, @costUpd, @providerIdUpd, @prestadoraIdUpd,
+                    @checkInDateUpd, @checkOutDateUpd, @nightsUpd, @paxAdultsItemUpd, @paxChildrenItemUpd, @serviceTypeUpd, @destinationItemUpd,
+                    @reservationCodeItemUpd, @sellerCommissionUpd, @ticketPrinterCommissionUpd, @comboIdUpd, @mainTaxIdUpd, @inNationalityUpd,
+                    @serviceUpd, @serviciosUpd, @descripcionUpd, @descripcionUpd, @passengerItemUpd, @providerDueDateUpd, @providerInvoiceUpd
+                );
+                SET @qp_id_upd = SCOPE_IDENTITY();
+
+                -- Insert Applied Taxes (QuotationProductTax)
+                IF JSON_QUERY(@item_val_upd, '$.appliedTaxes') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
+                    SELECT
+                        @qp_id_upd,
+                        TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.explicitAmount') AS FLOAT), ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.amount') AS FLOAT), 0)),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT), 0),
+                        ISNULL(JSON_VALUE(tax.value, '$.valueTypeSnapshot'), 'FIXED'),
+                        CASE WHEN TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) = @mainTaxIdUpd OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
+                    FROM OPENJSON(@item_val_upd, '$.appliedTaxes') AS tax
+                    WHERE TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) IS NOT NULL;
+                END;
+
+                -- Insert Passengers (QuotationProductPassenger)
+                IF JSON_QUERY(@item_val_upd, '$.passengers') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
+                    SELECT
+                        @qp_id_upd,
+                        JSON_VALUE(pax.value, '$.name'),
+                        JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@item_val_upd, '$.passengers') AS pax
+                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
+                END;
+
+                -- Insert Variables (QuotationProductVariable)
+                IF JSON_QUERY(@item_val_upd, '$.variables') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, value)
+                    SELECT
+                        @qp_id_upd,
+                        TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT),
+                        JSON_VALUE(v.value, '$.value')
+                    FROM OPENJSON(@item_val_upd, '$.variables') AS v
+                    WHERE TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT) IS NOT NULL;
+                END;
+
+                -- Insert Payments (QuotationProductPayment)
+                IF JSON_QUERY(@item_val_upd, '$.payments') IS NOT NULL
+                BEGIN
+                    INSERT INTO dbo.[QuotationProductPayment] (
+                        quotationProductId, amount, paymentMethod, date, reference, creditCardId, cardNumber, authorizationCode, voucher, expirationDate
+                    )
+                    SELECT
+                        @qp_id_upd,
+                        ISNULL(TRY_CAST(JSON_VALUE(pmt.value, '$.amount') AS FLOAT), 0),
+                        JSON_VALUE(pmt.value, '$.paymentMethod'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.date') AS DATETIME2),
+                        JSON_VALUE(pmt.value, '$.reference'),
+                        TRY_CAST(JSON_VALUE(pmt.value, '$.creditCardId') AS INT),
+                        JSON_VALUE(pmt.value, '$.cardNumber'),
+                        JSON_VALUE(pmt.value, '$.authorizationCode'),
+                        JSON_VALUE(pmt.value, '$.voucher'),
+                        JSON_VALUE(pmt.value, '$.expirationDate')
+                    FROM OPENJSON(@item_val_upd, '$.payments') AS pmt;
+                END;
+
+                FETCH NEXT FROM item_cur_upd INTO @item_val_upd;
+            END;
+
+            CLOSE item_cur_upd;
+            DEALLOCATE item_cur_upd;
+        END;
+
+        -- Recalculate totalAmount if 0 or missing
+        DECLARE @calcTotalUpd FLOAT = (
+            SELECT SUM(ISNULL(qpt.explicitAmount, 0))
+            FROM dbo.[QuotationProductTax] qpt
+            JOIN dbo.[QuotationProduct] qp ON qpt.quotationProductId = qp.id
+            WHERE qp.quotationId = @p_id
+        );
+        IF @calcTotalUpd IS NULL OR @calcTotalUpd = 0
+        BEGIN
+            SET @calcTotalUpd = (
+                SELECT SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1))
+                FROM dbo.[QuotationProduct] qp
+                WHERE qp.quotationId = @p_id
+            );
+        END;
+
+        IF @calcTotalUpd IS NOT NULL AND @calcTotalUpd > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @calcTotalUpd,
+                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotalUpd),
+                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotalUpd)
+            WHERE id = @p_id;
+        END
+        ELSE IF @totalAmount > 0
+        BEGIN
+            UPDATE dbo.[Quotation]
+            SET totalAmount = @totalAmount
+            WHERE id = @p_id;
+        END;
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Cotización ', @p_id, N' actualizada correctamente.');
+        SELECT @p_id AS p_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT 0 AS p_id, @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.39. spCotizacionDuplicar
+IF OBJECT_ID('dbo.spCotizacionDuplicar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionDuplicar;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionDuplicar
+    @p_quotation_id INT,
+    @p_acting_user_id INT = 1,
+    @p_new_quotation_id INT = NULL OUTPUT,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE id = @p_quotation_id)
+        BEGIN
+            SET @p_new_quotation_id = 0;
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: Cotización origen no encontrada (ID ', @p_quotation_id, N').');
+            SELECT 0 AS p_new_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado, NULL AS internalNumber;
+            RETURN;
+        END;
+
+        DECLARE @userId INT = @p_acting_user_id;
+        IF @userId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @userId)
+            SET @userId = NULL;
+
+        DECLARE @branchId INT, @implantId INT;
+        SELECT @branchId = branchId, @implantId = implantId FROM dbo.[Quotation] WHERE id = @p_quotation_id;
+
+        DECLARE @internalNumber NVARCHAR(100) = NULL;
+        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @internalNumber OUTPUT;
+
+        BEGIN TRANSACTION;
+
+        INSERT INTO dbo.[Quotation] (
+            internalNumber, [date], clientId, currency, exchangeRate,
+            branchId, implantId, sellerId, ticketPrinterId,
+            baseCommissionable, commissionPercentage, chargesAndTaxes,
+            totalAmount, userId, state, stateDescription, stateUpdatedAt,
+            costoTotal, valorBase, utilidad, comisionTotalPercentage,
+            comisionFreelancePercentage, comisionFreelanceValue,
+            comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
+            destination, startDate, endDate, passenger, paxAdults, paxChildren,
+            reservationCode, copyFieldsToProducts, manualDescription
+        )
+        SELECT
+            ISNULL(@internalNumber, N'TEMP'), GETDATE(), clientId, currency, exchangeRate,
+            branchId, implantId, sellerId, ticketPrinterId,
+            baseCommissionable, commissionPercentage, chargesAndTaxes,
+            totalAmount, ISNULL(@userId, userId), N'NUEVO', CONCAT(N'Copia de cotización #', CAST(@p_quotation_id AS NVARCHAR(20))), GETDATE(),
+            costoTotal, valorBase, utilidad, comisionTotalPercentage,
+            comisionFreelancePercentage, comisionFreelanceValue,
+            comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
+            destination, startDate, endDate, passenger, paxAdults, paxChildren,
+            reservationCode, copyFieldsToProducts, manualDescription
+        FROM dbo.[Quotation]
+        WHERE id = @p_quotation_id;
+
+        SET @p_new_quotation_id = SCOPE_IDENTITY();
+
+        IF @internalNumber IS NULL OR @internalNumber = N'TEMP'
+        BEGIN
+            SET @internalNumber = CAST(@p_new_quotation_id AS NVARCHAR(50));
+            UPDATE dbo.[Quotation]
+            SET internalNumber = @internalNumber
+            WHERE id = @p_new_quotation_id;
+        END;
+
+        INSERT INTO dbo.[QuotationStateHistory] (quotationId, state, [description], createdAt, userId)
+        VALUES (@p_new_quotation_id, N'NUEVO', CONCAT(N'Copia de cotización #', CAST(@p_quotation_id AS NVARCHAR(20))), GETDATE(), @userId);
+
+        -- Duplicar combos
+        IF OBJECT_ID('dbo.QuotationCombo', 'U') IS NOT NULL
+        BEGIN
+            INSERT INTO dbo.[QuotationCombo] (quotationId, comboId)
+            SELECT @p_new_quotation_id, comboId
+            FROM dbo.[QuotationCombo]
+            WHERE quotationId = @p_quotation_id;
+        END;
+
+        -- Duplicar servicios manuales
+        IF OBJECT_ID('dbo.QuotationManualService', 'U') IS NOT NULL
+        BEGIN
+            INSERT INTO dbo.[QuotationManualService] (quotationId, providerName, serviceName, cost, salePrice, utility, createdAt)
+            SELECT @p_new_quotation_id, providerName, serviceName, cost, salePrice, utility, GETDATE()
+            FROM dbo.[QuotationManualService]
+            WHERE quotationId = @p_quotation_id;
+        END;
+
+        -- Duplicar productos
+        DECLARE @origQpId INT, @newQpId INT;
+        DECLARE qp_cursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_quotation_id;
+
+        OPEN qp_cursor;
+        FETCH NEXT FROM qp_cursor INTO @origQpId;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            INSERT INTO dbo.[QuotationProduct] (
+                quotationId, productId, quantity, price, cost, providerId, prestadoraId,
+                checkInDate, checkOutDate, nights, paxAdults, paxChildren,
+                serviceType, destination, reservationCode, sellerCommission,
+                ticketPrinterCommission, comboId, mainTaxId, inNationality,
+                service, servicios, descripcion, description, passenger,
+                providerDueDate, providerInvoice
+            )
+            SELECT
+                @p_new_quotation_id, productId, quantity, price, cost, providerId, prestadoraId,
+                checkInDate, checkOutDate, nights, paxAdults, paxChildren,
+                serviceType, destination, reservationCode, sellerCommission,
+                ticketPrinterCommission, comboId, mainTaxId, inNationality,
+                service, servicios, descripcion, description, passenger,
+                providerDueDate, providerInvoice
+            FROM dbo.[QuotationProduct]
+            WHERE id = @origQpId;
+
+            SET @newQpId = SCOPE_IDENTITY();
+
+            -- Duplicar pasajeros
+            INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, [name], document)
+            SELECT @newQpId, [name], document
+            FROM dbo.[QuotationProductPassenger]
+            WHERE quotationProductId = @origQpId;
+
+            -- Duplicar impuestos
+            INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
+            SELECT @newQpId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain
+            FROM dbo.[QuotationProductTax]
+            WHERE quotationProductId = @origQpId;
+
+            -- Duplicar variables
+            INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, [value])
+            SELECT @newQpId, masterVariableId, [value]
+            FROM dbo.[QuotationProductVariable]
+            WHERE quotationProductId = @origQpId;
+
+            -- Duplicar pagos
+            INSERT INTO dbo.[QuotationProductPayment] (quotationProductId, amount, paymentMethod, reference, [date], creditCardId, cardNumber, authorizationCode, voucher, expirationDate)
+            SELECT @newQpId, amount, paymentMethod, reference, [date], creditCardId, cardNumber, authorizationCode, voucher, expirationDate
+            FROM dbo.[QuotationProductPayment]
+            WHERE quotationProductId = @origQpId;
+
+            FETCH NEXT FROM qp_cursor INTO @origQpId;
+        END;
+
+        CLOSE qp_cursor;
+        DEALLOCATE qp_cursor;
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Cotización duplicada correctamente con ID ', @p_new_quotation_id);
+        SELECT @p_new_quotation_id AS p_new_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado, @internalNumber AS internalNumber;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_new_quotation_id = 0;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT 0 AS p_new_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado, NULL AS internalNumber;
+    END CATCH;
+END;
+GO
+
+-- 2.40. spCotizacionEliminar
+IF OBJECT_ID('dbo.spCotizacionEliminar', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionEliminar;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionEliminar
+    @p_id INT,
+    @p_acting_user_id INT = 1,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE id = @p_id)
+        BEGIN
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: Cotización no encontrada con ID ', @p_id);
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END;
+
+        DECLARE @internalNumber NVARCHAR(100) = (SELECT internalNumber FROM dbo.[Quotation] WHERE id = @p_id);
+
+        BEGIN TRANSACTION;
+
+        DELETE FROM dbo.[QuotationProductTax] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+        DELETE FROM dbo.[QuotationProductPassenger] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+        DELETE FROM dbo.[QuotationProductVariable] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+        DELETE FROM dbo.[QuotationProductPayment] WHERE quotationProductId IN (SELECT id FROM dbo.[QuotationProduct] WHERE quotationId = @p_id);
+        DELETE FROM dbo.[QuotationProduct] WHERE quotationId = @p_id;
+        DELETE FROM dbo.[QuotationCombo] WHERE quotationId = @p_id;
+        IF OBJECT_ID('dbo.QuotationManualService', 'U') IS NOT NULL DELETE FROM dbo.[QuotationManualService] WHERE quotationId = @p_id;
+        DELETE FROM dbo.[QuotationStateHistory] WHERE quotationId = @p_id;
+        DELETE FROM dbo.[Quotation] WHERE id = @p_id;
+
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])
+        BEGIN
+            DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);
+        END;
+
+        COMMIT TRANSACTION;
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Cotización ', ISNULL(@internalNumber, CAST(@p_id AS NVARCHAR(20))), N' eliminada con éxito.');
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.41. spCotizacionActualizarEstadoManual
+IF OBJECT_ID('dbo.spCotizacionActualizarEstadoManual', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionActualizarEstadoManual;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionActualizarEstadoManual
+    @p_id INT,
+    @p_state NVARCHAR(50),
+    @p_description NVARCHAR(MAX) = NULL,
+    @p_acting_user_id INT = 1,
+    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE id = @p_id)
+        BEGIN
+            SET @p_mensaje_resultado = CONCAT(N'ERROR: Cotización ', @p_id, N' no existe.');
+            SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+            RETURN;
+        END;
+
+        UPDATE dbo.[Quotation]
+        SET [state] = @p_state,
+            [stateDescription] = ISNULL(@p_description, [stateDescription]),
+            [stateUpdatedAt] = GETDATE()
+        WHERE id = @p_id;
+
+        INSERT INTO dbo.[QuotationStateHistory] (quotationId, [state], [description], createdAt, userId)
+        VALUES (@p_id, @p_state, ISNULL(@p_description, CONCAT(N'Cambio de estado a ', @p_state)), GETDATE(), @p_acting_user_id);
+
+        SET @p_mensaje_resultado = CONCAT(N'SUCCESS: Estado de cotización #', @p_id, N' actualizado a ', @p_state);
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END TRY
+    BEGIN CATCH
+        SET @p_mensaje_resultado = CONCAT(N'ERROR: ', ERROR_MESSAGE());
+        SELECT @p_mensaje_resultado AS p_mensaje_resultado;
+    END CATCH;
+END;
+GO
+
+-- 2.42. spCotizacionActualizarEstado
+IF OBJECT_ID('dbo.spCotizacionActualizarEstado', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionActualizarEstado;
+GO
+
+CREATE PROCEDURE dbo.spCotizacionActualizarEstado
+    @p_response NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF ISJSON(@p_response) = 1
+    BEGIN
+        DECLARE @estadosStr NVARCHAR(MAX);
+        DECLARE resp_cur CURSOR LOCAL FAST_FORWARD FOR
+        SELECT JSON_VALUE(value, '$.Estados') FROM OPENJSON(@p_response);
+
+        OPEN resp_cur;
+        FETCH NEXT FROM resp_cur INTO @estadosStr;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            IF @estadosStr IS NOT NULL AND @estadosStr <> ''
+            BEGIN
+                DECLARE @item NVARCHAR(255);
+                DECLARE item_cur CURSOR LOCAL FAST_FORWARD FOR
+                SELECT value FROM STRING_SPLIT(@estadosStr, '|');
+
+                OPEN item_cur;
+                FETCH NEXT FROM item_cur INTO @item;
+
+                WHILE @@FETCH_STATUS = 0
+                BEGIN
+                    IF CHARINDEX(':', @item) > 0
+                    BEGIN
+                        DECLARE @idStr NVARCHAR(50) = SUBSTRING(@item, 1, CHARINDEX(':', @item) - 1);
+                        DECLARE @estado NVARCHAR(50) = SUBSTRING(@item, CHARINDEX(':', @item) + 1, LEN(@item));
+                        DECLARE @quotId INT = TRY_CAST(@idStr AS INT);
+                        IF @quotId IS NOT NULL
+                        BEGIN
+                            UPDATE dbo.[Quotation]
+                            SET [state] = @estado,
+                                [stateUpdatedAt] = GETDATE()
+                            WHERE id = @quotId;
+                        END;
+                    END;
+                    FETCH NEXT FROM item_cur INTO @item;
+                END;
+
+                CLOSE item_cur;
+                DEALLOCATE item_cur;
+            END;
+
+            FETCH NEXT FROM resp_cur INTO @estadosStr;
+        END;
+
+        CLOSE resp_cur;
+        DEALLOCATE resp_cur;
+    END;
+END;
+GO
+
 -- ============================================================================
 -- SECCIÓN 3: PROCEDIMIENTOS ALMACENADOS DE INTEGRACIÓN ERP (ZEUS / STANDALONE)
 -- ============================================================================
+
 
 
 
@@ -1576,8 +4084,8 @@ BEGIN
 			in_nacionalidad=ISNULL(C.CotizacionServicios.value('in_nacionalidad[1]','INT'),1) ,
 			cd_voucher=ISNULL(C.CotizacionServicios.value('cd_voucher[1]','VARCHAR(25)'),'') ,
 			in_cantpax=ISNULL(C.CotizacionServicios.value('in_cantpax[1]','INT'),1) ,
-			dt_llegada=ISNULL(C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'),'19000101'),
-			dt_salida=ISNULL(C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'),'19000101'),
+			dt_llegada=ISNULL(C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), ISNULL(C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), '19000101')),
+			dt_salida=ISNULL(C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), ISNULL(C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), '19000101')),
 			cd_cencosto=ISNULL(C.CotizacionServicios.value('cd_cencosto[1]','VARCHAR(25)'),'')  ,
 			cd_auxiliar=ISNULL(C.CotizacionServicios.value('cd_auxiliar[1]','VARCHAR(25)'),'')  ,
 			cd_item =ISNULL(C.CotizacionServicios.value('cd_item[1]','VARCHAR(25)'),'') ,
@@ -3144,6 +5652,23 @@ BEGIN
 			ds_valor VARCHAR(500) COLLATE DATABASE_DEFAULT, cd_codigo VARCHAR(25) COLLATE DATABASE_DEFAULT
 		);
 
+		CREATE TABLE #TmpTiposFacturacionHoteles (
+			id INT IDENTITY(1,1) PRIMARY KEY,
+			id_facturacion INT,
+			id_item INT,
+			in_tipoitem INT,
+			cd_TiposFacturacionHoteles VARCHAR(25) COLLATE DATABASE_DEFAULT,
+			ds_TiposFacturacionHoteles VARCHAR(100) COLLATE DATABASE_DEFAULT,
+			Id_TiposFacturacionHoteles INT,
+			in_cantidad INT,
+			am_valor MONEY,
+			am_contado MONEY,
+			am_credito MONEY,
+			cd_cargosdesc VARCHAR(25) COLLATE DATABASE_DEFAULT,
+			ds_cargonm VARCHAR(100) COLLATE DATABASE_DEFAULT,
+			id_cargosdesc INT
+		);
+
 		CREATE TABLE #GenerarConceptosAuto (
 			id_ConceptoFacturacion INT,
 			cd_ConceptoFacturacion VARCHAR(50) COLLATE DATABASE_DEFAULT,
@@ -4054,6 +6579,28 @@ BEGIN
 			ds_valor=ISNULL(V.Var.value('ds_valor[1]', 'VARCHAR(500)'),''),
 			cd_codigo=ISNULL(V.Var.value('cd_codigo[1]', 'VARCHAR(25)'),'')
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/Variables') V(Var);
+
+		DELETE FROM #TmpTiposFacturacionHoteles;
+		INSERT INTO #TmpTiposFacturacionHoteles (
+			id_facturacion, id_item, in_tipoitem, cd_TiposFacturacionHoteles, ds_TiposFacturacionHoteles, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, cd_cargosdesc, ds_cargonm, id_cargosdesc
+		)
+		SELECT 
+			id_facturacion = ISNULL(H.Htl.value('id_factura[1]', 'INT'), 0),
+			id_item = ISNULL(H.Htl.value('id_item[1]', 'INT'), 0),
+			in_tipoitem = ISNULL(H.Htl.value('in_tipoitem[1]', 'INT'), 0),
+			cd_TiposFacturacionHoteles = ISNULL(H.Htl.value('cd_tiposfacturacionhoteles[1]', 'VARCHAR(25)'), 'NCH'),
+			ds_TiposFacturacionHoteles = ISNULL(H.Htl.value('ds_tiposfacturacionhoteles[1]', 'VARCHAR(100)'), 'Noches'),
+			Id_TiposFacturacionHoteles = ISNULL(TF.id, 5),
+			in_cantidad = ISNULL(H.Htl.value('in_cantidad[1]', 'INT'), 1),
+			am_valor = ISNULL(H.Htl.value('am_valor[1]', 'MONEY'), 0),
+			am_contado = ISNULL(H.Htl.value('am_contado[1]', 'MONEY'), 0),
+			am_credito = ISNULL(H.Htl.value('am_credito[1]', 'MONEY'), 0),
+			cd_cargosdesc = ISNULL(H.Htl.value('cd_cargosdesc[1]', 'VARCHAR(25)'), 'TAR'),
+			ds_cargonm = ISNULL(CD.ds_nombre, ISNULL(H.Htl.value('ds_cargonm[1]', 'VARCHAR(100)'), 'Tarifa')),
+			id_cargosdesc = ISNULL(CD.id, 1)
+		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/TiposFacturacionHoteles') H(Htl)
+		LEFT JOIN dbo.TiposFacturacionHoteles TF ON TF.cd_codigo = ISNULL(H.Htl.value('cd_tiposfacturacionhoteles[1]', 'VARCHAR(25)'), 'NCH')
+		LEFT JOIN dbo.CargosDesc CD ON CD.cd_codigo = ISNULL(H.Htl.value('cd_cargosdesc[1]', 'VARCHAR(25)'), 'TAR');
 	
 	
 	--While 1 = 1
@@ -4845,7 +7392,50 @@ BEGIN
 						IF @calc_noches IS NULL OR @calc_noches <= 0 SET @calc_noches = 1;
 						DECLARE @calc_dias INT = @calc_noches;
 
-						SET @SrvSqlStmt = @SrvVarsSqlStmt + @SrvCargSqlStmt + @SrvFpSqlStmt + @SrvProvSqlStmt;
+						-- Build TiposFacturacionHoteles SQL
+						SET @SrvHtlSqlStmt = '';
+						DECLARE @th_id_tiposfacturacionhoteles INT, @th_in_cantidad INT, @th_am_valor MONEY, @th_am_contado MONEY, @th_am_credito MONEY, @th_id_cargosdesc INT, @th_ds_cargonm VARCHAR(100);
+						DECLARE curItemSrvHtl CURSOR LOCAL FAST_FORWARD FOR
+						SELECT Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, id_cargosdesc, ds_cargonm
+						FROM #TmpTiposFacturacionHoteles
+						WHERE id_item = @gen_id_item;
+
+						OPEN curItemSrvHtl;
+						FETCH NEXT FROM curItemSrvHtl INTO @th_id_tiposfacturacionhoteles, @th_in_cantidad, @th_am_valor, @th_am_contado, @th_am_credito, @th_id_cargosdesc, @th_ds_cargonm;
+						WHILE @@FETCH_STATUS = 0
+						BEGIN
+							SET @SrvHtlSqlStmt = @SrvHtlSqlStmt + CHAR(13) + CHAR(10) + 
+								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
+								' VALUES (@NewSrvId, NULL, ' + CAST(ISNULL(@th_id_tiposfacturacionhoteles, 5) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_in_cantidad, 1) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_am_valor, 0) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_am_contado, 0) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@th_am_credito, 0) AS VARCHAR) + ', NULL, ' +
+								CAST(ISNULL(@th_id_cargosdesc, 1) AS VARCHAR) + ', ''' +
+								REPLACE(ISNULL(@th_ds_cargonm, 'Tarifa'), '''', '''''') + ''');';
+							FETCH NEXT FROM curItemSrvHtl INTO @th_id_tiposfacturacionhoteles, @th_in_cantidad, @th_am_valor, @th_am_contado, @th_am_credito, @th_id_cargosdesc, @th_ds_cargonm;
+						END;
+						CLOSE curItemSrvHtl;
+						DEALLOCATE curItemSrvHtl;
+
+						-- Fallback si no vinieron TiposFacturacionHoteles en el XML pero el ítem es de servicio/hotel
+						IF ISNULL(@SrvHtlSqlStmt, '') = '' AND @calc_noches IS NOT NULL
+						BEGIN
+							DECLARE @fb_cargoid INT = 1;
+							DECLARE @fb_cargonm VARCHAR(100) = 'Tarifa';
+							SELECT TOP 1 @fb_cargoid = id_carg, @fb_cargonm = ds_nombre FROM #TmpFacturaCargos WHERE id_item = @gen_id_item AND cd_tipo IN ('C','D') ORDER BY in_orden ASC;
+							IF @fb_cargoid IS NULL SET @fb_cargoid = 1;
+							IF @fb_cargonm IS NULL SET @fb_cargonm = 'Tarifa';
+
+							SET @SrvHtlSqlStmt = CHAR(13) + CHAR(10) + 
+								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
+								' VALUES (@NewSrvId, NULL, 5, ' + CAST(ISNULL(@calc_noches, 1) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@gen_am_tarifa / NULLIF(@calc_noches, 0), @gen_am_tarifa) AS VARCHAR) + ', ' +
+								CAST(ISNULL(@gen_am_tarifa, 0) AS VARCHAR) + ', 0, NULL, ' +
+								CAST(@fb_cargoid AS VARCHAR) + ', ''' + REPLACE(@fb_cargonm, '''', '''''') + ''');';
+						END;
+
+						SET @SrvSqlStmt = @SrvVarsSqlStmt + @SrvCargSqlStmt + @SrvFpSqlStmt + @SrvProvSqlStmt + @SrvHtlSqlStmt;
 						
 						SET @SqlStmt = @SqlStmt + CHAR(13) + CHAR(10) + '
 						DECLARE @NewSrvId_' + CAST(@ItemIndex AS VARCHAR) + ' INT;
@@ -4879,8 +7469,8 @@ BEGIN
 							@in_edad = NULL,
 							@cd_voucher = NULL,
 							@in_cantpax = 1,
-							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
-							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
+							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
+							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
 							@ds_destino = ''' + ISNULL(@gen_cd_destino, '') + ''',
 							@id_gds = '+ CAST(ISNULL(@gen_id_gds,1) AS VARCHAR) + ',
 							@am_basecomisionable = ' + CAST(ISNULL(@gen_am_basecomisionable,0) AS VARCHAR) + ',
@@ -5236,6 +7826,604 @@ BEGIN
     END CATCH
 END
 GO
+
+GO
+
+
+-- ==========================================
+-- Procedimiento Exportación: spExportInvoices
+-- ==========================================
+
+CREATE OR ALTER PROCEDURE [dbo].[spExportInvoices]
+    @Envoices_id VARCHAR(MAX),
+    @User_id INT = 1
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @mensaje_resultado VARCHAR(MAX) = '';
+
+    SET @Envoices_id = LTRIM(RTRIM(@Envoices_id));
+    IF @Envoices_id IS NULL OR @Envoices_id = ''
+    BEGIN
+        SELECT 'ERROR: No se han proporcionado IDs de Facturacion válidos.' AS mensaje_resultado;
+        RETURN;
+    END;
+
+    -- Validar Usuario
+    IF NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @User_id)
+    BEGIN
+        SELECT TOP 1 @User_id = id FROM dbo.[User] WHERE isActive = 1 ORDER BY id ASC;
+        IF @User_id IS NULL
+        BEGIN
+            SELECT TOP 1 @User_id = id FROM dbo.[User] ORDER BY id ASC;
+            IF @User_id IS NULL
+            BEGIN
+                SELECT 'ERROR: No existen usuarios registrados en el sistema.' AS mensaje_resultado;
+                RETURN;
+            END;
+        END;
+    END;
+
+    -- Parse IDs
+    DECLARE @idsTable TABLE (id INT);
+    INSERT INTO @idsTable (id)
+    SELECT CAST(value AS INT)
+    FROM STRING_SPLIT(@Envoices_id, ',')
+    WHERE TRIM(value) <> '' AND ISNUMERIC(TRIM(value)) = 1;
+
+    -- 0. Pre-validación: Factura ya exportada
+    DECLARE @err_already_exported VARCHAR(MAX) = '';
+    SELECT TOP 1 @err_already_exported = 'ERROR: La factura ' + ISNULL(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + ' ya se encuentra exportada a Zeus ERP.'
+    FROM dbo.[Invoices] e
+    WHERE e.id IN (SELECT id FROM @idsTable)
+      AND e.state = 'EXPORTED';
+
+    IF @err_already_exported IS NOT NULL AND @err_already_exported <> ''
+    BEGIN
+        SELECT @err_already_exported AS mensaje_resultado;
+        RETURN;
+    END;
+
+    -- 0.1 Pre-validación: Cliente deshabilitado en Korex
+    DECLARE @err_client VARCHAR(MAX) = '';
+    SELECT TOP 1 
+        @err_client = 'ERROR: El cliente "' + ISNULL(c.name, 'DESCONOCIDO') + '" (NIT/Tercero ' + ISNULL(c.document, '') + ') se encuentra deshabilitado en Korex. Debe habilitarlo en el maestro de clientes de Korex antes de exportar la factura.'
+    FROM dbo.[Invoices] e
+    JOIN dbo.[Client] c ON e.clientId = c.id
+    WHERE e.id IN (SELECT id FROM @idsTable)
+      AND c.isActive = 0;
+
+    IF @err_client IS NOT NULL AND @err_client <> ''
+    BEGIN
+        SELECT @err_client AS mensaje_resultado;
+        RETURN;
+    END;
+
+    -- 0.2 Pre-validación: Conceptos de Facturación y Tipos de Servicio
+    DECLARE @v_err_concept VARCHAR(MAX) = '';
+
+    SELECT TOP 1 
+        @v_err_concept = 'ERROR: La factura ' + ISNULL(e.internalNumber, 'FAC-' + CAST(e.id AS VARCHAR)) + 
+                         ' contiene el producto ''' + ISNULL(ep.descripcion, ISNULL(pr.description, 'SIN NOMBRE')) + 
+                         ''' que no tiene asignado un Concepto de Facturación ni Clasificación de Servicio en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
+    FROM dbo.[InvoicesProduct] ep
+    JOIN dbo.[Invoices] e ON ep.invoiceId = e.id
+    LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
+    WHERE e.id IN (SELECT id FROM @idsTable)
+      AND ISNULL(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), '') = ''
+      AND ISNULL(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), ISNULL(NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), '')) = '';
+
+    IF @v_err_concept IS NOT NULL AND @v_err_concept <> ''
+    BEGIN
+        SELECT @v_err_concept AS mensaje_resultado;
+        RETURN;
+    END;
+
+    -- Construir XML para Zeus ERP
+    DECLARE @xmlResult XML;
+
+    SET @xmlResult = (
+        SELECT 
+            e.id AS [id_factura],
+            '55' AS [cd_fuente],
+            '33' AS [cd_serie],
+            '' AS [cd_consecutivo],
+            1 AS [cd_usuario],
+            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
+            SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+            CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_fechacont],
+            CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_vence],
+            SUBSTRING(ISNULL(c.document, ''), 1, 15) AS [cd_tercero_codigo],
+            SUBSTRING(ISNULL(c.name, ''), 1, 100) AS [ds_tercero_nombre],
+            SUBSTRING(ISNULL(c.document, ''), 1, 15) AS [cd_cliente_codigo],
+            SUBSTRING(ISNULL(c.name, ''), 1, 100) AS [ds_cliente_nombre],
+            SUBSTRING(ISNULL(c.address, ''), 1, 150) AS [ds_cliente_dir],
+            '' AS [ds_cliente_ciudad],
+            '' AS [ds_cliente_tel],
+            SUBSTRING(ISNULL(c.address, ''), 1, 150) AS [ds_cliente_dirdesp],
+            '' AS [ds_cliente_email],
+            SUBSTRING(ISNULL(c.name, ''), 1, 100) AS [ds_cliente_contacto],
+            '' AS [ds_cliente_contacto_email],
+            ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
+            SUBSTRING(ISNULL(s.code, 'OFP'), 1, 5) AS [cd_vendedor],
+            SUBSTRING(ISNULL(tp.code, '01'), 1, 6) AS [cd_tiqueteador],
+            CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
+            CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [am_tcambiousd],
+            1 AS [id_tipoventa],
+            '' AS [ds_Observacion],
+            CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [TotalFactura],
+            CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [ValorFactura],
+            -- Items
+            (
+                SELECT 
+                    e.id AS [id_factura],
+                    ep.id AS [id_item],
+                    'Hotel' AS [tipo_item],
+                    3 AS [in_tipoitem],
+                    ep.id AS [id_referencia_origen],
+                    '' AS [cd_tiquete],
+                    SUBSTRING(ISNULL(ep.descripcion, ISNULL(pr.description, '')), 1, 250) AS [ds_descrip],
+                    1 AS [in_nacionalidad],
+                    '' AS [cd_cencosto],
+                    '' AS [cd_auxiliar],
+                    '' AS [cd_item],
+                    CAST(
+                        ISNULL((
+                            SELECT SUM(ipt.explicitAmount)
+                            FROM dbo.[InvoicesProductTax] ipt
+                            LEFT JOIN dbo.[ChargeAndTax] ct ON ct.id = ipt.chargeAndTaxId
+                            LEFT JOIN dbo.[ChargeAndTax] target_ct ON target_ct.id = ct.targetTaxId
+                            WHERE ipt.invoiceProductId = ep.id
+                              AND (
+                                  ipt.isMain = 1 OR
+                                  (ipt.isMain = 0 AND ct.targetTaxId IS NOT NULL AND (
+                                      target_ct.type = 'PRINCIPAL' OR target_ct.isEditable = 0 OR target_ct.code = 'TAR' OR target_ct.name LIKE '%TARIFA%' OR target_ct.id = ep.mainTaxId
+                                  ))
+                              )
+                        ), ISNULL(ep.price * ep.quantity, 0))
+                    AS DECIMAL(18,2)) AS [am_tarifa],
+                    CAST(
+                        ISNULL((
+                            SELECT SUM(ipt.explicitAmount)
+                            FROM dbo.[InvoicesProductTax] ipt
+                            JOIN dbo.[ChargeAndTax] ct ON ct.id = ipt.chargeAndTaxId
+                            WHERE ipt.invoiceProductId = ep.id AND ct.code = 'IVA'
+                        ), 0)
+                    AS DECIMAL(18,2)) AS [am_iva],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_tua],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_comb],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_vat],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_Comision],
+                    -- Titular: primer pasajero con nombres y apellidos separados
+                    CASE 
+                        WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, 30)
+                        WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
+                            THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - 1)
+                        ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) - 1)
+                    END AS [ds_paxname],
+                    CASE 
+                        WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN ''
+                        WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
+                            THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1, 100)), 1, 30)
+                        ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) + 1, 100)), 1, 30)
+                    END AS [ds_paxape],
+                    'SR' AS [ds_paxprefix],
+                    '' AS [cd_tourcode],
+                    0 AS [NumTktConj],
+                    'ACT' AS [cd_TipoTiquete],
+                    1 AS [id_air],
+                    '' AS [ds_itinerario],
+                    '' AS [ds_itinerarioaerolinea],
+                    'Y' AS [ds_clases],
+                    '' AS [ds_Observaciones],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_highfare],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_lowfare],
+                    '' AS [ds_solicita],
+                    '' AS [ds_lapsoviaje],
+                    '' AS [cd_tktrevisado],
+                    '' AS [cd_PasaportePax],
+                    '' AS [cd_pax_CC],
+                    CAST(100.0 AS DECIMAL(18,2)) AS [am_PorFacParcial],
+                    ISNULL(ep.paxAdults, 1) AS [in_cantpax],
+                    '' AS [cd_FormaPagoTAO],
+                    '' AS [cd_TarjetaCreditoTAO],
+                    '' AS [cd_NumeroTarjetaTAO],
+                    '' AS [cd_VencimientoTarjetaTAO],
+                    '' AS [cd_NumeroPolizaTAO],
+                    '' AS [cd_AnexoPolizaTAO],
+                    '' AS [ds_AutorizacionTarjetaTAO],
+                    0 AS [in_cuotasTarjetaTAO],
+                    'EFE' AS [cd_FormasPago],
+                    '' AS [cd_TarjetasCredito],
+                    CAST(
+                        ISNULL(
+                            (SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id),
+                            ISNULL((SELECT SUM(explicitAmount) FROM dbo.[InvoicesProductTax] WHERE invoiceProductId = ep.id), ISNULL(ep.price * ep.quantity, 0))
+                        )
+                    AS DECIMAL(18,2)) AS [am_fp1],
+                    '' AS [ds_cc_code],
+                    '' AS [ds_cc_number],
+                    '' AS [ds_cc_vence],
+                    '' AS [ds_cc_autorizacion],
+                    '' AS [ds_cc_voucher],
+                    0 AS [in_cc_cuotas],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_fp2],
+                    '' AS [ds_cc_code2],
+                    '' AS [ds_cc_number2],
+                    '' AS [ds_cc_vence2],
+                    '' AS [ds_cc_autorizacion2],
+                    '' AS [ds_cc_voucher2],
+                    0 AS [in_cc_cuotas2],
+                    ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
+                    CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
+                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
+                    SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+                    0 AS [bl_ahorro],
+                    'ACT' AS [cd_TipoTiqueteGDS],
+                    '' AS [cd_TiposDocumento],
+                    '' AS [cd_entdist],
+                    '' AS [cd_entvend],
+                    'BOG' AS [cd_destino],
+                    CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_fechaexped],
+                    SUBSTRING(ISNULL(tp.code, '01'), 1, 6) AS [cd_tiqueteadores],
+                    1 AS [id_gds],
+                    1 AS [iden_gds],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_comisionPNR],
+                    '' AS [ds_records],
+                    0 AS [bl_NoCalcComision],
+                    0 AS [bl_NoCalcIvaComision],
+                    CAST(
+                        ISNULL((
+                            SELECT SUM(ipt.explicitAmount)
+                            FROM dbo.[InvoicesProductTax] ipt
+                            WHERE ipt.invoiceProductId = ep.id AND ipt.isMain = 1
+                        ), ISNULL(ep.price, 0))
+                    AS DECIMAL(18,2)) AS [am_basecomisionable],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_porcomision],
+                    '2' AS [cd_tiposconceptfac],
+                    COALESCE(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), 'FAC', '01') AS [cd_conceptofacturacion],
+                    COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), 'HOTEL', '01') AS [cd_tiposservicio],
+                    SUBSTRING(ISNULL(prv.code, '01'), 1, 25) AS [cd_proveedores],
+                    SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(ep.servicios)), ''), NULLIF(LTRIM(RTRIM(ep.descripcion)), ''), NULLIF(LTRIM(RTRIM(pr.description)), ''), ''), 1, 250) AS [ds_servicio],
+                    CAST(
+                        (
+                            ISNULL(ep.price * ep.quantity, 0) +
+                            ISNULL((
+                                SELECT SUM(ipt2.explicitAmount)
+                                FROM dbo.[InvoicesProductTax] ipt2
+                                JOIN dbo.[ChargeAndTax] ct2 ON ct2.id = ipt2.chargeAndTaxId
+                                LEFT JOIN dbo.[ChargeAndTax] target_ct ON target_ct.id = ct2.targetTaxId
+                                WHERE ipt2.invoiceProductId = ep.id
+                                  AND ipt2.isMain = 0
+                                  AND ct2.targetTaxId IS NOT NULL
+                                  AND (
+                                      target_ct.type = 'PRINCIPAL' OR target_ct.isEditable = 0 OR target_ct.code = 'TAR' OR target_ct.name LIKE '%TARIFA%' OR target_ct.id = ep.mainTaxId
+                                  )
+                            ), 0) +
+                            CASE WHEN ISNULL(ep.price, 0) = 0 THEN
+                                ISNULL((
+                                    SELECT SUM(ipt3.explicitAmount)
+                                    FROM dbo.[InvoicesProductTax] ipt3
+                                    WHERE ipt3.invoiceProductId = ep.id AND ipt3.isMain = 1
+                                ), 0)
+                            ELSE 0 END
+                        )
+                    AS DECIMAL(18,2)) AS [am_valorprov],
+                    ISNULL(e.currency, 'COP') AS [cd_monedaprov],
+                    CONVERT(VARCHAR(19), ISNULL(ep.checkInDate, e.date), 120) AS [dt_llegada],
+                    CONVERT(VARCHAR(19), ISNULL(ep.checkOutDate, ISNULL(ep.checkInDate, e.date)), 120) AS [dt_salida],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_pordescuento],
+                    CAST(0 AS DECIMAL(18,2)) AS [am_basedescuento],
+                    CONVERT(VARCHAR(19), ISNULL(ep.checkOutDate, ISNULL(ep.checkInDate, e.date)), 120) AS [Fecha_Salida],
+                    CONVERT(VARCHAR(19), ISNULL(ep.checkInDate, e.date), 120) AS [Fecha_Llegada],
+                    CASE 
+                        WHEN ep.nights IS NOT NULL AND ep.nights > 0 THEN ep.nights
+                        WHEN ep.checkInDate IS NOT NULL AND ep.checkOutDate IS NOT NULL AND DATEDIFF(day, ep.checkInDate, ep.checkOutDate) > 0 
+                            THEN DATEDIFF(day, ep.checkInDate, ep.checkOutDate)
+                        ELSE 1 
+                    END AS [in_noches],
+                    CASE 
+                        WHEN ep.nights IS NOT NULL AND ep.nights > 0 THEN ep.nights
+                        WHEN ep.checkInDate IS NOT NULL AND ep.checkOutDate IS NOT NULL AND DATEDIFF(day, ep.checkInDate, ep.checkOutDate) > 0 
+                            THEN DATEDIFF(day, ep.checkInDate, ep.checkOutDate)
+                        ELSE 1 
+                    END AS [in_dias],
+                    '1' AS [id_tipoproveedor],
+                    '1' AS [cd_tipoproveedor],
+                    'GENERAL' AS [ds_tipoproveedor],
+                    'I' + RIGHT('0000000' + CAST(ep.id AS VARCHAR), 7) AS [cd_consecutivo_variablesadicionales],
+                    CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [am_valor_total],
+                    -- Sub-nodo: Pasajeros (Todos los pasajeros con nombre y apellido divididos)
+                    (
+                        SELECT 
+                            e.id AS [id_factura],
+                            ep.id AS [id_item],
+                            3 AS [in_tipoitem],
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, 50)
+                                WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
+                                    THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - 1)
+                                ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) - 1)
+                            END AS [ds_paxname],
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN ''
+                                WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
+                                    THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1, 100)), 1, 50)
+                                ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) + 1, 100)), 1, 50)
+                            END AS [ds_paxape],
+                            'SR' AS [ds_paxprefix],
+                            '' AS [ds_paxclasificacion],
+                            '' AS [cd_voucherpax],
+                            SUBSTRING(ISNULL(pp.document, c.document), 1, 50) AS [cd_paxidentificacion],
+                            0 AS [in_edad],
+                            '' AS [cd_tiquete]
+                        FROM (SELECT 1 AS dummy) d
+                        LEFT JOIN dbo.[InvoicesProductPasenger] pp ON pp.invoiceProductId = ep.id
+                        FOR XML PATH('Pasajeros'), TYPE
+                    ),
+                    -- Sub-nodo: Formaspago (Preservando montos individuales)
+                    (
+                        SELECT 
+                            e.id AS [id_factura],
+                            ep.id AS [id_item],
+                            3 AS [in_tipoitem],
+                            ISNULL(p.code, CASE WHEN LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%' THEN 'TC' ELSE 'EFE' END) AS [cd_codigo],
+                            ISNULL(ipp.paymentMethod, 'CONTADO') AS [ds_nombre],
+                            CAST(
+                                ISNULL(ipp.amount, 
+                                    ISNULL((SELECT SUM(explicitAmount) FROM dbo.[InvoicesProductTax] WHERE invoiceProductId = ep.id), ISNULL(ep.price * ep.quantity, 0))
+                                )
+                            AS DECIMAL(18,2)) AS [am_valor]
+                        FROM (SELECT 1 AS dummy) d
+                        LEFT JOIN dbo.[InvoicesProductPayment] ipp ON ipp.invoiceProductId = ep.id
+                        LEFT JOIN dbo.[Payment] p ON LOWER(p.name) = LOWER(ipp.paymentMethod)
+                        FOR XML PATH('Formaspago'), TYPE
+                    ),
+                    -- Sub-nodo: CargosImpuestos (Clasificando am_contado y am_credito por forma de pago)
+                    (
+                        SELECT 
+                            e.id AS [id_factura],
+                            ep.id AS [id_item],
+                            3 AS [in_tipoitem],
+                            ISNULL(ct.code, 'TAR') AS [cd_codigo],
+                            ISNULL(ct.name, 'Tarifa') AS [ds_nombre],
+                            CASE WHEN ipt.isMain = 1 OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name LIKE '%TARIFA%' THEN 'C' ELSE 'I' END AS [cd_tipo],
+                            CAST(ISNULL(ct.value, 0) AS DECIMAL(18,4)) AS [am_porcentaje],
+                            CAST(
+                                (
+                                    ISNULL(ipt.explicitAmount, ep.price * ep.quantity) +
+                                    CASE WHEN (ipt.isMain = 1 OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name LIKE '%TARIFA%') THEN
+                                        ISNULL((
+                                            SELECT SUM(sub_t.explicitAmount)
+                                            FROM dbo.[InvoicesProductTax] sub_t
+                                            JOIN dbo.[ChargeAndTax] sub_ct ON sub_t.chargeAndTaxId = sub_ct.id
+                                            WHERE sub_t.invoiceProductId = ipt.invoiceProductId
+                                              AND sub_t.isMain = 0
+                                              AND sub_ct.targetTaxId = ct.id
+                                        ), 0)
+                                    ELSE 0 END
+                                ) AS DECIMAL(18,2)
+                            ) AS [am_valor],
+                            CASE 
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%')
+                                ) THEN CAST(
+                                    (
+                                        ISNULL(ipt.explicitAmount, ep.price * ep.quantity) +
+                                        CASE WHEN (ipt.isMain = 1 OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name LIKE '%TARIFA%') THEN
+                                            ISNULL((
+                                                SELECT SUM(sub_t.explicitAmount)
+                                                FROM dbo.[InvoicesProductTax] sub_t
+                                                JOIN dbo.[ChargeAndTax] sub_ct ON sub_t.chargeAndTaxId = sub_ct.id
+                                                WHERE sub_t.invoiceProductId = ipt.invoiceProductId
+                                                  AND sub_t.isMain = 0
+                                                  AND sub_ct.targetTaxId = ct.id
+                                            ), 0)
+                                        ELSE 0 END
+                                    ) AS DECIMAL(18,2)
+                                )
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
+                                ) THEN CAST(0 AS DECIMAL(18,2))
+                                ELSE CAST(
+                                    ROUND(
+                                        (
+                                            ISNULL(ipt.explicitAmount, ep.price * ep.quantity) +
+                                            CASE WHEN (ipt.isMain = 1 OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name LIKE '%TARIFA%') THEN
+                                                ISNULL((
+                                                    SELECT SUM(sub_t.explicitAmount)
+                                                    FROM dbo.[InvoicesProductTax] sub_t
+                                                    JOIN dbo.[ChargeAndTax] sub_ct ON sub_t.chargeAndTaxId = sub_ct.id
+                                                    WHERE sub_t.invoiceProductId = ipt.invoiceProductId
+                                                      AND sub_t.isMain = 0
+                                                      AND sub_ct.targetTaxId = ct.id
+                                                ), 0)
+                                            ELSE 0 END
+                                        ) * 
+                                        ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
+                                        NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
+                                    , 2) AS DECIMAL(18,2)
+                                )
+                            END AS [am_contado],
+                            CASE 
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%')
+                                ) THEN CAST(0 AS DECIMAL(18,2))
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
+                                ) THEN CAST(
+                                    (
+                                        ISNULL(ipt.explicitAmount, ep.price * ep.quantity) +
+                                        CASE WHEN (ipt.isMain = 1 OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name LIKE '%TARIFA%') THEN
+                                            ISNULL((
+                                                SELECT SUM(sub_t.explicitAmount)
+                                                FROM dbo.[InvoicesProductTax] sub_t
+                                                JOIN dbo.[ChargeAndTax] sub_ct ON sub_t.chargeAndTaxId = sub_ct.id
+                                                WHERE sub_t.invoiceProductId = ipt.invoiceProductId
+                                                  AND sub_t.isMain = 0
+                                                  AND sub_ct.targetTaxId = ct.id
+                                            ), 0)
+                                        ELSE 0 END
+                                    ) AS DECIMAL(18,2)
+                                )
+                                ELSE CAST(
+                                    (
+                                        (
+                                            ISNULL(ipt.explicitAmount, ep.price * ep.quantity) +
+                                            CASE WHEN (ipt.isMain = 1 OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name LIKE '%TARIFA%') THEN
+                                                ISNULL((
+                                                    SELECT SUM(sub_t.explicitAmount)
+                                                    FROM dbo.[InvoicesProductTax] sub_t
+                                                    JOIN dbo.[ChargeAndTax] sub_ct ON sub_t.chargeAndTaxId = sub_ct.id
+                                                    WHERE sub_t.invoiceProductId = ipt.invoiceProductId
+                                                      AND sub_t.isMain = 0
+                                                      AND sub_ct.targetTaxId = ct.id
+                                                ), 0)
+                                            ELSE 0 END
+                                        ) - 
+                                        ROUND(
+                                            (
+                                                ISNULL(ipt.explicitAmount, ep.price * ep.quantity) +
+                                                CASE WHEN (ipt.isMain = 1 OR ct.type = 'PRINCIPAL' OR ct.code = 'TAR' OR ct.name LIKE '%TARIFA%') THEN
+                                                    ISNULL((
+                                                        SELECT SUM(sub_t.explicitAmount)
+                                                        FROM dbo.[InvoicesProductTax] sub_t
+                                                        JOIN dbo.[ChargeAndTax] sub_ct ON sub_t.chargeAndTaxId = sub_ct.id
+                                                        WHERE sub_t.invoiceProductId = ipt.invoiceProductId
+                                                          AND sub_t.isMain = 0
+                                                          AND sub_ct.targetTaxId = ct.id
+                                                    ), 0)
+                                                ELSE 0 END
+                                            ) * 
+                                            ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
+                                            NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
+                                        , 2)
+                                    ) AS DECIMAL(18,2)
+                                )
+                            END AS [am_credito],
+                            ISNULL(ct.id, 1) AS [id_carg],
+                            ISNULL(ct.id, 1) AS [id_imp],
+                            CASE WHEN ct.code = 'IVA' THEN 1 ELSE 0 END AS [bl_iva],
+                            1 AS [in_orden]
+                        FROM dbo.[InvoicesProductTax] ipt
+                        JOIN dbo.[ChargeAndTax] ct ON ipt.chargeAndTaxId = ct.id
+                        LEFT JOIN dbo.[ChargeAndTax] target_ct ON target_ct.id = ct.targetTaxId
+                        WHERE ipt.invoiceProductId = ep.id
+                          AND NOT (
+                              ipt.isMain = 0 AND ct.targetTaxId IS NOT NULL AND (
+                                  target_ct.type = 'PRINCIPAL' OR target_ct.isEditable = 0 OR target_ct.code = 'TAR' OR target_ct.name LIKE '%TARIFA%' OR target_ct.id = ep.mainTaxId
+                              )
+                          )
+                        FOR XML PATH('CargosImpuestos'), TYPE
+                    ),
+                    -- Sub-nodo: Variables (Variables Adicionales dinámicas de InvoicesProductVariable)
+                    (
+                        SELECT 
+                            e.id AS [id_factura],
+                            ep.id AS [id_item],
+                            CASE WHEN pr.type = 'Tiquete' THEN 1 ELSE 3 END AS [in_tipoitem],
+                            CASE WHEN pr.type = 'Tiquete' THEN 'Tiquetes' ELSE 'FacturacionServicios' END AS [ds_maestro],
+                            ISNULL(mv.name, mv.code) AS [ds_VariableAdicional],
+                            ISNULL(ipv.value, '') AS [ds_valor],
+                            ISNULL(mv.code, '') AS [cd_codigo]
+                        FROM dbo.[InvoicesProductVariable] ipv
+                        JOIN dbo.[MasterVariable] mv ON ipv.masterVariableId = mv.id
+                        WHERE ipv.invoiceProductId = ep.id
+                        FOR XML PATH('Variables'), TYPE
+                    ),
+                    -- Sub-nodo: TiposFacturacionHoteles (para desglose de tarifas por noche/unidad en hoteles y servicios)
+                    (
+                        SELECT 
+                            e.id AS [id_factura],
+                            ep.id AS [id_item],
+                            3 AS [in_tipoitem],
+                            'NCH' AS [cd_tiposfacturacionhoteles],
+                            'Noches' AS [ds_tiposfacturacionhoteles],
+                            ISNULL(ep.quantity, 1) AS [in_cantidad],
+                            CAST(ISNULL(ep.price, 0) AS DECIMAL(18,2)) AS [am_valor],
+                            CASE 
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%')
+                                ) THEN CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2))
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
+                                ) THEN CAST(0 AS DECIMAL(18,2))
+                                ELSE CAST(
+                                    ROUND(
+                                        ISNULL(ep.price * ep.quantity, 0) * 
+                                        ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
+                                        NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
+                                    , 2) AS DECIMAL(18,2)
+                                )
+                            END AS [am_contado],
+                            CASE 
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%')
+                                ) THEN CAST(0 AS DECIMAL(18,2))
+                                WHEN NOT EXISTS (
+                                    SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
+                                    WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
+                                ) THEN CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2))
+                                ELSE CAST(
+                                    (
+                                        ISNULL(ep.price * ep.quantity, 0) - 
+                                        ROUND(
+                                            ISNULL(ep.price * ep.quantity, 0) * 
+                                            ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
+                                            NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
+                                        , 2)
+                                    ) AS DECIMAL(18,2)
+                                )
+                            END AS [am_credito],
+                            ISNULL(ct_main.code, 'TAR') AS [cd_cargosdesc],
+                            ISNULL(ct_main.name, 'TARIFA') AS [ds_cargonm],
+                            ISNULL(ct_main.id, 1) AS [id_cargosdesc]
+                        FROM (SELECT 1 AS dummy) d
+                        LEFT JOIN dbo.[ChargeAndTax] ct_main ON ct_main.id = ep.mainTaxId
+                        FOR XML PATH('TiposFacturacionHoteles'), TYPE
+                    )
+                FROM dbo.[InvoicesProduct] ep
+                LEFT JOIN dbo.[ChargeAndTax] ct_main ON ep.mainTaxId = ct_main.id
+                LEFT JOIN dbo.[Product] pr ON ep.productId = pr.id
+                LEFT JOIN dbo.[Provider] prv ON ep.providerId = prv.id
+                LEFT JOIN dbo.[InvoicesProductPasenger] pax1 ON pax1.id = (
+                    SELECT MIN(pp_min.id) FROM dbo.[InvoicesProductPasenger] pp_min WHERE pp_min.invoiceProductId = ep.id
+                )
+                WHERE ep.invoiceId = e.id
+                FOR XML PATH('Item'), TYPE
+            )
+        FROM dbo.[Invoices] e
+        LEFT JOIN dbo.[Client] c ON e.clientId = c.id
+        LEFT JOIN dbo.[Branch] b ON e.branchId = b.id
+        LEFT JOIN dbo.[Implant] imp ON e.implantId = imp.id
+        LEFT JOIN dbo.[Seller] s ON e.sellerId = s.id
+        LEFT JOIN dbo.[User] u ON e.userId = u.id
+        LEFT JOIN dbo.[TicketPrinter] tp ON e.ticketPrinterId = tp.id
+        WHERE e.id IN (SELECT id FROM @idsTable)
+        FOR XML PATH('Facturacion'), ROOT('Facturaciones'), TYPE
+    );
+
+    DECLARE @v_xml VARCHAR(MAX) = CAST(@xmlResult AS VARCHAR(MAX));
+
+    IF @v_xml IS NULL OR @v_xml = ''
+    BEGIN
+        SET @mensaje_resultado = 'ERROR: No se pudo construir la estructura XML para las facturas.';
+    END
+    ELSE
+    BEGIN
+        SET @mensaje_resultado = @v_xml;
+    END
+
+    SELECT @mensaje_resultado AS mensaje_resultado;
+END;
 
 GO
 

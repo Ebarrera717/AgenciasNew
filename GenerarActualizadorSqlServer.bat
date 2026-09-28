@@ -42,6 +42,18 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
+echo Ejecutando KorexValidator Oficial (Pre-Build Actualizador SQL Server)...
+node scripts/korex_validator.js --engine=sqlserver --phase=pre-build
+if %errorlevel% neq 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO: KorexValidator emitio dictamen [NO GO]. Actualizador SQL Server CANCELADO.
+    echo ===============================================================================
+    pause
+    exit /b %errorlevel%
+)
+
+echo.
 set /p COMPILAR_NEXT="Desea compilar el sitio web (Next.js)? (S/N) [S]: "
 set "ARGS_EMPAQUETAR="
 if /i "%COMPILAR_NEXT%"=="N" (
@@ -83,9 +95,13 @@ if %errorlevel% neq 0 (
 )
 echo.
 
+echo [PASO ADICIONAL] Empaquetando ZIP de Actualizacion Directa (Bypass WDAC/AppLocker)...
+powershell.exe -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%~dp0RELEASE_KOREX\*' -DestinationPath '%~dp0Instalador\Korex_SQLServer_Update_Directo.zip' -Force"
+
 echo ================================================================
 echo EXITO: ACTUALIZADOR DE SQL SERVER GENERADO EN:
-echo        Instalador\Korex_SQLServer_Update_Setup.exe
+echo        1. Instalador\Korex_SQLServer_Update_Setup.exe  (Instalador EXE)
+echo        2. Instalador\Korex_SQLServer_Update_Directo.zip (Paquete ZIP sin bloqueo WDAC)
 echo ================================================================
 echo.
 pause

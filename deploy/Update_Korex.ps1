@@ -7,6 +7,14 @@ param(
 )
 
 $TargetDir = $PSScriptRoot
+if (-not (Test-Path "$TargetDir\.env")) {
+    $parent = Split-Path -Parent $PSScriptRoot
+    if (Test-Path "$parent\.env") {
+        $TargetDir = $parent
+    } elseif (Test-Path ".\.env") {
+        $TargetDir = (Get-Location).Path
+    }
+}
 Set-Location -Path $TargetDir
 $ProgressPreference = 'SilentlyContinue'
 
@@ -27,12 +35,19 @@ function Write-Log($message, $level = "INFO") {
 }
 
 function Show-Alert($title, $message, $icon = "Error") {
+    Write-Host "====================================================" -ForegroundColor Red
+    Write-Host "[$title] $message" -ForegroundColor Yellow
+    Write-Host "====================================================" -ForegroundColor Red
     try {
-        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
         [System.Windows.Forms.MessageBox]::Show($message, $title, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::$icon) | Out-Null
     } catch {
-        $wshell = New-Object -ComObject Wscript.Shell
-        $wshell.Popup($message, 0, $title, 16) | Out-Null
+        try {
+            $wshell = New-Object -ComObject Wscript.Shell -ErrorAction Stop
+            $wshell.Popup($message, 0, $title, 16) | Out-Null
+        } catch {
+            # Silencioso en modo de lenguaje restringido
+        }
     }
 }
 

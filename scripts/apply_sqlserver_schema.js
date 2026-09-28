@@ -2,39 +2,17 @@ const mssql = require('mssql');
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // Query postgres for SQL Server config
 async function getSQLServerConfig() {
-    const pgUrl = process.env.DATABASE_URL_POSTGRES || "postgresql://postgres:zzeusagencias@192.168.80.26:5432/Korex_colaereo?schema=public";
-    const pgPool = new Pool({ connectionString: pgUrl });
-    try {
-        const res = await pgPool.query('SELECT * FROM "fnGetSQLServerConfig"()');
-        await pgPool.end();
-        if (res.rows && res.rows.length > 0) {
-            const c = res.rows[0];
-            return {
-                user: c.db_user || 'sa',
-                password: c.db_password || 'zzeusagencias',
-                server: c.db_host || '127.0.0.1',
-                database: c.db_name || 'Korex_Pruebas',
-                port: c.db_port ? parseInt(c.db_port) : 1433,
-                options: {
-                    encrypt: false,
-                    trustServerCertificate: true,
-                    instanceName: c.db_instance || undefined
-                }
-            };
-        }
-    } catch (err) {
-        console.warn('Could not fetch SQL Server config from pg, using defaults:', err.message);
-    }
     return {
-        user: 'sa',
-        password: 'zzeusagencias',
-        server: '127.0.0.1',
-        database: 'Korex_Pruebas',
-        port: 1433,
-        options: { encrypt: false, trustServerCertificate: true }
+        user: process.env.SQLSERVER_USER || 'zeusagencias',
+        password: process.env.SQLSERVER_PASSWORD || 'zzeusagencias',
+        server: process.env.SQLSERVER_HOST || 'ZEUSAGENCIAS10',
+        database: process.env.SQLSERVER_DATABASE || 'Korex_Pruebas',
+        port: process.env.SQLSERVER_PORT ? parseInt(process.env.SQLSERVER_PORT) : 1433,
+        options: { encrypt: false, trustServerCertificate: true, enableArithAbort: true }
     };
 }
 

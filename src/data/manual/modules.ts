@@ -165,11 +165,13 @@ export const MANUAL_MODULES: ManualModule[] = [
             {
                 code: 'COT-01',
                 name: 'Consulta e Historial de Cotizaciones',
-                summary: 'Consola principal para buscar, filtrar, editar, duplicar, imprimir y facturar cotizaciones.',
-                concept: 'Muestra el listado de propuestas comerciales de la agencia con filtros por cliente, consecutivo, asesor comercial o estado.',
+                summary: 'Consola principal para buscar, filtrar, editar, duplicar, imprimir, descargar plantillas e importar cotizaciones masivas.',
+                concept: 'Muestra el listado de propuestas comerciales de la agencia con filtros por cliente, consecutivo, asesor comercial o estado. Cuenta con descarga directa de la plantilla oficial de importación en Excel y módulo de carga masiva.',
                 fields: [
                     { name: 'Buscador General', type: 'Campo Texto', description: 'Filtra en tiempo real por consecutivo, cliente o destino.' },
                     { name: 'Filtro por Estado', type: 'Selector', description: 'Permite acotar por estado (Nuevo, Aprobado, Facturado, Cancelado).' },
+                    { name: 'Botón Descargar Plantilla', type: 'Botón Acción', description: 'Descarga instantánea de la plantilla oficial (.xlsx) para estructurar importaciones masivas de cotizaciones con ejemplos y columnas requeridas.' },
+                    { name: 'Botón Importar Excel', type: 'Botón Acción', description: 'Despliega el panel de carga de archivos Excel (.xlsx/.xls) para importar cotizaciones masivas hacia Korex.' },
                     { name: 'Botón + Nueva Cotización', type: 'Botón Acción', description: 'Abre el formulario de registro de cotizaciones desde cero.' },
                     { name: 'Acción Editar', type: 'Botón Fila', description: 'Abre el formulario para ajustar precios, productos o pasajeros.' },
                     { name: 'Acción Duplicar', type: 'Botón Fila', description: 'Crea una copia idéntica de la cotización con un consecutivo nuevo.' },
@@ -178,7 +180,8 @@ export const MANUAL_MODULES: ManualModule[] = [
                 ],
                 businessRules: [
                     'Una cotización facturada preserva su registro para auditoría contable.',
-                    'Duplicar una cotización genera un nuevo consecutivo conservando los pasajeros y productos.'
+                    'Duplicar una cotización genera un nuevo consecutivo conservando los pasajeros y productos.',
+                    'La plantilla de cotización descargable incluye ejemplos representativos de productos, prestadoras, fechas, valores e información de proveedores.'
                 ],
                 steps: [
                     {
@@ -188,11 +191,16 @@ export const MANUAL_MODULES: ManualModule[] = [
                     },
                     {
                         number: 2,
+                        title: 'Descargar Plantilla o Importar Excel',
+                        description: 'Haga clic en "Descargar Plantilla" para obtener el formato oficial .xlsx, o en "Importar Excel" para cargar un lote de cotizaciones.'
+                    },
+                    {
+                        number: 3,
                         title: 'Filtrar y Buscar Cotizaciones',
                         description: 'Escriba el nombre del cliente o filtre por estado para ubicar la propuesta.'
                     },
                     {
-                        number: 3,
+                        number: 4,
                         title: 'Ejecutar Acciones Comerciales',
                         description: 'Utilice los botones de acción para editar, imprimir en PDF o convertir la cotización a factura.'
                     }
@@ -212,12 +220,16 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { name: 'Fecha Vencimiento Proveedor', type: 'Fecha (Opcional)', description: 'Fecha límite de pago o vencimiento emitida por el proveedor del servicio.' },
                     { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura, recibo o soporte entregado por el proveedor.' },
                     { name: 'Variables Adicionales', type: 'Campos Dinámicos', description: 'Variables adicionales requeridas. Muestra un distintivo "Obligatoria" si el cliente seleccionado la tiene configurada para cotización.' },
-                    { name: 'Pasajeros e Itinerarios', type: 'Detalle de Ítem', description: 'Especifica nombres, documentos, fechas de viaje y trayectos.' }
+                    { name: 'Pasajeros e Itinerarios', type: 'Detalle de Ítem', description: 'Especifica nombres, documentos, fechas de viaje y trayectos.' },
+                    { name: 'Adjuntos y Documentos en Lote', type: 'Gestor Documental Multiactivo', description: 'Permite cargar múltiples archivos simultáneamente (Subir Lote), visualizarlos, descargarlos individualmente o empaquetados en lote comprimido (.ZIP) con un solo clic, y eliminarlos de forma masiva o selectiva.' }
                 ],
                 businessRules: [
-                    'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para cotizaciones, el sistema validará en el formulario y en base de datos que todos los productos contengan un valor válido antes de permitir guardar.',
+                    'Si el parámetro del sistema "PERMITIR_COTIZACION_SIN_PRODUCTOS" está habilitado (valor "1"), es posible crear y guardar una cotización únicamente con el cliente y datos de cabecera sin necesidad de registrar productos de inmediato.',
+                    'Permite pre-cargar y colocar adjuntos antes de guardar la cotización o de agregar productos; los archivos quedan preparados en cola ("Por guardar") y se suben y vinculan automáticamente al persistir la cotización.',
+                    'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para cotizaciones, el sistema validará en el formulario y en base de datos que todos los productos registrados contengan un valor válido antes de permitir guardar.',
                     'En importaciones de cotizaciones desde Excel, si falta alguna variable obligatoria para cotización, el proceso se detendrá indicando el error específico por grupo de productos.',
-                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor se pueden diligenciar manualmente en la pantalla y cargar masivamente desde las plantillas de Excel.'
+                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor se pueden diligenciar manualmente en la pantalla y cargar masivamente desde las plantillas de Excel.',
+                    'El gestor de adjuntos admite selección múltiple para carga masiva y empaqueta dinámicamente todos los archivos seleccionados en un archivo comprimido .ZIP para descarga en lote con nombres preservados.'
                 ],
                 steps: [
                     {
@@ -227,13 +239,13 @@ export const MANUAL_MODULES: ManualModule[] = [
                     },
                     {
                         number: 2,
-                        title: 'Agregar Servicios o Productos y Variables',
-                        description: 'Haga clic en "+ Agregar Producto", especifique el tipo de servicio, costo, precio de venta, fecha de vencimiento y factura del proveedor, y complete las variables adicionales requeridas.'
+                        title: 'Agregar Servicios o Adjuntos Previos',
+                        description: 'Puede agregar productos con "+ Agregar Producto" o directamente adjuntar documentos previos en el panel de Adjuntos antes de incorporar productos.'
                     },
                     {
                         number: 3,
                         title: 'Guardar y Generar Propuesta',
-                        description: 'Presione "Guardar Cotización" para emitir la propuesta oficial.'
+                        description: 'Presione "Guardar Cotización" para emitir la propuesta oficial. Cualquier adjunto en cola se vinculará de forma inmediata.'
                     }
                 ]
             }
@@ -250,10 +262,12 @@ export const MANUAL_MODULES: ManualModule[] = [
             {
                 code: 'FAC-01',
                 name: 'Emisión e Historial de Facturas',
-                summary: 'Gestión del historial de facturación de venta, validación de variables obligatorias y estado contable.',
-                concept: 'Registra los movimientos contables de venta, cartera, cuentas por cobrar e impuestos a partir de las cotizaciones aprobadas o facturación directa. La asignación de cuentas contables para Cargos sigue la prioridad estricta en 3 niveles: 1) Tipo de Servicio, 2) Concepto de Facturación, 3) Cargo. Para Impuestos, la cuenta se asigna de forma directa desde la tabla de Impuestos. Valida de forma estricta las variables adicionales obligatorias para factura definidas en el cliente y almacena la información del proveedor (Fecha de Vencimiento y Factura Proveedor).',
+                summary: 'Gestión del historial de facturación de venta, validación de variables obligatorias, importación Excel y estado contable.',
+                concept: 'Registra los movimientos contables de venta, cartera, cuentas por cobrar e impuestos a partir de las cotizaciones aprobadas o facturación directa. Permite la descarga directa de la plantilla Excel oficial de facturas (.xlsx) y la carga masiva. La asignación de cuentas contables para Cargos sigue la prioridad estricta en 3 niveles: 1) Tipo de Servicio, 2) Concepto de Facturación, 3) Cargo. Para Impuestos, la cuenta se asigna de forma directa desde la tabla de Impuestos. Valida de forma estricta las variables adicionales obligatorias para factura definidas en el cliente y almacena la información del proveedor (Fecha de Vencimiento y Factura Proveedor).',
                 fields: [
                     { name: 'Buscador de Facturas', type: 'Texto', description: 'Busca facturas por número de consecutivo, cliente o estado.' },
+                    { name: 'Botón Descargar Plantilla', type: 'Botón Acción', description: 'Descarga de forma instantánea la plantilla Excel (.xlsx) estructurada con los campos y filas de ejemplo requeridos para la importación masiva de facturas.' },
+                    { name: 'Botón Importar Excel', type: 'Botón Acción', description: 'Abre el panel de carga masiva de archivos de factura con soporte de arrastrar y soltar.' },
                     { name: 'Factura Zeus ERP', type: 'Insignia Alfanumérica', description: 'Muestra el número consecutivo oficial generado en Zeus ERP (ej. 6600000056) para facturas importadas desde Excel o emitidas que hayan sido exportadas al ERP.' },
                     { name: 'Estado Contable', type: 'Indicador', description: 'Muestra el estado de la factura (Nuevo, Facturado, Exportado, Cancelado).' },
                     { name: 'Forma de Pago', type: 'Selector', description: 'Define la modalidad de pago (Efectivo, Tarjeta, Transferencia, Crédito).' },
@@ -264,16 +278,23 @@ export const MANUAL_MODULES: ManualModule[] = [
                 businessRules: [
                     'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para facturas, el formulario web y el Stored Procedure bloquearán la emisión si algún ítem carece de dicha variable.',
                     'En importaciones de facturas desde Excel, el sistema valida que las variables obligatorias de factura vengan informadas en la columna de variables o en las columnas dinámicas correspondientes.',
-                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor son persistidos en base de datos y pueden ser editados en el formulario web o importados masivamente vía Excel.'
+                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor son persistidos en base de datos y pueden ser editados en el formulario web o importados masivamente vía Excel.',
+                    'La plantilla de facturas descargable contiene ejemplos detallados de líneas aéreas, hoteles, servicios, itinerarios, formas de pago y datos de proveedor.',
+                    'Para servicios de terceros y hotelería exportados a Zeus ERP, se genera automáticamente el desglose de Tipos Facturación de Hoteles (Fac_Servicios_TiposFacturacionHoteles) con tipo por defecto "Noches" (NCH), cantidad, valor unitario y cargo a aplicar mapeados directamente desde las columnas de Precio Unitario, Cantidad y Cargo Principal de la factura / Excel.'
                 ],
                 steps: [
                     {
                         number: 1,
+                        title: 'Descargar Plantilla o Cargar Facturas Masivas',
+                        description: 'En el encabezado del Historial de Facturas, haga clic en "Descargar Plantilla" para obtener el formato oficial .xlsx o "Importar Excel" para procesar el lote.'
+                    },
+                    {
+                        number: 2,
                         title: 'Facturar desde Cotización o Nueva Factura',
                         description: 'En el historial de cotizaciones ubique una propuesta aprobada y presione "Facturar", o cree una nueva factura directa.'
                     },
                     {
-                        number: 2,
+                        number: 3,
                         title: 'Confirmar Datos, Variables de Factura y Emitir',
                         description: 'Verifique los valores, complete las variables adicionales obligatorias de factura y emita la factura oficial.'
                     }
@@ -1158,6 +1179,56 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { number: 1, title: 'Activar Encriptación General', description: 'En Parámetros del Sistema, edite el parámetro EncriptarClaves y asigne el valor 1.' },
                     { number: 2, title: 'Cifrar Archivo .ENV Local', description: 'Ejecute node scripts/encrypt_password.js --env para convertir las contraseñas en texto plano a tokens ENC(...).' },
                     { number: 3, title: 'Validar Conectividad', description: 'Pruebe la conexión en /api/test-sqlserver o ejecute node scripts/validate_password_encryption_suite.js.' }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'quotation-attachments-and-audit',
+        title: 'Carga Masiva de Adjuntos y Auditoría de Cambios en Cotizaciones',
+        iconName: 'History',
+        category: 'Operaciones Comerciales y Auditoría',
+        description: 'Manual de uso para la subida múltiple de archivos, descarga individual o comprimida en ZIP y consulta detallada del snapshot de cambios por versión en Cotizaciones.',
+        overview: 'El sistema permite gestionar de forma masiva los archivos adjuntos (PDFs, imágenes, hojas de cálculo) vinculados a una cotización, con opciones para subir múltiples archivos simultáneamente y descargarlos de forma selectiva o en un paquete .ZIP consolidado. Adicionalmente, cada modificación genera una instantánea completa (metadata) en el historial de estados, registrando el usuario, fecha/hora y habilitando un visor comparativo para consultar el detalle exacto de productos, pasajeros y tarifas de cada versión.',
+        procedures: [
+            {
+                code: 'COT-ATT-01',
+                name: 'Gestión y Descarga en Lote de Archivos Adjuntos',
+                summary: 'Carga y descarga múltiple/ZIP de documentos de soporte en cotizaciones.',
+                concept: 'Permite anexar múltiples soportes (vouchers, contratos, itinerarios) en un solo paso y descargarlos individualmente o empaquetados en un archivo comprimido .ZIP con barra de progreso.',
+                fields: [
+                    { name: 'Subir Archivos', type: 'Carga Múltiple (input multiple)', description: 'Permite seleccionar varios archivos a la vez para cargarlos al expediente.' },
+                    { name: 'Descargar Todo (ZIP)', type: 'Botón de Acción', description: 'Empaqueta todos los adjuntos de la cotización en un archivo .ZIP generado en el navegador.' },
+                    { name: 'Descargar Seleccionados (ZIP)', type: 'Botón de Acción', description: 'Empaqueta y descarga únicamente los archivos seleccionados mediante casillas de verificación.' }
+                ],
+                businessRules: [
+                    'Los archivos adjuntados se vinculan de manera persistente a la cotización mediante la API /api/quotations/[id]/attachments.',
+                    'La descarga en lote utiliza compresión del lado del cliente (JSZip), optimizando la transferencia de red y tiempos de respuesta.'
+                ],
+                steps: [
+                    { number: 1, title: 'Abrir Sección de Adjuntos', description: 'En el formulario de cotización, desplácese hasta la sección inferior "Archivos Adjuntos".' },
+                    { number: 2, title: 'Cargar Múltiples Archivos', description: 'Haga clic en "+ Subir Archivos" y elija uno o varios documentos. Se mostrará el progreso de subida en tiempo real.' },
+                    { number: 3, title: 'Descargar en Lote', description: 'Haga clic en "Descargar Todo (ZIP)" o seleccione los archivos deseados y haga clic en "Descargar Seleccionados (ZIP)".' }
+                ]
+            },
+            {
+                code: 'COT-AUD-02',
+                name: 'Auditoría y Consulta de Modificaciones por Versión',
+                summary: 'Inspección visual y técnica de las modificaciones históricas de la cotización.',
+                concept: 'Cada vez que una cotización es editada o cambia de estado, se captura una instantánea completa (JSON snapshot) guardando el usuario responsable, timestamp y los valores exactos de cada ítem, producto, servicio manual y totalizador.',
+                fields: [
+                    { name: 'Pestaña Historial', type: 'Pestaña en Información General', description: 'Muestra la cronología de creaciones y modificaciones ordenadas descendentemente.' },
+                    { name: 'Usuario que Modificó', type: 'Identificador', description: 'Nombre o código del usuario que realizó la acción.' },
+                    { name: 'Consultar Detalle', type: 'Botón / Modal de Auditoría', description: 'Abre el modal de detalle histórico con desglose visual de productos y visor técnico JSON con opción de copiar.' }
+                ],
+                businessRules: [
+                    'El historial captura snapshots tanto en PostgreSQL (jsonb) como en SQL Server (NVARCHAR(MAX)).',
+                    'El modal de detalle histórico permite revisar el desglose original de productos, precios de venta, costos y pasajeros registrados en ese momento específico.'
+                ],
+                steps: [
+                    { number: 1, title: 'Acceder a la Pestaña Historial', description: 'En el formulario de cotización, seleccione la pestaña "Historial de Estados y Cambios".' },
+                    { number: 2, title: 'Consultar una Versión', description: 'Ubique la fila deseada y haga clic en el botón "Consultar Detalle".' },
+                    { number: 3, title: 'Revisar o Copiar Datos', description: 'Explore el resumen visual de productos y tarifas, o cambie a la pestaña "Auditoría Técnica JSON" para copiar el snapshot completo.' }
                 ]
             }
         ]

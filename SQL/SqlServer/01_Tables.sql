@@ -467,9 +467,13 @@ BEGIN
         [state] NVARCHAR(25) NOT NULL,
         [description] NVARCHAR(MAX) NULL,
         [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_QuotationStateHistory_CreatedAt DEFAULT GETDATE(),
-        [userId] INT NULL CONSTRAINT FK_QuotationStateHistory_User REFERENCES dbo.[User]([id])
+        [userId] INT NULL CONSTRAINT FK_QuotationStateHistory_User REFERENCES dbo.[User]([id]),
+        [metadata] NVARCHAR(MAX) NULL
     );
 END;
+
+IF OBJECT_ID('dbo.QuotationStateHistory', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationStateHistory') AND name = 'metadata')
+    ALTER TABLE dbo.[QuotationStateHistory] ADD [metadata] NVARCHAR(MAX) NULL;
 
 -- 20. Invoices
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Invoices' AND schema_id = SCHEMA_ID('dbo'))
@@ -621,6 +625,20 @@ BEGIN
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductCombo PRIMARY KEY,
         [invoiceId] INT NOT NULL,
         [comboId] INT NOT NULL
+    );
+END;
+
+-- 20g_att. Attachment
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Attachment' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Attachment] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Attachment PRIMARY KEY,
+        [quotationId] INT NOT NULL CONSTRAINT FK_Attachment_Quotation REFERENCES dbo.[Quotation]([id]) ON DELETE CASCADE,
+        [fileName] NVARCHAR(255) NOT NULL,
+        [fileType] NVARCHAR(100) NOT NULL,
+        [fileSize] INT NOT NULL,
+        [fileContent] VARBINARY(MAX) NOT NULL,
+        [createdAt] DATETIME2 NOT NULL CONSTRAINT DF_Attachment_createdAt DEFAULT GETDATE()
     );
 END;
 

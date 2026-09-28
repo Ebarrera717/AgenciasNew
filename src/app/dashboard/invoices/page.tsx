@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Filter, FileText, Download, Trash2, Eye, Edit2, MoreVertical, Printer, FileCode, Upload, Send } from 'lucide-react'
+import { Search, Plus, Filter, FileText, Download, Trash2, Eye, Edit2, MoreVertical, Printer, FileCode, Upload, Send, FileDown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
 import ExcelImportInvoices from '@/components/excel-import-invoices'
+import { downloadInvoiceTemplate } from '@/lib/excel-templates'
 
 export default function InvoicesListPage() {
     const [invoices, setInvoices] = useState<any[]>([])
@@ -198,6 +199,16 @@ export default function InvoicesListPage() {
                     >
                         <Send className="w-5 h-5" />
                         Enviar a Zeus ERP {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                    </motion.button>
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={downloadInvoiceTemplate}
+                        className="px-4 h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl flex items-center gap-2 shadow-sm text-sm font-bold transition-all cursor-pointer active:scale-95"
+                        title="Descargar plantilla Excel para importación de facturas"
+                    >
+                        <FileDown className="w-5 h-5" />
+                        Descargar Plantilla
                     </motion.button>
                     <motion.button
                         whileHover={{ scale: 1.05 }}

@@ -15,6 +15,7 @@ function syncSqlServerUpdater() {
     const pathTables = path.join(sqlDir, '01_Tables.sql');
     const pathSeeds = path.join(sqlDir, '02_Seeds.sql');
     const pathSps = path.join(sqlDir, '03_Functions_And_SPs.sql');
+    const pathSpExportInvoices = path.join(sqlDir, 'spExportInvoices.sql');
 
     if (!fs.existsSync(pathTables) || !fs.existsSync(pathSeeds) || !fs.existsSync(pathSps)) {
         console.error('❌ ERROR: No se encontraron los archivos fuente en SQL/SqlServer/');
@@ -23,7 +24,15 @@ function syncSqlServerUpdater() {
 
     const contentTables = fs.readFileSync(pathTables, 'utf8');
     const contentSeeds = fs.readFileSync(pathSeeds, 'utf8');
-    const contentSps = fs.readFileSync(pathSps, 'utf8');
+    let contentSps = fs.readFileSync(pathSps, 'utf8');
+
+    if (fs.existsSync(pathSpExportInvoices)) {
+        const contentExport = fs.readFileSync(pathSpExportInvoices, 'utf8');
+        contentSps += '\n\nGO\n\n-- --------------------------------------------------------------------------\n' +
+                      '-- spExportInvoices (Generación de XML de Facturas en SQL Server)\n' +
+                      '-- --------------------------------------------------------------------------\n' +
+                      contentExport + '\n\nGO\n';
+    }
 
     const header = `-- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER

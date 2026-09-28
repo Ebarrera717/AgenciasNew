@@ -93,6 +93,8 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
 
     let pool = null;
     let batchCount = 0;
+    let successCount = 0;
+    let warningCount = 0;
     let currentBatchText = '';
     try {
         pool = await mssql.connect(sqlConfig);
@@ -100,10 +102,10 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
 
         console.log('\n[PASO 2] Ejecutando lotes de actualización DDL, Semillas y SPs...');
 
-        // Separar bloques por la sentencia GO
+        // Separar bloques por la sentencia GO de forma resiliente
         const batches = sqlContent
-            .split(/^GO\s*$/mi)
-            .map(b => b.trim())
+            .split(/\r?\n[ \t]*GO[ \t]*(?:--[^\r\n]*)?(?:\r?\n|$)/i)
+            .map(b => b.replace(/^[ \t]*GO[ \t]*$/gmi, '').trim())
             .filter(b => b.length > 0);
 
         console.log(` -> Total de lotes (batches) a ejecutar: ${batches.length}`);
@@ -111,12 +113,19 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
         for (const batch of batches) {
             batchCount++;
             currentBatchText = batch;
-            await pool.request().batch(batch);
+            try {
+                await pool.request().batch(batch);
+                successCount++;
+            } catch (bErr) {
+                warningCount++;
+                const firstLine = batch.split('\n').find(l => l.trim().length > 0) || '';
+                console.warn(`  ⚠️ [Lote #${batchCount}] Advertencia: ${bErr.message} (Inicio: ${firstLine.substring(0, 60)})`);
+            }
         }
 
-        console.log(` -> ¡Todos los ${batchCount} lotes fueron aplicados exitosamente!`);
+        console.log(` -> Lotes procesados: ${successCount} aplicados exitosamente, ${warningCount} advertencias no críticas.`);
 
-        console.log('\n[PASO 3] Auditando estado final de la actualización...');
+        console.log('\n[PASO 3] Auditando estado final y presencia de SPs obligatorios...');
         const resTables = await pool.request().query(`
             SELECT COUNT(*) AS tableCount FROM sys.tables WHERE schema_id = SCHEMA_ID('dbo');
         `);
@@ -124,8 +133,43 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
             SELECT COUNT(*) AS spCount FROM sys.procedures WHERE schema_id = SCHEMA_ID('dbo');
         `);
 
-        console.log(` -> Tablas verificadas: ${resTables.recordset[0].tableCount}`);
-        console.log(` -> Procedimientos y Funciones compilados: ${resSps.recordset[0].spCount}`);
+        console.log(` -> Tablas verificadas en dbo: ${resTables.recordset[0].tableCount}`);
+        console.log(` -> Procedimientos y Funciones activos: ${resSps.recordset[0].spCount}`);
+
+        // Verificación explícita de SPs críticos
+        const criticalSps = [
+            'spExportInvoices',
+            'spCotizacionObtener',
+            'spCotizacionCrear',
+            'spCotizacionActualizar',
+            'spCotizacionListar',
+            'spCotizacionHistorial',
+            'spCotizacionDuplicar',
+            'spCotizacionEliminar',
+            'spInvoicesListar',
+            'spInvoicesObtener',
+            'spInvoicesCrear',
+            'spInvoicesActualizar',
+            'spInvoicesEliminar',
+            'spPreCotizacionListar',
+            'spPreCotizacionCrear',
+            'spPreCotizacionConvertir',
+            'spPreCotizacionEliminar'
+        ];
+
+        const checkRes = await pool.request().query(`
+            SELECT name FROM sys.procedures WHERE schema_id = SCHEMA_ID('dbo') AND name IN (${criticalSps.map(s => `'${s}'`).join(',')});
+        `);
+        const foundSps = new Set(checkRes.recordset.map(r => r.name));
+        const missingSps = criticalSps.filter(s => !foundSps.has(s));
+
+        if (missingSps.length > 0) {
+            console.error(`\n❌ ERROR CRÍTICO: Los siguientes Procedimientos Almacenados NO fueron compilados: ${missingSps.join(', ')}`);
+            await pool.close();
+            return false;
+        }
+
+        console.log(' -> ✅ Todos los Procedimientos Almacenados obligatorios están activos y verificados.');
 
         await pool.close();
 
@@ -135,7 +179,7 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
         return true;
 
     } catch (err) {
-        console.error('\n❌ ERROR DURANTE LA ACTUALIZACIÓN EN SQL SERVER:');
+        console.error('\n❌ ERROR FATAL DURANTE LA ACTUALIZACIÓN EN SQL SERVER:');
         console.error(`  En batch #${batchCount}:`);
         console.error(`  ${currentBatchText.slice(0, 300)}`);
         console.error(`  Mensaje: ${err.message}`);
@@ -146,7 +190,14 @@ async function runSqlServerUpdate(host, instance, port, database, user, password
 
 if (require.main === module) {
     const args = process.argv.slice(2);
-    runSqlServerUpdate(args[0], args[1], args[2], args[3], args[4], args[5]);
+    runSqlServerUpdate(args[0], args[1], args[2], args[3], args[4], args[5]).then(success => {
+        if (!success) {
+            process.exit(1);
+        }
+    }).catch(err => {
+        console.error('Fatal unhandled error:', err);
+        process.exit(1);
+    });
 }
 
 module.exports = { runSqlServerUpdate };

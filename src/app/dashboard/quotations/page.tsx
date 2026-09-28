@@ -24,19 +24,24 @@ import {
     Eye,
     X,
     CheckCircle2,
-    Database
+    Database,
+    Upload,
+    FileDown
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import QuotationInvoiceModal from './QuotationInvoiceModal'
+import ExcelImportQuotations from '@/components/excel-import-quotations'
+import { downloadQuotationTemplate } from '@/lib/excel-templates'
 
 export default function QuotationsListPage() {
     const router = useRouter()
     const [quotations, setQuotations] = useState<any[]>([])
     const [states, setStates] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [isImportOpen, setIsImportOpen] = useState(false)
     const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
     const [exportingXmlId, setExportingXmlId] = useState<number | null>(null)
     
@@ -472,7 +477,23 @@ export default function QuotationsListPage() {
                     </h1>
                     <p className="text-zinc-500 dark:text-zinc-400 font-medium text-xs md:text-sm mt-0.5">Consulta y administra todas las cotizaciones emitidas</p>
                 </div>
-                <div className="flex items-center gap-2.5 shrink-0">
+                <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                    <button
+                        onClick={downloadQuotationTemplate}
+                        className="px-3.5 h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl shadow-xs font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
+                        title="Descargar plantilla Excel para importación de cotizaciones"
+                    >
+                        <FileDown className="w-4 h-4" /> Descargar Plantilla
+                    </button>
+
+                    <button
+                        onClick={() => setIsImportOpen(!isImportOpen)}
+                        className="px-3.5 h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl shadow-xs font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
+                        title="Importar cotizaciones desde archivo Excel"
+                    >
+                        <Upload className="w-4 h-4" /> Importar Excel
+                    </button>
+
                     <button
                         onClick={handleExportZeus}
                         className="px-4 h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-md font-bold transition-all flex items-center gap-2 text-xs cursor-pointer active:scale-95"
@@ -488,6 +509,19 @@ export default function QuotationsListPage() {
                     </Link>
                 </div>
             </header>
+
+            <AnimatePresence>
+                {isImportOpen && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden mb-5"
+                    >
+                        <ExcelImportQuotations onImportSuccess={fetchQuotations} />
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Filtros Avanzados */}
             <div className="bg-white dark:bg-zinc-900/50 p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-5 shadow-sm">
@@ -626,7 +660,7 @@ export default function QuotationsListPage() {
             </div>
 
             {/* Contenedor de Tabla con Barra de Herramientas de Exportación */}
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm min-h-[450px]">
+            <div className="w-full max-w-full overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm min-h-[450px]">
                 {/* Barra Superior de Herramientas Excel */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl">
                     <div className="flex items-center gap-3 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
@@ -668,8 +702,8 @@ export default function QuotationsListPage() {
                         <p className="text-xs">Aún no se ha emitido ninguna o no coincide con la búsqueda.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto min-h-[420px] pb-36">
-                        <table className="w-full text-left border-collapse text-xs md:text-sm">
+                    <div className="overflow-x-auto w-full min-h-[420px] pb-36">
+                        <table className="w-full min-w-[900px] text-left border-collapse text-xs md:text-sm">
                             <thead className="bg-zinc-50/70 dark:bg-zinc-800/40">
                                 <tr>
                                     <th className="px-4 py-3.5 w-10 border-b border-zinc-200 dark:border-zinc-800">
@@ -690,13 +724,13 @@ export default function QuotationsListPage() {
                                             {sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />}
                                         </div>
                                     </th>
-                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Reserva / Localizador</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap min-w-[120px]">Reserva / Localizador</th>
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Fecha</th>
-                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Cliente</th>
-                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Elaborado por</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap min-w-[160px]">Cliente</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap min-w-[120px]">Elaborado por</th>
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Monto Total</th>
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Estado</th>
-                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right whitespace-nowrap">Acciones</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right whitespace-nowrap sticky right-0 bg-zinc-50 dark:bg-zinc-800/95 backdrop-blur-sm z-10 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -715,8 +749,8 @@ export default function QuotationsListPage() {
                                                 {q.internalNumber ? (q.internalNumber.startsWith('#') ? q.internalNumber : '#' + q.internalNumber) : '#' + q.id}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                            <div className="font-semibold text-zinc-800 dark:text-zinc-200 text-xs md:text-sm">
+                                        <td className="px-4 py-3.5 whitespace-nowrap max-w-[180px]">
+                                            <div className="font-semibold text-zinc-800 dark:text-zinc-200 text-xs md:text-sm max-w-[170px] truncate" title={q.reservationCode || '-'}>
                                                 {q.reservationCode || '-'}
                                             </div>
                                         </td>
@@ -726,16 +760,16 @@ export default function QuotationsListPage() {
                                                 <span>{format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy')}</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3.5">
-                                            <div className="font-bold text-zinc-900 dark:text-white text-xs md:text-sm">
+                                        <td className="px-4 py-3.5 max-w-[220px]">
+                                            <div className="font-bold text-zinc-900 dark:text-white text-xs md:text-sm max-w-[210px] truncate" title={q.clientName || 'Cliente'}>
                                                 {q.clientName || 'Cliente'}
                                             </div>
-                                            <div className="text-[11px] text-zinc-400">
+                                            <div className="text-[11px] text-zinc-400 max-w-[210px] truncate" title={q.passengerName || 'Mismo titular'}>
                                                 Pax: {q.passengerName || 'Mismo titular'}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                            <div className="font-medium text-zinc-700 dark:text-zinc-300 text-xs">
+                                        <td className="px-4 py-3.5 whitespace-nowrap max-w-[160px]">
+                                            <div className="font-medium text-zinc-700 dark:text-zinc-300 text-xs max-w-[150px] truncate" title={q.userName || 'Sistema'}>
                                                 {q.userName || 'Sistema'}
                                             </div>
                                         </td>
@@ -755,7 +789,7 @@ export default function QuotationsListPage() {
                                                 {q.state || 'NUEVO'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3.5 text-right whitespace-nowrap relative">
+                                        <td className="px-4 py-3.5 text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-zinc-900/95 group-hover:bg-zinc-50/95 dark:group-hover:bg-zinc-800/90 backdrop-blur-sm z-10 transition-colors shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

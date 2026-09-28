@@ -71,21 +71,146 @@ export function parseSQLServerUrl(connStr: string) {
 }
 
 /**
- * Obtiene el nombre de la base de datos externa de Zeus ERP desde Parámetros del Sistema (BaseSQLServer)
- * o desde process.env.ZEUS_ERP_DB, por defecto 'ZeusAgencias_23'. NUNCA Korex_pruebas.
+ * Obtiene la configuración de conexión hacia Zeus ERP directamente desde los Parámetros del Sistema
+ * (ServidorSQLServer, BaseSQLServer, UsuarioSQLServer, ClaveSQLServer, PuertoSQLServer, EncriptarClaves).
+ * QUEDA ESTRICTAMENTE PROHIBIDO usar valores predeterminados o fallbacks arbitrarios.
+ */
+export async function getZeusSQLServerConfig(): Promise<{
+    servidor: string;
+    instanceName?: string;
+    rawHost: string;
+    usuario: string;
+    clave: string;
+    base_datos: string;
+    puerto: string;
+}> {
+    const paramsMap: Record<string, string> = {};
+
+    if (isSQLServerMode()) {
+        const pool = await getSQLServerConnection();
+        try {
+            const res = await pool.request().query(`
+                SELECT code, value FROM dbo.[SystemParameter]
+                WHERE code IN ('ServidorSQLServer', 'BaseSQLServer', 'UsuarioSQLServer', 'ClaveSQLServer', 'PuertoSQLServer', 'EncriptarClaves')
+            `);
+            for (const row of res.recordset || []) {
+                paramsMap[row.code] = (row.value || '').trim();
+            }
+        } finally {
+            await pool.close();
+        }
+    } else {
+        const { executePostgresQuery } = await import('./postgres');
+        const rows = await executePostgresQuery(`
+            SELECT "code", "value" FROM public."SystemParameter"
+            WHERE "code" = ANY(ARRAY['ServidorSQLServer', 'BaseSQLServer', 'UsuarioSQLServer', 'ClaveSQLServer', 'PuertoSQLServer', 'EncriptarClaves'])
+        `);
+        for (const row of rows || []) {
+            paramsMap[row.code] = (row.value || '').trim();
+        }
+    }
+
+    const servidor = paramsMap['ServidorSQLServer'];
+    const base_datos = paramsMap['BaseSQLServer'];
+    const usuario = paramsMap['UsuarioSQLServer'];
+    let clave = paramsMap['ClaveSQLServer'] || '';
+    const puerto = paramsMap['PuertoSQLServer'] || '1433';
+    const encriptar = paramsMap['EncriptarClaves'] === '1';
+
+    if (!servidor) {
+        throw new Error('❌ Error de Configuración: El parámetro "ServidorSQLServer" (Host/IP de Zeus ERP) no está configurado en los Parámetros del Sistema.');
+    }
+    if (!base_datos) {
+        throw new Error('❌ Error de Configuración: El parámetro "BaseSQLServer" (Base de Datos de Zeus ERP) no está configurado en los Parámetros del Sistema.');
+    }
+    if (!usuario) {
+        throw new Error('❌ Error de Configuración: El parámetro "UsuarioSQLServer" (Usuario de Zeus ERP) no está configurado en los Parámetros del Sistema.');
+    }
+
+    if (encriptar && clave) {
+        clave = decryptPassword(clave);
+    }
+
+    const serverVal = servidor.replace(/\//g, '\\');
+    let host = serverVal;
+    let instanceName: string | undefined = undefined;
+
+    if (serverVal.includes('\\')) {
+        const parts = serverVal.split('\\');
+        host = parts[0];
+        instanceName = parts[1];
+    }
+
+    return {
+        servidor: serverVal,
+        instanceName,
+        rawHost: host,
+        usuario,
+        clave,
+        base_datos,
+        puerto
+    };
+}
+
+/**
+ * Obtiene el nombre de la base de datos externa de Zeus ERP desde Parámetros del Sistema (BaseSQLServer).
+ * Nunca retorna defaults arbitrarios.
  */
 export async function getZeusERPDatabaseName(): Promise<string> {
-    try {
-        const param = await prisma.systemParameter.findUnique({
-            where: { code: 'BaseSQLServer' },
-            select: { value: true }
-        });
-        if (param && param.value && param.value.trim() !== '') {
-            return param.value.trim();
-        }
-    } catch (e) {}
+    const config = await getZeusSQLServerConfig();
+    return config.base_datos;
+}
 
-    return process.env.ZEUS_ERP_DB || 'ZeusAgencias_23';
+/**
+ * Obtiene una conexión directa hacia el servidor y base de datos de Zeus ERP
+ * utilizando los Parámetros del Sistema parametrizados por el usuario.
+ */
+export async function getZeusSQLServerConnection(): Promise<mssql.ConnectionPool> {
+    const config = await getZeusSQLServerConfig();
+
+    const sqlConfig: any = {
+        user: config.usuario,
+        password: config.clave,
+        server: config.rawHost,
+        database: config.base_datos,
+        options: {
+            encrypt: false,
+            trustServerCertificate: true,
+            enableArithAbort: true,
+            connectTimeout: 20000
+        },
+        connectionTimeout: 20000,
+        requestTimeout: 60000
+    };
+
+    if (config.instanceName) {
+        sqlConfig.options.instanceName = config.instanceName;
+        if (config.puerto && config.puerto !== '' && config.puerto !== '1433') {
+            sqlConfig.port = parseInt(config.puerto, 10);
+        }
+        console.log(`[ZEUS_CONN] Conectando a Zeus ERP [${config.base_datos}] en: ${config.rawHost}\\${config.instanceName} (Puerto: ${sqlConfig.port || 'Dinámico SQL Browser'}) con usuario '${config.usuario}'`);
+    } else if (config.puerto && config.puerto !== '') {
+        sqlConfig.port = parseInt(config.puerto, 10);
+        console.log(`[ZEUS_CONN] Conectando a Zeus ERP [${config.base_datos}] en: ${config.rawHost}:${sqlConfig.port} con usuario '${config.usuario}'`);
+    } else {
+        sqlConfig.port = 1433;
+        console.log(`[ZEUS_CONN] Conectando a Zeus ERP [${config.base_datos}] en: ${config.rawHost}:1433 con usuario '${config.usuario}'`);
+    }
+
+    try {
+        const pool = new mssql.ConnectionPool(sqlConfig);
+        await pool.connect();
+        console.log(`[ZEUS_CONN] ¡ÉXITO al conectar con BD [${config.base_datos}] de Zeus ERP en (${config.servidor})!`);
+        return pool;
+    } catch (error: any) {
+        console.error(`[ZEUS_CONN] Error conectando a Zeus ERP:`, error.message);
+        const richMsg = `[Servidor Configurado: ${config.servidor}${config.puerto ? ':' + config.puerto : ''} | Host Intentado: ${config.rawHost} | Instancia: ${config.instanceName || 'Predeterminada'} | BD: ${config.base_datos} | Usuario: ${config.usuario}] - Error: ${error.message}${error.code ? ' [Código: ' + error.code + ']' : ''}`;
+        const enrichedError = new Error(richMsg);
+        (enrichedError as any).code = error.code || 'SQL_CONN_ERROR';
+        (enrichedError as any).originalError = error;
+        (enrichedError as any).connectionConfig = { server: config.servidor, host: config.rawHost, instanceName: config.instanceName, port: sqlConfig.port, db: config.base_datos, user: config.usuario };
+        throw enrichedError;
+    }
 }
 
 /**
@@ -237,12 +362,15 @@ export async function executeSQLServerProcedure(spName: string, params: any, tar
 
     try {
         const fullSpName = spName.includes('.') ? spName : `dbo.${spName}`;
-        let dbToUse = targetDb;
-        if (!dbToUse && isZeusProcedure) {
-            dbToUse = await getZeusERPDatabaseName();
+        
+        if (isZeusProcedure) {
+            const targetDb = await getZeusERPDatabaseName();
+            console.log(`[SQL_SERVER_EXEC] Procedimiento Zeus ERP: ${fullSpName} | BD Destino: ${targetDb} (según Parámetros del Sistema)`);
+            pool = await getZeusSQLServerConnection();
+        } else {
+            console.log(`[SQL_SERVER_EXEC] Procedimiento Interno Korex: ${fullSpName} | BD Destino: Principal (.env)`);
+            pool = await getSQLServerConnection();
         }
-        console.log(`[SQL_SERVER_EXEC] Procedimiento: ${fullSpName} | BD Destino: ${dbToUse || 'Principal (.env)'} | Parámetros:`, JSON.stringify(params));
-        pool = await getSQLServerConnection(dbToUse);
         const request = pool.request();
 
         if (params) {

@@ -8,24 +8,63 @@ import { recordTraceEvent, generateTraceCode } from './traceability'
  */
 export async function isAutoExportEnabled(type: 'QUOTATION' | 'INVOICE'): Promise<boolean> {
     try {
-        const codes = type === 'QUOTATION'
-            ? ['EnviarCotizacionesAutoSQLserver']
-            : ['EnviarFacturacionAutoSQLserver', 'EnviarFacturasAutoSQLserver'];
+        const primaryCode = type === 'QUOTATION' ? 'EnviarCotizacionesAutoSQLserver' : 'EnviarFacturacionAutoSQLserver';
+        const fallbackCodes = type === 'QUOTATION'
+            ? ['EnviarCotizacionesAuto']
+            : ['EnviarFacturasAutoSQLserver', 'EnviarFacturaAutoSQLserver', 'EnviarFacturacionAuto', 'EnviarFacturasAuto'];
+        const allCodes = [primaryCode, ...fallbackCodes];
 
         if (isSQLServerMode()) {
             const pool = await getSQLServerConnection();
-            const res = await pool.request()
-                .input('c1', codes[0])
-                .input('c2', codes[1] || codes[0])
-                .query(`SELECT value FROM dbo.[SystemParameter] WHERE code IN (@c1, @c2)`);
+            const placeholders = allCodes.map((_, i) => `@c${i}`).join(', ');
+            const req = pool.request();
+            allCodes.forEach((code, i) => req.input(`c${i}`, code));
+            const res = await req.query(`SELECT code, value FROM dbo.[SystemParameter] WHERE code IN (${placeholders})`);
             await pool.close();
-            return res.recordset?.some((r: any) => String(r.value).trim() === '1') || false;
+
+            const records: { code: string; value: string }[] = res.recordset || [];
+            
+            // 1. Evaluación ESTRICTA del parámetro primario configurado en la pantalla de Parámetros
+            const primaryRow = records.find(r => r.code === primaryCode);
+            if (primaryRow) {
+                const val = String(primaryRow.value || '').trim().toLowerCase();
+                const isEnabled = val === '1' || val === 'true' || val === 'si';
+                console.log(`[ZEUS_AUTO_EXPORT] isAutoExportEnabled(${type}) = ${isEnabled} (Parámetro primario ${primaryCode} = '${primaryRow.value}')`);
+                return isEnabled;
+            }
+
+            // 2. Solo si no existe el parámetro primario, evaluar fallbacks legados
+            const fallbackRow = records.find(r => {
+                const val = String(r.value || '').trim().toLowerCase();
+                return val === '1' || val === 'true' || val === 'si';
+            });
+            const isEnabled = Boolean(fallbackRow);
+            console.log(`[ZEUS_AUTO_EXPORT] isAutoExportEnabled(${type}) = ${isEnabled} (Evaluación fallback: ${JSON.stringify(records)})`);
+            return isEnabled;
         } else {
             const res = await executePostgresQuery(
-                `SELECT "value" FROM public."SystemParameter" WHERE "code" = ANY($1::text[])`,
-                [codes]
+                `SELECT "code", "value" FROM public."SystemParameter" WHERE "code" = ANY($1::text[])`,
+                [allCodes]
             );
-            return res?.some((r: any) => String(r.value).trim() === '1') || false;
+            const records: { code: string; value: string }[] = res || [];
+
+            // 1. Evaluación ESTRICTA del parámetro primario configurado en la pantalla de Parámetros
+            const primaryRow = records.find(r => r.code === primaryCode);
+            if (primaryRow) {
+                const val = String(primaryRow.value || '').trim().toLowerCase();
+                const isEnabled = val === '1' || val === 'true' || val === 'si';
+                console.log(`[ZEUS_AUTO_EXPORT] isAutoExportEnabled(${type}) = ${isEnabled} (Parámetro primario PG ${primaryCode} = '${primaryRow.value}')`);
+                return isEnabled;
+            }
+
+            // 2. Solo si no existe el parámetro primario, evaluar fallbacks legados
+            const fallbackRow = records.find(r => {
+                const val = String(r.value || '').trim().toLowerCase();
+                return val === '1' || val === 'true' || val === 'si';
+            });
+            const isEnabled = Boolean(fallbackRow);
+            console.log(`[ZEUS_AUTO_EXPORT] isAutoExportEnabled(${type}) = ${isEnabled} (Evaluación fallback PG: ${JSON.stringify(records)})`);
+            return isEnabled;
         }
     } catch (e: any) {
         console.warn(`[ZEUS_AUTO_EXPORT] Error consultando parámetro para ${type}:`, e.message);
@@ -74,7 +113,7 @@ export async function autoExportQuotationToZeusERP(
         if (!xmlStr || typeof xmlStr !== 'string' || !xmlStr.trim().startsWith('<') || xmlStr.startsWith('ERROR')) {
             console.warn(`[ZEUS_AUTO_EXPORT] No se pudo generar XML válido para cotización(es) [${idsStr}]: ${xmlStr}`);
             await registerLog(userId, 'QUOTATION', 'AUTO_EXPORT_ERROR', `ID(s) ${idsStr}: Error en generación de XML: ${xmlStr}`, { xml: xmlStr });
-            return { exported: false, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
+            return { exported: true, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
         }
 
         // 2. Inyección en Zeus ERP (spCotizacionesCrear)
@@ -164,7 +203,7 @@ export async function autoExportInvoiceToZeusERP(
         if (!xmlStr || typeof xmlStr !== 'string' || !xmlStr.trim().startsWith('<') || xmlStr.startsWith('ERROR')) {
             console.warn(`[ZEUS_AUTO_EXPORT] No se pudo generar XML válido para factura(s) [${idsStr}]: ${xmlStr}`);
             await registerLog(userId, 'INVOICE', 'AUTO_EXPORT_ERROR', `ID(s) ${idsStr}: Error en generación de XML: ${xmlStr}`, { xml: xmlStr });
-            return { exported: false, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
+            return { exported: true, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
         }
 
         // 2. Inyección en Zeus ERP (spFacturacionesCrear)
@@ -195,8 +234,9 @@ export async function autoExportInvoiceToZeusERP(
         const idArray = idsStr.split(',').map((id: string) => parseInt(id.trim(), 10)).filter((n: number) => !isNaN(n));
         if (spResult.length > 0) {
             if (isSQLServerMode()) {
-                for (const item of spResult) {
-                    const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray.length === 1 ? idArray[0] : 0));
+                for (let idx = 0; idx < spResult.length; idx++) {
+                    const item = spResult[idx];
+                    const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray[idx] || (idArray.length === 1 ? idArray[0] : 0)));
                     const isOk = checkItemSuccess(item);
                     if (isOk && invId > 0) {
                         const rawMsg = getItemMessage(item);
@@ -211,6 +251,7 @@ export async function autoExportInvoiceToZeusERP(
                                 `UPDATE dbo.[Invoices] SET [state] = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}', zeusInvoiceNumber = '${zeusNum}'` : ''} WHERE id = ${invId}`
                             );
                             await pool.close();
+                            console.log(`[ZEUS_AUTO_EXPORT] Factura #${invId} actualizada a EXPORTED con consecutivo Zeus: ${zeusNum || consecutivo || '-'}`);
                         } catch (uErr: any) {
                             console.warn('[ZEUS_AUTO_EXPORT] Error actualizando estado de factura SQL Server:', uErr.message);
                         }
@@ -236,16 +277,21 @@ export async function autoExportInvoiceToZeusERP(
             { spResult, targetDb }
         );
 
+        const firstMsg = spResult.length > 0 ? getItemMessage(spResult[0]) : '';
+        const cleanMsg = firstMsg ? firstMsg.split('--- DYNAMIC EXECUTION TRACE ---')[0].trim() : '';
+
         return {
             exported: true,
             success,
-            message: success ? 'Factura exportada automáticamente a Zeus ERP' : 'Exportación con observaciones en Zeus ERP',
+            message: success 
+                ? (cleanMsg ? `Factura exportada a Zeus ERP (${cleanMsg})` : 'Factura exportada automáticamente a Zeus ERP') 
+                : (cleanMsg || 'Exportación con observaciones en Zeus ERP'),
             spResult,
             xml: xmlStr
         };
     } catch (error: any) {
         console.error(`[ZEUS_AUTO_EXPORT] Excepción en exportación automática de factura [${idsStr}]:`, error.message);
         await registerLog(userId, 'INVOICE', 'AUTO_EXPORT_EXCEPTION', `ID(s) ${idsStr}: ${error.message}`, { error: error.message });
-        return { exported: false, success: false, message: error.message };
+        return { exported: true, success: false, message: error.message };
     }
 }

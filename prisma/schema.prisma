@@ -585,9 +585,9 @@ model Airports {
   id       Int     @id @default(autoincrement())
   code     String  @unique @db.VarChar(10)
   name     String  @db.VarChar(150)
-  citiesId Int
+  citiesId Int?
   isActive Boolean @default(true)
-  Cities   Cities  @relation(fields: [citiesId], references: [id], onDelete: Cascade)
+  Cities   Cities? @relation(fields: [citiesId], references: [id], onDelete: Cascade)
 }
 
 model BookingGDS {
@@ -791,12 +791,12 @@ model Cities {
   id          Int        @id @default(autoincrement())
   code        String     @unique @db.VarChar(10)
   name        String     @db.VarChar(100)
-  countriesId Int
+  countriesId Int?
   statecode   String?    @db.VarChar(25)
   iata        String?    @db.VarChar(10)
   isActive    Boolean    @default(true)
   Airports    Airports[]
-  Countries   Countries  @relation(fields: [countriesId], references: [id], onDelete: Cascade)
+  Countries   Countries? @relation(fields: [countriesId], references: [id], onDelete: Cascade)
 }
 
 model Countries {
@@ -1026,6 +1026,7 @@ model QuotationStateHistory {
   description String?
   createdAt   DateTime  @default(now()) @db.Timestamp(6)
   userId      Int?
+  metadata    Json?
   quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   user        User?     @relation(fields: [userId], references: [id])
 
@@ -1161,6 +1162,7 @@ model TransactionConsecutive {
   implantId       Int?
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now()) @db.Timestamp(6)
+  padding         Int?     @default(4)
   branch          Branch?  @relation(fields: [branchId], references: [id], onUpdate: NoAction)
   implant         Implant? @relation(fields: [implantId], references: [id], onUpdate: NoAction)
 }
@@ -1219,49 +1221,38 @@ model NotasCreditoNoRef {
 }
 
 model TraceabilitySession {
-  id              Int               @id @default(autoincrement())
-  code            String            @unique
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
   userId          Int?
-  origin          String?           @default("WEB")
   module          String
   screen          String?
   action          String
   process         String?
-  status          String            @default("IN_PROGRESS")
-  totalDurationMs Float?            @default(0)
+  status          String   @default("IN_PROGRESS")
+  totalDurationMs Float?   @default(0)
   errorMessage    String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @default(now()) @updatedAt
-  logs            TraceabilityLog[]
-
-  @@index([code], map: "idx_trace_session_code")
-  @@index([userId], map: "idx_trace_session_user")
-  @@index([createdAt], map: "idx_trace_session_created")
+  createdAt       DateTime @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  origin          String?  @default("WEB")
 }
 
 model TraceabilityLog {
-  id                Int                 @id @default(autoincrement())
+  id                Int      @id @default(autoincrement())
   sessionId         Int
   code              String
   userId            Int?
-  origin            String?             @default("WEB")
   eventType         String
   stepName          String
   spName            String?
   endpoint          String?
-  durationMs        Float?              @default(0)
-  status            String              @default("SUCCESS")
+  durationMs        Float?   @default(0)
+  status            String   @default("SUCCESS")
   inputData         Json?
   outputData        Json?
   techMessage       String?
   functionalMessage String?
   stackTrace        String?
   affectedId        String?
-  createdAt         DateTime            @default(now())
-  session           TraceabilitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId], map: "idx_trace_log_session")
-  @@index([code], map: "idx_trace_log_code")
-  @@index([eventType], map: "idx_trace_log_type")
-  @@index([createdAt], map: "idx_trace_log_created")
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  origin            String?  @default("WEB")
 }
