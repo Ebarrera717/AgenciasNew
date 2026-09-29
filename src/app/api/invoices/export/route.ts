@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     try {
         const { ids, userId } = await req.json()
 
-        const idArray = (Array.isArray(ids) ? ids : ids.toString().split(',')).map((id: any) => parseInt(String(id).trim(), 10)).filter((n: number) => !isNaN(n));
+        const idArray: number[] = (Array.isArray(ids) ? ids : ids.toString().split(',')).map((id: any) => parseInt(String(id).trim(), 10)).filter((n: number) => !isNaN(n));
 
         if (idArray.length === 0) {
             return NextResponse.json({ message: 'No valid invoice IDs provided' }, { status: 400 });
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Filtrar únicamente los IDs pendientes
-        const pendingIds = idArray.filter(id => !alreadyExportedIds.includes(id));
+        const pendingIds = idArray.filter((id: number) => !alreadyExportedIds.includes(id));
         const idsStr = pendingIds.join(',');
 
         // 1. Obtener XML (dual motor support)

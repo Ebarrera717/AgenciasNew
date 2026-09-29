@@ -275,8 +275,9 @@ export default function InvoicesHistoryPage() {
                                                 </Link>
                                             </div>
                                         </td>
-                                    </tr>
-                                ))}
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

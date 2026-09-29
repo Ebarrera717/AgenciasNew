@@ -148,10 +148,17 @@ export default function InvoicesListPage() {
         return true;
     });
 
-    // Ordenamiento
+    // Ordenamiento natural (numérico y alfanumérico) por Referencia / ID
     const sortedInvoices = [...filteredInvoices].sort((a, b) => {
-        if (sortDirection === 'asc') return a.id - b.id;
-        return b.id - a.id;
+        const keyA = String(a.internalNumber || a.consecutivo || a.id || '').trim();
+        const keyB = String(b.internalNumber || b.consecutivo || b.id || '').trim();
+        const res = keyA.localeCompare(keyB, undefined, { numeric: true, sensitivity: 'base' });
+        if (res !== 0) {
+            return sortDirection === 'asc' ? res : -res;
+        }
+        const numA = Number(a.id) || 0;
+        const numB = Number(b.id) || 0;
+        return sortDirection === 'asc' ? numA - numB : numB - numA;
     });
 
     const handleToggleSort = () => {

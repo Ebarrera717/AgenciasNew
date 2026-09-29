@@ -162,10 +162,17 @@ export default function QuotationsListPage() {
         fetchQuotations()
     }, [])
 
-    // Aplicar ordenamiento por ID
+    // Aplicar ordenamiento natural por Referencia / ID
     const sortedQs = [...quotations].sort((a, b) => {
-        if (sortDirection === 'asc') return a.id - b.id
-        return b.id - a.id
+        const keyA = String(a.internalNumber || a.consecutivo || a.id || '').trim();
+        const keyB = String(b.internalNumber || b.consecutivo || b.id || '').trim();
+        const res = keyA.localeCompare(keyB, undefined, { numeric: true, sensitivity: 'base' });
+        if (res !== 0) {
+            return sortDirection === 'asc' ? res : -res;
+        }
+        const numA = Number(a.id) || 0;
+        const numB = Number(b.id) || 0;
+        return sortDirection === 'asc' ? numA - numB : numB - numA;
     })
 
     const filteredQs = sortedQs
