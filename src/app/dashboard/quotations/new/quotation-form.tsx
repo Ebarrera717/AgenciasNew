@@ -1821,10 +1821,10 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                         {/* Per-Product Details Row */}
                                         <div className="col-span-12 mt-2 pt-4 border-t border-zinc-200 dark:border-zinc-700/50">
                                             <p className="text-[10px] uppercase font-bold text-zinc-400 mb-3">Detalles de Proveedor y Pasajero</p>
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                                 <div className="md:col-span-2 grid grid-cols-2 gap-2">
                                                     <div className="space-y-1">
-                                                        <label className="text-[10px] uppercase font-bold text-zinc-400">Proveedor</label>
+                                                        <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Proveedor</label>
                                                         <SearchSelect
                                                             options={data.providers || []}
                                                             value={item.providerId}
@@ -1846,7 +1846,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                     </div>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Prestadora</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Prestadora</label>
                                                     <SearchSelect
                                                         options={data.prestadoras || []}
                                                         value={item.prestadoraId}
@@ -1856,7 +1856,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Fecha Inicial</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Fecha Inicial</label>
                                                     <input
                                                         type="date"
                                                         className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs p-1"
@@ -1865,7 +1865,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Fecha Final</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Fecha Final</label>
                                                     <input
                                                         type="date"
                                                         className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs p-1"
@@ -1874,15 +1874,15 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Adultos</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Adultos</label>
                                                     <input type="number" min="1" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.paxAdults} onChange={(e) => updateItem(index, 'paxAdults', parseInt(e.target.value))} />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Niños</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Niños</label>
                                                     <input type="number" min="0" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.paxChildren} onChange={(e) => updateItem(index, 'paxChildren', parseInt(e.target.value))} />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Destino</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Destino</label>
                                                     <SearchSelect
                                                         options={data.cities || []}
                                                         value={item.destination || ''}
@@ -1897,31 +1897,31 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Servicio / Tipo</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Servicio / Tipo</label>
                                                     <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.serviceType} onChange={(e) => updateItem(index, 'serviceType', e.target.value)} />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-[10px] uppercase font-bold text-zinc-400">Reservación</label>
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Reservación</label>
                                                     <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.reservationCode} onChange={(e) => updateItem(index, 'reservationCode', e.target.value)} />
                                                 </div>
                                                 <div className="space-y-1 md:col-span-2">
-                                                     <label className="text-[10px] uppercase font-bold text-zinc-400">Pasajero</label>
+                                                     <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Pasajero</label>
                                                      <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.passenger || ''} onChange={(e) => updateItem(index, 'passenger', e.target.value)} placeholder="Pasajero del producto..." />
                                                  </div>
                                                  <div className="space-y-1 md:col-span-2">
-                                                     <label className="text-[10px] uppercase font-bold text-blue-500">Servicio</label>
+                                                     <label className="text-[10px] uppercase font-bold text-blue-500 h-7 flex items-end leading-tight pb-0.5">Servicio</label>
                                                      <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-blue-200 dark:border-blue-800 outline-none text-xs" value={item.servicios || item.service || ''} onChange={(e) => { updateItem(index, 'servicios', e.target.value); updateItem(index, 'service', e.target.value); }} placeholder="Servicio (ej. Desayuno incluido, Traslado VIP)..." />
                                                  </div>
                                                  <div className="space-y-1 md:col-span-2">
-                                                     <label className="text-[10px] uppercase font-bold text-blue-500">Descripción Manual</label>
+                                                     <label className="text-[10px] uppercase font-bold text-blue-500 h-7 flex items-end leading-tight pb-0.5">Descripción Manual</label>
                                                      <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-blue-200 dark:border-blue-800 outline-none text-xs" value={item.descripcion || ''} onChange={(e) => updateItem(index, 'descripcion', e.target.value)} placeholder="Descripción manual del producto..." />
                                                  </div>
                                                  <div className="space-y-1">
-                                                     <label className="text-[10px] uppercase font-bold text-amber-500">F. Venc. Proveedor</label>
+                                                     <label className="text-[10px] uppercase font-bold text-amber-500 h-7 flex items-end leading-tight pb-0.5">F. Venc. Proveedor</label>
                                                      <input type="date" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.providerDueDate || ''} onChange={(e) => updateItem(index, 'providerDueDate', e.target.value)} />
                                                  </div>
                                                  <div className="space-y-1">
-                                                     <label className="text-[10px] uppercase font-bold text-amber-500">Factura Proveedor</label>
+                                                     <label className="text-[10px] uppercase font-bold text-amber-500 h-7 flex items-end leading-tight pb-0.5">Factura Proveedor</label>
                                                      <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.providerInvoice || ''} onChange={(e) => updateItem(index, 'providerInvoice', e.target.value)} placeholder="Nº Factura Proveedor..." />
                                                  </div>
                                             </div>

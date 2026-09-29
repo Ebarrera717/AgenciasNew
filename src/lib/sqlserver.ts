@@ -179,8 +179,8 @@ export async function getZeusSQLServerConnection(): Promise<mssql.ConnectionPool
             enableArithAbort: true,
             connectTimeout: 20000
         },
-        connectionTimeout: 20000,
-        requestTimeout: 60000
+        connectionTimeout: 30000,
+        requestTimeout: 300000
     };
 
     if (config.instanceName) {
@@ -276,10 +276,10 @@ export async function getSQLServerConnection(overrideDbName?: string) {
             encrypt: false,
             trustServerCertificate: true,
             enableArithAbort: true,
-            connectTimeout: 15000
+            connectTimeout: 30000
         },
-        connectionTimeout: 15000,
-        requestTimeout: 60000
+        connectionTimeout: 30000,
+        requestTimeout: 300000
     };
 
     if (instanceName) {

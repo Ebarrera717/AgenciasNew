@@ -517,8 +517,8 @@ BEGIN
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProduct PRIMARY KEY,
         [invoiceId] INT NOT NULL,
         [productId] INT NOT NULL,
-        [quantity] INT NOT NULL,
-        [price] FLOAT NOT NULL,
+        [quantity] INT NULL CONSTRAINT DF_InvoicesProduct_Quantity DEFAULT 1,
+        [price] FLOAT NULL CONSTRAINT DF_InvoicesProduct_Price DEFAULT 0,
         [cost] FLOAT NULL CONSTRAINT DF_InvoicesProduct_Cost DEFAULT 0,
         [providerId] INT NULL,
         [prestadoraId] INT NULL,
@@ -545,6 +545,23 @@ BEGIN
         [providerDueDate] DATETIME2 NULL,
         [providerInvoice] NVARCHAR(100) NULL
     );
+END;
+
+IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'price')
+BEGIN
+    ALTER TABLE dbo.[InvoicesProduct] ALTER COLUMN [price] FLOAT NULL;
+END;
+IF NOT EXISTS (SELECT * FROM sys.default_constraints WHERE name = 'DF_InvoicesProduct_Price')
+BEGIN
+    ALTER TABLE dbo.[InvoicesProduct] ADD CONSTRAINT DF_InvoicesProduct_Price DEFAULT 0 FOR [price];
+END;
+IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'quantity')
+BEGIN
+    ALTER TABLE dbo.[InvoicesProduct] ALTER COLUMN [quantity] INT NULL;
+END;
+IF NOT EXISTS (SELECT * FROM sys.default_constraints WHERE name = 'DF_InvoicesProduct_Quantity')
+BEGIN
+    ALTER TABLE dbo.[InvoicesProduct] ADD CONSTRAINT DF_InvoicesProduct_Quantity DEFAULT 1 FOR [quantity];
 END;
 
 -- 20b. InvoicesProductTax
@@ -2085,17 +2102,34 @@ IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDefinicion' AND sc
 BEGIN
     CREATE TABLE dbo.[VariableDefinicion] (
         [IDEN] NUMERIC(18,0) IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        [Nombre] VARCHAR(50) NULL
+        [Nombre] VARCHAR(250) NULL,
+        [Descripcion] VARCHAR(500) NULL,
+        [Presentacion] VARCHAR(250) NULL,
+        [TipoDato] VARCHAR(50) NULL,
+        [Codigo] VARCHAR(50) NULL
     );
 END;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'Descripcion')
+    ALTER TABLE dbo.[VariableDefinicion] ADD [Descripcion] VARCHAR(500) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'Presentacion')
+    ALTER TABLE dbo.[VariableDefinicion] ADD [Presentacion] VARCHAR(250) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'TipoDato')
+    ALTER TABLE dbo.[VariableDefinicion] ADD [TipoDato] VARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicion') AND name = 'Codigo')
+    ALTER TABLE dbo.[VariableDefinicion] ADD [Codigo] VARCHAR(50) NULL;
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDefinicionMaestro' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
     CREATE TABLE dbo.[VariableDefinicionMaestro] (
         [IDEN] NUMERIC(18,0) IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        [Codigo] VARCHAR(50) NULL
+        [Codigo] VARCHAR(50) NULL,
+        [Nombre] VARCHAR(250) NULL
     );
 END;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.VariableDefinicionMaestro') AND name = 'Nombre')
+    ALTER TABLE dbo.[VariableDefinicionMaestro] ADD [Nombre] VARCHAR(250) NULL;
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'VariableDatosMaestro' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN

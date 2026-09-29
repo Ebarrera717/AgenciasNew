@@ -270,6 +270,8 @@ BEGIN
 		am_basedescuento DECIMAL,
 		Fecha_Salida TIMESTAMP,
 		Fecha_Llegada TIMESTAMP,
+		cd_facturaproveedor VARCHAR(25),
+		dt_fechavencimientoproveedor TIMESTAMP,
 		ColId VARCHAR(25),
 		cd_Consecutivo_depende VARCHAR(50),
 		CodigoReserva VARCHAR(50),
@@ -527,6 +529,7 @@ BEGIN
 		cd_conceptofacturacion, cd_tiposservicio, cd_proveedores, 
 		ds_servicio, am_valorprov, cd_monedaprov, dt_llegada, dt_salida, 
 		am_pordescuento, am_basedescuento, Fecha_Salida, Fecha_Llegada, 
+		cd_facturaproveedor, dt_fechavencimientoproveedor,
 		ColId, cd_Consecutivo_depende, CodigoReserva, 
 		cd_Consecutivo_variablesadicionales, am_valor_total, ds_proveedores, 
 		id_FormasPagoAirPlus, cd_FormasPagoAirPlus, ds_FormasPagoAirPlus, 
@@ -641,7 +644,12 @@ BEGIN
         '' AS cd_tiposconceptfac,
         COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') AS cd_conceptofacturacion,
         COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
-        SUBSTRING(COALESCE(prov.code, prov.name, ''), 1, 25) AS cd_proveedores,
+        SUBSTRING(COALESCE(
+            NULLIF(TRIM(prov.code), ''),
+            NULLIF(TRIM(prov."airlineCode"), ''),
+            (SELECT p_fb.code FROM public."Provider" p_fb WHERE p_fb.code IS NOT NULL AND TRIM(p_fb.code) <> '' ORDER BY p_fb.id ASC LIMIT 1),
+            '890100577'
+        ), 1, 25) AS cd_proveedores,
         SUBSTRING(COALESCE(NULLIF(TRIM(ep."servicios"), ''), NULLIF(TRIM(ep."descripcion"), ''), NULLIF(TRIM(pr.description), ''), ''), 1, 250) AS ds_servicio,
         (
             COALESCE(ep.price, 0) +
@@ -665,10 +673,12 @@ BEGIN
         0 AS am_basedescuento,
         COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS Fecha_Salida,
         COALESCE(ep."checkInDate", e.date) AS Fecha_Llegada,
+        SUBSTRING(COALESCE(ep."providerInvoice", ''), 1, 25) AS cd_facturaproveedor,
+        COALESCE(ep."providerDueDate", ep."checkInDate", e.date) AS dt_fechavencimientoproveedor,
         '' AS ColId,
         '' AS cd_Consecutivo_depende,
         SUBSTRING(COALESCE(ep."reservationCode", ''), 1, 50) AS CodigoReserva,
-        'I' || LPAD(ep.id::text, 7, '0') AS cd_Consecutivo_variablesadicionales,
+        SUBSTRING(MD5(RANDOM()::TEXT || ep.id::TEXT || CLOCK_TIMESTAMP()::TEXT), 1, 8) AS cd_Consecutivo_variablesadicionales,
         COALESCE(e."totalAmount", 0) AS am_valor_total,
         SUBSTRING(COALESCE(prov.code, ''), 1, 250) AS ds_proveedores,
         NULL AS id_FormasPagoAirPlus,
@@ -694,7 +704,13 @@ BEGIN
 		    			FROM public."InvoicesProductPasenger" pp 
 						WHERE pp."invoiceProductId" = ep.id
     					ORDER BY pp.id
-    					LIMIT 1) epp ON true;
+    					LIMIT 1) epp ON true
+    WHERE (
+        COALESCE(ep.price, 0) > 0 
+        OR COALESCE(ep.cost, 0) > 0 
+        OR COALESCE(NULLIF(TRIM(ep.descripcion), ''), '') <> '' 
+        OR COALESCE(NULLIF(TRIM(ep.servicios), ''), '') <> ''
+    );
 
     -- 6. Poblar Tabla itinerarios
     INSERT INTO itinerarios (
@@ -1063,6 +1079,7 @@ BEGIN
 									s.cd_conceptofacturacion, s.cd_tiposservicio, s.cd_proveedores, 
 									s.ds_servicio, s.am_valorprov, s.cd_monedaprov, s.dt_llegada, s.dt_salida, 
 									s.am_pordescuento, s.am_basedescuento, s.Fecha_Salida, s.Fecha_Llegada, 
+									s.cd_facturaproveedor, s.dt_fechavencimientoproveedor,
 									s.ColId, s.cd_Consecutivo_depende, s.CodigoReserva, 
 									s.cd_Consecutivo_variablesadicionales, s.am_valor_total, s.ds_proveedores, 
 									s.id_FormasPagoAirPlus, s.cd_FormasPagoAirPlus, s.ds_FormasPagoAirPlus, 

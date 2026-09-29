@@ -3482,6 +3482,16 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationStateHistory' AND column_name = 'metadata') THEN
         ALTER TABLE public."QuotationStateHistory" ADD COLUMN "metadata" jsonb;
     END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProduct' AND column_name = 'price' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."InvoicesProduct" ALTER COLUMN "price" DROP NOT NULL;
+        ALTER TABLE public."InvoicesProduct" ALTER COLUMN "price" SET DEFAULT 0;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'price' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."QuotationProduct" ALTER COLUMN "price" DROP NOT NULL;
+        ALTER TABLE public."QuotationProduct" ALTER COLUMN "price" SET DEFAULT 0;
+    END IF;
 END $$;
 
 

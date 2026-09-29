@@ -41,20 +41,31 @@ export default function InvoicesHistoryPage() {
         fetchInvoices()
     }, [])
 
+    const isInvoiceExported = (q: any) => {
+        const st = (q?.state || '').toUpperCase();
+        return st === 'EXPORTED' || st === 'EXPORTADA' || st === 'ENVIADO' || Boolean(q?.zeusInvoiceNumber && String(q?.zeusInvoiceNumber).trim() !== '');
+    };
+
     const filteredQs = invoices.filter(q =>
         q.id.toString().includes(searchTerm) ||
-        q.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+        (q.clientName || '').toLowerCase().includes(searchTerm.toLowerCase())
     )
+
+    const selectableQs = filteredQs.filter(q => !isInvoiceExported(q));
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            setSelectedIds(filteredQs.map(q => q.id))
+            setSelectedIds(selectableQs.map(q => q.id))
         } else {
             setSelectedIds([])
         }
     }
 
     const handleSelectOne = (id: number) => {
+        const target = invoices.find(q => q.id === id);
+        if (target && isInvoiceExported(target)) {
+            return;
+        }
         setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         )
@@ -164,79 +175,87 @@ export default function InvoicesHistoryPage() {
                             <thead className="bg-zinc-50 dark:bg-zinc-800/30">
                                 <tr>
                                     <th className="px-8 py-6 w-10 border-b border-zinc-100 dark:border-zinc-800">
-                                        <input
-                                            type="checkbox"
-                                            className="w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                            checked={selectedIds.length === filteredQs.length && filteredQs.length > 0}
-                                            onChange={handleSelectAll}
-                                        />
-                                    </th>
-                                    <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Referencia</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Fecha</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Cliente</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Elaborado por</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Monto Total</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Estado</th>
-                                    <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800 text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                                {filteredQs.map((q) => (
-                                    <tr key={q.id} className={`group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all ${selectedIds.includes(q.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
-                                        <td className="px-8 py-6">
-                                            <input
-                                                type="checkbox"
-                                                className="w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                checked={selectedIds.includes(q.id)}
-                                                onChange={() => handleSelectOne(q.id)}
-                                            />
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="font-mono font-black text-blue-600 dark:text-blue-400 text-base flex items-center gap-2">
-                                                {q.invoiceNumber || q.internalNumber || `#${q.id}`}
-                                            </div>
-                                            {(q.fuente || q.serie || q.consecutivo) && (
-                                                <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
-                                                    {q.fuente ? `Fuente: ${q.fuente}` : ''} {q.serie ? `| Serie: ${q.serie}` : ''} {q.consecutivo ? `| Cons: ${q.consecutivo}` : ''}
-                                                </div>
-                                            )}
-                                        </td>
+                                         <input
+                                             type="checkbox"
+                                             className={`w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 ${selectableQs.length === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                                             checked={selectableQs.length > 0 && selectedIds.length === selectableQs.length}
+                                             disabled={selectableQs.length === 0}
+                                             onChange={handleSelectAll}
+                                             title={selectableQs.length === 0 ? "No hay facturas pendientes por exportar" : "Seleccionar todas las facturas pendientes"}
+                                         />
+                                     </th>
+                                     <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Referencia</th>
+                                     <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Fecha</th>
+                                     <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Cliente</th>
+                                     <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Elaborado por</th>
+                                     <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Monto Total</th>
+                                     <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">Estado</th>
+                                     <th className="px-8 py-6 text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800 text-right">Acciones</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                 {filteredQs.map((q) => {
+                                     const isExported = isInvoiceExported(q);
+                                     return (
+                                     <tr key={q.id} className={`group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all ${selectedIds.includes(q.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                          <td className="px-8 py-6">
-                                             <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm font-medium">
-                                                 <Calendar className="w-4 h-4 opacity-50" />
-                                                 <div>
-                                                     <div>{q.date ? format(new Date(q.date), 'dd/MM/yyyy') : '-'}</div>
-                                                     {q.dueDate && (
-                                                         <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                                                             Venc: {format(new Date(q.dueDate), 'dd/MM/yyyy')}
-                                                         </div>
-                                                     )}
+                                             <input
+                                                 type="checkbox"
+                                                 className={`w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 ${
+                                                     isExported ? 'opacity-30 cursor-not-allowed bg-zinc-200 dark:bg-zinc-700' : 'cursor-pointer'
+                                                 }`}
+                                                 checked={selectedIds.includes(q.id)}
+                                                 disabled={isExported}
+                                                 onChange={() => handleSelectOne(q.id)}
+                                                 title={isExported ? `Factura ${q.invoiceNumber || q.internalNumber || q.id} ya fue exportada a Zeus ERP` : 'Seleccionar para exportar'}
+                                             />
+                                         </td>
+                                         <td className="px-8 py-6">
+                                             <div className="font-mono font-black text-blue-600 dark:text-blue-400 text-base flex items-center gap-2">
+                                                 {q.invoiceNumber || q.internalNumber || `#${q.id}`}
+                                             </div>
+                                             {(q.fuente || q.serie || q.consecutivo) && (
+                                                 <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                                                     {q.fuente ? `Fuente: ${q.fuente}` : ''} {q.serie ? `| Serie: ${q.serie}` : ''} {q.consecutivo ? `| Cons: ${q.consecutivo}` : ''}
                                                  </div>
+                                             )}
+                                         </td>
+                                          <td className="px-8 py-6">
+                                              <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 text-sm font-medium">
+                                                  <Calendar className="w-4 h-4 opacity-50" />
+                                                  <div>
+                                                      <div>{q.date ? format(new Date(q.date), 'dd/MM/yyyy') : '-'}</div>
+                                                      {q.dueDate && (
+                                                          <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                                                              Venc: {format(new Date(q.dueDate), 'dd/MM/yyyy')}
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                              </div>
+                                          </td>
+                                         <td className="px-8 py-6">
+                                             <div className="font-semibold text-zinc-800 dark:text-zinc-200">{q.clientName}</div>
+                                             <div className="text-xs text-zinc-500">{q.branchName ? `Sucursal: ${q.branchName}` : ''}</div>
+                                         </td>
+                                         <td className="px-8 py-6">
+                                             <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                                                 {q.userName || q.sellerName || 'Sistema'}
                                              </div>
                                          </td>
-                                        <td className="px-8 py-6">
-                                            <div className="font-semibold text-zinc-800 dark:text-zinc-200">{q.clientName}</div>
-                                            <div className="text-xs text-zinc-500">{q.branchName ? `Sucursal: ${q.branchName}` : ''}</div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                                                {q.userName || q.sellerName || 'Sistema'}
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
-                                                ${parseFloat(q.amount ?? q.totalAmount ?? 0).toLocaleString()} <span className="text-xs opacity-70">{q.currency || 'COP'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <span className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${
-                                                q.state === 'ENVIADO' 
-                                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" 
-                                                : "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
-                                            }`}>
-                                                {q.state || 'NUEVO'}
-                                            </span>
-                                        </td>
+                                         <td className="px-8 py-6">
+                                             <div className="font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+                                                 ${parseFloat(q.amount ?? q.totalAmount ?? 0).toLocaleString()} <span className="text-xs opacity-70">{q.currency || 'COP'}</span>
+                                             </div>
+                                         </td>
+                                         <td className="px-8 py-6">
+                                             <span className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider ${
+                                                 isExported || q.state === 'ENVIADO' 
+                                                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" 
+                                                 : "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                                             }`}>
+                                                 {q.state || 'NUEVO'}
+                                             </span>
+                                         </td>
                                         <td className="px-8 py-6 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <Link

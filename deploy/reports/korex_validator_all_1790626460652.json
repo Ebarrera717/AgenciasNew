@@ -1,0 +1,371 @@
+{
+  "version": "2.0.0",
+  "timestamp": "2026-09-28T20:14:20.186Z",
+  "phase": "pre-build",
+  "targetEngine": "all",
+  "items": [
+    {
+      "category": "Estructura SQL Server",
+      "component": "Invoices.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "Invoices.zeusInvoiceNumber",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "Invoices.dueDate",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "Invoices.fuente",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "Invoices.serie",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "Invoices.consecutivo",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "InvoicesProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "InvoicesProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "Quotation.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "QuotationProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura SQL Server",
+      "component": "QuotationProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Presente en 01_Tables.sql y ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spExportInvoices",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spInvoicesListar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spInvoicesObtener",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spInvoicesCrear",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spInvoicesActualizar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spInvoicesEliminar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionListar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionHistorial",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionObtener",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionCrear",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionActualizar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionDuplicar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionEliminar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spPreCotizacionListar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spPreCotizacionCrear",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spPreCotizacionConvertir",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spPreCotizacionEliminar",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spCotizacionesCrear",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Procedimientos SQL Server",
+      "component": "spFacturacionesCrear",
+      "status": "✅ OK",
+      "detail": "Compilado en ActualizadorSERVER.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "Invoices.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "Invoices.zeusInvoiceNumber",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "Invoices.dueDate",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "Invoices.fuente",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "Invoices.serie",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "Invoices.consecutivo",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "InvoicesProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "InvoicesProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "Quotation.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "QuotationProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Estructura PostgreSQL",
+      "component": "QuotationProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Presente en Alter_New_Columns.sql y Actualizador.sql"
+    },
+    {
+      "category": "Procedimientos PostgreSQL",
+      "component": "spExportInvoices",
+      "status": "✅ OK",
+      "detail": "Compilado en Actualizador.sql"
+    },
+    {
+      "category": "Procedimientos PostgreSQL",
+      "component": "spExportQuotation",
+      "status": "✅ OK",
+      "detail": "Compilado en Actualizador.sql"
+    },
+    {
+      "category": "Procedimientos PostgreSQL",
+      "component": "fnInvoicesListar",
+      "status": "✅ OK",
+      "detail": "Compilado en Actualizador.sql"
+    },
+    {
+      "category": "Procedimientos PostgreSQL",
+      "component": "fnCotizacionListar",
+      "status": "✅ OK",
+      "detail": "Compilado en Actualizador.sql"
+    },
+    {
+      "category": "Procedimientos PostgreSQL",
+      "component": "fnCotizacionHistorial",
+      "status": "✅ OK",
+      "detail": "Compilado en Actualizador.sql"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.zeusInvoiceNumber",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.dueDate",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.fuente",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.serie",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.consecutivo",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "InvoicesProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "InvoicesProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Quotation.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "QuotationProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "QuotationProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Seguridad .env",
+      "component": "RELEASE_KOREX/.env",
+      "status": "✅ OK",
+      "detail": "Empaquetado limpio sin archivos .env"
+    },
+    {
+      "category": "BD PostgreSQL Activa",
+      "component": "Invoices.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Columna presente en PostgreSQL activo"
+    },
+    {
+      "category": "BD SQL Server Activa",
+      "component": "Conexión SQL Server",
+      "status": "ℹ️ INFO",
+      "detail": "Ambiente SQL Server no alcanzable localmente (Login failed for user 'sa'.). Validación de scripts superada."
+    }
+  ],
+  "errors": [],
+  "warnings": [],
+  "status": "GO"
+}

@@ -102,216 +102,232 @@ export async function POST(req: NextRequest) {
             const createdIds: number[] = [];
             const createdConsecutives: string[] = [];
 
-            for (const [groupKey, items] of grouped.entries()) {
-                const first = items[0];
-                
-                // 1. Resolver Cliente
-                const clientDoc = (first.Cliente_Documento || '').toString().trim();
-                let clientId = 1;
-                if (clientDoc) {
-                    const clientRes = await pool.request()
-                        .input('doc', mssql.VarChar, clientDoc)
-                        .query(`SELECT TOP 1 id FROM dbo.[Client] WHERE document = @doc`);
-                    if (clientRes.recordset && clientRes.recordset.length > 0) {
-                        clientId = clientRes.recordset[0].id;
-                    } else {
-                        const newClientRes = await pool.request()
-                            .input('name', mssql.VarChar, first.Cliente_Nombre || `Cliente ${clientDoc}`)
+            const transaction = new mssql.Transaction(pool);
+            await transaction.begin();
+            let isTxActive = true;
+
+            try {
+                for (const [groupKey, items] of grouped.entries()) {
+                    const first = items[0];
+                    
+                    // 1. Resolver Cliente
+                    const clientDoc = (first.Cliente_Documento || '').toString().trim();
+                    let clientId = 1;
+                    if (clientDoc) {
+                        const clientRes = await new mssql.Request(transaction)
                             .input('doc', mssql.VarChar, clientDoc)
-                            .query(`INSERT INTO dbo.[Client] (name, document) OUTPUT INSERTED.id VALUES (@name, @doc)`);
-                        if (newClientRes.recordset && newClientRes.recordset.length > 0) {
-                            clientId = newClientRes.recordset[0].id;
+                            .query(`SELECT TOP 1 id FROM dbo.[Client] WHERE document = @doc`);
+                        if (clientRes.recordset && clientRes.recordset.length > 0) {
+                            clientId = clientRes.recordset[0].id;
+                        } else {
+                            const newClientRes = await new mssql.Request(transaction)
+                                .input('name', mssql.VarChar, first.Cliente_Nombre || `Cliente ${clientDoc}`)
+                                .input('doc', mssql.VarChar, clientDoc)
+                                .query(`INSERT INTO dbo.[Client] (name, document) OUTPUT INSERTED.id VALUES (@name, @doc)`);
+                            if (newClientRes.recordset && newClientRes.recordset.length > 0) {
+                                clientId = newClientRes.recordset[0].id;
+                            }
                         }
                     }
-                }
 
-                // 2. Resolver Sucursal, Implante, Vendedor, Tiqueteador
-                let branchId = 1;
-                if (first.Sucursal_Codigo) {
-                    const bRes = await pool.request().input('code', mssql.VarChar, first.Sucursal_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Branch] WHERE code = @code`);
-                    if (bRes.recordset && bRes.recordset.length > 0) branchId = bRes.recordset[0].id;
-                }
-                let implantId: number | null = null;
-                if (first.Implant_Codigo) {
-                    const iRes = await pool.request().input('code', mssql.VarChar, first.Implant_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Implant] WHERE code = @code`);
-                    if (iRes.recordset && iRes.recordset.length > 0) implantId = iRes.recordset[0].id;
-                }
-                let sellerId: number | null = null;
-                if (first.Vendedor_Codigo) {
-                    const sRes = await pool.request().input('code', mssql.VarChar, first.Vendedor_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Seller] WHERE code = @code`);
-                    if (sRes.recordset && sRes.recordset.length > 0) sellerId = sRes.recordset[0].id;
-                }
-                let ticketPrinterId: number | null = null;
-                if (first.Tiqueteador_Codigo) {
-                    const tRes = await pool.request().input('code', mssql.VarChar, first.Tiqueteador_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[TicketPrinter] WHERE code = @code`);
-                    if (tRes.recordset && tRes.recordset.length > 0) ticketPrinterId = tRes.recordset[0].id;
-                }
-
-                // Validar variables adicionales obligatorias del cliente para cotizaciones en SQL Server
-                const clientObjRes = await pool.request()
-                    .input('cId', mssql.Int, clientId)
-                    .query(`SELECT mandatoryVariables FROM dbo.[Client] WHERE id = @cId`);
-                if (clientObjRes.recordset && clientObjRes.recordset.length > 0) {
-                    let mvRaw = clientObjRes.recordset[0].mandatoryVariables;
-                    if (typeof mvRaw === 'string') {
-                        try { mvRaw = JSON.parse(mvRaw); } catch (e) {}
+                    // 2. Resolver Sucursal, Implante, Vendedor, Tiqueteador
+                    let branchId = 1;
+                    if (first.Sucursal_Codigo) {
+                        const bRes = await new mssql.Request(transaction).input('code', mssql.VarChar, first.Sucursal_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Branch] WHERE code = @code`);
+                        if (bRes.recordset && bRes.recordset.length > 0) branchId = bRes.recordset[0].id;
                     }
-                    let reqVarIds: number[] = [];
-                    if (Array.isArray(mvRaw)) {
-                        reqVarIds = mvRaw;
-                    } else if (mvRaw && typeof mvRaw === 'object') {
-                        reqVarIds = Array.isArray(mvRaw.quotation) ? mvRaw.quotation : (Array.isArray(mvRaw.quotations) ? mvRaw.quotations : []);
+                    let implantId: number | null = null;
+                    if (first.Implant_Codigo) {
+                        const iRes = await new mssql.Request(transaction).input('code', mssql.VarChar, first.Implant_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Implant] WHERE code = @code`);
+                        if (iRes.recordset && iRes.recordset.length > 0) implantId = iRes.recordset[0].id;
+                    }
+                    let sellerId: number | null = null;
+                    if (first.Vendedor_Codigo) {
+                        const sRes = await new mssql.Request(transaction).input('code', mssql.VarChar, first.Vendedor_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Seller] WHERE code = @code`);
+                        if (sRes.recordset && sRes.recordset.length > 0) sellerId = sRes.recordset[0].id;
+                    }
+                    let ticketPrinterId: number | null = null;
+                    if (first.Tiqueteador_Codigo) {
+                        const tRes = await new mssql.Request(transaction).input('code', mssql.VarChar, first.Tiqueteador_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[TicketPrinter] WHERE code = @code`);
+                        if (tRes.recordset && tRes.recordset.length > 0) ticketPrinterId = tRes.recordset[0].id;
                     }
 
-                    if (reqVarIds.length > 0) {
-                        for (const itm of items) {
-                            const varStr = (itm.Variables_Adicionales || itm.Variables_Codigos_Y_Valores || itm.Variables_Cotizacion || itm.Variables || '').toString();
-                            for (const reqId of reqVarIds) {
-                                const varMasterRes = await pool.request()
-                                    .input('vId', mssql.Int, reqId)
-                                    .query(`SELECT id, code, name FROM dbo.[MasterVariable] WHERE id = @vId`);
-                                const vMaster = varMasterRes.recordset?.[0];
-                                const vCode = vMaster?.code?.toLowerCase();
-                                const vName = vMaster?.name || `Variable #${reqId}`;
+                    // Validar variables adicionales obligatorias del cliente para cotizaciones en SQL Server
+                    const clientObjRes = await new mssql.Request(transaction)
+                        .input('cId', mssql.Int, clientId)
+                        .query(`SELECT mandatoryVariables FROM dbo.[Client] WHERE id = @cId`);
+                    if (clientObjRes.recordset && clientObjRes.recordset.length > 0) {
+                        let mvRaw = clientObjRes.recordset[0].mandatoryVariables;
+                        if (typeof mvRaw === 'string') {
+                            try { mvRaw = JSON.parse(mvRaw); } catch (e) {}
+                        }
+                        let reqVarIds: number[] = [];
+                        if (Array.isArray(mvRaw)) {
+                            reqVarIds = mvRaw;
+                        } else if (mvRaw && typeof mvRaw === 'object') {
+                            reqVarIds = Array.isArray(mvRaw.quotation) ? mvRaw.quotation : (Array.isArray(mvRaw.quotations) ? mvRaw.quotations : []);
+                        }
 
-                                const hasVar = varStr.split('|').some((part: string) => {
-                                    const [c, val] = part.split(':');
-                                    return (c?.trim().toLowerCase() === vCode || c?.trim() === reqId.toString()) && val?.trim();
-                                });
+                        if (reqVarIds.length > 0) {
+                            for (const itm of items) {
+                                const varStr = (itm.Variables_Adicionales || itm.Variables_Codigos_Y_Valores || itm.Variables_Cotizacion || itm.Variables || '').toString();
+                                for (const reqId of reqVarIds) {
+                                    const varMasterRes = await new mssql.Request(transaction)
+                                        .input('vId', mssql.Int, reqId)
+                                        .query(`SELECT id, code, name FROM dbo.[MasterVariable] WHERE id = @vId`);
+                                    const vMaster = varMasterRes.recordset?.[0];
+                                    const vCode = vMaster?.code?.toLowerCase();
+                                    const vName = vMaster?.name || `Variable #${reqId}`;
 
-                                if (!hasVar) {
-                                    throw new Error(`ERROR en GRUPO ${groupKey}: El cliente requiere completar la variable adicional "${vName}" en el producto "${itm.Producto_Codigo || 'Ítem'}".`);
+                                    const hasVar = varStr.split('|').some((part: string) => {
+                                        const [c, val] = part.split(':');
+                                        return (c?.trim().toLowerCase() === vCode || c?.trim() === reqId.toString()) && val?.trim();
+                                    });
+
+                                    if (!hasVar) {
+                                        throw new Error(`ERROR en GRUPO ${groupKey}: El cliente requiere completar la variable adicional "${vName}" en el producto "${itm.Producto_Codigo || 'Ítem'}".`);
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                const consecInfo = await getNextTransactionConsecutive('QUOTATION', branchId, implantId);
-                const internalNum = first.Consecutivo 
-                    ? (first.Serie ? `${first.Serie}-${first.Consecutivo}` : first.Consecutivo)
-                    : consecInfo.formattedConsecutive;
-                const globalCargos = parseFloat(first.Cargos_A_Cotizacion || '0');
-                const currency = first.Moneda || 'COP';
-                const exchangeRate = parseFloat(first.Tasa_Cambio || '1');
-                const commissionPct = parseFloat(first.Comision_Global_Pct || '0');
+                    const consecInfo = await getNextTransactionConsecutive('QUOTATION', branchId, implantId);
+                    const internalNum = first.Consecutivo 
+                        ? (first.Serie ? `${first.Serie}-${first.Consecutivo}` : first.Consecutivo)
+                        : consecInfo.formattedConsecutive;
+                    const globalCargos = parseFloat(first.Cargos_A_Cotizacion || '0');
+                    const currency = first.Moneda || 'COP';
+                    const exchangeRate = parseFloat(first.Tasa_Cambio || '1');
+                    const commissionPct = parseFloat(first.Comision_Global_Pct || '0');
 
-                // Insert Quotation Header
-                const qRes = await pool.request()
-                    .input('internalNumber', mssql.VarChar, internalNum)
-                    .input('clientId', mssql.Int, clientId)
-                    .input('currency', mssql.VarChar, currency)
-                    .input('exchangeRate', mssql.Float, exchangeRate)
-                    .input('branchId', mssql.Int, branchId)
-                    .input('implantId', mssql.Int, implantId)
-                    .input('sellerId', mssql.Int, sellerId)
-                    .input('ticketPrinterId', mssql.Int, ticketPrinterId)
-                    .input('commissionPercentage', mssql.Float, commissionPct)
-                    .input('chargesAndTaxes', mssql.Float, globalCargos)
-                    .input('totalAmount', mssql.Float, 0)
-                    .input('userId', mssql.Int, actingUserId)
-                    .query(`
-                        INSERT INTO dbo.[Quotation] (
-                            internalNumber, clientId, currency, exchangeRate, branchId, implantId, sellerId,
-                            ticketPrinterId, commissionPercentage, chargesAndTaxes, totalAmount, userId
-                        ) OUTPUT INSERTED.id VALUES (
-                            @internalNumber, @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId,
-                            @ticketPrinterId, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId
-                        )
-                    `);
-
-                const quotationId = qRes.recordset[0].id;
-                createdIds.push(quotationId);
-                createdConsecutives.push(internalNum);
-
-                let quotationTotalSum = globalCargos;
-
-                // Insert Items
-                for (const it of items) {
-                    let productId = 1;
-                    if (it.Producto_Codigo) {
-                        const pRes = await pool.request().input('code', mssql.VarChar, it.Producto_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Product] WHERE code = @code`);
-                        if (pRes.recordset && pRes.recordset.length > 0) productId = pRes.recordset[0].id;
-                    }
-                    let providerId: number | null = null;
-                    if (it.Proveedor_Codigo) {
-                        const prCode = it.Proveedor_Codigo.toString().trim();
-                        const prRes = await pool.request().input('code', mssql.VarChar, prCode).query(`SELECT TOP 1 id FROM dbo.[Provider] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) LIKE '%' + UPPER(@code) + '%'`);
-                        if (prRes.recordset && prRes.recordset.length > 0) providerId = prRes.recordset[0].id;
-                    }
-
-                    let prestadoraId: number | null = null;
-                    const prestCode = getExcelPrestadoraCode(it);
-                    if (prestCode) {
-                        const prestRes = await pool.request()
-                            .input('code', mssql.VarChar, prestCode)
-                            .query(`SELECT TOP 1 id FROM dbo.[Prestadora] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) = UPPER(@code) OR UPPER(name) LIKE '%' + UPPER(@code) + '%'`);
-                        if (prestRes.recordset && prestRes.recordset.length > 0) {
-                            prestadoraId = prestRes.recordset[0].id;
-                        }
-                    }
-
-                    const rawPrice = it.Precio_Unitario ?? it['Precio Unitario'] ?? it.Precio ?? '0';
-                    let itemPrice = parseFloat(rawPrice || '0');
-                    const quantity = parseInt(it.Cantidad || '1', 10);
-                    const cost = parseFloat(it.Costo || '0');
-                    const checkIn = normalizeDateString(it.CheckIn || it['Check-In'] || '');
-                    const checkOut = normalizeDateString(it.CheckOut || it['Check-Out'] || '');
-                    const sellerComm = parseFloat(it.Comision_Vendedor_Producto || '0');
-                    const ticketPrinterComm = parseFloat(it.Comision_Tiqueteador_Producto || '0');
-                    const inNationality = parseInt(it.Nacionalidad || '1', 10);
-
-                    let nights: number | null = null;
-                    if (checkIn && checkOut) {
-                        const diffTime = Math.abs(new Date(checkOut).getTime() - new Date(checkIn).getTime());
-                        nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    } else if (it.Noches) {
-                        nights = parseInt(it.Noches || '1', 10);
-                    }
-
-                    await pool.request()
-                        .input('quotationId', mssql.Int, quotationId)
-                        .input('productId', mssql.Int, productId)
-                        .input('quantity', mssql.Int, quantity)
-                        .input('price', mssql.Float, itemPrice)
-                        .input('cost', mssql.Float, cost)
-                        .input('providerId', mssql.Int, providerId)
-                        .input('prestadoraId', mssql.Int, prestadoraId)
-                        .input('checkInDate', mssql.VarChar, checkIn || null)
-                        .input('checkOutDate', mssql.VarChar, checkOut || null)
-                        .input('nights', mssql.Int, nights)
-                        .input('paxAdults', mssql.Int, parseInt(it.Pax_Adultos || '1', 10))
-                        .input('paxChildren', mssql.Int, parseInt(it.Pax_Ninos || '0', 10))
-                        .input('serviceType', mssql.VarChar, it.Tipo_Servicio || null)
-                        .input('destination', mssql.VarChar, it.Destino || null)
-                        .input('reservationCode', mssql.VarChar, it.Reserva || null)
-                        .input('sellerCommission', mssql.Float, sellerComm)
-                        .input('ticketPrinterCommission', mssql.Float, ticketPrinterComm)
-                        .input('inNationality', mssql.Int, inNationality)
-                        .input('servicios', mssql.VarChar, it.Servicios || null)
-                        .input('descripcion', mssql.VarChar, it.Descripcion || null)
-                        .input('passenger', mssql.VarChar, it.Pasajeros || null)
-                        .input('providerDueDate', mssql.VarChar, normalizeDateString(it.Fecha_Vencimiento_Proveedor || it.Fecha_Vencimiento || it.Vencimiento_Proveedor || it.providerDueDate || '') || null)
-                        .input('providerInvoice', mssql.VarChar, (it.Factura_Proveedor || it.Factura || it.Factura_Prov || it.providerInvoice || '').toString().trim() || null)
+                    // Insert Quotation Header
+                    const qRes = await new mssql.Request(transaction)
+                        .input('internalNumber', mssql.VarChar, internalNum)
+                        .input('clientId', mssql.Int, clientId)
+                        .input('currency', mssql.VarChar, currency)
+                        .input('exchangeRate', mssql.Float, exchangeRate)
+                        .input('branchId', mssql.Int, branchId)
+                        .input('implantId', mssql.Int, implantId)
+                        .input('sellerId', mssql.Int, sellerId)
+                        .input('ticketPrinterId', mssql.Int, ticketPrinterId)
+                        .input('commissionPercentage', mssql.Float, commissionPct)
+                        .input('chargesAndTaxes', mssql.Float, globalCargos)
+                        .input('totalAmount', mssql.Float, 0)
+                        .input('userId', mssql.Int, actingUserId)
                         .query(`
-                            INSERT INTO dbo.[QuotationProduct] (
-                                quotationId, productId, quantity, price, cost, providerId, prestadoraId,
-                                checkInDate, checkOutDate, nights, paxAdults, paxChildren,
-                                serviceType, destination, reservationCode, sellerCommission, ticketPrinterCommission,
-                                inNationality, servicios, descripcion, passenger, providerDueDate, providerInvoice
-                            ) VALUES (
-                                @quotationId, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
-                                TRY_CAST(@checkInDate AS DATETIME2), TRY_CAST(@checkOutDate AS DATETIME2), @nights, @paxAdults, @paxChildren,
-                                @serviceType, @destination, @reservationCode, @sellerCommission, @ticketPrinterCommission,
-                                @inNationality, @servicios, @descripcion, @passenger, TRY_CAST(@providerDueDate AS DATETIME2), @providerInvoice
+                            INSERT INTO dbo.[Quotation] (
+                                internalNumber, clientId, currency, exchangeRate, branchId, implantId, sellerId,
+                                ticketPrinterId, commissionPercentage, chargesAndTaxes, totalAmount, userId
+                            ) OUTPUT INSERTED.id VALUES (
+                                @internalNumber, @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId,
+                                @ticketPrinterId, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId
                             )
                         `);
 
-                    quotationTotalSum += (itemPrice * quantity);
+                    const quotationId = qRes.recordset[0].id;
+                    let quotationTotalSum = globalCargos;
+
+                    // Insert Items
+                    for (const it of items) {
+                        let productId = 1;
+                        if (it.Producto_Codigo) {
+                            const pRes = await new mssql.Request(transaction).input('code', mssql.VarChar, it.Producto_Codigo.toString().trim()).query(`SELECT TOP 1 id FROM dbo.[Product] WHERE code = @code`);
+                            if (pRes.recordset && pRes.recordset.length > 0) productId = pRes.recordset[0].id;
+                        }
+                        let providerId: number | null = null;
+                        if (it.Proveedor_Codigo) {
+                            const prCode = it.Proveedor_Codigo.toString().trim();
+                            const prRes = await new mssql.Request(transaction).input('code', mssql.VarChar, prCode).query(`SELECT TOP 1 id FROM dbo.[Provider] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) LIKE '%' + UPPER(@code) + '%'`);
+                            if (prRes.recordset && prRes.recordset.length > 0) providerId = prRes.recordset[0].id;
+                        }
+
+                        let prestadoraId: number | null = null;
+                        const prestCode = getExcelPrestadoraCode(it);
+                        if (prestCode) {
+                            const prestRes = await new mssql.Request(transaction)
+                                .input('code', mssql.VarChar, prestCode)
+                                .query(`SELECT TOP 1 id FROM dbo.[Prestadora] WHERE UPPER(code) = UPPER(@code) OR UPPER(name) = UPPER(@code) OR UPPER(name) LIKE '%' + UPPER(@code) + '%'`);
+                            if (prestRes.recordset && prestRes.recordset.length > 0) {
+                                prestadoraId = prestRes.recordset[0].id;
+                            }
+                        }
+
+                        const rawPrice = it.Precio_Unitario ?? it['Precio Unitario'] ?? it.Precio ?? '0';
+                        let itemPrice = parseFloat(rawPrice || '0');
+                        const quantity = parseInt(it.Cantidad || '1', 10);
+                        const cost = parseFloat(it.Costo || '0');
+                        const checkIn = normalizeDateString(it.CheckIn || it['Check-In'] || '');
+                        const checkOut = normalizeDateString(it.CheckOut || it['Check-Out'] || '');
+                        const sellerComm = parseFloat(it.Comision_Vendedor_Producto || '0');
+                        const ticketPrinterComm = parseFloat(it.Comision_Tiqueteador_Producto || '0');
+                        const inNationality = parseInt(it.Nacionalidad || '1', 10);
+
+                        let nights: number | null = null;
+                        if (checkIn && checkOut) {
+                            const diffTime = Math.abs(new Date(checkOut).getTime() - new Date(checkIn).getTime());
+                            nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        } else if (it.Noches) {
+                            nights = parseInt(it.Noches || '1', 10);
+                        }
+
+                        await new mssql.Request(transaction)
+                            .input('quotationId', mssql.Int, quotationId)
+                            .input('productId', mssql.Int, productId)
+                            .input('quantity', mssql.Int, quantity)
+                            .input('price', mssql.Float, itemPrice)
+                            .input('cost', mssql.Float, cost)
+                            .input('providerId', mssql.Int, providerId)
+                            .input('prestadoraId', mssql.Int, prestadoraId)
+                            .input('checkInDate', mssql.VarChar, checkIn || null)
+                            .input('checkOutDate', mssql.VarChar, checkOut || null)
+                            .input('nights', mssql.Int, nights)
+                            .input('paxAdults', mssql.Int, parseInt(it.Pax_Adultos || '1', 10))
+                            .input('paxChildren', mssql.Int, parseInt(it.Pax_Ninos || '0', 10))
+                            .input('serviceType', mssql.VarChar, it.Tipo_Servicio || null)
+                            .input('destination', mssql.VarChar, it.Destino || null)
+                            .input('reservationCode', mssql.VarChar, it.Reserva || null)
+                            .input('sellerCommission', mssql.Float, sellerComm)
+                            .input('ticketPrinterCommission', mssql.Float, ticketPrinterComm)
+                            .input('inNationality', mssql.Int, inNationality)
+                            .input('servicios', mssql.VarChar, it.Servicios || null)
+                            .input('descripcion', mssql.VarChar, it.Descripcion || null)
+                            .input('passenger', mssql.VarChar, it.Pasajeros || null)
+                            .input('providerDueDate', mssql.VarChar, normalizeDateString(it.Fecha_Vencimiento_Proveedor || it.Fecha_Vencimiento || it.Vencimiento_Proveedor || it.providerDueDate || '') || null)
+                            .input('providerInvoice', mssql.VarChar, (it.Factura_Proveedor || it.Factura || it.Factura_Prov || it.providerInvoice || '').toString().trim() || null)
+                            .query(`
+                                INSERT INTO dbo.[QuotationProduct] (
+                                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
+                                    checkInDate, checkOutDate, nights, paxAdults, paxChildren,
+                                    serviceType, destination, reservationCode, sellerCommission, ticketPrinterCommission,
+                                    inNationality, servicios, descripcion, passenger, providerDueDate, providerInvoice
+                                ) VALUES (
+                                    @quotationId, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
+                                    TRY_CAST(@checkInDate AS DATETIME2), TRY_CAST(@checkOutDate AS DATETIME2), @nights, @paxAdults, @paxChildren,
+                                    @serviceType, @destination, @reservationCode, @sellerCommission, @ticketPrinterCommission,
+                                    @inNationality, @servicios, @descripcion, @passenger, TRY_CAST(@providerDueDate AS DATETIME2), @providerInvoice
+                                )
+                            `);
+
+                        quotationTotalSum += (itemPrice * quantity);
+                    }
+
+                    // Update Total
+                    await new mssql.Request(transaction).input('id', mssql.Int, quotationId).input('total', mssql.Float, quotationTotalSum).query(`UPDATE dbo.[Quotation] SET totalAmount = @total WHERE id = @id`);
+
+                    createdIds.push(quotationId);
+                    createdConsecutives.push(internalNum);
                 }
 
-                // Update Total
-                await pool.request().input('id', mssql.Int, quotationId).input('total', mssql.Float, quotationTotalSum).query(`UPDATE dbo.[Quotation] SET totalAmount = @total WHERE id = @id`);
+                await transaction.commit();
+                isTxActive = false;
+            } catch (txErr: any) {
+                if (isTxActive) {
+                    try { await transaction.rollback(); } catch (_) {}
+                    isTxActive = false;
+                }
+                await pool.close();
+                throw txErr;
             }
 
             await pool.close();

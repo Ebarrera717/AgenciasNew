@@ -71,6 +71,9 @@ DECLARE
     v_imported_count INT := 0;
     v_created_ids TEXT := '';
     v_decimals INT;
+    v_existing_id INT;
+    v_existing_state TEXT;
+    v_existing_zeus_num TEXT;
 BEGIN
     -- 1. Crear tabla temporal
     CREATE TEMP TABLE IF NOT EXISTS tmp_import_invoice_rows (
@@ -338,18 +341,47 @@ BEGIN
             END IF;
         END IF;
 
-        INSERT INTO public."Invoices" (
-            "internalNumber", "date", "clientId", "currency", "exchangeRate", 
-            "branchId", "implantId", "sellerId", "ticketPrinterId", 
-            "baseCommissionable", "commissionPercentage", "chargesAndTaxes", "totalAmount", "userId", "state",
-            "fuente", "serie", "consecutivo"
-        ) VALUES (
-            v_internal_number, now(), v_client_id, COALESCE(v_invoice_record.moneda, 'COP'), 
-            COALESCE(v_invoice_record.tasa_cambio, 1), v_branch_id, v_implant_id, v_seller_id, 
-            v_ticket_printer_id, 0, ROUND(COALESCE(v_invoice_record.comision_global, 0)::numeric, v_decimals)::double precision, 
-            ROUND(COALESCE(v_invoice_record.cargos_global, 0)::numeric, v_decimals)::double precision, 0, p_user_id, 'NUEVO',
-            v_invoice_record.fuente, v_invoice_record.serie, v_invoice_record.consecutivo
-        ) RETURNING id INTO v_invoice_id;
+        -- Verificar si ya existe la factura en el sistema
+        SELECT id, "state", "zeusInvoiceNumber" INTO v_existing_id, v_existing_state, v_existing_zeus_num 
+        FROM public."Invoices" 
+        WHERE "internalNumber" = v_internal_number;
+
+        IF v_existing_id IS NOT NULL THEN
+            IF UPPER(COALESCE(v_existing_state, '')) IN ('EXPORTED', 'EXPORTADA', 'ENVIADO') OR (v_existing_zeus_num IS NOT NULL AND TRIM(v_existing_zeus_num) <> '') THEN
+                -- Factura ya fue exportada a Zeus ERP, no duplicar ni sobrescribir
+                CONTINUE;
+            ELSE
+                v_invoice_id := v_existing_id;
+                UPDATE public."Invoices" SET
+                    "clientId" = v_client_id, "currency" = COALESCE(v_invoice_record.moneda, 'COP'),
+                    "exchangeRate" = COALESCE(v_invoice_record.tasa_cambio, 1), "branchId" = v_branch_id,
+                    "implantId" = v_implant_id, "sellerId" = v_seller_id, "ticketPrinterId" = v_ticket_printer_id,
+                    "baseCommissionable" = 0, "commissionPercentage" = ROUND(COALESCE(v_invoice_record.comision_global, 0)::numeric, v_decimals)::double precision,
+                    "chargesAndTaxes" = ROUND(COALESCE(v_invoice_record.cargos_global, 0)::numeric, v_decimals)::double precision,
+                    "totalAmount" = 0, "userId" = p_user_id, "state" = 'NUEVO',
+                    "fuente" = v_invoice_record.fuente, "serie" = v_invoice_record.serie, "consecutivo" = v_invoice_record.consecutivo
+                WHERE id = v_invoice_id;
+
+                DELETE FROM public."InvoicesProductPayment" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProductTax" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProductPasenger" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProductVariable" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id;
+            END IF;
+        ELSE
+            INSERT INTO public."Invoices" (
+                "internalNumber", "date", "clientId", "currency", "exchangeRate", 
+                "branchId", "implantId", "sellerId", "ticketPrinterId", 
+                "baseCommissionable", "commissionPercentage", "chargesAndTaxes", "totalAmount", "userId", "state",
+                "fuente", "serie", "consecutivo"
+            ) VALUES (
+                v_internal_number, now(), v_client_id, COALESCE(v_invoice_record.moneda, 'COP'), 
+                COALESCE(v_invoice_record.tasa_cambio, 1), v_branch_id, v_implant_id, v_seller_id, 
+                v_ticket_printer_id, 0, ROUND(COALESCE(v_invoice_record.comision_global, 0)::numeric, v_decimals)::double precision, 
+                ROUND(COALESCE(v_invoice_record.cargos_global, 0)::numeric, v_decimals)::double precision, 0, p_user_id, 'NUEVO',
+                v_invoice_record.fuente, v_invoice_record.serie, v_invoice_record.consecutivo
+            ) RETURNING id INTO v_invoice_id;
+        END IF;
 
         v_created_ids := v_created_ids || v_internal_number || ', ';
 

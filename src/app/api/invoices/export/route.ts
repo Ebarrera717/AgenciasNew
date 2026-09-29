@@ -20,11 +20,60 @@ export async function POST(req: NextRequest) {
     try {
         const { ids, userId } = await req.json()
 
-        if (!ids || (Array.isArray(ids) && ids.length === 0)) {
-            return NextResponse.json({ message: 'No invoice IDs provided' }, { status: 400 })
+        const idArray = (Array.isArray(ids) ? ids : ids.toString().split(',')).map((id: any) => parseInt(String(id).trim(), 10)).filter((n: number) => !isNaN(n));
+
+        if (idArray.length === 0) {
+            return NextResponse.json({ message: 'No valid invoice IDs provided' }, { status: 400 });
         }
 
-        const idsStr = Array.isArray(ids) ? ids.join(',') : ids.toString();
+        // Consultar estado previo de las facturas en la base de datos activa
+        const invoiceNumberMap: Record<number, string> = {};
+        const alreadyExportedIds: number[] = [];
+
+        try {
+            if (isSQLServerMode()) {
+                const pool = await getSQLServerConnection();
+                const res = await pool.request().query(`SELECT id, internalNumber, serie, consecutivo, [state], zeusInvoiceNumber FROM dbo.[Invoices] WHERE id IN (${idArray.join(',')})`);
+                await pool.close();
+                for (const r of res.recordset) {
+                    const num = r.internalNumber || (r.consecutivo ? (r.serie ? `${r.serie}-${r.consecutivo}` : `FAC-${r.consecutivo}`) : `FAC-${r.id}`);
+                    invoiceNumberMap[r.id] = num;
+                    const st = (r.state || '').toUpperCase();
+                    if (st === 'EXPORTED' || st === 'EXPORTADA' || (r.zeusInvoiceNumber && String(r.zeusInvoiceNumber).trim() !== '')) {
+                        alreadyExportedIds.push(r.id);
+                    }
+                }
+            } else {
+                const res = await executePostgresQuery(
+                    `SELECT id, "internalNumber", serie, consecutivo, state, "zeusInvoiceNumber" FROM public."Invoices" WHERE id IN (${idArray.join(',')})`
+                );
+                for (const r of res) {
+                    const num = r.internalNumber || (r.consecutivo ? (r.serie ? `${r.serie}-${r.consecutivo}` : `FAC-${r.consecutivo}`) : `FAC-${r.id}`);
+                    invoiceNumberMap[r.id] = num;
+                    const st = (r.state || '').toUpperCase();
+                    if (st === 'EXPORTED' || st === 'EXPORTADA' || (r.zeusInvoiceNumber && String(r.zeusInvoiceNumber).trim() !== '')) {
+                        alreadyExportedIds.push(r.id);
+                    }
+                }
+            }
+        } catch (e: any) {
+            console.warn('[EXPORT_API] No se pudieron consultar números de factura:', e.message);
+        }
+
+        // Si todas las facturas enviadas ya fueron exportadas, detener fail fast
+        if (alreadyExportedIds.length > 0 && alreadyExportedIds.length === idArray.length) {
+            const numList = alreadyExportedIds.map(id => invoiceNumberMap[id] || `ID #${id}`).join(', ');
+            return NextResponse.json({
+                success: false,
+                message: `⚠️ La(s) factura(s) seleccionada(s) (${numList}) ya fue(ron) exportada(s) a Zeus ERP previamente y no pueden re-exportarse.`,
+                alreadyExported: true,
+                traceCode
+            }, { status: 400 });
+        }
+
+        // Filtrar únicamente los IDs pendientes
+        const pendingIds = idArray.filter(id => !alreadyExportedIds.includes(id));
+        const idsStr = pendingIds.join(',');
 
         // 1. Obtener XML (dual motor support)
         let xmlStr = '';
@@ -63,34 +112,6 @@ export async function POST(req: NextRequest) {
             });
             await registerLog(userId, 'INVOICE', 'EXPORT_ERROR', 'No se generó XML para facturas', { ids: idsStr });
             return NextResponse.json({ message: 'Error en generación de XML de facturación', traceCode }, { status: 500 })
-        }
-
-        // Obtener mapa de números de factura (internalNumber / consecutivo)
-        const idArray = idsStr.split(',').map((id: string) => parseInt(id.trim(), 10)).filter((n: number) => !isNaN(n));
-        const invoiceNumberMap: Record<number, string> = {};
-
-        if (idArray.length > 0) {
-            try {
-                if (isSQLServerMode()) {
-                    const pool = await getSQLServerConnection();
-                    const res = await pool.request().query(`SELECT id, internalNumber, serie, consecutivo FROM dbo.[Invoices] WHERE id IN (${idArray.join(',')})`);
-                    await pool.close();
-                    for (const r of res.recordset) {
-                        const num = r.internalNumber || (r.consecutivo ? (r.serie ? `${r.serie}-${r.consecutivo}` : `FAC-${r.consecutivo}`) : `FAC-${r.id}`);
-                        invoiceNumberMap[r.id] = num;
-                    }
-                } else {
-                    const res = await executePostgresQuery(
-                        `SELECT id, "internalNumber", serie, consecutivo FROM public."Invoices" WHERE id IN (${idArray.join(',')})`
-                    );
-                    for (const r of res) {
-                        const num = r.internalNumber || (r.consecutivo ? (r.serie ? `${r.serie}-${r.consecutivo}` : `FAC-${r.consecutivo}`) : `FAC-${r.id}`);
-                        invoiceNumberMap[r.id] = num;
-                    }
-                }
-            } catch (e: any) {
-                console.warn('[EXPORT_API] No se pudieron consultar números de factura:', e.message);
-            }
         }
 
         // 2. Integración Directa con SQL Server (spFacturacionesCrear -> Zeus ERP)
@@ -194,22 +215,25 @@ export async function POST(req: NextRequest) {
             if (spResult.length > 0) {
                 console.log(`[EXPORT_API] Actualizando estados de facturas para: ${idsStr}`);
                 if (isSQLServerMode()) {
-                    for (const item of spResult) {
-                        const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray.length === 1 ? idArray[0] : 0));
-                        const isOk = checkItemSuccess(item);
-                        if (isOk && invId > 0) {
-                            const rawMsg = getItemMessage(item);
-                            const match = rawMsg.match(/([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})/i) || rawMsg.match(/([0-9]{8,10})/i);
-                            const fuente = match && match[2] ? match[1] : '55';
-                            const serie = match && match[2] ? match[2] : '66';
-                            const consecutivo = match ? (match[3] || match[1]) : null;
-                            const zeusNum = (serie && consecutivo) ? (consecutivo.startsWith(serie) ? consecutivo : `${serie}${consecutivo}`) : consecutivo;
-                            const pool = await getSQLServerConnection();
-                            await pool.request().query(
-                                `UPDATE dbo.[Invoices] SET [state] = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}', zeusInvoiceNumber = '${zeusNum}'` : ''} WHERE id = ${invId}`
-                            );
-                            await pool.close();
+                    const pool = await getSQLServerConnection();
+                    try {
+                        for (const item of spResult) {
+                            const invId = Number(item.invoiceId || item.Factura || item.id_factura || item.id || (idArray.length === 1 ? idArray[0] : 0));
+                            const isOk = checkItemSuccess(item);
+                            if (isOk && invId > 0) {
+                                const rawMsg = getItemMessage(item);
+                                const match = rawMsg.match(/([A-Z0-9]{2})-([A-Z0-9]{2})-?([0-9]{8})/i) || rawMsg.match(/([0-9]{8,10})/i);
+                                const fuente = match && match[2] ? match[1] : '55';
+                                const serie = match && match[2] ? match[2] : '66';
+                                const consecutivo = match ? (match[3] || match[1]) : null;
+                                const zeusNum = (serie && consecutivo) ? (consecutivo.startsWith(serie) ? consecutivo : `${serie}${consecutivo}`) : consecutivo;
+                                await pool.request().query(
+                                    `UPDATE dbo.[Invoices] SET [state] = 'EXPORTED'${consecutivo ? `, consecutivo = '${consecutivo}', serie = '${serie}', fuente = '${fuente}', zeusInvoiceNumber = '${zeusNum}'` : ''} WHERE id = ${invId}`
+                                );
+                            }
                         }
+                    } finally {
+                        await pool.close();
                     }
                 } else {
                     try {

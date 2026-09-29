@@ -271,14 +271,17 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { name: 'Factura Zeus ERP', type: 'Insignia Alfanumérica', description: 'Muestra el número consecutivo oficial generado en Zeus ERP (ej. 6600000056) para facturas importadas desde Excel o emitidas que hayan sido exportadas al ERP.' },
                     { name: 'Estado Contable', type: 'Indicador', description: 'Muestra el estado de la factura (Nuevo, Facturado, Exportado, Cancelado).' },
                     { name: 'Forma de Pago', type: 'Selector', description: 'Define la modalidad de pago (Efectivo, Tarjeta, Transferencia, Crédito).' },
-                    { name: 'Fecha Vencimiento Proveedor', type: 'Fecha (Opcional)', description: 'Fecha límite de pago al proveedor del ítem facturado.' },
-                    { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura o documento del proveedor asociado al producto.' },
+                    { name: 'Fecha Vencimiento Proveedor', type: 'Fecha (Opcional)', description: 'Fecha límite de pago al proveedor del ítem facturado, exportada a Zeus ERP en dbo.FacturaProveedor y Fac_Servicios.' },
+                    { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura o documento del proveedor asociado al producto, exportada a Zeus ERP en dbo.FacturaProveedor.' },
+                    { name: 'Check-In / Check-Out', type: 'Fechas (Opcional)', description: 'Fechas de llegada y salida del servicio/hotel, exportadas a Zeus ERP en dbo.Fac_Servicios (dt_llegada, dt_salida).' },
+                    { name: 'Servicios', type: 'Texto Multilínea', description: 'Descripción detallada de servicios incluidos o complementarios, exportada a Zeus ERP en dbo.Fac_Servicios (ds_servicio).' },
                     { name: 'Variables Adicionales de Factura', type: 'Campos Dinámicos', description: 'Variables adicionales requeridas con distintivo "Obligatoria" si el cliente la exige para facturas.' }
                 ],
                 businessRules: [
                     'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para facturas, el formulario web y el Stored Procedure bloquearán la emisión si algún ítem carece de dicha variable.',
                     'En importaciones de facturas desde Excel, el sistema valida que las variables obligatorias de factura vengan informadas en la columna de variables o en las columnas dinámicas correspondientes.',
-                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor son persistidos en base de datos y pueden ser editados en el formulario web o importados masivamente vía Excel.',
+                    'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor son persistidos en base de datos y se transmiten automáticamente a Zeus ERP insertando/actualizando la tabla dbo.FacturaProveedor vinculada a la factura creada.',
+                    'Los campos Check-In, Check-Out y Servicios son transmitidos a Zeus ERP guardándose en las columnas dt_llegada, dt_salida, dt_FechaSalidaSrv, dt_FechaLlegadaSrv y ds_servicio de dbo.Fac_Servicios.',
                     'La plantilla de facturas descargable contiene ejemplos detallados de líneas aéreas, hoteles, servicios, itinerarios, formas de pago y datos de proveedor.',
                     'Para servicios de terceros y hotelería exportados a Zeus ERP, se genera automáticamente el desglose de Tipos Facturación de Hoteles (Fac_Servicios_TiposFacturacionHoteles) con tipo por defecto "Noches" (NCH), cantidad, valor unitario y cargo a aplicar mapeados directamente desde las columnas de Precio Unitario, Cantidad y Cargo Principal de la factura / Excel.'
                 ],
@@ -1229,6 +1232,75 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { number: 1, title: 'Acceder a la Pestaña Historial', description: 'En el formulario de cotización, seleccione la pestaña "Historial de Estados y Cambios".' },
                     { number: 2, title: 'Consultar una Versión', description: 'Ubique la fila deseada y haga clic en el botón "Consultar Detalle".' },
                     { number: 3, title: 'Revisar o Copiar Datos', description: 'Explore el resumen visual de productos y tarifas, o cambie a la pestaña "Auditoría Técnica JSON" para copiar el snapshot completo.' }
+                ]
+            }
+        ]
+    },
+    {
+        id: 'invoices-export-protection',
+        title: 'Control y Protección contra Duplicidad en Exportación de Facturas',
+        iconName: 'ShieldAlert',
+        category: 'Operaciones Comerciales y Facturación',
+        description: 'Manual de control y salvaguarda contra duplicación en la exportación de facturas hacia Zeus ERP.',
+        overview: 'El módulo de Facturación incorpora un mecanismo de protección visual y a nivel de servidor que impide la selección múltiple o reenvío accidental de facturas que ya han sido emitidas y sincronizadas exitosamente en Zeus ERP (estado EXPORTED / consecutivo generado).',
+        procedures: [
+            {
+                code: 'FAC-EXP-01',
+                name: 'Bloqueo de Selección y Exportación de Facturas Procesadas',
+                summary: 'Protección visual y de backend para evitar reenvíos duplicados a Zeus ERP.',
+                concept: 'Garantiza la integridad contable y operativa impidiendo que facturas que ya cuentan con número consecutivo o estado EXPORTED sean marcadas en las listas de selección masiva.',
+                fields: [
+                    { name: 'Casilla de Selección (Checkbox)', type: 'Control de Interfaz', description: 'Deshabilitada automáticamente para facturas ya exportadas con tooltip explicativo.' },
+                    { name: 'Seleccionar Todos (Cabecera)', type: 'Control de Lote', description: 'Selecciona exclusivamente las facturas pendientes por exportar, omitiendo las ya procesadas.' },
+                    { name: 'Insignia de Estado', type: 'Distintivo Visual', description: 'Identifica con verde esmeralda las facturas en estado EXPORTED / ENVIADO y su consecutivo asignado.' }
+                ],
+                businessRules: [
+                    'Toda factura con estado EXPORTED o con consecutivo asignado se bloquea para nueva selección.',
+                    'El endpoint /api/invoices/export valida y filtra en el servidor cualquier ID previamente procesado, emitiendo una notificación clara si se intenta re-exportar.'
+                ],
+                steps: [
+                    { number: 1, title: 'Visualizar Lista de Facturas', description: 'Ingrese a /dashboard/invoices o /dashboard/invoices/history.' },
+                    { number: 2, title: 'Seleccionar Facturas Pendientes', description: 'Haga clic en las casillas activas o use la casilla de cabecera para marcar solo las pendientes.' },
+                    { number: 3, title: 'Enviar a Zeus ERP', description: 'Haga clic en "Enviar a Zeus ERP". Al finalizar, las facturas procesadas quedarán automáticamente protegidas contra re-envíos.' }
+                ]
+            },
+            {
+                code: 'FAC-EXP-02',
+                name: 'Procesamiento en Lote de Alto Rendimiento hacia Zeus ERP',
+                summary: 'Optimización de throughput, inserción en bloque (set-based) y reutilización de conexiones.',
+                concept: 'El motor de exportación procesa lotes de facturas de forma optimizada ejecutando generación de XML unificada, inserciones set-based en FacturaProveedor y lectura directa sin bloqueos (NOLOCK) en maestros de Zeus ERP, completando lotes de 10 facturas en menos de 20 segundos.',
+                fields: [
+                    { name: 'Exportación Masiva', type: 'Proceso Batch', description: 'Envía hasta múltiples facturas simultáneamente en un único payload XML optimizado.' },
+                    { name: 'Tiempos de Respuesta', type: 'Indicador de Rendimiento', description: 'Procesamiento promedio de ~1.7s a 2s por factura contable completa.' }
+                ],
+                businessRules: [
+                    'Las consultas de enriquecimiento en clientes, vendedores, sucursales e impuestos utilizan lecturas no bloqueantes WITH (NOLOCK).',
+                    'Las inserciones a FacturaProveedor se realizan por conjunto de datos (set-based) eliminando el costo de cursores iterativos.',
+                    'La actualización del estado de las facturas en Korex se realiza en una sola transacción reutilizando el pool de conexión.'
+                ],
+                steps: [
+                    { number: 1, title: 'Selección de Múltiples Facturas', description: 'Marque las facturas deseadas (ej. 10 facturas) en la tabla de facturación.' },
+                    { number: 2, title: 'Ejecutar Exportación', description: 'Haga clic en "Enviar a Zeus ERP". El sistema mostrará la barra de progreso y confirmará la generación de cada consecutivo contable.' }
+                ]
+            },
+            {
+                code: 'FAC-EXP-03',
+                name: 'Filtros Avanzados, Herramientas Excel y Estandarización Visual',
+                summary: 'Módulo unificado de 9 filtros, ordenamiento dinámico y exportación a Excel en Facturas y Cotizaciones.',
+                concept: 'Provee una cuadrícula completa de 9 criterios de búsqueda avanzada (Referencia, Reserva, Pasajero, Cliente, Vendedor, Estado, Rango de Fechas y Monto Total), ordenamiento bidireccional por consecutivo e integración con herramientas rápidas de copiado al portapapeles y descarga de hojas de cálculo .xlsx.',
+                fields: [
+                    { name: 'Cuadrícula de Filtros (9 Criterios)', type: 'Panel de Búsqueda', description: 'Permite filtrar facturas por referencia/ID, código de reserva, pasajero, cliente, vendedor, estado, fecha desde/hasta y monto exacto.' },
+                    { name: 'Copiar a Excel', type: 'Botón de Acción Rápida', description: 'Copia las facturas filtradas en formato TSV/HTML para pegarlas directamente en hojas de Excel con Ctrl+V.' },
+                    { name: 'Excel (.xlsx)', type: 'Descarga de Archivo', description: 'Genera y descarga un archivo .xlsx estructurado con la información operacional y contable.' }
+                ],
+                businessRules: [
+                    'El diseño visual, paleta de colores (azul primario, verde esmeralda para plantillas y morado para portapapeles) y botones de acción están 100% estandarizados entre Cotizaciones y Facturas.',
+                    'El ordenamiento por Referencia / ID permite alternar de forma ascendente y descendente haciendo clic en la cabecera.'
+                ],
+                steps: [
+                    { number: 1, title: 'Aplicar Filtros', description: 'Complete uno o varios campos en el panel "FILTROS DE BÚSQUEDA" y haga clic en "Buscar".' },
+                    { number: 2, title: 'Exportar o Copiar', description: 'Utilice "Copiar a Excel" para transferir al portapapeles o "Excel (.xlsx)" para descargar el archivo completo.' },
+                    { number: 3, title: 'Limpiar', description: 'Haga clic en "Limpiar" para restablecer todos los filtros a su estado inicial.' }
                 ]
             }
         ]

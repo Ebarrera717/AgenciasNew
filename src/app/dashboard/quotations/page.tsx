@@ -26,7 +26,9 @@ import {
     CheckCircle2,
     Database,
     Upload,
-    FileDown
+    FileDown,
+    Send,
+    Plus
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -479,8 +481,22 @@ export default function QuotationsListPage() {
                 </div>
                 <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
                     <button
+                        onClick={handleExportZeus}
+                        disabled={selectedIds.length === 0}
+                        className={`px-4 h-10 rounded-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                            selectedIds.length > 0
+                            ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"
+                            : "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed"
+                        }`}
+                        title="Exportar cotizaciones seleccionadas a Zeus ERP"
+                    >
+                        <Send className="w-4 h-4" />
+                        Exportar Zeus ERP {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                    </button>
+
+                    <button
                         onClick={downloadQuotationTemplate}
-                        className="px-3.5 h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl shadow-xs font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
+                        className="px-3.5 h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl shadow-xs font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
                         title="Descargar plantilla Excel para importación de cotizaciones"
                     >
                         <FileDown className="w-4 h-4" /> Descargar Plantilla
@@ -494,17 +510,9 @@ export default function QuotationsListPage() {
                         <Upload className="w-4 h-4" /> Importar Excel
                     </button>
 
-                    <button
-                        onClick={handleExportZeus}
-                        className="px-4 h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-md font-bold transition-all flex items-center gap-2 text-xs cursor-pointer active:scale-95"
-                        title="Exportar cotizaciones seleccionadas a Zeus ERP"
-                    >
-                        <Download className="w-4 h-4" /> Exportar Zeus ERP
-                    </button>
-
                     <Link href="/dashboard/quotations/new">
                         <button className="px-4 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md font-bold transition-all flex items-center gap-2 text-xs cursor-pointer active:scale-95">
-                            Nueva Cotización <ArrowRight className="w-4 h-4" />
+                            <Plus className="w-4 h-4" /> Nueva Cotización
                         </button>
                     </Link>
                 </div>

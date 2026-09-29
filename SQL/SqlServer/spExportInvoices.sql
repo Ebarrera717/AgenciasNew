@@ -248,7 +248,12 @@ BEGIN
                     '2' AS [cd_tiposconceptfac],
                     COALESCE(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), 'FAC', '01') AS [cd_conceptofacturacion],
                     COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), 'HOTEL', '01') AS [cd_tiposservicio],
-                    SUBSTRING(ISNULL(prv.code, '01'), 1, 25) AS [cd_proveedores],
+                    SUBSTRING(COALESCE(
+                        NULLIF(RTRIM(LTRIM(prv.code)), ''),
+                        NULLIF(RTRIM(LTRIM(prv.airlineCode)), ''),
+                        (SELECT TOP 1 p_fb.code FROM dbo.[Provider] p_fb WHERE p_fb.code IS NOT NULL AND RTRIM(LTRIM(p_fb.code)) <> '' ORDER BY p_fb.id ASC),
+                        '890100577'
+                    ), 1, 25) AS [cd_proveedores],
                     SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(ep.servicios)), ''), NULLIF(LTRIM(RTRIM(ep.descripcion)), ''), NULLIF(LTRIM(RTRIM(pr.description)), ''), ''), 1, 250) AS [ds_servicio],
                     CAST(
                         (
@@ -281,6 +286,8 @@ BEGIN
                     CAST(0 AS DECIMAL(18,2)) AS [am_basedescuento],
                     CONVERT(VARCHAR(19), ISNULL(ep.checkOutDate, ISNULL(ep.checkInDate, e.date)), 120) AS [Fecha_Salida],
                     CONVERT(VARCHAR(19), ISNULL(ep.checkInDate, e.date), 120) AS [Fecha_Llegada],
+                    ISNULL(ep.providerInvoice, '') AS [cd_facturaproveedor],
+                    CONVERT(VARCHAR(19), ISNULL(ep.providerDueDate, ISNULL(ep.checkInDate, e.date)), 120) AS [dt_fechavencimientoproveedor],
                     CASE 
                         WHEN ep.nights IS NOT NULL AND ep.nights > 0 THEN ep.nights
                         WHEN ep.checkInDate IS NOT NULL AND ep.checkOutDate IS NOT NULL AND DATEDIFF(day, ep.checkInDate, ep.checkOutDate) > 0 
@@ -296,7 +303,7 @@ BEGIN
                     '1' AS [id_tipoproveedor],
                     '1' AS [cd_tipoproveedor],
                     'GENERAL' AS [ds_tipoproveedor],
-                    'I' + RIGHT('0000000' + CAST(ep.id AS VARCHAR), 7) AS [cd_consecutivo_variablesadicionales],
+                    SUBSTRING(master.dbo.fn_varbintohexstr(HASHBYTES('MD5', CAST(ep.id AS VARCHAR) + CAST(SYSDATETIME() AS VARCHAR))), 3, 8) AS [cd_consecutivo_variablesadicionales],
                     CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [am_valor_total],
                     -- Sub-nodo: Pasajeros (Todos los pasajeros con nombre y apellido divididos)
                     (
@@ -562,6 +569,12 @@ BEGIN
                     SELECT MIN(pp_min.id) FROM dbo.[InvoicesProductPasenger] pp_min WHERE pp_min.invoiceProductId = ep.id
                 )
                 WHERE ep.invoiceId = e.id
+                  AND (
+                      ISNULL(ep.price, 0) > 0 
+                      OR ISNULL(ep.cost, 0) > 0 
+                      OR NULLIF(LTRIM(RTRIM(ep.descripcion)), '') IS NOT NULL 
+                      OR NULLIF(LTRIM(RTRIM(ep.servicios)), '') IS NOT NULL
+                  )
                 FOR XML PATH('Item'), TYPE
             )
         FROM dbo.[Invoices] e
