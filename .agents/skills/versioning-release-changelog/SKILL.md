@@ -95,7 +95,36 @@ Antes de declarar una versión como liberada (`RELEASED`), el agente o desarroll
 
 ---
 
-## 5. Reglas Operativas para Agentes de IA
+## 5. Control de Ejecución Infranqueable del Actualizador (Reglas 45-56)
+
+1. **Principio Infranqueable**: *"Todo lo que deba ejecutarse debe ejecutarse y todo lo que no se ejecute debe ser reportado."*
+2. **Prohibición de Éxito Parcial o Falso**: El actualizador NUNCA puede finalizar como `EXIT CODE 0` o mostrar *"Actualización exitosa"* si algún script, SP, función, migración, tabla, columna, índice, vista o prueba quedó sin ejecutar, falló o si producción queda en un estado diferente al de desarrollo.
+3. **Estado Obligatorio por Componente**: Cada componente (Conexión, Versión, Backup, Tablas, Columnas, Índices, Funciones, SPs, Vistas, Backend, Frontend, Servicio, Pruebas) debe quedar en un estado explícito: `OK`, `ERROR`, `OMITIDO`, `NO EJECUTADO`, `NO APLICA`.
+4. **Verificación Post-Ejecución (`EJECUTADO + VALIDADO = OK`)**: No basta con ejecutar un `.sql`. El actualizador debe verificar inmediatamente la existencia, compilación, permisos y dependencias del objeto creado/actualizado.
+5. **Separación de Niveles de Error**: Manejo explícito entre `ERROR BLOQUEANTE`, `ERROR NO BLOQUEANTE`, `WARNING` e `INFORMACIÓN`. Un warning por objeto existente (ej. tabla A ya existe) no debe detener la actualización de SPs posteriores, pero todo error queda registrado.
+6. **Códigos de Salida Reales (`EXIT CODE`)**:
+   - `EXIT CODE 0`: Actualización 100% exitosa y validada.
+   - `EXIT CODE 1`: Actualización incompleta o con errores.
+   - `EXIT CODE 2`: Validación final / post-check fallido.
+   - `EXIT CODE 3`: Problema de configuración.
+   - `EXIT CODE 4`: Problema de conexión.
+   - `EXIT CODE 5`: Rollback ejecutado.
+7. **Reporte Automático HTML/JSON**: Toda ejecución de actualizador debe emitir automáticamente un reporte detallado con marca temporal (`Korex_Update_Report_<VERSION>_<TIMESTAMP>.html`).
+
+---
+
+## 6. Cadena de Validación Desarrollo → Release → Producción (Reglas 57-72)
+
+1. **Cadena Obligatoria**:
+   $$\text{DESARROLLO} \rightarrow \text{PRUEBAS AUTOMÁTICAS} \rightarrow \text{RELEASE CANDIDATE} \rightarrow \text{VALIDACIÓN PG/SQL} \rightarrow \text{INSTALADOR} \rightarrow \text{ACTUALIZADOR} \rightarrow \text{RELEASE} \rightarrow \text{PRODUCCIÓN} \rightarrow \text{POST-UPDATE VALIDATION}$$
+2. **Manifest de Release**: Cada release genera un manifest certificado de componentes esperados vs presentes en Backend, Frontend, PostgreSQL, SQL Server y Artefactos.
+3. **Smoke Test Post-Actualización**: Validación automatizada posterior al despliegue (App inicia, Login OK, Conexión BD OK, SPs críticos existen, Endpoints principales responden, Trazabilidad activa).
+4. **Regla de No Silencio**: Korex prefiere **FALLAR CLARAMENTE** con diagnóstico estructurado antes que continuar silenciosamente con errores latentes.
+5. **Criterio Absoluto**: Si existe cualquier diferencia entre lo esperado y lo instalado en producción, la actualización se marca como **FALLIDA O INCOMPLETA** (NUNCA EXITOSA).
+
+---
+
+## 7. Reglas Operativas para Agentes de IA
 
 Todo agente de IA que realice modificaciones en Korex **DEBE**:
 1. Leer y consultar la versión actual en `package.json` y `CHANGELOG.md`.
@@ -104,4 +133,6 @@ Todo agente de IA que realice modificaciones en Korex **DEBE**:
 4. Crear o extender pruebas automatizadas de regresión para el problema corregido.
 5. Inyectar y compilar localmente los SPs/DDL (`node deploy/gen_schema_json.js` / `node deploy/sync_zeus_erp.js`).
 6. Redactar las secciones de validación del cliente con pasos claros, reproducibles y orientados al usuario.
-7. Nunca emitir una conclusión de prueba como `"OK"` sin haber ejecutado la verificación técnica real.
+7. Verificar que el actualizador valide presencia y compilación (`EJECUTADO + VALIDADO = OK`).
+8. Nunca emitir una conclusión de prueba como `"OK"` sin haber ejecutado la verificación técnica real.
+

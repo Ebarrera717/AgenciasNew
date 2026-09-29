@@ -861,15 +861,275 @@ Cada cambio funcional debe decir explícitamente:
 
 ---
 
-## 44. REGLA DE ORO DEL VERSIONAMIENTO Y CRITERIO FINAL
+## 45. REGLA CRÍTICA – ACTUALIZADOR NO PUEDE TERMINAR CON EJECUCIÓN INCOMPLETA
 
-1. **NINGUNA CORRECCIÓN SE PIERDE.**
-2. **NINGUNA VERSIÓN PUBLICADA SE MODIFICA.**
-3. **NINGÚN CAMBIO IMPORTANTE QUEDA SIN DOCUMENTAR.**
-4. **NINGUNA VERSIÓN SE LIBERA SIN VALIDAR POSTGRESQL Y SQL SERVER.**
+El actualizador de Korex debe operar bajo el principio:
 
-Una versión de Korex solamente puede considerarse **OFICIAL** cuando el código, base de datos, instaladores, pruebas, CHANGELOG, seguridad y trazabilidad están 100% alineados. El número de versión no representa solamente una compilación: **representa un ESTADO CONTROLADO, VALIDADO Y DOCUMENTADO del producto.**
+> **"TODO LO QUE DEBA EJECUTARSE DEBE EJECUTARSE Y TODO LO QUE NO SE EJECUTE DEBE SER REPORTADO."**
+
+El actualizador NUNCA puede finalizar mostrando *"Actualización exitosa"* cuando:
+- Un script no fue ejecutado.
+- Un script falló.
+- Un SP no fue creado o actualizado.
+- Una función no fue creada o actualizada.
+- Una migración no fue ejecutada.
+- Una tabla no fue actualizada.
+- Una columna requerida no fue creada.
+- Un índice no fue creado.
+- Una vista no fue actualizada.
+- Un objeto quedó pendiente.
+- Un archivo no fue copiado.
+- Un componente no fue actualizado.
+- Una prueba obligatoria no fue ejecutada.
+- Una validación no pudo realizarse.
+- Existe una diferencia entre lo esperado y lo encontrado.
+
+---
+
+## 46. PROHIBIDO OCULTAR ERRORES O CONTINUAR SILENCIOSAMENTE
+
+Si durante la actualización ocurre un error, el actualizador NO debe:
+- Ocultarlo o ignorarlo.
+- Continuar silenciosamente.
+- Marcarlo como warning cuando realmente impide completar la actualización.
+- Finalizar como EXIT CODE 0.
+- Informar "Actualización completada".
+- Dejar objetos pendientes sin reportarlos.
+
+Cada error debe quedar registrado explícitamente en el log y el reporte.
+
+---
+
+## 47. CONTROL DE EJECUCIÓN DE CADA COMPONENTE
+
+Antes de iniciar la actualización debe construirse una lista de componentes esperados (ej. 01 - Validación de conexión, 02 - Validación de versión, 03 - Backup, 04 - Tablas, 05 - Columnas, 06 - Índices, 07 - Funciones, 08 - Stored Procedures, 09 - Vistas, 10 - Triggers, 11 - Datos/parametrización, 12 - Backend, 13 - Frontend, 14 - Archivos, 15 - Servicio/proceso, 16 - Integraciones, 17 - Pruebas funcionales, 18 - Validación final).
+
+Cada componente debe terminar en uno de estos estados:
+- `OK`
+- `ERROR`
+- `OMITIDO`
+- `NO EJECUTADO`
+- `NO APLICA`
+
+Nunca puede quedar un componente sin estado.
+
+---
+
+## 48. UN SCRIPT EJECUTADO NO SIGNIFICA NECESARIAMENTE SCRIPT CORRECTAMENTE APLICADO
+
+El actualizador no debe limitarse a ejecutar scripts. Después de cada operación debe **VALIDAR EL RESULTADO**:
+
+*Ejemplo:*
+1. Ejecutar: `spExportInvoices.sql`
+2. Verificar: ¿Existe `dbo.spExportInvoices`? ¿La definición corresponde a la versión esperada? ¿Compila? ¿Puede ejecutarse? ¿Sus dependencias existen?
+
+**Resultado legítimo**: `EJECUTADO + VALIDADO = OK`  
+*Queda prohibido considerar `EJECUTADO = OK` sin validación de presencia y compilación.*
+
+---
+
+## 49. VALIDACIÓN DE OBJETOS DESPUÉS DE LA ACTUALIZACIÓN
+
+Después de ejecutar los scripts de base de datos debe compararse:
+$$\text{OBJETOS ESPERADOS} \quad \text{VS} \quad \text{OBJETOS EXISTENTES}$$
+
+Debe validarse como mínimo: tablas, columnas, tipos de datos, constraints, índices, funciones, SPs, vistas, triggers, parámetros y objetos de integración. Si falta un objeto obligatorio:
+$$\text{ACTUALIZACIÓN = FALLIDA}$$
+
+---
+
+## 50. PROBLEMA CRÍTICO DE SCRIPTS PARCIALES
+
+El actualizador NO debe detener el procesamiento de objetos posteriores únicamente porque encontró un warning o un error no bloqueante en un objeto anterior. Debe separar:
+- `ERROR BLOQUEANTE`
+- `ERROR NO BLOQUEANTE`
+- `WARNING`
+- `INFORMACIÓN`
+
+Un warning sobre un objeto ya existente (ej. Tabla A ya existe) NO debe provocar la detención de la ejecución de los SPs posteriores. Cada componente debe procesarse independientemente cuando técnicamente sea seguro hacerlo, pero todos los errores deben quedar registrados.
+
+---
+
+## 51. INVENTARIO PREVIO DE OBJETOS ESPERADOS
+
+Antes de ejecutar una actualización debe generarse un inventario:
+$$\text{RELEASE} \longrightarrow \text{OBJETOS ESPERADOS} \longrightarrow \text{OBJETOS ACTUALES} \longrightarrow \text{DIFERENCIAS} \longrightarrow \text{PLAN DE ACTUALIZACIÓN}$$
+
+Permite detectar previamente objetos faltantes, antiguos, inesperados, versiones incorrectas o dependencias ausentes.
+
+---
+
+## 52. VALIDACIÓN FINAL OBLIGATORIA
+
+La actualización solamente puede terminar correctamente cuando se ejecuten TODAS las validaciones obligatorias:
+$$\text{PRE-CHECK} \longrightarrow \text{ACTUALIZACIÓN} \longrightarrow \text{POST-CHECK} \longrightarrow \text{PRUEBAS} \longrightarrow \text{COMPARACIÓN} \longrightarrow \text{RESULTADO FINAL}$$
+
+---
+
+## 53. REGLA DE EXIT CODE
+
+El actualizador debe utilizar códigos de salida reales:
+- `EXIT CODE 0`: Actualización completamente exitosa.
+- `EXIT CODE 1`: Actualización incompleta o con errores.
+- `EXIT CODE 2`: Validación final fallida.
+- `EXIT CODE 3`: Problema de configuración.
+- `EXIT CODE 4`: Problema de conexión.
+- `EXIT CODE 5`: Rollback ejecutado.
+
+*Queda prohibido devolver EXIT CODE 0 si existe una operación obligatoria fallida o no ejecutada.*
+
+---
+
+## 54. ESTADO FINAL DE LA ACTUALIZACIÓN
+
+El actualizador debe terminar mostrando únicamente uno de estos estados explícitos:
+
+**ACTUALIZACIÓN EXITOSA**: Todos los componentes fueron ejecutados. Todas las validaciones obligatorias fueron exitosas.
+
+o:
+
+**ACTUALIZACIÓN FALLIDA**: La actualización NO fue completada. Muestra componentes con error, no ejecutados, pendientes y la acción requerida.
+
+*Nunca utilizar mensajes ambiguos como "Actualización finalizada".*
+
+---
+
+## 55. REPORTE AUTOMÁTICO DE ACTUALIZACIÓN
+
+Cada actualización debe generar un reporte HTML/JSON estructurado (ej. `Korex_Update_Report_3.7.13_20260929_133500.html`) que contenga: cliente/instalación, versión anterior, versión nueva, build, motor, base de datos, fecha, duración, pre-check, inventario de componentes esperados vs ejecutados vs OK vs error, post-check, pruebas funcionales y EXIT CODE.
+
+---
+
+## 56. PROHIBIDO INFORMAR ÉXITO PARCIAL COMO ÉXITO TOTAL
+
+Si de 97 scripts esperados se ejecutan 95 y 2 no se ejecutan, el resultado NO ES EXITOSO. Debe mostrar: `ACTUALIZACIÓN INCOMPLETA – REVISIÓN REQUERIDA`, aunque la aplicación continúe funcionando parcialmente.
+
+---
+
+## 57. VALIDACIÓN DESARROLLO → RELEASE → PRODUCCIÓN
+
+Ningún cambio debe llegar a producción únicamente porque "funciona en desarrollo". Debe existir una cadena de validación:
+$$\text{DESARROLLO} \rightarrow \text{PRUEBAS AUTOMÁTICAS} \rightarrow \text{RELEASE CANDIDATE} \rightarrow \text{VALIDACIÓN PG/SQL} \rightarrow \text{INSTALADOR} \rightarrow \text{ACTUALIZADOR} \rightarrow \text{RELEASE} \rightarrow \text{PRODUCCIÓN} \rightarrow \text{POST-UPDATE VALIDATION}$$
+
+---
+
+## 58. PRINCIPIO "LO QUE FUNCIONÓ EN DESARROLLO DEBE EXISTIR EN PRODUCCIÓN"
+
+Para cada release debe existir un inventario de componentes (código, archivos, SPs, funciones, tablas, columnas, índices, vistas, triggers, parámetros, integraciones). Producción debe compararse contra ese inventario. No se debe asumir que porque el instalador terminó correctamente todos los componentes fueron instalados.
+
+---
+
+## 59. DETECCIÓN DE "FUNCIONA EN DESARROLLO PERO NO EN PRODUCCIÓN"
+
+Antes de liberar una versión deben buscarse explícitamente diferencias entre desarrollo y el paquete de producción:
+- Archivos o SPs presentes en desarrollo pero ausentes en scripts o release.
+- Tablas/columnas presentes en desarrollo pero no incluidas en migraciones.
+- Funciones, configuraciones o variables requeridas no documentadas.
+- Diferencias de versión, motor o estructura.
+
+---
+
+## 60. VALIDACIÓN DE CONTENIDO DEL INSTALADOR
+
+Antes de entregar el instalador:
+$$\text{CONTENIDO DEL DESARROLLO} \longrightarrow \text{BUILD} \longrightarrow \text{INSTALADOR} \longrightarrow \text{EXTRAER / INSPECCIONAR} \longrightarrow \text{COMPARAR} \longrightarrow \text{VALIDAR}$$
+
+El sistema debe comprobar que los componentes obligatorios realmente estén incluidos dentro del instalador.
+
+---
+
+## 61. VALIDACIÓN EN UNA BASE LIMPIA
+
+Cada release debe probarse en una base de datos limpia o controlada demostrando que el instalador/migrador puede construir la estructura requerida sin depender accidentalmente de objetos existentes en la base del desarrollador.
+
+---
+
+## 62. VALIDACIÓN DE ACTUALIZACIÓN DESDE VERSIONES ANTERIORES
+
+No basta con probar una instalación nueva. Debe probarse obligatoriamente la ruta:
+$$\text{VERSIÓN ANTERIOR} \longrightarrow \text{ACTUALIZADOR} \longrightarrow \text{NUEVA VERSIÓN} \longrightarrow \text{VALIDACIÓN}$$
+
+---
+
+## 63. VALIDACIÓN DE DATOS EXISTENTES
+
+Una actualización NO debe asumir que la base está vacía. Debe probarse con datos existentes, maestros, movimientos, configuraciones y parámetros, verificando que no destruya ni altere información existente.
+
+---
+
+## 64. VALIDACIÓN ESPECÍFICA POST-PRODUCCIÓN (SMOKE TEST)
+
+Después de una actualización en producción debe ejecutarse automáticamente un SMOKE TEST que valide:
+- [ ] Aplicación inicia
+- [ ] Login funciona
+- [ ] Conexión a BD funciona
+- [ ] Motor correcto
+- [ ] Versión y Build correctos
+- [ ] SPs, tablas y funciones críticas existen
+- [ ] Endpoint principal responde
+- [ ] Integraciones críticas responden
+- [ ] Trazabilidad funciona
+
+---
+
+## 65. SI EL POST-CHECK FALLA
+
+Si una validación posterior a la actualización falla:
+- NO mostrar éxito.
+- Mostrar `ACTUALIZACIÓN INSTALADA PERO NO VALIDADA` o `ACTUALIZACIÓN FALLIDA`.
+- Si existe rollback seguro: ejecutar rollback.
+- Si no existe rollback seguro: detener el proceso y generar diagnóstico.
+
+---
+
+## 66. COMPARACIÓN DESARROLLO VS RELEASE
+
+Antes de generar el instalador debe ejecutarse una validación de completitud:
+$$\text{DESARROLLO} \longrightarrow \text{MANIFEST DE RELEASE} \longrightarrow \text{BUILD} \longrightarrow \text{MANIFEST DEL INSTALADOR} \longrightarrow \text{COMPARACIÓN}$$
+Si falta un solo componente obligatorio: **RELEASE BLOQUEADO**.
+
+---
+
+## 67. MANIFEST DE RELEASE
+
+Cada release debe generar un manifest que certifique componentes esperados vs presentes en Backend, Frontend, PostgreSQL, SQL Server, Instalador, Actualizador y Pruebas obligatorias. El manifest forma parte del paquete ejecutable y la evidencia del release.
+
+---
+
+## 68. REGLA PARA STORED PROCEDURES
+
+Cada SP incluido en una versión debe responder: ¿Está en el release? ¿Fue ejecutado? ¿Compiló? ¿Existe después de la actualización? ¿Corresponde a la versión? ¿Sus dependencias existen? ¿Fue probado?
+
+---
+
+## 69. REGLA PARA MIGRACIONES
+
+Cada migración debe registrar: ID, versión origen, versión destino, motor, script, resultado, duración, error, rollback y validación posterior. Una migración parcialmente ejecutada NO puede marcarse como exitosa.
+
+---
+
+## 70. REGLA DE NO SILENCIO
+
+Korex prefiere **FALLAR CLARAMENTE** antes que continuar silenciosamente. Un error visible permite corregir; un error oculto llega a producción.
+
+---
+
+## 71. REGLA DE DIFERENCIA ENTRE DESARROLLO Y PRODUCCIÓN
+
+Debe asumirse que **DESARROLLO ≠ PRODUCCIÓN** hasta demostrar lo contrario. Cada release debe validar explícitamente versiones, estructura, permisos, dependencias, archivos, servicios, variables e integraciones.
+
+---
+
+## 72. PRINCIPIO FINAL Y CRITERIO ABSOLUTO
+
+1. **NINGÚN ACTUALIZADOR PUEDE DECIR "ÉXITO" SI NO PUEDE DEMOSTRAR QUÉ EJECUTÓ Y QUE EL RESULTADO FINAL ES CORRECTO.**
+2. **NINGÚN COMPONENTE PUEDE QUEDAR SIN ESTADO.**
+3. **NINGÚN ERROR PUEDE SER OCULTADO.**
+4. **NINGÚN OBJETO ESPERADO PUEDE QUEDAR SIN VALIDAR.**
+5. **NINGÚN CAMBIO QUE FUNCIONE EN DESARROLLO DEBE LLEGAR A PRODUCCIÓN SIN HABER SIDO VERIFICADO EN EL RELEASE.**
+6. **SI EXISTE UNA DIFERENCIA ENTRE LO ESPERADO Y LO INSTALADO: LA ACTUALIZACIÓN DEBE QUEDAR COMO FALLIDA O INCOMPLETA (NUNCA EXITOSA).**
 
 ============================================================
-FIN DEL DOCUMENTO KOREX-VERSIONAMIENTO-001
+FIN DEL DOCUMENTO KOREX-VERSIONAMIENTO-001 (72 REGLAS MAESTRAS)
 ============================================================
+

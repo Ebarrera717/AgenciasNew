@@ -8,8 +8,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         const { id: paramId } = await context.params
-        const id = parseInt(paramId)
-        if (isNaN(id)) return NextResponse.json({ message: 'ID inválido' }, { status: 400 })
+        const cleanParam = (paramId || '').trim()
+        if (!cleanParam) return NextResponse.json({ message: 'ID de factura no provisto' }, { status: 400 })
+
+        const numericId = parseInt(cleanParam)
+        const validNumericId = !isNaN(numericId) ? numericId : null
 
         if (isSQLServerMode()) {
             const { getSQLServerConnection } = await import('@/lib/sqlserver');
@@ -17,7 +20,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             try {
                 pool = await getSQLServerConnection();
                 const req = pool.request();
-                req.input('p_id', mssql.Int, id);
+                req.input('p_id', mssql.Int, validNumericId);
+                req.input('p_search', mssql.NVarChar(250), cleanParam);
                 const result = await req.execute('dbo.spInvoicesObtener');
                 await pool.close();
 
@@ -35,32 +39,36 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
                 const itinsRaw: any[] = sets[6] || [];
                 const combosRaw: any[] = sets[7] || [];
 
-                const products = productsRaw.map((p: any) => ({
-                    ...p,
-                    ticketCode: p.ticketCode || null,
-                    appliedTaxes: taxesRaw.filter((t: any) => t.invoiceProductId === p.id).map((t: any) => ({
-                        ...t,
-                        id: t.chargeAndTaxId || t.id,
-                        chargeAndTaxId: t.chargeAndTaxId || t.id,
-                        name: t.taxName || t.name,
-                        code: t.taxCode || t.code,
-                        explicitAmount: t.explicitAmount != null ? t.explicitAmount : (t.amount ?? 0),
-                        amount: t.explicitAmount != null ? t.explicitAmount : (t.amount ?? 0)
-                    })),
-                    passengers: paxesRaw.filter((px: any) => px.invoiceProductId === p.id),
-                    variables: varsRaw.filter((v: any) => v.invoiceProductId === p.id).map((v: any) => ({
-                        ...v,
-                        masterVariableId: v.masterVariableId,
-                        code: v.variableCode || v.code,
-                        name: v.variableName || v.name,
-                        value: v.value
-                    })),
-                    payments: pymtsRaw.filter((pm: any) => pm.invoiceProductId === p.id),
-                    itinerariesItineraryList: itinsRaw.filter((it: any) => it.invoiceProductId === p.id),
-                    product: { id: p.productId, description: p.productDescription || p.productName, name: p.productName, code: p.productCode },
-                    provider: { id: p.providerId, name: p.providerName, code: p.providerCode },
-                    prestadora: { id: p.prestadoraId, name: p.prestadoraName, code: p.prestadoraCode }
-                }));
+                const products = productsRaw.map((p: any) => {
+                    const pIdStr = String(p.id);
+                    return {
+                        ...p,
+                        ticketCode: p.ticketCode || null,
+                        itemDescription: p.itemDescription || p.descripcion || p.productDescription || p.servicios || '',
+                        appliedTaxes: taxesRaw.filter((t: any) => String(t.invoiceProductId) === pIdStr).map((t: any) => ({
+                            ...t,
+                            id: t.chargeAndTaxId || t.id,
+                            chargeAndTaxId: t.chargeAndTaxId || t.id,
+                            name: t.taxName || t.name,
+                            code: t.taxCode || t.code,
+                            explicitAmount: t.explicitAmount != null ? t.explicitAmount : (t.amount ?? 0),
+                            amount: t.explicitAmount != null ? t.explicitAmount : (t.amount ?? 0)
+                        })),
+                        passengers: paxesRaw.filter((px: any) => String(px.invoiceProductId) === pIdStr),
+                        variables: varsRaw.filter((v: any) => String(v.invoiceProductId) === pIdStr).map((v: any) => ({
+                            ...v,
+                            masterVariableId: v.masterVariableId,
+                            code: v.variableCode || v.code,
+                            name: v.variableName || v.name,
+                            value: v.value
+                        })),
+                        payments: pymtsRaw.filter((pm: any) => String(pm.invoiceProductId) === pIdStr),
+                        itinerariesItineraryList: itinsRaw.filter((it: any) => String(it.invoiceProductId) === pIdStr),
+                        product: { id: p.productId, description: p.productDescription || p.productName || p.descripcion || p.servicios, name: p.productName || p.productDescription || p.descripcion, code: p.productCode },
+                        provider: { id: p.providerId, name: p.providerName, code: p.providerCode },
+                        prestadora: { id: p.prestadoraId, name: p.prestadoraName, code: p.prestadoraCode }
+                    };
+                });
 
                 const invoice = {
                     ...invoiceRow,
@@ -80,15 +88,31 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             }
         }
 
-        const invoice = await prisma.invoices.findUnique({
-            where: { id }
-        }) as any;
+        let invoice: any = null;
+        if (validNumericId !== null) {
+            invoice = await prisma.invoices.findUnique({
+                where: { id: validNumericId }
+            });
+        }
+
+        if (!invoice) {
+            invoice = await prisma.invoices.findFirst({
+                where: {
+                    OR: [
+                        { internalNumber: cleanParam },
+                        { zeusInvoiceNumber: cleanParam },
+                        { consecutivo: cleanParam }
+                    ]
+                }
+            });
+        }
 
         if (!invoice) {
             return NextResponse.json({ message: 'Factura no encontrada' }, { status: 404 })
         }
 
-        const productsRaw = await prisma.invoicesProduct.findMany({ where: { invoiceId: id } });
+        const targetId = invoice.id;
+        const productsRaw = await prisma.invoicesProduct.findMany({ where: { invoiceId: targetId } });
         
         const products = [];
         for (const p of productsRaw) {
@@ -106,6 +130,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             products.push({
                 ...p,
                 ticketCode: (p as any).ticketCode || null,
+                itemDescription: (p as any).itemDescription || (p as any).descripcion || (p as any).productDescription || '',
                 appliedTaxes,
                 passengers,
                 variables,
@@ -116,7 +141,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
         }
         invoice.products = products;
 
-        const combosRaw = await prisma.invoicesProductCombo.findMany({ where: { invoiceId: id } });
+        const combosRaw = await prisma.invoicesProductCombo.findMany({ where: { invoiceId: targetId } });
         const combos = [];
         for (const c of combosRaw) {
              let comboDetails = null;

@@ -1,10 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
     try {
+        if (isSQLServerMode()) {
+            const pool = await getSQLServerConnection();
+            const result = await pool.request().execute('dbo.spInvoicesListar');
+            await pool.close();
+
+            const rows = result.recordset || [];
+            const formattedHistory = rows.map(r => ({
+                id: r.id,
+                internalNumber: r.internalNumber,
+                invoiceNumber: (r.serie ? `${r.serie}-${r.consecutivo}` : r.consecutivo) || r.internalNumber || `#${r.id}`,
+                fuente: r.fuente,
+                serie: r.serie,
+                consecutivo: r.consecutivo,
+                date: r.date,
+                dueDate: r.dueDate,
+                clientName: r.clientName || 'Consumidor Final',
+                document: r.clientDocument || '',
+                amount: Number(r.totalAmount) || 0,
+                totalAmount: Number(r.totalAmount) || 0,
+                currency: r.currency || 'COP',
+                state: r.state || 'NUEVO',
+                userName: r.sellerName || 'Sistema',
+                sellerName: r.sellerName || '',
+                branchName: r.branchName || '',
+                itemsCount: 0
+            }));
+
+            return NextResponse.json(formattedHistory);
+        }
+
         const invoices = await prisma.invoices.findMany({
             orderBy: { date: 'desc' },
             take: 100

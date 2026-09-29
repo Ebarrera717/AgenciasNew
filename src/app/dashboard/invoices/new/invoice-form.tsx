@@ -998,7 +998,7 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                 const mainTaxId = p.mainTaxId;
 
                                 // Inferir el precio desde el monto del cargo principal guardado
-                                const mainTaxEntry = safeAppliedTaxes.find((t: any) => t.chargeAndTaxId === mainTaxId);
+                                const mainTaxEntry = safeAppliedTaxes.find((t: any) => String(t.chargeAndTaxId || t.id) === String(mainTaxId));
                                 let inferredPrice = p.price;
                                 if (mainTaxEntry && mainTaxEntry.explicitAmount != null) {
                                     inferredPrice = mainTaxEntry.explicitAmount / (p.quantity || 1);
@@ -1027,7 +1027,7 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                     ticketPrinterCommission: p.ticketPrinterCommission || 0,
                                     mainTaxId,
                                     inNationality: p.inNationality || 1,
-                                    itemDescription: p.itemDescription || '',
+                                    itemDescription: p.itemDescription || p.descripcion || p.productDescription || '',
                                     servicios: p.servicios || '',
                                     itinerary: p.itinerary || '',
                                     class: p.class || '',
@@ -1035,12 +1035,12 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                     itinerariesItineraryList: Array.isArray(p.itinerariesItineraryList) ? p.itinerariesItineraryList : [],
                                     payments: Array.isArray(p.payments) ? p.payments : [],
                                     // Info extra para renderizado si el maestro no carga a tiempo
-                                    _productName: p.product?.description,
-                                    _providerName: p.provider?.name,
-                                    _prestadoraName: p.prestadora?.name,
+                                    _productName: p.product?.description || p.product?.name || p.productDescription || p.productName || p.descripcion || p.servicios || '',
+                                    _providerName: p.provider?.name || p.providerName || '',
+                                    _prestadoraName: p.prestadora?.name || p.prestadoraName || '',
                                     appliedTaxes: safeAppliedTaxes.map((t: any) => ({
-                                        chargeAndTaxId: t.chargeAndTaxId,
-                                        amount: t.explicitAmount ?? 0
+                                        chargeAndTaxId: t.chargeAndTaxId || t.id,
+                                        amount: t.explicitAmount ?? t.amount ?? 0
                                     })),
                                     variables: safeVariables.map((v: any) => ({
                                         id: v.id,

@@ -148,3 +148,32 @@ node scripts/validate_full_suite.js
 ```
 Validando que las 11 capas (PostgreSQL local, Json Schema, T-SQL Scripts y Suites de Despliegue SQL Server) respondan con **`✅ OK`**.
 
+---
+
+## 6. Regla Crítica – Ejecución Completa, Manifest y Verificación Post-Actualización (Reglas 45-72)
+
+1. **Principio Absoluto del Actualizador**:
+   > *"Todo lo que deba ejecutarse debe ejecutarse y todo lo que no se ejecute debe ser reportado."*
+   El actualizador NUNCA puede terminar mostrando *"Actualización exitosa"* o devolver `EXIT CODE 0` si un script, SP, función, migración, tabla, columna, índice, vista o prueba no fue ejecutado o falló.
+
+2. **Manejo de Errores y No Silencio**:
+   Queda estrictamente prohibido ocultar errores, ignorar excepciones, continuar silenciosamente o clasificar como warning errores que impidan completar la actualización.
+
+3. **Verificación Post-Ejecución (`EJECUTADO + VALIDADO = OK`)**:
+   No se acepta considerar un script como completado únicamente por haber sido invocado (`EJECUTADO = OK`). Debe verificarse explícitamente en la base de datos la presencia, compilación y validez del objeto (`EJECUTADO + VALIDADO = OK`).
+
+4. **Clasificación de Estados por Componente**:
+   Cada objeto del plan de actualización debe terminar con un estado explícito: `OK`, `ERROR`, `OMITIDO`, `NO EJECUTADO`, `NO APLICA`.
+
+5. **Códigos de Salida Reales (`EXIT CODE`)**:
+   - `EXIT CODE 0`: Actualización 100% exitosa y validada.
+   - `EXIT CODE 1`: Actualización incompleta o con errores.
+   - `EXIT CODE 2`: Validación final / post-check fallido.
+   - `EXIT CODE 3`: Problema de configuración.
+   - `EXIT CODE 4`: Problema de conexión.
+   - `EXIT CODE 5`: Rollback ejecutado.
+
+6. **Cadena de Validación Desarrollo → Release → Producción**:
+   Exige manifest de release, comprobación en base limpia, prueba desde versión previa, validación con datos reales y Smoke Test post-actualización. Se prohíbe asumir que *"funciona en desarrollo = funciona en producción"*.
+
+

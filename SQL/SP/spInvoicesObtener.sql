@@ -1,5 +1,5 @@
 -- ============================================================================
--- spInvoicesObtener - Consulta Completa de Factura por ID (SQL Server / T-SQL)
+-- spInvoicesObtener - Consulta Completa de Factura por ID o Referencia (SQL Server / T-SQL)
 -- ============================================================================
 
 IF OBJECT_ID('dbo.spInvoicesObtener', 'P') IS NOT NULL
@@ -7,10 +7,51 @@ IF OBJECT_ID('dbo.spInvoicesObtener', 'P') IS NOT NULL
 GO
 
 CREATE PROCEDURE dbo.spInvoicesObtener
-    @p_id INT
+    @p_id INT = NULL,
+    @p_search NVARCHAR(250) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    DECLARE @targetId INT = @p_id;
+
+    -- Si @p_id es provisto pero no coincide con la clave primaria id, intentar buscar por referencia
+    IF @targetId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Invoices] WHERE [id] = @targetId)
+    BEGIN
+        DECLARE @p_id_str NVARCHAR(100) = CAST(@p_id AS NVARCHAR(100));
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Invoices]
+        WHERE [internalNumber] = @p_id_str
+           OR [zeusInvoiceNumber] = @p_id_str
+           OR [consecutivo] = @p_id_str
+           OR ([serie] IS NOT NULL AND [consecutivo] IS NOT NULL AND ([serie] + '-' + [consecutivo] = @p_id_str OR [serie] + [consecutivo] = @p_id_str));
+    END
+
+    -- Si aún no tenemos un targetId válido y se pasó @p_search, resolver por la cadena de búsqueda
+    IF @targetId IS NULL AND @p_search IS NOT NULL AND TRIM(@p_search) <> ''
+    BEGIN
+        DECLARE @cleanSearch NVARCHAR(250) = TRIM(@p_search);
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Invoices]
+        WHERE [internalNumber] = @cleanSearch
+           OR [zeusInvoiceNumber] = @cleanSearch
+           OR [consecutivo] = @cleanSearch
+           OR ([serie] IS NOT NULL AND [consecutivo] IS NOT NULL AND ([serie] + '-' + [consecutivo] = @cleanSearch OR [serie] + [consecutivo] = @cleanSearch));
+
+        -- Fallback si el parámetro de búsqueda era puramente entero
+        IF @targetId IS NULL AND ISNUMERIC(@cleanSearch) = 1
+        BEGIN
+            SELECT TOP 1 @targetId = [id]
+            FROM dbo.[Invoices]
+            WHERE [id] = CAST(@cleanSearch AS INT);
+        END
+    END
+
+    -- Fallback de resguardo
+    IF @targetId IS NULL
+    BEGIN
+        SET @targetId = ISNULL(@p_id, 0);
+    END
 
     -- Recordset 0: Cabecera Invoices
     SELECT 
@@ -50,7 +91,7 @@ BEGIN
     LEFT JOIN dbo.[Seller] s ON i.[sellerId] = s.[id]
     LEFT JOIN dbo.[TicketPrinter] tp ON i.[ticketPrinterId] = tp.[id]
     LEFT JOIN dbo.[User] u ON i.[userId] = u.[id]
-    WHERE i.[id] = @p_id;
+    WHERE i.[id] = @targetId;
 
     -- Recordset 1: InvoicesProduct
     SELECT 
@@ -95,7 +136,7 @@ BEGIN
     LEFT JOIN dbo.[Product] p ON ip.[productId] = p.[id]
     LEFT JOIN dbo.[Provider] prov ON ip.[providerId] = prov.[id]
     LEFT JOIN dbo.[Prestadora] prest ON ip.[prestadoraId] = prest.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ip.[id] ASC;
 
     -- Recordset 2: InvoicesProductTax
@@ -113,7 +154,7 @@ BEGIN
     FROM dbo.[InvoicesProductTax] ipt
     JOIN dbo.[InvoicesProduct] ip ON ipt.[invoiceProductId] = ip.[id]
     LEFT JOIN dbo.[ChargeAndTax] ct ON ipt.[chargeAndTaxId] = ct.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipt.[id] ASC;
 
     -- Recordset 3: InvoicesProductPasenger
@@ -124,7 +165,7 @@ BEGIN
         ipp.[document]
     FROM dbo.[InvoicesProductPasenger] ipp
     JOIN dbo.[InvoicesProduct] ip ON ipp.[invoiceProductId] = ip.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipp.[id] ASC;
 
     -- Recordset 4: InvoicesProductVariable
@@ -138,7 +179,7 @@ BEGIN
     FROM dbo.[InvoicesProductVariable] ipv
     JOIN dbo.[InvoicesProduct] ip ON ipv.[invoiceProductId] = ip.[id]
     LEFT JOIN dbo.[MasterVariable] mv ON ipv.[masterVariableId] = mv.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipv.[id] ASC;
 
     -- Recordset 5: InvoicesProductPayment
@@ -156,7 +197,7 @@ BEGIN
         ippay.[expirationDate]
     FROM dbo.[InvoicesProductPayment] ippay
     JOIN dbo.[InvoicesProduct] ip ON ippay.[invoiceProductId] = ip.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ippay.[id] ASC;
 
     -- Recordset 6: InvoicesProductItinerary
@@ -178,7 +219,7 @@ BEGIN
         ipi.[co2]
     FROM dbo.[InvoicesProductItinerary] ipi
     JOIN dbo.[InvoicesProduct] ip ON ipi.[invoiceProductId] = ip.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipi.[orden] ASC, ipi.[id] ASC;
 
     -- Recordset 7: InvoicesProductCombo
@@ -189,7 +230,7 @@ BEGIN
         cmb.[name] AS [comboName]
     FROM dbo.[InvoicesProductCombo] ipc
     LEFT JOIN dbo.[Combo] cmb ON ipc.[comboId] = cmb.[id]
-    WHERE ipc.[invoiceId] = @p_id
+    WHERE ipc.[invoiceId] = @targetId
     ORDER BY ipc.[id] ASC;
 END;
 GO
