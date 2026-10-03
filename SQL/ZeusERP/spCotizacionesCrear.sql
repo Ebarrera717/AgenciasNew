@@ -1,3 +1,18 @@
+-- Safeguards de Columnas para Tablas de Zeus ERP referenciadas en spCotizacionesCrear
+IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'bl_contabilizarCxPProvee') ALTER TABLE dbo.ImpRet ADD bl_contabilizarCxPProvee BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'bl_contabilizar_proveedor') ALTER TABLE dbo.ImpRet ADD bl_contabilizar_proveedor BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'cd_cuenta') ALTER TABLE dbo.ImpRet ADD cd_cuenta VARCHAR(20) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.CotizacionServicios_PaxAdicional', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'in_edad') ALTER TABLE dbo.CotizacionServicios_PaxAdicional ADD in_edad INT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'cd_tiquete') ALTER TABLE dbo.CotizacionServicios_PaxAdicional ADD cd_tiquete VARCHAR(50) NULL;
+END;
+GO
+
 -- Eliminar si existe
 IF OBJECT_ID('dbo.spCotizacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spCotizacionesCrear;
@@ -539,7 +554,12 @@ BEGIN
         SELECT 
 			id_sucursal = ISNULL(TRY_CAST(C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)') AS INT), 1),
 			id_implante = TRY_CAST(C.Cotizacion.value('cd_implante[1]','VARCHAR(25)') AS INT),
-			cd_consecutivo = C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)'),
+			cd_consecutivo = CASE 
+				WHEN ISNUMERIC(RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')))) = 1 
+				     AND LEN(RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')))) < 8
+				THEN RIGHT('00000000' + RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)'))), 8)
+				ELSE SUBSTRING(RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)'))), 1, 8)
+			END,
 			id_usuario = ISNULL(TRY_CAST(C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)') AS INT), 1),
 			dt_fechacont = ISNULL(C.Cotizacion.value('dt_fechacont[1]','SMALLDATETIME'),'19000101'),
 			dt_fecha = ISNULL(C.Cotizacion.value('dt_fecha[1]','SMALLDATETIME'),'19000101'),
@@ -602,6 +622,43 @@ BEGIN
 			bl_existe = 0
         FROM @xmlData.nodes('Cotizaciones/Cotizacion') AS C(Cotizacion)		 
 		
+		-- Resolver IDCLIENTE (Código Cliente) e IDTERCERO (NIT/Tercero) desde dbo.CLIENTES para @Cotizacion
+		IF OBJECT_ID('dbo.CLIENTES', 'U') IS NOT NULL
+		BEGIN
+			UPDATE C
+			SET 
+				C.cd_cliente_codigo = COALESCE(NULLIF(RTRIM(LTRIM(CL.IDCLIENTE)), ''), C.cd_cliente_codigo),
+				C.cd_tercero_codigo = COALESCE(NULLIF(RTRIM(LTRIM(CL.IDTERCERO)), ''), C.cd_cliente_codigo)
+			FROM @Cotizacion C
+			JOIN dbo.CLIENTES CL WITH (NOLOCK) ON RTRIM(CL.IDCLIENTE) = RTRIM(C.cd_cliente_codigo) OR RTRIM(CL.IDTERCERO) = RTRIM(C.cd_cliente_codigo)
+		END;
+ 
+		-- Verificar si la cotización ya existe en Zeus ERP (por consecutivo exacto, numérico o con ceros a la izquierda)
+		IF OBJECT_ID('dbo.Cotizacion', 'U') IS NOT NULL
+		BEGIN
+			UPDATE C
+			SET 
+				C.bl_existe = 1,
+				C.id_Cotizacion = EX.id
+			FROM @Cotizacion C
+			JOIN dbo.Cotizacion EX WITH (NOLOCK) ON 
+				RTRIM(LTRIM(EX.cd_consecutivo)) = RTRIM(LTRIM(C.cd_consecutivo))
+				OR (
+					ISNUMERIC(RTRIM(LTRIM(EX.cd_consecutivo))) = 1 
+					AND ISNUMERIC(RTRIM(LTRIM(C.cd_consecutivo))) = 1 
+					AND CAST(RTRIM(LTRIM(EX.cd_consecutivo)) AS BIGINT) = CAST(RTRIM(LTRIM(C.cd_consecutivo)) AS BIGINT)
+				)
+				OR RIGHT('00000000' + RTRIM(LTRIM(EX.cd_consecutivo)), 8) = RTRIM(LTRIM(C.cd_consecutivo));
+
+			-- Normalizar consecutivo en dbo.Cotizacion si tenía formato corto sin ceros
+			UPDATE EX
+			SET EX.cd_consecutivo = C.cd_consecutivo
+			FROM dbo.Cotizacion EX
+			JOIN @Cotizacion C ON 
+				EX.id = C.id_Cotizacion 
+				AND RTRIM(LTRIM(EX.cd_consecutivo)) <> RTRIM(LTRIM(C.cd_consecutivo));
+		END;
+
 		INSERT INTO @CotizacionServicios(
 			id_TiposConceptFac ,
 			id_ConceptoFacturacion ,
@@ -847,6 +904,16 @@ BEGIN
 		 LEFT JOIN dbo.TiposServicios TS ON TS.cd_codigo=C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(25)')
 		 LEFT JOIN dbo.Hoteles H ON H.cd_codigo=C.CotizacionServicios.value('cd_hoteles[1]','VARCHAR(25)')
         
+		-- Resolver IDTERCERO (NIT/Tercero) para Proveedores en @CotizacionServicios
+		IF OBJECT_ID('dbo.PROVEEDORES', 'U') IS NOT NULL
+		BEGIN
+			UPDATE CS
+			SET CS.cd_proveedores = COALESCE(NULLIF(RTRIM(LTRIM(P.IDTERCERO)), ''), CS.cd_proveedores)
+			FROM @CotizacionServicios CS
+			JOIN dbo.PROVEEDORES P WITH (NOLOCK) ON RTRIM(P.IDPROVE) = RTRIM(CS.cd_proveedores) OR RTRIM(P.IDTERCERO) = RTRIM(CS.cd_proveedores)
+			WHERE P.IDTERCERO IS NOT NULL AND LTRIM(RTRIM(P.IDTERCERO)) <> '';
+		END;
+
 		INSERT INTO @CotizacionServicios_PaxAdicional(
 			id_Cotizacion,
 			id_CotizacionServicios,
@@ -1724,7 +1791,7 @@ BEGIN
 
 		DECLARE @estado VARCHAR(8000)
 		SET @estado=''
-		SELECT @estado=@estado+ISNULL(cd_consecutivo,'0') + ':' + CASE WHEN id_Cotizacion IS NOT NULL THEN 'Enviado' ELSE 'Nuevo' END + '|'
+		SELECT @estado=@estado+ISNULL(cd_consecutivo,'0') + ':' + CASE WHEN id_Cotizacion IS NOT NULL THEN 'ENVIADO' ELSE 'NUEVO' END + '|'
 		FROM @Cotizacion;
         -- Retorno mejorado: Lista resumida de lo procesado
         SELECT 

@@ -5,7 +5,17 @@ echo   GENERANDO ENSAMBLADO Y PROGRAMA DE ACTUALIZACION (LITE)
 echo ========================================================
 echo.
 
-echo Paso 0: Generando descriptor de esquema y auditando la suite completa (PG + SQL)...
+echo Paso 0: Verificando conectividad y credenciales con PostgreSQL...
+node "%~dp0scripts\test_postgres_connection.js"
+if %errorlevel% neq 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO DE CONEXION: No fue posible conectar con el servidor PostgreSQL.
+    echo La compilacion del actualizador PostgreSQL fue CANCELADA.
+    echo ===============================================================================
+    pause
+    exit /b %errorlevel%
+)
 node "%~dp0deploy\gen_schema_json.js"
 if %errorlevel% neq 0 (
     echo Error generando el descriptor del esquema de la base de datos.
@@ -18,6 +28,18 @@ if %errorlevel% neq 0 (
     pause
     exit /b %errorlevel%
 )
+echo.
+echo Ejecutando Release Guardian de Integridad Universal...
+node "%~dp0scripts\korex_database_release_guardian.js"
+if %errorlevel% neq 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO: Release Guardian emitio dictamen [BLOQUEADO]. Actualizador CANCELADO.
+    echo ===============================================================================
+    pause
+    exit /b %errorlevel%
+)
+
 echo.
 echo Ejecutando KorexValidator Oficial (Pre-Build Actualizador)...
 node "%~dp0scripts\korex_validator.js" --engine=postgres --phase=pre-build

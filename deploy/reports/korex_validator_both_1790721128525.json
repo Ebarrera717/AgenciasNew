@@ -1,0 +1,83 @@
+{
+  "version": "2.0.0",
+  "timestamp": "2026-09-29T22:32:08.462Z",
+  "phase": "pre-build",
+  "targetEngine": "both",
+  "items": [
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.zeusInvoiceNumber",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.dueDate",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.fuente",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.serie",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Invoices.consecutivo",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "InvoicesProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "InvoicesProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "Quotation.isExcelImport",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "QuotationProduct.providerInvoice",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Prisma ORM",
+      "component": "QuotationProduct.providerDueDate",
+      "status": "✅ OK",
+      "detail": "Mapeado en schema.prisma"
+    },
+    {
+      "category": "Seguridad .env",
+      "component": "RELEASE_KOREX/.env",
+      "status": "✅ OK",
+      "detail": "Empaquetado limpio sin archivos .env"
+    }
+  ],
+  "errors": [],
+  "warnings": [],
+  "status": "GO"
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { executePostgresQuery } from '@/lib/postgres'
-import { executeSQLServerProcedure, getZeusERPDatabaseName } from '@/lib/sqlserver'
+import { executeSQLServerProcedure, getZeusERPDatabaseName, isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
 import { registerLog } from '@/lib/logger'
 
 export async function POST(req: NextRequest) {
@@ -11,13 +11,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'No quotation IDs provided' }, { status: 400 })
         }
 
-        const idsStr = Array.isArray(ids) ? ids.join(',') : ids.toString();
+        const idArray: number[] = (Array.isArray(ids) ? ids : ids.toString().split(','))
+            .map((id: any) => parseInt(String(id).trim(), 10))
+            .filter((n: number) => !isNaN(n));
+
+        const idsStr = idArray.join(',');
         const pgProcedure = exportType === 'INVOICE' ? 'spExportInvoices' : 'spExportQuotation';
         const mssqlProcedure = exportType === 'INVOICE' ? 'spFacturacionesCrear' : 'spCotizacionesCrear';
 
         // 1. Obtener XML (dual motor support)
         let xmlStr = '';
-        const { isSQLServerMode } = await import('@/lib/sqlserver');
         if (isSQLServerMode()) {
             const sqlResult = await executeSQLServerProcedure(pgProcedure, {
                 [exportType === 'INVOICE' ? 'Envoices_id' : 'Quotation_id']: idsStr,
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'Error en generación de XML de cotización' }, { status: 500 })
         }
 
-        // 2. Integración Directa con SQL Server (Nueva versión)
+        // 2. Integración Directa con SQL Server (Zeus ERP)
         let sqlServerMsg = 'Enviado exitosamente a SQL Server';
         let success = true;
         let spResult: any[] = [];
@@ -81,16 +84,41 @@ export async function POST(req: NextRequest) {
                 sqlServerMsg = summaryLines.join(' | ');
             }
 
-            // 4. Actualizar Estado en Postgres (Nueva instrucción de usuario)
-            if (success && spResult.length > 0) {
-                console.log(`[EXPORT_API] Actualizando estados en Postgres para: ${idsStr}`);
-                try {
-                    await executePostgresQuery(
-                        `CALL public."spCotizacionActualizarEstado"($1::JSONB)`,
-                        [JSON.stringify(spResult)]
-                    );
-                } catch (spPgError) {
-                    console.error('[EXPORT_API] Error al actualizar estado en Postgres:', spPgError);
+            // 4. Actualizar Estado en BD Activa (Dual Motor)
+            if (success && (spResult.length > 0 || idArray.length > 0)) {
+                console.log(`[EXPORT_API] Actualizando estados para cotizaciones: ${idsStr}`);
+                
+                const enrichedResult = spResult.map((item: any, idx: number) => ({
+                    ...item,
+                    quotationId: idArray[idx] || (idArray.length === 1 ? idArray[0] : null)
+                }));
+
+                if (isSQLServerMode()) {
+                    const pool = await getSQLServerConnection();
+                    try {
+                        for (const qId of idArray) {
+                            await pool.request().query(
+                                `UPDATE dbo.[Quotation] SET [state] = 'ENVIADO', [stateUpdatedAt] = GETDATE() WHERE id = ${qId}`
+                            );
+                        }
+                    } finally {
+                        await pool.close();
+                    }
+                } else {
+                    try {
+                        await executePostgresQuery(
+                            `CALL public."spCotizacionActualizarEstado"($1::JSONB)`,
+                            [JSON.stringify(enrichedResult.length > 0 ? enrichedResult : spResult)]
+                        );
+                        if (idArray.length > 0) {
+                            await executePostgresQuery(
+                                `UPDATE public."Quotation" SET "state" = 'ENVIADO', "stateUpdatedAt" = CURRENT_TIMESTAMP WHERE id = ANY($1::int[])`,
+                                [idArray]
+                            );
+                        }
+                    } catch (spPgError) {
+                        console.error('[EXPORT_API] Error al actualizar estado en Postgres:', spPgError);
+                    }
                 }
             }
 
@@ -108,7 +136,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ 
             success: success,
             message: success ? 'Exportación completada exitosamente' : sqlServerMsg,
-            spResult: spResult,   // ← resultado del SP (Estado por cotización)
+            spResult: spResult,
             xml: xmlStr
         });
 

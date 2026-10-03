@@ -5,10 +5,19 @@ const { Client } = require('pg');
 
 const rootDir = path.join(__dirname, '..');
 
+const { generatePostgresFunctionsAndSps } = require('./gen_postgres_sps_and_functions');
+
 async function validateAndPrepareSchema(customConnStr) {
   console.log("================================================================");
   console.log("  VALIDADOR PRE-COMPILACION DE BASE DE DATOS - AGENCIASNEW");
   console.log("================================================================");
+
+  // 0. Sincronizar y compilar carpeta dedicada SQL/PostgreSQL/
+  try {
+    generatePostgresFunctionsAndSps();
+  } catch (pgGenErr) {
+    console.warn("  [WARN] No se pudo compilar SQL/PostgreSQL:", pgGenErr.message);
+  }
 
   // 1. Desplegar todos los archivos SQL locales a la BD PostgreSQL local
   console.log("\n[PASO 1/4] Desplegando funciones y SPs a PostgreSQL local...");

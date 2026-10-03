@@ -118,7 +118,7 @@ async function validateAndInjectZeusSps() {
             if (missingSps.length > 0) {
                 console.log(`\n  ⚠️ Se detectaron ${missingSps.length} SP(s) faltantes en [${dbName}]. Inyectando automáticamente...`);
                 const fs = require('fs');
-                const spsSqlPath = path.join(__dirname, '..', 'SQL', 'SqlServer', '03_Functions_And_SPs.sql');
+                const spsSqlPath = path.join(__dirname, '..', 'SQL', 'ZeusERP', 'TODOS_LOS_SPS_ZEUSERP.sql');
                 if (fs.existsSync(spsSqlPath)) {
                     const sqlContent = fs.readFileSync(spsSqlPath, 'utf8');
                     const batches = sqlContent.split(/^GO\s*$/mi).map(b => b.trim()).filter(b => b.length > 0);

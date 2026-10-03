@@ -269,9 +269,27 @@ async function validateFullSuite() {
         });
     }
 
-    console.log('\n================================================================');
-    console.log('         MATRIZ DE RESULTADOS DE LA VALIDACIÓN COMPLETA          ');
-    console.log('================================================================');
+    // -------------------------------------------------------------------------
+    // CAPA 11: CONTROL ABSOLUTO DE RELEASE, MANIFEST, CONEXIÓN Y ACTUALIZACIÓN
+    // -------------------------------------------------------------------------
+    console.log('\n[CAPA 11/11] Validando Control Absoluto de Release, Manifest, Conexión y Actualización SQL Server...');
+    try {
+        const { execSync } = require('child_process');
+        execSync(`node "${path.join(__dirname, 'test_release_manifest.js')}"`, { stdio: 'pipe' });
+        results.push({
+            Capa: '11. Control Absoluto Release',
+            Componente: 'test_release_manifest.js',
+            Estado: '✅ OK',
+            Detalle: 'Coincidencia 100% (Repo = Inventario = Manifest = Paquete, Zero Fallback)'
+        });
+    } catch (absErr) {
+        results.push({
+            Capa: '11. Control Absoluto Release',
+            Componente: 'test_release_manifest.js',
+            Estado: '❌ FALLO',
+            Detalle: absErr.message
+        });
+    }
     console.table(results);
 
     const hasFailure = results.some(r => r.Estado.includes('❌') || r.Estado.includes('FALLO'));

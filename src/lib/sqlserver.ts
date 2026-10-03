@@ -398,7 +398,24 @@ export async function executeSQLServerProcedure(spName: string, params: any, tar
         const allRecordsets = result.recordsets as any[] | undefined;
         if (Array.isArray(allRecordsets) && allRecordsets.length > 1) {
             const foundLogRs = allRecordsets.find(rs => rs && rs.length > 0 && ('invoiceId' in rs[0] || 'quotationId' in rs[0] || 'success' in rs[0]));
-            executionResult = foundLogRs || allRecordsets[allRecordsets.length - 1] || result.recordset;
+            if (foundLogRs) {
+                // Si existe un recordset previo emitido por Zeus ERP (spza_Factura_Crear / spza_Cotizacion_Crear con Respuesta), extraer el mensaje exacto
+                const zeusErrorRs = allRecordsets.find(rs => rs && rs !== foundLogRs && rs.length > 0 && ('Respuesta' in rs[0] || 'respuesta' in rs[0]));
+                if (zeusErrorRs && zeusErrorRs[0]) {
+                    const rawZeusMsg = String(zeusErrorRs[0].Respuesta || zeusErrorRs[0].respuesta || '').trim();
+                    if (rawZeusMsg && rawZeusMsg.length > 0) {
+                        foundLogRs.forEach((item: any) => {
+                            const curMsg = String(item?.message || '');
+                            if (item && (item.success === 0 || item.success === false || !item.success || curMsg.includes('Código de retorno') || curMsg.includes('Error no especificado'))) {
+                                item.message = `❌ Error Zeus ERP: ${rawZeusMsg}`;
+                            }
+                        });
+                    }
+                }
+                executionResult = foundLogRs;
+            } else {
+                executionResult = allRecordsets[allRecordsets.length - 1] || result.recordset;
+            }
         }
         if (!executionResult && result.rowsAffected) {
             executionResult = result.rowsAffected;

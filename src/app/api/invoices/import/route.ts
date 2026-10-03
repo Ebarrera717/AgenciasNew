@@ -347,7 +347,7 @@ export async function POST(req: NextRequest) {
                     }
 
                     // 3. Consecutivo e Internal Number
-                    const consecInfo = await getNextTransactionConsecutive('INVOICE', branchId, implantId);
+                    const consecInfo = await getNextTransactionConsecutive('INVOICE', branchId, implantId, transaction);
                     const consecValRaw = getRowValue(first, 'Consecutivo', 'Consecutive');
                     const consecVal = consecValRaw ? consecValRaw.toString().trim() : consecInfo.consecutivoNumber.toString();
                     const serieValRaw = getRowValue(first, 'Serie', 'Prefix');
@@ -665,7 +665,8 @@ export async function POST(req: NextRequest) {
                                 .query(`UPDATE dbo.[InvoicesProduct] SET mainTaxId = @mainTaxId WHERE id = @id`);
                         }
 
-                        invoiceTotalSum += ((itemPrice * quantity) + itemTaxesSum);
+                        const itemCalculatedTotal = itemTaxesSum > 0 ? itemTaxesSum : (itemPrice * quantity);
+                        invoiceTotalSum += itemCalculatedTotal;
 
                         // Inserción de Pagos
                         const pymtsStr = (it.Pagos || '').toString().trim();
@@ -759,8 +760,41 @@ export async function POST(req: NextRequest) {
 
             await pool.close();
 
+            // Exportación opcional a Zeus ERP si la regla de parámetro automático está explícitamente habilitada
+            let autoExportResult: any = null;
+            let zeusDetailsStr = '';
+            if (createdIds.length > 0) {
+                try {
+                    const { autoExportInvoiceToZeusERP, isAutoExportEnabled } = await import('@/lib/zeus-auto-export');
+                    const enabled = await isAutoExportEnabled('INVOICE');
+                    if (enabled) {
+                        console.log(`[AUTO_EXPORT] Exportando síncronamente a Zeus ERP ${createdIds.length} facturas importadas...`);
+                        autoExportResult = await autoExportInvoiceToZeusERP(createdIds, actingUserId);
+
+                        const poolCheck = await getSQLServerConnection();
+                        const zeusRes = await poolCheck.request().query(
+                            `SELECT id, internalNumber, consecutivo, zeusInvoiceNumber FROM dbo.[Invoices] WHERE id IN (${createdIds.join(',')})`
+                        );
+                        await poolCheck.close();
+
+                        const zeusMapped = zeusRes.recordset.map(r => {
+                            const internal = r.internalNumber || (r.consecutivo ? `FAC-${r.consecutivo}` : `FAC-${r.id}`);
+                            const zeusNum = r.zeusInvoiceNumber || null;
+                            return zeusNum ? `${internal} (Zeus: ${zeusNum})` : internal;
+                        });
+                        if (zeusMapped.length > 0) {
+                            zeusDetailsStr = zeusMapped.join(', ');
+                        }
+                    }
+                } catch (expErr: any) {
+                    console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on SQL Server invoice import:', expErr?.message);
+                }
+            }
+
             const createdConsecutiveStr = createdConsecutives.join(', ');
-            const dbMessage = `SUCCESS: ${createdIds.length} facturas importadas nativamente en SQL Server (Korex_pruebas). [${createdConsecutiveStr}]`;
+            const dbMessage = zeusDetailsStr
+                ? `SUCCESS: ${createdIds.length} facturas importadas y exportadas a Zeus ERP. [${zeusDetailsStr}]`
+                : `SUCCESS: ${createdIds.length} facturas importadas nativamente en SQL Server. [${createdConsecutiveStr}]`;
 
             await recordTraceEvent({
                 code: traceCode,
@@ -775,20 +809,9 @@ export async function POST(req: NextRequest) {
                 endpoint: '/api/invoices/import',
                 durationMs: Date.now() - startTime,
                 status: 'SUCCESS',
-                outputData: { detail: dbMessage, importedCount: grouped.size, createdIds, createdConsecutives },
+                outputData: { detail: dbMessage, importedCount: grouped.size, createdIds, createdConsecutives, autoExportResult },
                 functionalMessage: dbMessage
             });
-
-            // Exportación opcional a Zeus ERP solo si la regla de parámetro automático está explícitamente habilitada (value === '1')
-            let autoExportResult = null;
-            if (createdIds.length > 0) {
-                try {
-                    const { autoExportInvoiceToZeusERP } = await import('@/lib/zeus-auto-export');
-                    autoExportResult = await autoExportInvoiceToZeusERP(createdIds, actingUserId);
-                } catch (expErr: any) {
-                    console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on SQL Server invoice import:', expErr?.message);
-                }
-            }
 
             return NextResponse.json({
                 message: 'Importación finalizada',
@@ -898,13 +921,31 @@ export async function POST(req: NextRequest) {
 
         // Exportación opcional a Zeus ERP solo si la regla de parámetro automático está explícitamente habilitada (value === '1')
         let autoExportResult = null;
+        let zeusDetailsStrPg = '';
         if (createdIds.length > 0) {
             try {
                 const { autoExportInvoiceToZeusERP } = await import('@/lib/zeus-auto-export');
                 autoExportResult = await autoExportInvoiceToZeusERP(createdIds, actingUserId);
+
+                const fetchedZeus: any[] = await executePostgresQuery(
+                    `SELECT id, "internalNumber", consecutivo, "zeusInvoiceNumber" FROM public."Invoices" WHERE id = ANY($1::int[])`,
+                    [createdIds]
+                );
+                const zeusMappedPg = fetchedZeus.map(r => {
+                    const internal = r.internalNumber || (r.consecutivo ? `FAC-${r.consecutivo}` : `FAC-${r.id}`);
+                    const zeusNum = r.zeusInvoiceNumber || null;
+                    return zeusNum ? `${internal} (Zeus: ${zeusNum})` : internal;
+                });
+                if (zeusMappedPg.length > 0) {
+                    zeusDetailsStrPg = zeusMappedPg.join(', ');
+                }
             } catch (expErr: any) {
                 console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on Postgres invoice import:', expErr?.message);
             }
+        }
+
+        if (zeusDetailsStrPg) {
+            dbMessage = `SUCCESS: ${createdIds.length} facturas importadas y exportadas a Zeus ERP. [${zeusDetailsStrPg}]`;
         }
 
         await recordTraceEvent({

@@ -12,22 +12,29 @@ export interface ConsecutiveResult {
 export async function getNextTransactionConsecutive(
     transactionType: string,
     branchId: number | null = null,
-    implantId: number | null = null
+    implantId: number | null = null,
+    existingTx?: mssql.Transaction | mssql.Request
 ): Promise<ConsecutiveResult> {
     const rawType = (transactionType || 'INVOICE').trim().toUpperCase()
 
     if (isSQLServerMode()) {
-        let pool
+        let pool: mssql.ConnectionPool | null = null
         try {
-            pool = await getSQLServerConnection()
-            const req = pool.request()
-                .input('type', mssql.VarChar, rawType)
-                .input('branchId', mssql.Int, branchId)
-                .input('implantId', mssql.Int, implantId)
+            let req: mssql.Request
+            if (existingTx) {
+                req = existingTx instanceof mssql.Transaction ? new mssql.Request(existingTx) : existingTx
+            } else {
+                pool = await getSQLServerConnection()
+                req = pool.request()
+            }
+
+            req.input('type', mssql.VarChar, rawType)
+               .input('branchId', mssql.Int, branchId)
+               .input('implantId', mssql.Int, implantId)
 
             const query = `
                 SELECT TOP 1 [id], ISNULL([prefix], '') AS prefix, [currentNumber], ISNULL([padding], 0) AS padding
-                FROM dbo.[TransactionConsecutive]
+                FROM dbo.[TransactionConsecutive] WITH (UPDLOCK, ROWLOCK)
                 WHERE [isActive] = 1
                   AND (
                       UPPER([transactionType]) = @type
@@ -53,11 +60,15 @@ export async function getNextTransactionConsecutive(
                 const padding = row.padding || 0
 
                 // Incrementar consecutivo
-                await pool.request()
+                const updateReq = existingTx 
+                    ? (existingTx instanceof mssql.Transaction ? new mssql.Request(existingTx) : existingTx)
+                    : pool!.request()
+
+                await updateReq
                     .input('id', mssql.Int, consecId)
                     .query(`UPDATE dbo.[TransactionConsecutive] SET [currentNumber] = [currentNumber] + 1, [updatedAt] = GETDATE() WHERE [id] = @id`)
 
-                await pool.close()
+                if (pool) await pool.close()
 
                 let numStr = consecNum.toString()
                 if (padding > 0 && numStr.length < padding) {
@@ -98,12 +109,16 @@ export async function getNextTransactionConsecutive(
 
                 let nextVal = 1
                 if (tableName) {
-                    const maxRes = await pool.request().query(`SELECT ISNULL(MAX(id), 0) + 1 AS nextVal FROM dbo.[${tableName}]`)
+                    const fallbackReq = existingTx 
+                        ? (existingTx instanceof mssql.Transaction ? new mssql.Request(existingTx) : existingTx)
+                        : pool!.request()
+
+                    const maxRes = await fallbackReq.query(`SELECT ISNULL(MAX(id), 0) + 1 AS nextVal FROM dbo.[${tableName}] WITH (NOLOCK)`)
                     if (maxRes.recordset && maxRes.recordset.length > 0) {
                         nextVal = maxRes.recordset[0].nextVal
                     }
                 }
-                await pool.close()
+                if (pool) await pool.close()
 
                 return {
                     consecutivoNumber: nextVal,

@@ -101,8 +101,8 @@ async function runValidator() {
         { name: 'spPreCotizacionCrear', requiredIn: ['sqlserver'] },
         { name: 'spPreCotizacionConvertir', requiredIn: ['sqlserver'] },
         { name: 'spPreCotizacionEliminar', requiredIn: ['sqlserver'] },
-        { name: 'spCotizacionesCrear', requiredIn: ['sqlserver'] },
-        { name: 'spFacturacionesCrear', requiredIn: ['sqlserver'] }
+        { name: 'spCotizacionesCrear', requiredIn: ['sqlserver'], isZeusErp: true },
+        { name: 'spFacturacionesCrear', requiredIn: ['sqlserver'], isZeusErp: true }
     ];
 
     // Verificar en SQL Server DDL y ActualizadorSERVER
@@ -110,6 +110,8 @@ async function runValidator() {
         const path01Tables = path.join(sqlServerDir, '01_Tables.sql');
         const content01Tables = fs.existsSync(path01Tables) ? fs.readFileSync(path01Tables, 'utf8') : '';
         const contentActServer = fs.existsSync(actualizadorServerPath) ? fs.readFileSync(actualizadorServerPath, 'utf8') : '';
+        const pathZeusSps = path.join(sqlDir, 'ZeusERP', 'TODOS_LOS_SPS_ZEUSERP.sql');
+        const contentZeusSps = fs.existsSync(pathZeusSps) ? fs.readFileSync(pathZeusSps, 'utf8') : '';
 
         for (const col of criticalColumns) {
             if (col.requiredIn.includes('sqlserver')) {
@@ -127,11 +129,20 @@ async function runValidator() {
 
         for (const sp of criticalProcedures) {
             if (sp.requiredIn.includes('sqlserver')) {
-                const inAct = contentActServer.toLowerCase().includes(sp.name.toLowerCase());
-                if (inAct) {
-                    addResult('Procedimientos SQL Server', sp.name, '✅ OK', 'Compilado en ActualizadorSERVER.sql');
+                if (sp.isZeusErp) {
+                    const inZeus = contentZeusSps.toLowerCase().includes(sp.name.toLowerCase());
+                    if (inZeus) {
+                        addResult('Procedimientos SQL Server', sp.name, '✅ OK', 'Compilado en SQL/ZeusERP/TODOS_LOS_SPS_ZEUSERP.sql');
+                    } else {
+                        addResult('Procedimientos SQL Server', sp.name, '❌ BLOQUEANTE', 'Falta en SQL/ZeusERP/TODOS_LOS_SPS_ZEUSERP.sql', true);
+                    }
                 } else {
-                    addResult('Procedimientos SQL Server', sp.name, '❌ BLOQUEANTE', 'Falta en ActualizadorSERVER.sql', true);
+                    const inAct = contentActServer.toLowerCase().includes(sp.name.toLowerCase());
+                    if (inAct) {
+                        addResult('Procedimientos SQL Server', sp.name, '✅ OK', 'Compilado en ActualizadorSERVER.sql');
+                    } else {
+                        addResult('Procedimientos SQL Server', sp.name, '❌ BLOQUEANTE', 'Falta en ActualizadorSERVER.sql', true);
+                    }
                 }
             }
         }

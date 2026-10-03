@@ -7,6 +7,11 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 ## 1. Reglas de Base de Datos y SQL
 
 - **REGLA METODOLÓGICA DE CREACIÓN Y DISEÑO DE SKILLS**: Toda nueva Skill o actualización de Skill **DEBE redactarse como un principio de arquitectura universal, patrón abstracto de solución o regla de diseño reutilizable**, evitando limitar las instrucciones a casos de prueba puntuales o valores del momento. Debe abstraer la causa raíz técnica y ofrecer una directriz general que resuelva automáticamente esa categoría de problema en cualquier desarrollo futuro de la plataforma.
+- **SKILL OBLIGATORIA DE CONTROL INTEGRAL DE GENERACIÓN, LIBERACIÓN Y VALIDACIÓN DE OBJETOS DE BASE DE DATOS (`control-integral-liberacion-db`)**: *"Ningún objeto de BD (SP, función, tabla, columna, vista o índice) desarrollado o corregido en Korex puede quedar fuera de la generación, instalación, actualización o distribución hacia producción. Todos los mecanismos de liberación (Instalador, Actualizador, Generador Directo de SPs, scripts individuales) operan bajo el **Release Guardian unificado** (`scripts/korex_database_release_guardian.js`), el cual realiza escaneo multi-fuente, comparación estricta de inventarios (BD vs Archivos vs Manifest), control de conteo exacto ($\text{Detectados} = \text{Esperados} = \text{Generados} = \text{Manifest}$), generación de hashes y validación bloqueante (Fail Fast con Exit Code 1). Ningún SP o release se considera liberado sin validación del Guardian."* Se deben seguir estrictamente las directivas del Skill [`control-integral-liberacion-db`](file:///f:/Proyectos/AgenciasNew/.agents/skills/control-integral-liberacion-db/SKILL.md).
+- **SKILL OBLIGATORIA DE GENERACIÓN CENTRALIZADA DE SPS Y FUNCIONES PARA CAMBIOS DIRECTOS (`generacion-centralizada-sps-funciones-cambios-directos`)**: *"Establece una ubicación única, predecible y obligatoria para Stored Procedures y Functions para distribución y cambios rápidos manuales en bases de datos de clientes (`SQL/SqlServer/`, `SQL/PostgreSQL/`, `SQL/ZeusERP/`), generando simultáneamente archivos individuales y consolidados (`TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql`, `TODOS_LOS_SPS_Y_FUNCIONES_POSTGRESQL.sql`, `TODOS_LOS_SPS_Y_FUNCIONES_ZEUSERP.sql`) bajo estricta validación $\text{Detectados} = \text{Individuales} = \text{Consolidado}$ sin alterar el mecanismo de compilación existente."* Se deben seguir estrictamente las 22 directivas del Skill [`generacion-centralizada-sps-funciones-cambios-directos`](file:///f:/Proyectos/AgenciasNew/.agents/skills/generacion-centralizada-sps-funciones-cambios-directos/SKILL.md).
+- **SKILL OBLIGATORIA DE INSTRUCCIONES DE APLICACIÓN EN PRODUCCIÓN (`instrucciones-aplicacion-produccion`)**: *"Todo desarrollo, modificación, corrección o ajuste en Korex debe incluir obligatoriamente una descripción clara, exacta y no ambigua de las **ACCIONES REQUERIDAS EN PRODUCCIÓN** (Base de Datos, Sitio, Servicios, Configuración, `.env`, orden de ejecución y validación posterior) para que el operador pueda aplicarlo sin tener que interpretar, deducir o investigar archivos o pasos por su cuenta."* Se deben seguir estrictamente las 10 directivas y la plantilla del Skill [`instrucciones-aplicacion-produccion`](file:///f:/Proyectos/AgenciasNew/.agents/skills/instrucciones-aplicacion-produccion/SKILL.md).
+- **SKILL MAESTRO DE ACTUALIZACIÓN PRODUCTIVA VERIFICABLE, AUTODIAGNÓSTICO Y REPARACIÓN (`korex-update-guardian`)**: *"Ningún actualizador de Korex puede finalizar mostrando 'Actualización exitosa' si un solo objeto (SP, función, tabla, columna o índice) falló, fue omitido o no coincide con el Manifest del Release. Todo servidor Korex incluye las 4 tablas de control (`Korex_UpdateHistory`, `Korex_UpdateObjects`, `Korex_UpdateErrors`, `Korex_Installation`), el ejecutable de verificación (`node scripts/korex_updater_guardian.js`) y la herramienta de diagnóstico y autoreparación (`node scripts/korex_diagnostico.js`)."* Se deben seguir estrictamente las directivas del Skill [`korex-update-guardian`](file:///f:/Proyectos/AgenciasNew/.agents/skills/korex-update-guardian/SKILL.md).
+- **SKILL MAESTRO DE CONTROL ABSOLUTO DE RELEASE, MANIFEST, CONEXIÓN Y ACTUALIZACIÓN SQL SERVER (`control-absoluto-release-manifest-sqlserver`)**: *"Garantiza que ninguna actualización de Korex SQL Server pueda omitir objetos existentes, generar manifests parciales, ejecutar contra bases no configuradas, utilizar fallbacks de desarrollo o finalizar sin validación del Guardian."* Se deben seguir estrictamente las 29 reglas del Skill [`control-absoluto-release-manifest-sqlserver`](file:///f:/Proyectos/AgenciasNew/.agents/skills/control-absoluto-release-manifest-sqlserver/SKILL.md).
 - **SKILL MAESTRA KOREX Y VALIDADOR AUTOMÁTICO OBLIGATORIO (`korex-master-rules`)**: *"Ningún cambio de Korex puede llegar a producción basándose únicamente en que funcionó en desarrollo. El componente `KorexValidator` (`scripts/korex_validator.js` / `ValidarKorex.bat`) opera bajo un **Sistema de Tres Barreras Infranqueables** (1. Validación Previa, 2. Ejecución Controlada Fail Fast, 3. Auditoría Posterior) y es una pieza versionada y obligatoria en el pipeline de desarrollo, empaquetado (`GenerarSetup.bat`, `GenerarActualizador.bat`, `GenerarSetupSqlServer.bat`, `GenerarActualizadorSqlServer.bat`) y actualización. Ante cualquier error no validado en ejecución de bloques GO o inconsistencia en SPs (`spExportInvoices`, etc.), el proceso DEBE detenerse inmediatamente, mostrar el error técnico y bloquear el proceso."* Se deben seguir estrictamente las 34 reglas del Skill [`korex-master-rules`](file:///f:/Proyectos/AgenciasNew/.agents/skills/korex-master-rules/SKILL.md).
 - **REGLA MAESTRA DE CONTROL DE REGRESIONES Y PROTECCIÓN DE CORRECCIONES (`correcciones-permanencia-proteccion`)**: *"Ninguna corrección, funcionalidad, configuración, SP, tabla, parámetro, proceso, interfaz o comportamiento que ya haya sido validado en Korex puede perderse, sobrescribirse, eliminarse, alterarse o degradarse en desarrollos posteriores. Principio obligatorio: TODO LO QUE SE CORRIGE, SE PROTEGE ACUMULATIVAMENTE."* Se deben seguir estrictamente las 22 directivas y el checklist del Skill [`correcciones-permanencia-proteccion`](file:///f:/Proyectos/AgenciasNew/.agents/skills/correcciones-permanencia-proteccion/SKILL.md).
 - **REGLA DE ORO DE DESARROLLO MULTIBASE (PostgreSQL + SQL Server)**: *"PostgreSQL y SQL Server son plataformas oficialmente soportadas. Todo cambio futuro debe diseñarse, implementarse y validarse para ambas desde el inicio. Ningún desarrollo se considera terminado si solo funciona en uno de los dos motores."* Se deben seguir estrictamente todas las directivas y el checklist obligatorio del Skill [`desarrollo-multibase`](file:///f:/Proyectos/AgenciasNew/.agents/skills/desarrollo-multibase/SKILL.md).
@@ -275,6 +280,70 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
   - Se exige inventario previo de objetos esperados, manifest de release, comprobación en base limpia, prueba desde versión anterior, validación con datos reales y Smoke Test post-actualización.
   - Queda prohibido asumir que *"funciona en desarrollo = funciona en producción"*.
 - **Validación Multibase y Automatizada Continua**: Ninguna versión se libera sin verificar PostgreSQL y SQL Server de forma 100% aislada. Se debe ejecutar obligatoriamente `node scripts/release_changelog_manager.js --validate` y las 11 capas de `node scripts/validate_full_suite.js`.
+
+---
+
+## 19. Regla Obligatoria de Diseño Visual y Diferenciación de AgenciasNew para Korex Analytics (`korex-analytics-design`)
+
+Korex Analytics debe tener una **identidad visual propia y claramente diferenciada de AgenciasNew**.
+
+No se debe reutilizar exactamente la misma combinación de colores, estilos visuales, encabezados, botones, fondos o elementos gráficos de AgenciasNew. Se deben seguir estrictamente todas las directivas del Skill [`korex-analytics-design`](file:///f:/Proyectos/AgenciasNew/.agents/skills/korex-analytics-design/SKILL.md) y el **Prompt Maestro de Desarrollo** en [`docs/PROMPT_MAESTRO_KOREX_ANALYTICS.md`](file:///f:/Proyectos/AgenciasNew/docs/PROMPT_MAESTRO_KOREX_ANALYTICS.md).
+
+### 1. IDENTIDAD VISUAL PROPIA
+Definir una nueva paleta de colores exclusiva para Korex Analytics.
+La selección debe transmitir: tecnología, análisis, información, confiabilidad, modernidad y profesionalismo.
+Como propuesta inicial utilizar una combinación basada en:
+* **Azul petróleo / azul oscuro** para navegación y elementos principales.
+* **Turquesa** para acciones y elementos interactivos.
+* **Gris claro** para fondos secundarios.
+* **Blanco** para superficies y contenido.
+* **Azul medio** para información.
+* **Verde** para estados exitosos.
+* **Naranja/ámbar** para advertencias.
+* **Rojo** exclusivamente para errores o acciones destructivas.
+
+La paleta definitiva debe definirse durante el diseño inicial y documentarse para que todo el proyecto mantenga consistencia.
+
+### 2. NO COPIAR EL DISEÑO DE AGENCIASNEW
+Aunque se reutilice la lógica y arquitectura de AgenciasNew, NO copiar automáticamente: colores, temas, fondos, botones, tarjetas, iconografía, encabezados, menú, estilos de tablas, estilos de formularios, tipografías ni componentes visuales.
+Los componentes funcionales pueden utilizarse como referencia, pero la presentación visual debe pertenecer a **Korex Analytics**.
+
+### 3. COMPONENTES QUE DEBEN RESPETAR LA NUEVA IDENTIDAD
+Aplicar la identidad visual a: Login, Menú principal, Dashboard, Parámetros de Usuarios, Configuración SQL Server, Ejecuciones, Historial de Ejecuciones, Formularios, Tablas, Modales, Alertas, Mensajes, Botones e Indicadores de estado.
+
+### 4. IDENTIFICACIÓN DEL MÓDULO DE EJECUCIONES
+El módulo de **Ejecuciones** debe tener una identificación visual clara.
+Los estados deben utilizar una representación consistente:
+* Pendiente → color informativo.
+* En ejecución → color de proceso/actividad.
+* Finalizada → verde.
+* Error → rojo.
+* Cancelada → gris o color neutral.
+* Advertencia → ámbar.
+
+No utilizar únicamente colores para comunicar el estado; acompañar cuando corresponda con texto, icono, tooltip e indicador visual para accesibilidad.
+
+### 5. DASHBOARD
+El Dashboard de Korex Analytics debe tener un diseño orientado al análisis y seguimiento de ejecuciones.
+Mostrar, cuando corresponda: ejecuciones recientes, ejecuciones en proceso, ejecuciones exitosas, ejecuciones con error, duración, usuario, base de datos utilizada, servidor e indicadores de actividad.
+La presentación debe ser visualmente diferente de AgenciasNew.
+
+### 6. TEMA Y COMPONENTES REUTILIZABLES
+Crear una configuración centralizada del tema visual. No colocar colores directamente dispersos por los componentes.
+Utilizar variables/tokens de diseño (`--primary`, `--secondary`, `--background`, `--surface`, `--text`, `--success`, `--warning`, `--error`, `--info`, `--border`).
+De esta manera la identidad visual puede modificarse posteriormente desde un único lugar.
+
+### 7. RESPONSIVE
+El diseño debe funcionar correctamente en escritorio, portátil, tablet y resoluciones diferentes, priorizando el uso administrativo y operativo, manteniendo buena lectura de tablas y Ejecuciones.
+
+### 8. ACCESIBILIDAD
+Los colores seleccionados deben mantener suficiente contraste. No utilizar el color como único mecanismo para diferenciar estados o resultados. Validar contraste, legibilidad, tamaños, foco de teclado, estados hover/focus y mensajes de error.
+
+### 9. REGLA FINAL
+Korex Analytics debe poder identificarse visualmente como un producto diferente de AgenciasNew aunque ambos compartan componentes técnicos y lógica de desarrollo.
+La reutilización de arquitectura y funcionalidad **NO debe significar reutilización automática de la identidad visual**.
+Separar estrictamente la arquitectura de la identidad visual.
+
 
 
 

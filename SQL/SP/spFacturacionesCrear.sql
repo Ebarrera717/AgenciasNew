@@ -1613,9 +1613,7 @@ BEGIN
 				IF @id_monedas_iata IS NULL SELECT TOP 1 @id_monedas_iata = id FROM dbo.Monedas_IATA WITH (NOLOCK) ORDER BY id;
 
 				SELECT TOP 1 @id_tiqueteador = id FROM dbo.Tiqueteadores WITH (NOLOCK) WHERE cd_codigo = @cd_tiqueteador;
-				IF @id_tiqueteador IS NULL SELECT TOP 1 @id_tiqueteador = id FROM ZeusAgencias_23.dbo.Tiqueteadores WITH (NOLOCK) WHERE cd_codigo = @cd_tiqueteador;
 				IF @id_tiqueteador IS NULL SELECT TOP 1 @id_tiqueteador = id FROM dbo.Tiqueteadores WITH (NOLOCK) ORDER BY id;
-				IF @id_tiqueteador IS NULL SELECT TOP 1 @id_tiqueteador = id FROM ZeusAgencias_23.dbo.Tiqueteadores WITH (NOLOCK) ORDER BY id;
 				IF @id_tiqueteador IS NULL SET @id_tiqueteador = 2;
 
 				SELECT TOP 1 @id_tipoventa = id_tipoventa FROM dbo.Tiqueteadores WITH (NOLOCK) WHERE id = @id_tiqueteador;
@@ -1752,6 +1750,7 @@ BEGIN
 							IF @var_Iden_Variable > 0
 							BEGIN
 								SET @TktSqlStmt = @TktSqlStmt + CHAR(13) + CHAR(10) + ' IF NOT EXISTS (SELECT 1 FROM dbo.VariableMaestro WHERE IDEN_Maestro = ' + CAST(@var_IDEN_Maestro AS VARCHAR) + ' AND IDEN_Variable = ' + CAST(@var_Iden_Variable AS VARCHAR) + ') INSERT INTO dbo.VariableMaestro (IDEN_Maestro, IDEN_Variable, Formula, OrdenEvaluacion) VALUES (' + CAST(@var_IDEN_Maestro AS VARCHAR) + ', ' + CAST(@var_Iden_Variable AS VARCHAR) + ', '''', 0);' + CHAR(13) + CHAR(10) +
+									' IF NOT EXISTS (SELECT 1 FROM dbo.VariableDatosMaestro WHERE IDEN_Maestro = ' + CAST(@var_IDEN_Maestro AS VARCHAR) + ' AND IDEN_Variable = ' + CAST(@var_Iden_Variable AS VARCHAR) + ' AND CodigoMaestro = ''' + REPLACE(@gen_cd_tiquete, '''', '''''') + ''')' +
 									' INSERT INTO dbo.VariableDatosMaestro (IDEN_Maestro, IDEN_Variable, CodigoMaestro, ValorNumerico, ValorFecha, ValorVarchar) VALUES (' + 
 									CAST(@var_IDEN_Maestro AS VARCHAR) + ', ' + 
 									CAST(@var_Iden_Variable AS VARCHAR) + ', ''' + 
@@ -2040,6 +2039,7 @@ BEGIN
 							IF @var_Iden_Variable_srv > 0
 							BEGIN
 								SET @SrvVarsSqlStmt = @SrvVarsSqlStmt + CHAR(13) + CHAR(10) + ' IF NOT EXISTS (SELECT 1 FROM dbo.VariableMaestro WHERE IDEN_Maestro = ' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ' AND IDEN_Variable = ' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ') INSERT INTO dbo.VariableMaestro (IDEN_Maestro, IDEN_Variable, Formula, OrdenEvaluacion) VALUES (' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ', ' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ', '''', 0);' + CHAR(13) + CHAR(10) +
+									' IF NOT EXISTS (SELECT 1 FROM dbo.VariableDatosMaestro WHERE IDEN_Maestro = ' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ' AND IDEN_Variable = ' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ' AND CodigoMaestro = (SELECT cd_Consecutivo_VariablesAdicionales FROM dbo.Fac_Servicios WHERE id = @NewSrvId))' +
 									' INSERT INTO dbo.VariableDatosMaestro (IDEN_Maestro, IDEN_Variable, CodigoMaestro, ValorNumerico, ValorFecha, ValorVarchar)' +
 									' SELECT ' + CAST(@var_IDEN_Maestro_srv AS VARCHAR) + ', ' + CAST(@var_Iden_Variable_srv AS VARCHAR) + ', cd_Consecutivo_VariablesAdicionales, ' +
 									CASE WHEN @var_TipoDato_srv IN ('Numeric', 'Integer') AND ISNUMERIC(@var_ValorObtenido_srv) = 1 THEN REPLACE(@var_ValorObtenido_srv, ',', '.') ELSE 'NULL' END + ', ' +
@@ -2506,27 +2506,181 @@ BEGIN
 				CLOSE curGenItems;
 				DEALLOCATE curGenItems;
 				
-				-- Execute spza_Factura_Crear inside a TRY CATCH
-				SET @FacturaRespuesta = NULL;
-				SET @FacturaEstado = NULL;
+				-- VALIDACIÓN PREVIA DE REGLAS DE NEGOCIO Y MAESTROS ZEUS ERP
+				DECLARE @ValidacionError VARCHAR(2000) = NULL;
+
+				-- 1. Validar Cliente en Zeus ERP
+				IF @ValidacionError IS NULL AND NOT EXISTS (SELECT 1 FROM dbo.CLIENTES WITH (NOLOCK) WHERE RTRIM(IDCLIENTE) = RTRIM(@cd_cliente))
+				BEGIN
+					SET @ValidacionError = 'El Cliente ''' + RTRIM(ISNULL(@cd_cliente, '')) + ''' no existe en la tabla de Clientes (dbo.CLIENTES) de Zeus ERP.';
+				END;
+
+				-- 2. Validar Vendedor en Zeus ERP
+				IF @ValidacionError IS NULL AND @cd_vendedor IS NOT NULL AND LTRIM(RTRIM(@cd_vendedor)) <> '' AND NOT EXISTS (SELECT 1 FROM dbo.MAEVENDE WITH (NOLOCK) WHERE RTRIM(IDVENDE) = RTRIM(@cd_vendedor))
+				BEGIN
+					SET @ValidacionError = 'El Vendedor ''' + RTRIM(@cd_vendedor) + ''' no existe en la tabla de Vendedores (dbo.MAEVENDE) de Zeus ERP.';
+				END;
+
+				-- 3. Validar Sucursal en Zeus ERP
+				IF @ValidacionError IS NULL AND @id_sucursal IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Sucursales WITH (NOLOCK) WHERE id = @id_sucursal)
+				BEGIN
+					SET @ValidacionError = 'La Sucursal con ID ''' + CAST(@id_sucursal AS VARCHAR) + ''' no existe en la tabla dbo.Sucursales de Zeus ERP.';
+				END;
+
+				-- 4. Validar Tiqueteador en Zeus ERP
+				IF @ValidacionError IS NULL AND @id_tiqueteador IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Tiqueteadores WITH (NOLOCK) WHERE id = @id_tiqueteador)
+				BEGIN
+					SET @ValidacionError = 'El Tiqueteador con ID ''' + CAST(@id_tiqueteador AS VARCHAR) + ''' no existe en la tabla dbo.Tiqueteadores de Zeus ERP.';
+				END;
+
+				-- 5. Validar Proveedores de los Ítems
+				IF @ValidacionError IS NULL
+				BEGIN
+					SELECT TOP 1 @ValidacionError = 'El Proveedor con NIT/Código ''' + RTRIM(ISNULL(TI.cd_proveedores, '')) + ''' asignado al ítem ''' + RTRIM(ISNULL(TI.ds_descrip, '')) + ''' no existe en la tabla dbo.PROVEEDORES de Zeus ERP.'
+					FROM #TmpFacturaItems TI
+					WHERE TI.id_factura = @id_facturacion
+					  AND LTRIM(RTRIM(ISNULL(TI.cd_proveedores, ''))) <> ''
+					  AND NOT EXISTS (SELECT 1 FROM dbo.PROVEEDORES WITH (NOLOCK) WHERE RTRIM(IDPROVE) = RTRIM(TI.cd_proveedores));
+				END;
+
+				-- 6. Validar Tipos de Servicio de los Ítems
+				IF @ValidacionError IS NULL
+				BEGIN
+					SELECT TOP 1 @ValidacionError = 'El Tipo de Servicio ID ''' + CAST(TI.id_tiposservicio AS VARCHAR) + ''' (ítem: ' + RTRIM(ISNULL(TI.ds_descrip, '')) + ') no existe en la tabla dbo.TiposServicios de Zeus ERP.'
+					FROM #TmpFacturaItems TI
+					WHERE TI.id_factura = @id_facturacion
+					  AND TI.id_tiposservicio IS NOT NULL
+					  AND NOT EXISTS (SELECT 1 FROM dbo.TiposServicios WITH (NOLOCK) WHERE id = TI.id_tiposservicio);
+				END;
+
+				-- 7. Validar Concepto de Facturación de los Ítems
+				IF @ValidacionError IS NULL
+				BEGIN
+					SELECT TOP 1 @ValidacionError = 'El Concepto de Facturación ID ''' + CAST(TI.id_conceptofacturacion AS VARCHAR) + ''' (ítem: ' + RTRIM(ISNULL(TI.ds_descrip, '')) + ') no existe en la tabla dbo.ConceptoFacturacion de Zeus ERP.'
+					FROM #TmpFacturaItems TI
+					WHERE TI.id_factura = @id_facturacion
+					  AND TI.id_conceptofacturacion IS NOT NULL
+					  AND NOT EXISTS (SELECT 1 FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE id = TI.id_conceptofacturacion);
+				END;
+
+				-- 8. Validar Variables Adicionales Exigidas por el Cliente en Zeus ERP
+				IF @ValidacionError IS NULL AND OBJECT_ID('dbo.Cliente_ConfiguracionVariables', 'U') IS NOT NULL AND OBJECT_ID('dbo.VariableDefinicion', 'U') IS NOT NULL
+				BEGIN
+					SELECT TOP 1 @ValidacionError = 'La Variable Adicional obligatoria ''' + RTRIM(ISNULL(VD.Nombre, '')) + ''' (en ' + CASE WHEN CCV.IDEN_Maestro = 37 THEN 'Servicios' ELSE 'Tiquetes' END + ') no fue enviada o está vacía para el cliente ''' + RTRIM(@cd_cliente) + '''.'
+					FROM dbo.Cliente_ConfiguracionVariables CCV WITH (NOLOCK)
+					JOIN dbo.VariableDefinicion VD WITH (NOLOCK) ON VD.IDEN = CCV.Iden_Variable
+					WHERE RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
+					  AND CCV.bl_Exige = 1
+					  AND CCV.IDEN_Maestro IN (35, 37)
+					  AND NOT EXISTS (
+						  SELECT 1 FROM #VariablesAdicionales VA
+						  WHERE VA.id_facturacion = @id_facturacion
+						    AND RTRIM(LTRIM(VA.ds_VariableAdicional)) = RTRIM(LTRIM(VD.Nombre))
+						    AND LTRIM(RTRIM(ISNULL(VA.ds_valor, ''))) <> ''
+					  )
+					  AND ISNULL(LTRIM(RTRIM(VD.DefaultVarchar)), '') = '';
+				END;
+
+				-- 9. Validar Permisos de Facturación en Zeus ERP (Proceso 93)
+				IF @ValidacionError IS NULL AND OBJECT_ID('dbo.ProcesosUsuarios', 'U') IS NOT NULL
+				BEGIN
+					IF EXISTS (
+						SELECT 1 FROM dbo.ProcesosUsuarios WITH (NOLOCK)
+						WHERE id_usuario = 1 AND id_proceso = 93 AND bl_permit = 0
+					)
+					BEGIN
+						SET @ValidacionError = 'El usuario no posee permisos suficientes en Zeus ERP para facturar (Proceso 93 - Facturación).';
+					END;
+				END;
+
+				-- 10. Validar Parametrización de Transacción y Consecutivos de la Sucursal en Zeus ERP
+				IF @ValidacionError IS NULL AND OBJECT_ID('dbo.ConfiguracionTransacciones', 'U') IS NOT NULL
+				BEGIN
+					DECLARE @chk_cfg_id INT = NULL, @chk_cfg_consec VARCHAR(20) = NULL;
+					SELECT TOP 1 @chk_cfg_id = id, @chk_cfg_consec = cd_consecutivo
+					FROM dbo.ConfiguracionTransacciones WITH (NOLOCK)
+					WHERE id_transaccion = 2 AND id_sucursal = @id_sucursal
+					  AND (id_implante = @id_implante OR (@id_implante IS NULL AND id_implante IS NULL));
+
+					IF @chk_cfg_id IS NULL
+					BEGIN
+						DECLARE @nomSuc VARCHAR(100) = (SELECT TOP 1 ds_nombre FROM dbo.Sucursales WITH (NOLOCK) WHERE id = @id_sucursal);
+						SET @ValidacionError = 'La Sucursal ''' + ISNULL(@nomSuc, CAST(@id_sucursal AS VARCHAR)) + ''' [ID ' + CAST(@id_sucursal AS VARCHAR) + '] no tiene parametrizada la transacción de Facturación en Zeus ERP (dbo.ConfiguracionTransacciones). Debe solicitar al administrador del sistema parametrizar la transacción.';
+					END
+					ELSE IF @chk_cfg_consec = '99999999'
+					BEGIN
+						SET @ValidacionError = 'El consecutivo de Facturación para la Sucursal [ID ' + CAST(@id_sucursal AS VARCHAR) + '] ha llegado al límite máximo en Zeus ERP. Consulte al administrador.';
+					END;
+				END;
+
+				-- 11. Validar Rango de Numeración y Vencimiento de Resolución de Facturación
+				IF @ValidacionError IS NULL AND OBJECT_ID('dbo.Sucursales', 'U') IS NOT NULL
+				BEGIN
+					DECLARE @v_num_ini NUMERIC(18,0), @v_num_fin NUMERIC(18,0), @v_bl_sin_res BIT;
+					IF @id_implante IS NOT NULL AND @id_implante > 0 AND OBJECT_ID('dbo.Implantes', 'U') IS NOT NULL
+					BEGIN
+						SELECT @v_num_ini = in_num_inicial, @v_num_fin = in_num_final, @v_bl_sin_res = bl_facturarsinresolucion
+						FROM dbo.Implantes WITH (NOLOCK) WHERE id = @id_implante;
+					END;
+					IF @v_num_ini IS NULL OR (@v_num_ini <= 0 AND @v_num_fin <= 0)
+					BEGIN
+						SELECT @v_num_ini = in_num_inicial, @v_num_fin = in_num_final, @v_bl_sin_res = bl_facturarsinresolucion
+						FROM dbo.Sucursales WITH (NOLOCK) WHERE id = @id_sucursal;
+					END;
+					
+					IF ISNULL(@v_bl_sin_res, 0) = 0 AND (ISNULL(@v_num_ini, 0) <= 0 OR ISNULL(@v_num_fin, 0) <= 0)
+					BEGIN
+						SET @ValidacionError = 'La Sucursal [ID ' + CAST(@id_sucursal AS VARCHAR) + '] no tiene configurado un rango de numeración autorizado en Zeus ERP y no tiene habilitada la opción de facturar sin resolución.';
+					END;
+				END;
+
+				IF @ValidacionError IS NULL AND OBJECT_ID('dbo.resoluciones', 'U') IS NOT NULL
+				BEGIN
+					SELECT TOP 1 @ValidacionError = 'La resolución de Facturación N° ''' + RTRIM(ISNULL(r.ds_num_resolucion, '')) + ''' de la Sucursal ''' + ISNULL(s.ds_nombre, CAST(@id_sucursal AS VARCHAR)) + ''' está vencida desde ' + CONVERT(VARCHAR, r.dt_Fechavencimiento, 111) + '. Verifique la parametrización en el maestro de resoluciones de Zeus ERP.'
+					FROM dbo.resoluciones r WITH (NOLOCK)
+					JOIN dbo.Sucursales s WITH (NOLOCK) ON s.id = r.id_sucursal
+					WHERE r.id_sucursal = @id_sucursal
+					  AND (r.id_implante = @id_implante OR (r.id_implante IS NULL AND @id_implante IS NULL))
+					  AND r.bl_activa = 1
+					  AND r.dt_Fechavencimiento IS NOT NULL
+					  AND r.dt_Fechavencimiento < GETDATE()
+					  AND r.bl_nopermitirvencidas = 1;
+				END;
+
+				-- Si hubo un error de validación previa, detener y retornar mensaje claro de inmediato
+				IF @ValidacionError IS NOT NULL
+				BEGIN
+					SET @FacturaEstado = 1;
+					SET @FacturaRespuesta = '❌ Error de Parametrización Zeus ERP: ' + @ValidacionError;
+					INSERT INTO @LogResults (invoiceId, success, message)
+					VALUES (@id_facturacion, 0, @FacturaRespuesta);
+
+					FETCH NEXT FROM curInvoices INTO @id_facturacion, @cd_fuente, @cd_serie, @cd_consecutivo;
+					CONTINUE;
+				END;
 
 				BEGIN TRY
 					DECLARE @ReturnCode INT;
 					DECLARE @FacturaExecSqlStmt NVARCHAR(MAX);
-					DECLARE @MaxFacIdBefore INT = ISNULL((SELECT MAX(id) FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)), 0);
+					DECLARE @MaxFacIdBefore INT = ISNULL((SELECT MAX(id) FROM dbo.fac_factura WITH (NOLOCK)), 0);
 
 					DECLARE @ZML_VariablesStr VARCHAR(MAX) = NULL;
 					
 					-- 1. Variables explícitas desde el XML
 					SELECT 
 						@ZML_VariablesStr = COALESCE(@ZML_VariablesStr + ' UNION ALL ', '') + 
-						'SELECT ' + ISNULL('''' + REPLACE(cd_codigo, '''', '''''') + '''', 'NULL') + ' AS cd_items, NULL AS ds_Items, ' + 
-						ISNULL('''' + REPLACE(ds_maestro, '''', '''''') + '''', 'NULL') + ' AS ds_Maestro, ' + 
-						ISNULL('''' + REPLACE(ds_VariableAdicional, '''', '''''') + '''', 'NULL') + ' AS ds_Variable, ' + 
-						ISNULL('''' + REPLACE(ds_valor, '''', '''''') + '''', 'NULL') + ' AS ds_Valor, ' +
+						'SELECT ' + ISNULL('''' + REPLACE(
+							CASE 
+								WHEN FI.tipo_item = 'Aire' THEN ISNULL(NULLIF(FI.cd_tiquete, ''), VA.cd_codigo)
+								ELSE ISNULL(NULLIF(FI.cd_Consecutivo_variablesadicionales, ''), VA.cd_codigo)
+							END, '''', '''''') + '''', 'NULL') + ' AS cd_items, NULL AS ds_Items, ' + 
+						ISNULL('''' + REPLACE(VA.ds_maestro, '''', '''''') + '''', 'NULL') + ' AS ds_Maestro, ' + 
+						ISNULL('''' + REPLACE(VA.ds_VariableAdicional, '''', '''''') + '''', 'NULL') + ' AS ds_Variable, ' + 
+						ISNULL('''' + REPLACE(VA.ds_valor, '''', '''''') + '''', 'NULL') + ' AS ds_Valor, ' +
 						ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ' AS id_Clientes'
-					FROM #VariablesAdicionales
-					WHERE id_facturacion = @id_facturacion;
+					FROM #VariablesAdicionales VA
+					LEFT JOIN #TmpFacturaItems FI ON FI.id_item = VA.id_item AND FI.id_factura = VA.id_facturacion
+					WHERE VA.id_facturacion = @id_facturacion;
 
 					-- 2. Variables exigidas por el cliente en Zeus ERP para Servicios (IDEN_Maestro = 37 / FacturacionServicios)
 					SELECT 
@@ -2573,7 +2727,7 @@ BEGIN
 					  );
 
 					SET @FacturaExecSqlStmt = N'
-						EXEC @ReturnCode = ZeusAgencias_23.dbo.spza_Factura_Crear' + CHAR(13) + CHAR(10) +
+						EXEC @ReturnCode = dbo.spza_Factura_Crear' + CHAR(13) + CHAR(10) +
 							'@id_usuario = 1,' + CHAR(13) + CHAR(10) +
 							'@id_sucursal = ' + ISNULL(CAST(@id_sucursal AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@id_implante = ' + ISNULL(CAST(@id_implante AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
@@ -2695,7 +2849,7 @@ BEGIN
 							@resFuente = LTRIM(RTRIM(cd_fuente)),
 							@resSerie = LTRIM(RTRIM(cd_serie)),
 							@resConsecutivo = LTRIM(RTRIM(cd_consecutivo))
-						FROM ZeusAgencias_23.dbo.fac_factura WITH (NOLOCK)
+						FROM dbo.fac_factura WITH (NOLOCK)
 						WHERE id > @MaxFacIdBefore
 						ORDER BY id ASC;
 
@@ -2705,7 +2859,7 @@ BEGIN
 							IF @resSerie IS NULL SET @resSerie = ISNULL(NULLIF(LTRIM(RTRIM(@cd_serie)), ''), '33');
 
 							-- Inserción por lote directa en FacturaProveedor en Zeus ERP (Set-based)
-							INSERT INTO ZeusAgencias_23.dbo.FacturaProveedor (
+							INSERT INTO dbo.FacturaProveedor (
 								id_fac_factura, id_fac_remision, cd_FacturaProveedor, cd_NCFProveedor, cd_Proveedor, dt_fecha, dt_fechaFacturaProveedor
 							)
 							SELECT DISTINCT 
@@ -2720,7 +2874,7 @@ BEGIN
 							WHERE TI.id_factura = @id_facturacion
 							  AND LTRIM(RTRIM(ISNULL(TI.cd_facturaproveedor, ''))) <> ''
 							  AND NOT EXISTS (
-								  SELECT 1 FROM ZeusAgencias_23.dbo.FacturaProveedor FP WITH (NOLOCK)
+								  SELECT 1 FROM dbo.FacturaProveedor FP WITH (NOLOCK)
 								  WHERE FP.id_fac_factura = @NewZeusFacId 
 								    AND FP.cd_FacturaProveedor = SUBSTRING(LTRIM(RTRIM(TI.cd_facturaproveedor)), 1, 25)
 							  );
@@ -2757,9 +2911,63 @@ BEGIN
 						SET @FacturaEstado = 1;
 						IF @RespTexto IS NOT NULL AND LTRIM(RTRIM(@RespTexto)) <> ''
 							SET @FacturaRespuesta = @RespTexto;
-						ELSE IF @FacturaRespuesta IS NULL OR LTRIM(RTRIM(@FacturaRespuesta)) = ''
+						ELSE IF @FacturaRespuesta IS NOT NULL AND LTRIM(RTRIM(@FacturaRespuesta)) <> '' AND @FacturaRespuesta NOT LIKE '%Código de retorno%'
+							SET @FacturaRespuesta = @FacturaRespuesta;
+						ELSE
 						BEGIN
-							SET @FacturaRespuesta = 'Error en spFacturaCrear (Código de retorno: ' + CAST(ISNULL(@ReturnCode, 1) AS VARCHAR) + ')';
+							-- Diagnóstico dinámico automático de causa raíz (consultas directas a tablas de Zeus ERP sin alterar transacciones)
+							DECLARE @diagReason NVARCHAR(1000) = NULL;
+
+							IF @diagReason IS NULL AND OBJECT_ID('dbo.ConfiguracionTransacciones', 'U') IS NOT NULL
+							BEGIN
+								IF NOT EXISTS (
+									SELECT 1 FROM dbo.ConfiguracionTransacciones WITH (NOLOCK)
+									WHERE id_transaccion = 2 AND id_sucursal = @id_sucursal
+									  AND (id_implante = @id_implante OR (@id_implante IS NULL AND id_implante IS NULL))
+								)
+								BEGIN
+									SET @diagReason = 'La Sucursal [ID ' + CAST(@id_sucursal AS VARCHAR) + '] no tiene parametrizada la transacción de Facturación en Zeus ERP (dbo.ConfiguracionTransacciones). Debe solicitar al administrador del sistema parametrizar la transacción.';
+								END;
+							END;
+
+							IF @diagReason IS NULL AND OBJECT_ID('dbo.Sucursales', 'U') IS NOT NULL
+							BEGIN
+								DECLARE @d_num_ini NUMERIC(18,0), @d_num_fin NUMERIC(18,0), @d_bl_sin_res BIT;
+								IF @id_implante IS NOT NULL AND @id_implante > 0 AND OBJECT_ID('dbo.Implantes', 'U') IS NOT NULL
+								BEGIN
+									SELECT @d_num_ini = in_num_inicial, @d_num_fin = in_num_final, @d_bl_sin_res = bl_facturarsinresolucion
+									FROM dbo.Implantes WITH (NOLOCK) WHERE id = @id_implante;
+								END;
+								IF @d_num_ini IS NULL OR (@d_num_ini <= 0 AND @d_num_fin <= 0)
+								BEGIN
+									SELECT @d_num_ini = in_num_inicial, @d_num_fin = in_num_final, @d_bl_sin_res = bl_facturarsinresolucion
+									FROM dbo.Sucursales WITH (NOLOCK) WHERE id = @id_sucursal;
+								END;
+								IF ISNULL(@d_bl_sin_res, 0) = 0 AND (ISNULL(@d_num_ini, 0) <= 0 OR ISNULL(@d_num_fin, 0) <= 0)
+								BEGIN
+									SET @diagReason = 'La Sucursal [ID ' + CAST(@id_sucursal AS VARCHAR) + '] no tiene configurado un rango de numeración autorizado en Zeus ERP (dbo.Sucursales / dbo.resoluciones).';
+								END;
+							END;
+
+							IF @diagReason IS NULL AND @id_implante IS NOT NULL AND OBJECT_ID('dbo.Implantes', 'U') IS NOT NULL
+							BEGIN
+								IF NOT EXISTS (SELECT 1 FROM dbo.Implantes WITH (NOLOCK) WHERE id = @id_implante AND id_sucursal = @id_sucursal)
+									SET @diagReason = 'El Implante ID ' + CAST(@id_implante AS VARCHAR) + ' no está asociado a la Sucursal ID ' + CAST(@id_sucursal AS VARCHAR) + ' en Zeus ERP';
+							END;
+
+							IF @diagReason IS NULL AND OBJECT_ID('dbo.ProcesosUsuarios', 'U') IS NOT NULL
+							BEGIN
+								IF EXISTS (
+									SELECT 1 FROM dbo.ProcesosUsuarios WITH (NOLOCK)
+									WHERE id_usuario = 1 AND id_proceso = 93 AND bl_permit = 0
+								)
+								BEGIN
+									SET @diagReason = 'El usuario no posee permisos suficientes en Zeus ERP (Proceso 93 - Facturación)';
+								END;
+							END;
+
+							SET @FacturaRespuesta = '❌ Error en dbo.spza_Factura_Crear (Código de retorno: ' + CAST(ISNULL(@ReturnCode, 1) AS VARCHAR) + ')' + 
+								CASE WHEN @diagReason IS NOT NULL THEN ' ➔ Causa identificada: ' + @diagReason ELSE '' END;
 						END;
 						SET @FacturaRespuesta = @FacturaRespuesta + CHAR(13) + CHAR(10) + '--- DYNAMIC EXECUTION TRACE ---' + CHAR(13) + CHAR(10) + ISNULL(@FacturaExecSqlStmt, '');
 					END
@@ -2786,7 +2994,6 @@ BEGIN
 				COMMIT TRANSACTION;
 			
 			SELECT invoiceId, success, message FROM @LogResults;
-			RETURN 0
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0

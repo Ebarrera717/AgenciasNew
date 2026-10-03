@@ -236,6 +236,16 @@ if ($DbUrl) {
                 Show-Alert "Fallo de Base de Datos" "El comparador inteligente falló al aplicar la actualización de base de datos.`n`nPor favor revise el log detallado de errores en: $LogFile"
                 exit 1
             }
+
+            Write-Log "Ejecutando verificador Korex Update Guardian en PostgreSQL ($PgDb)..."
+            if (Test-Path ".\scripts\korex_updater_guardian.js") {
+                node .\scripts\korex_updater_guardian.js >> $LogFile 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Log "ERROR CRITICO: Korex Update Guardian detecto objetos faltantes o erroneos en PostgreSQL ($PgDb)." "ERROR"
+                    Show-Alert "Error Critico de Verificacion" "El actualizador detecto que uno o mas objetos obligatorios (SPs/Tablas) no quedaron creados en la base de datos '$PgDb'.`n`nConsulte install_log.txt para ver el detalle."
+                    exit 1
+                }
+            }
         } else {
             Write-Log "No se encontro el archivo db_installer.js en la carpeta del sitio." "ERROR"
             Show-Alert "Error de Archivos" "No se encontró el ejecutable db_installer.js en el directorio de la aplicación."

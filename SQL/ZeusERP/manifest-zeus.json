@@ -1,0 +1,25 @@
+{
+  "releaseVersion": "0.1.0",
+  "build": "20261003.01",
+  "target": "ZeusAgencias_23",
+  "generatedAt": "2026-10-03T18:25:40.505Z",
+  "totalObjects": 2,
+  "objects": [
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "dbo.spCotizacionesCrear",
+      "sourceFile": "SQL/ZeusERP/spCotizacionesCrear.sql",
+      "hash": "48fe50694a5d88fe79c5027be036274d8351f45a069080800d59e210c231c53a",
+      "isMandatory": true,
+      "target": "ZEUS_ERP"
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "dbo.spFacturacionesCrear",
+      "sourceFile": "SQL/ZeusERP/spFacturacionesCrear.sql",
+      "hash": "f8625bab8256bd7d1e37e79dd4083b427c5eb333519b4c15686f875cc4819b40",
+      "isMandatory": true,
+      "target": "ZEUS_ERP"
+    }
+  ]
+}

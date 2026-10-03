@@ -9,17 +9,31 @@ echo.
 echo Ingrese los datos de conexion a SQL Server (Presione ENTER para usar los valores por defecto):
 echo.
 
-set "SQLSERVER_HOST=127.0.0.1"
-set /p SQLSERVER_HOST="Servidor SQL Server [127.0.0.1]: "
+set "SQLSERVER_HOST=ZEUSAGENCIAS10"
+set /p SQLSERVER_HOST="Servidor SQL Server [ZEUSAGENCIAS10]: "
 
 set "SQLSERVER_PORT=1433"
 set /p SQLSERVER_PORT="Puerto SQL Server [1433]: "
 
-set "SQLSERVER_USER=sa"
-set /p SQLSERVER_USER="Usuario SQL Server [sa]: "
+set "SQLSERVER_USER=zeusagencias"
+set /p SQLSERVER_USER="Usuario SQL Server [zeusagencias]: "
 
 set "SQLSERVER_PASSWORD=zzeusagencias"
 set /p SQLSERVER_PASSWORD="Clave SQL Server [zzeusagencias]: "
+
+echo.
+echo [PASO 0/4] Verificando conectividad y credenciales con SQL Server [%SQLSERVER_HOST%:%SQLSERVER_PORT%]...
+node scripts/test_sqlserver_connection.js "%SQLSERVER_HOST%" "%SQLSERVER_PORT%" "%SQLSERVER_USER%" "%SQLSERVER_PASSWORD%"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO DE CONEXION: No fue posible conectar con el servidor SQL Server.
+    echo La compilacion del actualizador fue CANCELADA.
+    echo ===============================================================================
+    pause
+    exit /b %ERRORLEVEL%
+)
 
 echo.
 echo [PASO 1/4] Sincronizando scripts T-SQL en ActualizadorSERVER.sql...
@@ -39,6 +53,18 @@ if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Fallo la validacion de maestros y funcionalidades SQL Server. Actualizador cancelado.
     pause
     exit /b %ERRORLEVEL%
+)
+
+echo.
+echo Ejecutando Release Guardian de Integridad Universal...
+node scripts/korex_database_release_guardian.js
+if %errorlevel% neq 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO: Release Guardian emitio dictamen [BLOQUEADO]. Actualizador CANCELADO.
+    echo ===============================================================================
+    pause
+    exit /b %errorlevel%
 )
 
 echo.

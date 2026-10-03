@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 import * as XLSX from 'xlsx'
+import { isSQLServerMode, executeSQLServerProcedure } from '@/lib/sqlserver'
+import { executePostgresQuery } from '@/lib/postgres'
 
 export async function POST(req: NextRequest) {
     try {
@@ -58,16 +59,24 @@ export async function POST(req: NextRequest) {
             return cols.map(c => (c !== undefined && c !== null ? c.toString().replace(/\^/g, ' ') : '')).join('^')
         }).join('\n')
 
-        // Call the Stored Procedure with TEXT data
-        const results: any[] = await prisma.$queryRawUnsafe(
-            `CALL public.spMaestroImportar($1::TEXT, $2::TEXT, $3::INT, $4::TEXT)`,
-            type,
-            textData,
-            actingUserId,
-            '' // p_mensaje_resultado
-        );
+        let message = ''
 
-        const message = results[0]?.p_mensaje_resultado || '';
+        if (isSQLServerMode()) {
+            // Ejecutar en SQL Server (Infraestructura Aislada)
+            const result = await executeSQLServerProcedure('spMaestroImportar', {
+                p_tipo: type,
+                p_text_data: textData,
+                p_acting_user_id: actingUserId
+            })
+            message = result?.p_mensaje_resultado || result?.message || (Array.isArray(result) && result[0]?.p_mensaje_resultado) || 'SUCCESS: Importación completada en SQL Server.'
+        } else {
+            // Ejecutar en PostgreSQL
+            const results: any[] = await executePostgresQuery(
+                `CALL public.spMaestroImportar($1::TEXT, $2::TEXT, $3::INT, $4::TEXT)`,
+                [type, textData, actingUserId, '']
+            )
+            message = results[0]?.p_mensaje_resultado || 'SUCCESS: Importación completada en PostgreSQL.'
+        }
 
         import('@/lib/logger').then(({ registerLog }) => {
             registerLog(
@@ -77,7 +86,7 @@ export async function POST(req: NextRequest) {
                 `Importación masiva de ${type} vía SP (Texto). Resultado: ${message}`, 
                 { type, message } 
             );
-        });
+        }).catch(() => {});
 
         if (message.startsWith('ERROR')) {
             throw new Error(message);
@@ -87,8 +96,8 @@ export async function POST(req: NextRequest) {
             message: message.startsWith('SUCCESS') ? message : `Importación completada: ${message}`
         })
 
-        } catch (error: any) {
-            console.error('Bulk upload error (SP Text):', error)
-            return NextResponse.json({ message: 'Error al procesar la importación masiva: ' + error.message }, { status: 500 })
-        }
+    } catch (error: any) {
+        console.error('Bulk upload error (SP Text):', error)
+        return NextResponse.json({ message: 'Error al procesar la importación masiva: ' + error.message }, { status: 500 })
+    }
 }

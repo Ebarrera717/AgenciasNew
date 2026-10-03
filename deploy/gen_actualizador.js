@@ -59,7 +59,11 @@ try {
     }
 
     fs.writeFileSync(actFile, content, 'utf8');
-    console.log('Actualizador.SQL (PostgreSQL) regenerado con éxito (' + content.length + ' bytes).');
+    
+    // Guardar copia directa en SQL/PostgreSQL/Actualizador.sql
+    const pgActFile = path.join(root, 'PostgreSQL', 'Actualizador.sql');
+    fs.writeFileSync(pgActFile, content, 'utf8');
+    console.log('Actualizador.SQL (PostgreSQL) guardado en SQL/PostgreSQL/Actualizador.sql (' + content.length + ' bytes).');
 
     const releaseSqlDir = path.join(__dirname, '..', 'RELEASE_KOREX', 'SQL');
     if (!fs.existsSync(releaseSqlDir)) {

@@ -8,6 +8,16 @@ echo ========================================================
 echo.
 
 echo Paso 0: Generando y auditando descriptor de esquema SQL Server...
+node "%~dp0scripts\test_sqlserver_connection.js"
+if %errorlevel% neq 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO DE CONEXION: No fue posible conectar con el servidor SQL Server.
+    echo La compilacion del instalador SQL Server fue CANCELADA.
+    echo ===============================================================================
+    pause
+    exit /b %errorlevel%
+)
 node "%~dp0deploy\sync_sqlserver_updater.js"
 if %errorlevel% neq 0 (
     echo Error durante la sincronizacion de scripts T-SQL de SQL Server.
@@ -20,6 +30,18 @@ if %errorlevel% neq 0 (
     pause
     exit /b %errorlevel%
 )
+echo.
+echo Ejecutando Release Guardian de Integridad Universal...
+node "%~dp0scripts\korex_database_release_guardian.js"
+if %errorlevel% neq 0 (
+    echo.
+    echo ===============================================================================
+    echo ERROR CRITICO: Release Guardian emitio dictamen [BLOQUEADO]. Instalador CANCELADO.
+    echo ===============================================================================
+    pause
+    exit /b %errorlevel%
+)
+
 echo.
 echo Ejecutando KorexValidator Oficial (Pre-Build SQL Server)...
 node "%~dp0scripts\korex_validator.js" --engine=sqlserver --phase=pre-build

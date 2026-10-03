@@ -162,14 +162,8 @@ export default function QuotationsListPage() {
         fetchQuotations()
     }, [])
 
-    // Aplicar ordenamiento natural por Referencia / ID
+    // Aplicar ordenamiento estricto por ID de Cotización
     const sortedQs = [...quotations].sort((a, b) => {
-        const keyA = String(a.internalNumber || a.consecutivo || a.id || '').trim();
-        const keyB = String(b.internalNumber || b.consecutivo || b.id || '').trim();
-        const res = keyA.localeCompare(keyB, undefined, { numeric: true, sensitivity: 'base' });
-        if (res !== 0) {
-            return sortDirection === 'asc' ? res : -res;
-        }
         const numA = Number(a.id) || 0;
         const numB = Number(b.id) || 0;
         return sortDirection === 'asc' ? numA - numB : numB - numA;
@@ -341,8 +335,8 @@ export default function QuotationsListPage() {
         }
 
         const dataForExcel = listToDownload.map(q => ({
-            'Referencia ID': q.id,
-            'No. Interno': q.internalNumber || '',
+            'ID Cotización': q.id,
+            'No. Referencia': q.internalNumber || '',
             'Fecha': format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy'),
             'Reserva / Localizador': q.reservationCode || '',
             'Cliente': q.clientName || '',
@@ -732,10 +726,10 @@ export default function QuotationsListPage() {
                                     <th 
                                         onClick={handleToggleSort} 
                                         className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:text-blue-600 transition-colors select-none whitespace-nowrap"
-                                        title="Hacer clic para alternar orden por Referencia / ID"
+                                        title="Hacer clic para alternar orden por ID de Cotización"
                                     >
                                         <div className="flex items-center gap-1.5">
-                                            <span>Referencia / ID</span>
+                                            <span>ID Cotización</span>
                                             {sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />}
                                         </div>
                                     </th>
@@ -760,9 +754,14 @@ export default function QuotationsListPage() {
                                             />
                                         </td>
                                         <td className="px-4 py-3.5 whitespace-nowrap">
-                                            <div className="font-bold text-zinc-900 dark:text-white text-xs md:text-sm">
-                                                {q.internalNumber ? (q.internalNumber.startsWith('#') ? q.internalNumber : '#' + q.internalNumber) : '#' + q.id}
+                                            <div className="font-black text-zinc-900 dark:text-white text-xs md:text-sm flex items-center gap-1.5">
+                                                <span>#{q.id}</span>
                                             </div>
+                                            {q.internalNumber && String(q.internalNumber) !== String(q.id) && (
+                                                <div className="text-[10px] text-zinc-400 font-medium truncate max-w-[140px]" title={q.internalNumber}>
+                                                    Ref: {q.internalNumber}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3.5 whitespace-nowrap max-w-[180px]">
                                             <div className="font-semibold text-zinc-800 dark:text-zinc-200 text-xs md:text-sm max-w-[170px] truncate" title={q.reservationCode || '-'}>

@@ -11,29 +11,38 @@ function generateTsqlFunctionsAndSps() {
     let zeusSpsContent = '';
     const zeusDir = path.join(__dirname, '..', 'SQL', 'ZeusERP');
     if (fs.existsSync(zeusDir)) {
-        const files = fs.readdirSync(zeusDir).filter(f => f.endsWith('.sql')).sort();
+        const files = fs.readdirSync(zeusDir).filter(f => f.endsWith('.sql') && f !== 'TODOS_LOS_SPS_ZEUSERP.sql').sort();
         for (const file of files) {
             const filePath = path.join(zeusDir, file);
             zeusSpsContent += `\n\n-- ==========================================\n-- Procedimiento Zeus ERP: ${file}\n-- ==========================================\n\n` + fs.readFileSync(filePath, 'utf8') + '\n\nGO\n';
         }
+        // Guardar compilado exclusivo de Zeus ERP en SQL/ZeusERP/TODOS_LOS_SPS_ZEUSERP.sql y TODOS_LOS_SPS_Y_FUNCIONES_ZEUSERP.sql
+        const pathZeusCompiled = path.join(zeusDir, 'TODOS_LOS_SPS_ZEUSERP.sql');
+        const pathZeusCompiledFull = path.join(zeusDir, 'TODOS_LOS_SPS_Y_FUNCIONES_ZEUSERP.sql');
+        fs.writeFileSync(pathZeusCompiled, zeusSpsContent, 'utf8');
+        fs.writeFileSync(pathZeusCompiledFull, zeusSpsContent, 'utf8');
+        console.log('✅ SQL/ZeusERP/TODOS_LOS_SPS_ZEUSERP.sql y TODOS_LOS_SPS_Y_FUNCIONES_ZEUSERP.sql generados exitosamente.');
     }
 
-    // Fallback retrocompatible para SQL/SP/
-    const pathSpCotizaciones = path.join(__dirname, '..', 'SQL', 'SP', 'spCotizacionesCrear.sql');
-    const pathSpFacturaciones = path.join(__dirname, '..', 'SQL', 'SP', 'spFacturacionesCrear.sql');
-    if (!zeusSpsContent.includes('spCotizacionesCrear') && fs.existsSync(pathSpCotizaciones)) {
-        zeusSpsContent += '\n\n' + fs.readFileSync(pathSpCotizaciones, 'utf8') + '\n\nGO\n';
-    }
-    if (!zeusSpsContent.includes('spFacturacionesCrear') && fs.existsSync(pathSpFacturaciones)) {
-        zeusSpsContent += '\n\n' + fs.readFileSync(pathSpFacturaciones, 'utf8') + '\n\nGO\n';
-    }
+    let korexExtraSpsContent = '';
+    const sqlServerDir = path.join(__dirname, '..', 'SQL', 'SqlServer');
+    const excludedFiles = new Set([
+        '01_Tables.sql',
+        '02_Seeds.sql',
+        '03_Functions_And_SPs.sql',
+        'TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql',
+        'ActualizadorSERVER.sql',
+        'Actualizador.sql',
+        'manifest-sps.json'
+    ]);
 
-    // Procedimiento de Exportación de Facturas (spExportInvoices)
-    const pathSpExportInvoices = path.join(__dirname, '..', 'SQL', 'SqlServer', 'spExportInvoices.sql');
-    if (fs.existsSync(pathSpExportInvoices)) {
-        let exportInvSql = fs.readFileSync(pathSpExportInvoices, 'utf8');
-        exportInvSql = exportInvSql.replace(/^[ \t]*GO[ \t]*$/gmi, '').trim();
-        zeusSpsContent += '\n\n-- ==========================================\n-- Procedimiento Exportación: spExportInvoices\n-- ==========================================\n\n' + exportInvSql + '\n\nGO\n';
+    if (fs.existsSync(sqlServerDir)) {
+        const extraFiles = fs.readdirSync(sqlServerDir).filter(f => f.endsWith('.sql') && !excludedFiles.has(f)).sort();
+        for (const file of extraFiles) {
+            const filePath = path.join(sqlServerDir, file);
+            let sqlContent = fs.readFileSync(filePath, 'utf8').trim();
+            korexExtraSpsContent += `\n\n-- ==========================================\n-- Procedimiento Standalone: ${file}\n-- ==========================================\n\n` + sqlContent + '\n\nGO\n';
+        }
     }
 
     const baseContent = `-- ============================================================================
@@ -47,7 +56,32 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- Safeguards de Columnas para Tablas de Zeus ERP y Korex
-IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo') ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo') ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'bl_contabilizarCxPProvee') ALTER TABLE dbo.ImpRet ADD bl_contabilizarCxPProvee BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'bl_contabilizar_proveedor') ALTER TABLE dbo.ImpRet ADD bl_contabilizar_proveedor BIT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'cd_cuenta') ALTER TABLE dbo.ImpRet ADD cd_cuenta VARCHAR(20) NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'bl_inactivo') ALTER TABLE dbo.ImpRet ADD bl_inactivo BIT NULL DEFAULT 0;
+END;
+GO
+IF OBJECT_ID('dbo.CotizacionServicios_PaxAdicional', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'in_edad') ALTER TABLE dbo.CotizacionServicios_PaxAdicional ADD in_edad INT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') AND name = 'cd_tiquete') ALTER TABLE dbo.CotizacionServicios_PaxAdicional ADD cd_tiquete VARCHAR(50) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.FacturaServicios_PaxAdicional', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FacturaServicios_PaxAdicional') AND name = 'in_edad') ALTER TABLE dbo.FacturaServicios_PaxAdicional ADD in_edad INT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FacturaServicios_PaxAdicional') AND name = 'cd_tiquete') ALTER TABLE dbo.FacturaServicios_PaxAdicional ADD cd_tiquete VARCHAR(50) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.CotizacionServicios', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.CotizacionServicios') AND name = 'in_EdadPax')
+    ALTER TABLE dbo.CotizacionServicios ADD in_EdadPax INT NULL DEFAULT 0;
+GO
+IF OBJECT_ID('dbo.Fac_Servicios', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Fac_Servicios') AND name = 'in_EdadPax')
+    ALTER TABLE dbo.Fac_Servicios ADD in_EdadPax INT NULL DEFAULT 0;
 GO
 IF OBJECT_ID('dbo.TiposServicios', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TiposServicios') AND name = 'cd_cuenta') ALTER TABLE dbo.TiposServicios ADD cd_cuenta VARCHAR(20) NULL;
 GO
@@ -99,6 +133,90 @@ BEGIN
 END;
 GO
 
+-- Safeguards para tablas maestras
+IF OBJECT_ID('dbo.Branch', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Branch') AND name = 'createdAt') ALTER TABLE dbo.[Branch] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Branch') AND name = 'updatedAt') ALTER TABLE dbo.[Branch] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.Implant', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Implant') AND name = 'createdAt') ALTER TABLE dbo.[Implant] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Implant') AND name = 'updatedAt') ALTER TABLE dbo.[Implant] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.Seller', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Seller') AND name = 'createdAt') ALTER TABLE dbo.[Seller] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Seller') AND name = 'updatedAt') ALTER TABLE dbo.[Seller] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.TicketPrinter', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TicketPrinter') AND name = 'createdAt') ALTER TABLE dbo.[TicketPrinter] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TicketPrinter') AND name = 'updatedAt') ALTER TABLE dbo.[TicketPrinter] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.ChargeAndTax', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChargeAndTax') AND name = 'inNationality') ALTER TABLE dbo.[ChargeAndTax] ADD [inNationality] INT NULL DEFAULT 1;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChargeAndTax') AND name = 'createdAt') ALTER TABLE dbo.[ChargeAndTax] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChargeAndTax') AND name = 'updatedAt') ALTER TABLE dbo.[ChargeAndTax] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.Client', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Client') AND name = 'createdAt') ALTER TABLE dbo.[Client] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Client') AND name = 'updatedAt') ALTER TABLE dbo.[Client] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.Provider', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Provider') AND name = 'createdAt') ALTER TABLE dbo.[Provider] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Provider') AND name = 'updatedAt') ALTER TABLE dbo.[Provider] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.ProviderType', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProviderType') AND name = 'createdAt') ALTER TABLE dbo.[ProviderType] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ProviderType') AND name = 'updatedAt') ALTER TABLE dbo.[ProviderType] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.Product', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Product') AND name = 'createdAt') ALTER TABLE dbo.[Product] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Product') AND name = 'updatedAt') ALTER TABLE dbo.[Product] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.Prestadora', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Prestadora') AND name = 'createdAt') ALTER TABLE dbo.[Prestadora] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Prestadora') AND name = 'updatedAt') ALTER TABLE dbo.[Prestadora] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.MasterVariable', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MasterVariable') AND name = 'createdAt') ALTER TABLE dbo.[MasterVariable] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.MasterVariable') AND name = 'updatedAt') ALTER TABLE dbo.[MasterVariable] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+IF OBJECT_ID('dbo.SystemParameter', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.SystemParameter') AND name = 'createdAt') ALTER TABLE dbo.[SystemParameter] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.SystemParameter') AND name = 'updatedAt') ALTER TABLE dbo.[SystemParameter] ADD [updatedAt] DATETIME2 NULL;
+END;
+GO
+
+-- Safeguards para dbo.TransactionConsecutive
+IF OBJECT_ID('dbo.TransactionConsecutive', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TransactionConsecutive') AND name = 'padding') ALTER TABLE dbo.[TransactionConsecutive] ADD [padding] INT NULL DEFAULT 4;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TransactionConsecutive') AND name = 'updatedAt') ALTER TABLE dbo.[TransactionConsecutive] ADD [updatedAt] DATETIME2 NULL;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TransactionConsecutive') AND name = 'createdAt') ALTER TABLE dbo.[TransactionConsecutive] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+END;
+GO
+
 -- Safeguards para dbo.Invoices y detalles
 IF OBJECT_ID('dbo.Invoices', 'U') IS NOT NULL
 BEGIN
@@ -138,11 +256,21 @@ IF OBJECT_ID('dbo.InvoicesProductTax', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'rate') ALTER TABLE dbo.InvoicesProductTax ADD rate FLOAT NULL DEFAULT 0;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'explicitAmount') ALTER TABLE dbo.InvoicesProductTax ADD explicitAmount FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueSnapshot FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueTypeSnapshot VARCHAR(50) NULL DEFAULT 'PERCENTAGE';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'isMain') ALTER TABLE dbo.InvoicesProductTax ADD isMain BIT NULL DEFAULT 0;
+    ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
+    ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueTypeSnapshot VARCHAR(50) NULL;
 END;
 GO
 IF OBJECT_ID('dbo.QuotationProductTax', 'U') IS NOT NULL
 BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'rate') ALTER TABLE dbo.QuotationProductTax ADD rate FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueSnapshot FLOAT NULL DEFAULT 0;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueTypeSnapshot VARCHAR(50) NULL DEFAULT 'PERCENTAGE';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'isMain') ALTER TABLE dbo.QuotationProductTax ADD isMain BIT NULL DEFAULT 0;
     ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
+    ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueTypeSnapshot VARCHAR(50) NULL;
 END;
 GO
 IF OBJECT_ID('dbo.InvoicesProductVariable', 'U') IS NOT NULL
@@ -155,6 +283,12 @@ IF OBJECT_ID('dbo.InvoicesProductPasenger', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPasenger') AND name = 'name') ALTER TABLE dbo.InvoicesProductPasenger ADD name VARCHAR(250) NULL;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPasenger') AND name = 'document') ALTER TABLE dbo.InvoicesProductPasenger ADD document VARCHAR(50) NULL;
+END;
+GO
+IF OBJECT_ID('dbo.TicketType', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TicketType') AND name = 'createdAt') ALTER TABLE dbo.[TicketType] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TicketType') AND name = 'updatedAt') ALTER TABLE dbo.[TicketType] ADD [updatedAt] DATETIME2 NULL;
 END;
 GO
 IF OBJECT_ID('dbo.InvoicesProductItinerary', 'U') IS NOT NULL
@@ -458,6 +592,100 @@ GO
 -- ============================================================================
 -- SECCIÓN 2: PROCEDIMIENTOS ALMACENADOS DE MAESTROS Y CATALOGOS (T-SQL)
 -- ============================================================================
+
+-- 2.0. spObtenerSiguienteConsecutivo
+IF OBJECT_ID('dbo.spObtenerSiguienteConsecutivo', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spObtenerSiguienteConsecutivo;
+GO
+
+CREATE PROCEDURE dbo.spObtenerSiguienteConsecutivo
+    @p_transaction_type NVARCHAR(50),
+    @p_branch_id INT = NULL,
+    @p_implant_id INT = NULL,
+    @p_formatted_consecutive NVARCHAR(100) = NULL OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @v_norm_type NVARCHAR(50) = UPPER(LTRIM(RTRIM(ISNULL(@p_transaction_type, 'INVOICE'))));
+    DECLARE @v_id INT = NULL;
+    DECLARE @v_next_val INT = NULL;
+    DECLARE @v_prefix NVARCHAR(20) = '';
+    DECLARE @v_padding INT = 0;
+    DECLARE @v_num_str NVARCHAR(50);
+    
+    -- 1. Buscar en TransactionConsecutive si la tabla existe
+    IF OBJECT_ID('dbo.TransactionConsecutive', 'U') IS NOT NULL
+    BEGIN
+        SELECT TOP 1 
+            @v_id = id,
+            @v_next_val = ISNULL(currentNumber, ISNULL(initialNumber, 1)),
+            @v_prefix = ISNULL(LTRIM(RTRIM(prefix)), ''),
+            @v_padding = ISNULL(padding, 0)
+        FROM dbo.[TransactionConsecutive] WITH (UPDLOCK, ROWLOCK)
+        WHERE isActive = 1
+          AND (
+              UPPER(transactionType) = @v_norm_type
+              OR (@v_norm_type IN ('INVOICE', 'FACTURA', 'FACTURACION', 'FACTURACION ELECTRONICA') AND UPPER(transactionType) IN ('INVOICE', 'FACTURA', 'FACTURACION', 'FACTURACION ELECTRONICA'))
+              OR (@v_norm_type IN ('QUOTATION', 'COTIZACION') AND UPPER(transactionType) IN ('QUOTATION', 'COTIZACION'))
+              OR (@v_norm_type IN ('PREQUOTATION', 'PRECOTIZACION') AND UPPER(transactionType) IN ('PREQUOTATION', 'PRECOTIZACION'))
+              OR (@v_norm_type IN ('CREDIT_NOTE', 'NOTA_CREDITO') AND UPPER(transactionType) IN ('CREDIT_NOTE', 'NOTA_CREDITO'))
+          )
+          AND (@p_branch_id IS NULL OR branchId IS NULL OR branchId = @p_branch_id)
+          AND (@p_implant_id IS NULL OR implantId IS NULL OR implantId = @p_implant_id)
+        ORDER BY 
+            CASE WHEN @p_implant_id IS NOT NULL AND implantId = @p_implant_id THEN 1 WHEN implantId IS NOT NULL THEN 3 ELSE 2 END,
+            CASE WHEN @p_branch_id IS NOT NULL AND branchId = @p_branch_id THEN 1 WHEN branchId IS NOT NULL THEN 3 ELSE 2 END,
+            id ASC;
+    END;
+        
+    IF @v_id IS NOT NULL
+    BEGIN
+        UPDATE dbo.[TransactionConsecutive]
+        SET currentNumber = currentNumber + 1,
+            updatedAt = GETDATE()
+        WHERE id = @v_id;
+    END
+    ELSE
+    BEGIN
+        SET @v_prefix = CASE 
+            WHEN @v_norm_type IN ('QUOTATION', 'COTIZACION') THEN 'COT'
+            WHEN @v_norm_type IN ('INVOICE', 'FACTURA', 'FACTURACION') THEN 'FAC'
+            WHEN @v_norm_type IN ('CREDIT_NOTE', 'NOTA_CREDITO') THEN 'NC'
+            ELSE 'DOC'
+        END;
+        
+        IF @v_norm_type IN ('QUOTATION', 'COTIZACION')
+        BEGIN
+            IF OBJECT_ID('dbo.Quotation', 'U') IS NOT NULL
+                SELECT @v_next_val = ISNULL(MAX(id), 0) + 1 FROM dbo.[Quotation];
+            ELSE
+                SET @v_next_val = 1;
+        END
+        ELSE
+        BEGIN
+            IF OBJECT_ID('dbo.Invoices', 'U') IS NOT NULL
+                SELECT @v_next_val = ISNULL(MAX(id), 0) + 1 FROM dbo.[Invoices];
+            ELSE
+                SET @v_next_val = 1;
+        END;
+    END;
+    
+    SET @v_num_str = CAST(ISNULL(@v_next_val, 1) AS NVARCHAR(50));
+    IF @v_padding > 0 AND LEN(@v_num_str) < @v_padding
+        SET @v_num_str = RIGHT(REPLICATE('0', @v_padding) + @v_num_str, @v_padding);
+        
+    IF @v_prefix <> ''
+    BEGIN
+        IF RIGHT(@v_prefix, 1) IN ('-', '/')
+            SET @p_formatted_consecutive = @v_prefix + @v_num_str;
+        ELSE
+            SET @p_formatted_consecutive = @v_prefix + '-' + @v_num_str;
+    END
+    ELSE
+        SET @p_formatted_consecutive = @v_num_str;
+END;
+GO
 
 -- 2.1. spMonedaListar
 IF OBJECT_ID('dbo.spMonedaListar', 'P') IS NOT NULL
@@ -999,10 +1227,51 @@ IF OBJECT_ID('dbo.spInvoicesObtener', 'P') IS NOT NULL
 GO
 
 CREATE PROCEDURE dbo.spInvoicesObtener
-    @p_id INT
+    @p_id INT = NULL,
+    @p_search NVARCHAR(250) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    DECLARE @targetId INT = @p_id;
+
+    -- Si @p_id es provisto pero no coincide con la clave primaria id, intentar buscar por referencia
+    IF @targetId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Invoices] WHERE [id] = @targetId)
+    BEGIN
+        DECLARE @p_id_str NVARCHAR(100) = CAST(@p_id AS NVARCHAR(100));
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Invoices]
+        WHERE [internalNumber] = @p_id_str
+           OR [zeusInvoiceNumber] = @p_id_str
+           OR [consecutivo] = @p_id_str
+           OR ([serie] IS NOT NULL AND [consecutivo] IS NOT NULL AND ([serie] + '-' + [consecutivo] = @p_id_str OR [serie] + [consecutivo] = @p_id_str));
+    END
+
+    -- Si aún no tenemos un targetId válido y se pasó @p_search, resolver por la cadena de búsqueda
+    IF @targetId IS NULL AND @p_search IS NOT NULL AND TRIM(@p_search) <> ''
+    BEGIN
+        DECLARE @cleanSearch NVARCHAR(250) = TRIM(@p_search);
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Invoices]
+        WHERE [internalNumber] = @cleanSearch
+           OR [zeusInvoiceNumber] = @cleanSearch
+           OR [consecutivo] = @cleanSearch
+           OR ([serie] IS NOT NULL AND [consecutivo] IS NOT NULL AND ([serie] + '-' + [consecutivo] = @cleanSearch OR [serie] + [consecutivo] = @cleanSearch));
+
+        -- Fallback si el parámetro de búsqueda era puramente entero
+        IF @targetId IS NULL AND ISNUMERIC(@cleanSearch) = 1
+        BEGIN
+            SELECT TOP 1 @targetId = [id]
+            FROM dbo.[Invoices]
+            WHERE [id] = CAST(@cleanSearch AS INT);
+        END
+    END
+
+    -- Fallback de resguardo
+    IF @targetId IS NULL
+    BEGIN
+        SET @targetId = ISNULL(@p_id, 0);
+    END
 
     -- Recordset 0: Cabecera Invoices
     SELECT 
@@ -1042,7 +1311,7 @@ BEGIN
     LEFT JOIN dbo.[Seller] s ON i.[sellerId] = s.[id]
     LEFT JOIN dbo.[TicketPrinter] tp ON i.[ticketPrinterId] = tp.[id]
     LEFT JOIN dbo.[User] u ON i.[userId] = u.[id]
-    WHERE i.[id] = @p_id;
+    WHERE i.[id] = @targetId;
 
     -- Recordset 1: InvoicesProduct
     SELECT 
@@ -1087,7 +1356,7 @@ BEGIN
     LEFT JOIN dbo.[Product] p ON ip.[productId] = p.[id]
     LEFT JOIN dbo.[Provider] prov ON ip.[providerId] = prov.[id]
     LEFT JOIN dbo.[Prestadora] prest ON ip.[prestadoraId] = prest.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ip.[id] ASC;
 
     -- Recordset 2: InvoicesProductTax
@@ -1098,14 +1367,17 @@ BEGIN
         ct.[code] AS [taxCode],
         ct.[name] AS [taxName],
         ct.[type] AS [taxType],
-        ct.[valueType] AS [taxValueType],
+        ISNULL(ipt.[valueTypeSnapshot], ct.[valueType]) AS [taxValueType],
+        ISNULL(ipt.[valueSnapshot], ct.[value]) AS [valueSnapshot],
+        ISNULL(ipt.[valueTypeSnapshot], ct.[valueType]) AS [valueTypeSnapshot],
+        ISNULL(ipt.[isMain], 0) AS [isMain],
         ISNULL(ipt.[explicitAmount], 0) AS [explicitAmount],
         ISNULL(ipt.[explicitAmount], 0) AS [amount],
         ISNULL(ipt.[rate], 0) AS [rate]
     FROM dbo.[InvoicesProductTax] ipt
     JOIN dbo.[InvoicesProduct] ip ON ipt.[invoiceProductId] = ip.[id]
     LEFT JOIN dbo.[ChargeAndTax] ct ON ipt.[chargeAndTaxId] = ct.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipt.[id] ASC;
 
     -- Recordset 3: InvoicesProductPasenger
@@ -1116,7 +1388,7 @@ BEGIN
         ipp.[document]
     FROM dbo.[InvoicesProductPasenger] ipp
     JOIN dbo.[InvoicesProduct] ip ON ipp.[invoiceProductId] = ip.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipp.[id] ASC;
 
     -- Recordset 4: InvoicesProductVariable
@@ -1130,7 +1402,7 @@ BEGIN
     FROM dbo.[InvoicesProductVariable] ipv
     JOIN dbo.[InvoicesProduct] ip ON ipv.[invoiceProductId] = ip.[id]
     LEFT JOIN dbo.[MasterVariable] mv ON ipv.[masterVariableId] = mv.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipv.[id] ASC;
 
     -- Recordset 5: InvoicesProductPayment
@@ -1148,7 +1420,7 @@ BEGIN
         ippay.[expirationDate]
     FROM dbo.[InvoicesProductPayment] ippay
     JOIN dbo.[InvoicesProduct] ip ON ippay.[invoiceProductId] = ip.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ippay.[id] ASC;
 
     -- Recordset 6: InvoicesProductItinerary
@@ -1170,7 +1442,7 @@ BEGIN
         ipi.[co2]
     FROM dbo.[InvoicesProductItinerary] ipi
     JOIN dbo.[InvoicesProduct] ip ON ipi.[invoiceProductId] = ip.[id]
-    WHERE ip.[invoiceId] = @p_id
+    WHERE ip.[invoiceId] = @targetId
     ORDER BY ipi.[orden] ASC, ipi.[id] ASC;
 
     -- Recordset 7: InvoicesProductCombo
@@ -1181,7 +1453,7 @@ BEGIN
         cmb.[name] AS [comboName]
     FROM dbo.[InvoicesProductCombo] ipc
     LEFT JOIN dbo.[Combo] cmb ON ipc.[comboId] = cmb.[id]
-    WHERE ipc.[invoiceId] = @p_id
+    WHERE ipc.[invoiceId] = @targetId
     ORDER BY ipc.[id] ASC;
 END;
 GO
@@ -1345,12 +1617,15 @@ BEGIN
                 -- Impuestos del Item
                 IF JSON_QUERY(@itemJson, '$.appliedTaxes') IS NOT NULL
                 BEGIN
-                    INSERT INTO dbo.[InvoicesProductTax] ([invoiceProductId], [chargeAndTaxId], [explicitAmount], [rate])
+                    INSERT INTO dbo.[InvoicesProductTax] ([invoiceProductId], [chargeAndTaxId], [explicitAmount], [rate], [valueSnapshot], [valueTypeSnapshot], [isMain])
                     SELECT 
                         @newIpId,
                         TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) AS INT),
                         ISNULL(TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.explicitAmount'), JSON_VALUE(tax.value, '$.amount')) AS FLOAT), 0),
-                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.rate') AS FLOAT), 0)
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.rate') AS FLOAT), 0),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT), 0),
+                        ISNULL(JSON_VALUE(tax.value, '$.valueTypeSnapshot'), 'PERCENTAGE'),
+                        CASE WHEN TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) AS INT) = @mainTaxId OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
                     FROM OPENJSON(@itemJson, '$.appliedTaxes') AS tax
                     WHERE ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) IS NOT NULL;
                 END;
@@ -1610,12 +1885,15 @@ BEGIN
                 -- Impuestos del Item
                 IF JSON_QUERY(@itemJson, '$.appliedTaxes') IS NOT NULL
                 BEGIN
-                    INSERT INTO dbo.[InvoicesProductTax] ([invoiceProductId], [chargeAndTaxId], [explicitAmount], [rate])
+                    INSERT INTO dbo.[InvoicesProductTax] ([invoiceProductId], [chargeAndTaxId], [explicitAmount], [rate], [valueSnapshot], [valueTypeSnapshot], [isMain])
                     SELECT 
                         @newIpId,
                         TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) AS INT),
                         ISNULL(TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.explicitAmount'), JSON_VALUE(tax.value, '$.amount')) AS FLOAT), 0),
-                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.rate') AS FLOAT), 0)
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.rate') AS FLOAT), 0),
+                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT), 0),
+                        ISNULL(JSON_VALUE(tax.value, '$.valueTypeSnapshot'), 'PERCENTAGE'),
+                        CASE WHEN TRY_CAST(ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) AS INT) = @mainTaxId OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
                     FROM OPENJSON(@itemJson, '$.appliedTaxes') AS tax
                     WHERE ISNULL(JSON_VALUE(tax.value, '$.chargeAndTaxId'), JSON_VALUE(tax.value, '$.id')) IS NOT NULL;
                 END;
@@ -1757,9 +2035,25 @@ BEGIN
         i.[dueDate],
         i.[clientId],
         c.[name] AS [clientName],
-        c.[document] AS [clientDocument],
-        ISNULL(NULLIF(i.[totalAmount], 0), 0) AS [totalAmount],
-        ISNULL(i.[currency], 'COP') AS [currency],
+        COALESCE(
+            NULLIF(
+                (
+                    SELECT SUM(ipt.[explicitAmount])
+                    FROM dbo.[InvoicesProductTax] ipt
+                    JOIN dbo.[InvoicesProduct] ip ON ipt.[invoiceProductId] = ip.[id]
+                    WHERE ip.[invoiceId] = i.[id]
+                ), 0
+            ),
+            NULLIF(
+                (
+                    SELECT SUM(ip.[price] * ip.[quantity])
+                    FROM dbo.[InvoicesProduct] ip
+                    WHERE ip.[invoiceId] = i.[id]
+                ), 0
+            ),
+            i.[totalAmount],
+            0
+        ) AS [totalAmount],
         ISNULL(i.[state], 'NUEVO') AS [state],
         ISNULL(i.[isExcelImport], 0) AS [isExcelImport],
         i.[zeusInvoiceNumber],
@@ -2216,10 +2510,47 @@ IF OBJECT_ID('dbo.spCotizacionObtener', 'P') IS NOT NULL
 GO
 
 CREATE PROCEDURE dbo.spCotizacionObtener
-    @p_id INT
+    @p_id INT = NULL,
+    @p_search NVARCHAR(250) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    DECLARE @targetId INT = @p_id;
+
+    -- Si @p_id es provisto pero no coincide con la clave primaria id, intentar buscar por referencia
+    IF @targetId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE [id] = @targetId)
+    BEGIN
+        DECLARE @p_id_str NVARCHAR(100) = CAST(@p_id AS NVARCHAR(100));
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Quotation]
+        WHERE [internalNumber] = @p_id_str
+           OR [reservationCode] = @p_id_str;
+    END
+
+    -- Si aún no tenemos un targetId válido y se pasó @p_search, resolver por la cadena de búsqueda
+    IF @targetId IS NULL AND @p_search IS NOT NULL AND TRIM(@p_search) <> ''
+    BEGIN
+        DECLARE @cleanSearch NVARCHAR(250) = TRIM(@p_search);
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Quotation]
+        WHERE [internalNumber] = @cleanSearch
+           OR [reservationCode] = @cleanSearch;
+
+        -- Fallback si el parámetro de búsqueda era puramente entero
+        IF @targetId IS NULL AND ISNUMERIC(@cleanSearch) = 1
+        BEGIN
+            SELECT TOP 1 @targetId = [id]
+            FROM dbo.[Quotation]
+            WHERE [id] = CAST(@cleanSearch AS INT);
+        END
+    END
+
+    -- Fallback de resguardo
+    IF @targetId IS NULL
+    BEGIN
+        SET @targetId = ISNULL(@p_id, 0);
+    END
 
     SELECT 
         q.[id],
@@ -2374,7 +2705,7 @@ BEGIN
             FOR JSON PATH
         ) AS [stateHistoryJson]
     FROM dbo.[Quotation] q
-    WHERE q.[id] = @p_id;
+    WHERE q.[id] = @targetId;
 END;
 GO
 
@@ -3366,10 +3697,59 @@ GO
 
 `;
 
-    const fullScript = baseContent + '\n\n' + zeusSpsContent + '\n\nPRINT \'Procedimientos almacenados y funciones T-SQL compiladas exitosamente.\';\n';
+    const fullScript = baseContent + '\n\n' + korexExtraSpsContent + '\n\nPRINT \'Procedimientos almacenados y funciones T-SQL compiladas exitosamente.\';\n';
 
     fs.writeFileSync(path03, fullScript, 'utf8');
     console.log('✅ SQL/SqlServer/03_Functions_And_SPs.sql ampliado y generado con éxito.');
+
+    // Generar también TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql en SQL/SqlServer y en la raíz
+    const pathTodosSpsSql = path.join(__dirname, '..', 'SQL', 'SqlServer', 'TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql');
+    const pathRootTodosSpsSql = path.join(__dirname, '..', 'TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql');
+    fs.writeFileSync(pathTodosSpsSql, fullScript, 'utf8');
+    fs.writeFileSync(pathRootTodosSpsSql, fullScript, 'utf8');
+    console.log('✅ TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql generado en raíz y en SQL/SqlServer/.');
+
+    // Exportar archivos individuales en SQL/SqlServer/SP/ y SQL/SqlServer/Function/
+    const sqlServerSpDir = path.join(__dirname, '..', 'SQL', 'SqlServer', 'SP');
+    const sqlServerFuncDir = path.join(__dirname, '..', 'SQL', 'SqlServer', 'Function');
+    [sqlServerSpDir, sqlServerFuncDir].forEach(d => {
+        if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+    });
+
+    const blocks = fullScript.split(/^[ \t]*GO[ \t]*$/m);
+    let spCount = 0;
+    let fnCount = 0;
+
+    for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i].trim();
+        if (!block) continue;
+
+        // Detectar si el bloque anterior tenía un DROP FUNCTION o DROP PROCEDURE
+        let prevDrop = '';
+        if (i > 0 && /DROP\s+(FUNCTION|PROCEDURE)\s+dbo\.[a-zA-Z0-9_]+/i.test(blocks[i-1])) {
+            prevDrop = blocks[i-1].trim() + '\nGO\n\n';
+        }
+
+        const fnMatch = block.match(/CREATE\s+FUNCTION\s+dbo\.([a-zA-Z0-9_]+)/i);
+        if (fnMatch) {
+            const fnName = fnMatch[1];
+            const filePath = path.join(sqlServerFuncDir, `${fnName}.sql`);
+            fs.writeFileSync(filePath, prevDrop + block + '\nGO\n', 'utf8');
+            fnCount++;
+            continue;
+        }
+
+        const spMatch = block.match(/CREATE\s+PROCEDURE\s+dbo\.([a-zA-Z0-9_]+)/i);
+        if (spMatch) {
+            const spName = spMatch[1];
+            const filePath = path.join(sqlServerSpDir, `${spName}.sql`);
+            fs.writeFileSync(filePath, prevDrop + block + '\nGO\n', 'utf8');
+            spCount++;
+            continue;
+        }
+    }
+    console.log(`✅ ${fnCount} funciones T-SQL sincronizadas en SQL/SqlServer/Function/`);
+    console.log(`✅ ${spCount} procedimientos almacenados T-SQL sincronizados en SQL/SqlServer/SP/`);
 
     try {
         const { syncSqlServerUpdater } = require('./sync_sqlserver_updater');

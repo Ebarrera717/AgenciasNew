@@ -3,10 +3,47 @@ IF OBJECT_ID('dbo.spCotizacionObtener', 'P') IS NOT NULL
 GO
 
 CREATE PROCEDURE dbo.spCotizacionObtener
-    @p_id INT
+    @p_id INT = NULL,
+    @p_search NVARCHAR(250) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    DECLARE @targetId INT = @p_id;
+
+    -- Si @p_id es provisto pero no coincide con la clave primaria id, intentar buscar por referencia
+    IF @targetId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Quotation] WHERE [id] = @targetId)
+    BEGIN
+        DECLARE @p_id_str NVARCHAR(100) = CAST(@p_id AS NVARCHAR(100));
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Quotation]
+        WHERE [internalNumber] = @p_id_str
+           OR [reservationCode] = @p_id_str;
+    END
+
+    -- Si aún no tenemos un targetId válido y se pasó @p_search, resolver por la cadena de búsqueda
+    IF @targetId IS NULL AND @p_search IS NOT NULL AND TRIM(@p_search) <> ''
+    BEGIN
+        DECLARE @cleanSearch NVARCHAR(250) = TRIM(@p_search);
+        SELECT TOP 1 @targetId = [id]
+        FROM dbo.[Quotation]
+        WHERE [internalNumber] = @cleanSearch
+           OR [reservationCode] = @cleanSearch;
+
+        -- Fallback si el parámetro de búsqueda era puramente entero
+        IF @targetId IS NULL AND ISNUMERIC(@cleanSearch) = 1
+        BEGIN
+            SELECT TOP 1 @targetId = [id]
+            FROM dbo.[Quotation]
+            WHERE [id] = CAST(@cleanSearch AS INT);
+        END
+    END
+
+    -- Fallback de resguardo
+    IF @targetId IS NULL
+    BEGIN
+        SET @targetId = ISNULL(@p_id, 0);
+    END
 
     SELECT 
         q.[id],
@@ -161,6 +198,6 @@ BEGIN
             FOR JSON PATH
         ) AS [stateHistoryJson]
     FROM dbo.[Quotation] q
-    WHERE q.[id] = @p_id;
+    WHERE q.[id] = @targetId;
 END;
 GO

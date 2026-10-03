@@ -3,7 +3,8 @@ param(
     [string]$SqlPort,
     [string]$SqlDb,
     [string]$SqlUser,
-    [string]$SqlPass
+    [string]$SqlPass,
+    [switch]$SkipDb
 )
 
 $TargetDir = $PSScriptRoot
@@ -140,13 +141,36 @@ if ($SqlHost -eq $env:COMPUTERNAME -or $SqlHost.ToLower() -eq "localhost" -or $S
 }
 
 # =============================================================================
-# PASO 2: APLICAR ACTUALIZACIÓN T-SQL DE SQL SERVER
+# PASO 2: APLICAR ACTUALIZACIÓN T-SQL DE SQL SERVER Y VERIFICAR CON GUARDIAN
 # =============================================================================
-Write-Log "Ejecutando actualizador T-SQL de base de datos SQL Server..."
-if (Test-Path ".\deploy\update_db_sqlserver.js") {
-    node .\deploy\update_db_sqlserver.js >> $LogFile 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Log "Advertencia al ejecutar update_db_sqlserver.js. Verificando ejecucion con sync_sqlserver_updater..." "WARN"
+if ($SkipDb) {
+    Write-Log "[MODO MANUAL / SOLO APLICACION] Parametro -SkipDb detectado: Se omite la ejecucion de scripts T-SQL y validaciones de base de datos." "INFO"
+} else {
+    Write-Log "Ejecutando actualizador T-SQL en base de datos SQL Server [$SqlHost / $SqlDb]..."
+    if (Test-Path ".\deploy\update_db_sqlserver.js") {
+        node .\deploy\update_db_sqlserver.js "$SqlHost" "" "$SqlPort" "$SqlDb" "$SqlUser" "$SqlPass" >> $LogFile 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR CRITICO: Fallo al ejecutar update_db_sqlserver.js en base $SqlDb" "ERROR"
+            Show-Alert "Error de Actualizacion de Base de Datos" "No fue posible aplicar los scripts T-SQL en la base de datos SQL Server '$SqlDb'."
+            exit 1
+        }
+    }
+
+    Write-Log "Ejecutando verificacion de objetos Korex Update Guardian en SQL Server ($SqlDb)..."
+    $env:DB_ENGINE = "sqlserver"
+    $env:DB_HOST = $SqlHost
+    $env:DB_PORT = $SqlPort
+    $env:DB_NAME = $SqlDb
+    $env:DB_USER = $SqlUser
+    $env:DB_PASSWORD = $SqlPass
+
+    if (Test-Path ".\scripts\korex_updater_guardian.js") {
+        node .\scripts\korex_updater_guardian.js >> $LogFile 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR CRITICO: Korex Update Guardian detecto objetos faltantes o erroneos en SQL Server ($SqlDb)." "ERROR"
+            Show-Alert "Error Critico de Verificacion" "El actualizador detecto que uno o mas objetos obligatorios (SPs/Tablas) no quedaron creados en la base de datos '$SqlDb'.`n`nConsulte install_sqlserver_log.txt para ver el detalle."
+            exit 1
+        }
     }
 }
 

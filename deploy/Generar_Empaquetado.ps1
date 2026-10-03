@@ -155,6 +155,7 @@ if (!(Test-Path "$ReleaseDir\SQL\SP")) { New-Item -ItemType Directory -Path "$Re
 if (Test-Path ".\SQL\SP\spLimpiarMovimientosProduccion.sql") { Copy-Item ".\SQL\SP\spLimpiarMovimientosProduccion.sql" -Destination "$ReleaseDir\SQL\SP" -Force }
 if (Test-Path ".\SQL\Actualizador\Actualizador.SQL") { Copy-Item ".\SQL\Actualizador\Actualizador.SQL" -Destination "$ReleaseDir\SQL" -Force }
 if (Test-Path ".\SQL\Actualizador\ActualizadorSERVER.SQL") { Copy-Item ".\SQL\Actualizador\ActualizadorSERVER.SQL" -Destination "$ReleaseDir\SQL" -Force }
+if (Test-Path ".\SQL\SqlServer\TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql") { Copy-Item ".\SQL\SqlServer\TODOS_LOS_SPS_Y_FUNCIONES_SQLSERVER.sql" -Destination "$ReleaseDir\SQL" -Force }
 if (Test-Path ".\SQL\Data\Inicial.sql") { Copy-Item ".\SQL\Data\Inicial.sql" -Destination "$ReleaseDir\SQL" -Force }
 if (Test-Path ".\SQL\schema_reference.json") { Copy-Item ".\SQL\schema_reference.json" -Destination "$ReleaseDir\SQL" -Force }
 

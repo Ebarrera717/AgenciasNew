@@ -90,18 +90,9 @@ async function syncToZeusERP(silentSuccess = false) {
         return false;
     }
 
-    // 2. Cargar exclusivamente las funciones y SPs de integración para Zeus ERP (evitando crear tablas locales de Korex)
-    const spsSqlPath = path.join(rootDir, 'SQL', 'SqlServer', '03_Functions_And_SPs.sql');
-    let sqlContent = '';
-    if (fs.existsSync(spsSqlPath)) {
-        sqlContent = fs.readFileSync(spsSqlPath, 'utf8');
-    } else {
-        console.error('  [ERROR] No se encontró SQL/SqlServer/03_Functions_And_SPs.sql para sincronizar.');
-        return false;
-    }
-
     const config = getSqlServerConfig();
-    const dbsToSync = [config.database];
+    const zeusDbName = config.database;
+    const dbsToSync = [zeusDbName];
 
     // También sincronizar en la BD principal de Korex SQL Server si es diferente a Zeus ERP
     let envDbName = null;
@@ -120,6 +111,18 @@ async function syncToZeusERP(silentSuccess = false) {
         let pool = null;
         let batchCount = 0;
         let successCount = 0;
+
+        let spsSqlPath = (targetDb.toLowerCase() === zeusDbName.toLowerCase())
+            ? path.join(rootDir, 'SQL', 'ZeusERP', 'TODOS_LOS_SPS_ZEUSERP.sql')
+            : path.join(rootDir, 'SQL', 'SqlServer', '03_Functions_And_SPs.sql');
+
+        let sqlContent = '';
+        if (fs.existsSync(spsSqlPath)) {
+            sqlContent = fs.readFileSync(spsSqlPath, 'utf8');
+        } else {
+            console.error(`  [ERROR] No se encontró ${spsSqlPath} para sincronizar en [${targetDb}].`);
+            continue;
+        }
 
         try {
             const dbConfig = { ...config, database: targetDb };

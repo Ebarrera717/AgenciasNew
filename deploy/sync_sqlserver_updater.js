@@ -62,6 +62,8 @@ GO
         contentSps + '\n\nGO\n';
 
     const targetPaths = [
+        path.join(__dirname, '..', 'SQL', 'SqlServer', 'ActualizadorSERVER.sql'),
+        path.join(__dirname, '..', 'SQL', 'SqlServer', 'Actualizador.sql'),
         path.join(__dirname, '..', 'SQL', 'Actualizador', 'ActualizadorSERVER.sql'),
         path.join(__dirname, '..', 'RELEASE_KOREX', 'SQL', 'ActualizadorSERVER.SQL')
     ];

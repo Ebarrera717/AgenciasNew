@@ -182,8 +182,15 @@ BEGIN
         [code] NVARCHAR(50) NOT NULL CONSTRAINT UQ_TicketType_Code UNIQUE,
         [name] NVARCHAR(150) NOT NULL,
         [description] NVARCHAR(MAX) NULL,
-        [isActive] BIT NULL CONSTRAINT DF_TicketType_IsActive DEFAULT 1
+        [isActive] BIT NULL CONSTRAINT DF_TicketType_IsActive DEFAULT 1,
+        [createdAt] DATETIME2 NULL CONSTRAINT DF_TicketType_CreatedAt DEFAULT GETDATE(),
+        [updatedAt] DATETIME2 NULL
     );
+END;
+IF OBJECT_ID('dbo.TicketType', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TicketType') AND name = 'createdAt') ALTER TABLE dbo.[TicketType] ADD [createdAt] DATETIME2 NULL DEFAULT GETDATE();
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TicketType') AND name = 'updatedAt') ALTER TABLE dbo.[TicketType] ADD [updatedAt] DATETIME2 NULL;
 END;
 
 -- 12. Product
@@ -325,9 +332,12 @@ BEGIN
         [orden] INT NULL CONSTRAINT DF_ChargeAndTax_Orden DEFAULT 0,
         [productIds] NVARCHAR(MAX) NULL CONSTRAINT DF_ChargeAndTax_ProductIds DEFAULT '[]',
         [targetTaxId] INT NULL,
+        [inNationality] INT NULL CONSTRAINT DF_ChargeAndTax_InNationality DEFAULT 1,
         [isActive] BIT NOT NULL CONSTRAINT DF_ChargeAndTax_IsActive DEFAULT 1
     );
 END;
+IF OBJECT_ID('dbo.ChargeAndTax', 'U') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ChargeAndTax') AND name = 'inNationality')
+    ALTER TABLE dbo.[ChargeAndTax] ADD [inNationality] INT NULL DEFAULT 1;
 
 -- 19. QuotationProduct
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationProduct' AND schema_id = SCHEMA_ID('dbo'))
@@ -397,10 +407,11 @@ BEGIN
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationProductTax PRIMARY KEY,
         [quotationProductId] INT NOT NULL CONSTRAINT FK_QuotationProductTax_QuotationProduct REFERENCES dbo.[QuotationProduct]([id]) ON DELETE CASCADE,
         [chargeAndTaxId] INT NOT NULL CONSTRAINT FK_QuotationProductTax_ChargeAndTax REFERENCES dbo.[ChargeAndTax]([id]),
-        [valueSnapshot] FLOAT NOT NULL,
-        [valueTypeSnapshot] NVARCHAR(50) NOT NULL,
+        [valueSnapshot] FLOAT NULL CONSTRAINT DF_QuotationProductTax_valueSnapshot DEFAULT 0,
+        [valueTypeSnapshot] NVARCHAR(50) NULL CONSTRAINT DF_QuotationProductTax_valueTypeSnapshot DEFAULT 'PERCENTAGE',
         [explicitAmount] FLOAT NULL,
-        [isMain] BIT NOT NULL CONSTRAINT DF_QuotationProductTax_IsMain DEFAULT 0
+        [rate] FLOAT NULL CONSTRAINT DF_QuotationProductTax_rate DEFAULT 0,
+        [isMain] BIT NULL CONSTRAINT DF_QuotationProductTax_IsMain DEFAULT 0
     );
 END;
 
@@ -571,9 +582,10 @@ BEGIN
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductTax PRIMARY KEY,
         [invoiceProductId] INT NOT NULL,
         [chargeAndTaxId] INT NOT NULL,
-        [valueSnapshot] FLOAT NOT NULL,
-        [valueTypeSnapshot] NVARCHAR(50) NOT NULL,
+        [valueSnapshot] FLOAT NULL CONSTRAINT DF_InvoicesProductTax_valueSnapshot DEFAULT 0,
+        [valueTypeSnapshot] NVARCHAR(50) NULL CONSTRAINT DF_InvoicesProductTax_valueTypeSnapshot DEFAULT 'PERCENTAGE',
         [explicitAmount] FLOAT NULL,
+        [rate] FLOAT NULL CONSTRAINT DF_InvoicesProductTax_rate DEFAULT 0,
         [isMain] BIT NULL CONSTRAINT DF_InvoicesProductTax_IsMain DEFAULT 0
     );
 END;
@@ -2625,6 +2637,76 @@ IF OBJECT_ID('dbo.QuotationProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM s
 
 IF OBJECT_ID('dbo.InvoicesProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'providerDueDate') ALTER TABLE dbo.[InvoicesProduct] ADD [providerDueDate] DATETIME2 NULL;
 IF OBJECT_ID('dbo.InvoicesProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProduct') AND name = 'providerInvoice') ALTER TABLE dbo.[InvoicesProduct] ADD [providerInvoice] NVARCHAR(100) NULL;
+
+-- ============================================================================
+-- TABLAS DE CONTROL DE ACTUALIZACIÓN KOREX UPDATE GUARDIAN
+-- ============================================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Korex_UpdateHistory' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Korex_UpdateHistory] (
+        [UpdateId] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Korex_UpdateHistory PRIMARY KEY,
+        [VersionAnterior] NVARCHAR(50) NULL,
+        [VersionNueva] NVARCHAR(50) NOT NULL,
+        [Build] NVARCHAR(50) NULL,
+        [Motor] NVARCHAR(50) NOT NULL,
+        [Servidor] NVARCHAR(255) NULL,
+        [BaseDatos] NVARCHAR(255) NULL,
+        [FechaInicio] DATETIME2 NOT NULL CONSTRAINT DF_Korex_UpdateHistory_FechaInicio DEFAULT GETDATE(),
+        [FechaFin] DATETIME2 NULL,
+        [Estado] NVARCHAR(50) NOT NULL, -- OK, INCOMPLETA, FALLIDA
+        [ExitCode] INT NOT NULL DEFAULT 0,
+        [Usuario] NVARCHAR(150) NULL,
+        [Equipo] NVARCHAR(150) NULL,
+        [ResumenLog] NVARCHAR(MAX) NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Korex_UpdateObjects' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Korex_UpdateObjects] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Korex_UpdateObjects PRIMARY KEY,
+        [UpdateId] INT NOT NULL CONSTRAINT FK_Korex_UpdateObjects_History REFERENCES dbo.[Korex_UpdateHistory]([UpdateId]),
+        [ObjectType] NVARCHAR(50) NOT NULL, -- TABLE, COLUMN, PROCEDURE, FUNCTION, INDEX, DATA
+        [ObjectName] NVARCHAR(255) NOT NULL,
+        [Expected] BIT NOT NULL DEFAULT 1,
+        [Executed] BIT NOT NULL DEFAULT 0,
+        [Compiled] BIT NOT NULL DEFAULT 0,
+        [Validated] BIT NOT NULL DEFAULT 0,
+        [HashExpected] NVARCHAR(128) NULL,
+        [HashActual] NVARCHAR(128) NULL,
+        [Status] NVARCHAR(50) NOT NULL, -- OK, WARNING, ERROR, OMITIDO
+        [ErrorMessage] NVARCHAR(MAX) NULL,
+        [ExecutionTimeMs] INT NULL DEFAULT 0,
+        [FechaVerificacion] DATETIME2 NOT NULL CONSTRAINT DF_Korex_UpdateObjects_Fecha DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Korex_UpdateErrors' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Korex_UpdateErrors] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Korex_UpdateErrors PRIMARY KEY,
+        [UpdateId] INT NOT NULL CONSTRAINT FK_Korex_UpdateErrors_History REFERENCES dbo.[Korex_UpdateHistory]([UpdateId]),
+        [ObjectName] NVARCHAR(255) NULL,
+        [ErrorNumber] INT NULL,
+        [ErrorMessage] NVARCHAR(MAX) NOT NULL,
+        [StackTrace] NVARCHAR(MAX) NULL,
+        [Fecha] DATETIME2 NOT NULL CONSTRAINT DF_Korex_UpdateErrors_Fecha DEFAULT GETDATE()
+    );
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Korex_Installation' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE dbo.[Korex_Installation] (
+        [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Korex_Installation PRIMARY KEY,
+        [AppVersion] NVARCHAR(50) NOT NULL,
+        [DbVersion] NVARCHAR(50) NOT NULL,
+        [Build] NVARCHAR(50) NULL,
+        [Motor] NVARCHAR(50) NOT NULL,
+        [LastValidationDate] DATETIME2 NOT NULL CONSTRAINT DF_Korex_Installation_LastVal DEFAULT GETDATE(),
+        [Status] NVARCHAR(50) NOT NULL DEFAULT 'HEALTHY',
+        [Environment] NVARCHAR(50) NULL DEFAULT 'PRODUCTION'
+    );
+END;
 
 PRINT 'Tablas de la base de datos SQL Server estructuradas exitosamente.';
 
