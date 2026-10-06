@@ -789,7 +789,7 @@ BEGIN
 				@c_PorIva = am_porcentaje,
 				@c_codigoimpiva = cd_codigo,
 				@c_nombreimpiva = ds_nombre
-			FROM dbo.ImpRet 
+			FROM dbo.ImpRet WITH (NOLOCK)
 			WHERE id = 1;
 		END
 		IF @am_porcentaje_iva IS NULL SET @am_porcentaje_iva = 19.00;
@@ -797,8 +797,8 @@ BEGIN
 
 		IF OBJECT_ID('dbo.parametros', 'U') IS NOT NULL
 		BEGIN
-			SELECT TOP 1 @NumDecimales = TRY_CAST(LTRIM(RTRIM(valor)) AS INT) FROM dbo.parametros WHERE id = 33;
-			SELECT TOP 1 @CalcularAutoValoresItemFac = ISNULL(LTRIM(RTRIM(valor)), 'N') FROM dbo.parametros WHERE id = 326;
+			SELECT TOP 1 @NumDecimales = TRY_CAST(LTRIM(RTRIM(valor)) AS INT) FROM dbo.parametros WITH (NOLOCK) WHERE id = 33;
+			SELECT TOP 1 @CalcularAutoValoresItemFac = ISNULL(LTRIM(RTRIM(valor)), 'N') FROM dbo.parametros WITH (NOLOCK) WHERE id = 326;
 		END
 		IF @NumDecimales IS NULL SET @NumDecimales = 2;
 		IF @CalcularAutoValoresItemFac IS NULL SET @CalcularAutoValoresItemFac = 'N';
@@ -1307,19 +1307,19 @@ BEGIN
 			bl_NoCalcIvaComision = ISNULL(F.Item.value('bl_nocalcivacomision[1]','BIT'),0),
 			am_basecomisionable = ISNULL(F.Item.value('am_basecomisionable[1]','MONEY'),0),
 			am_porcomision = ISNULL(F.Item.value('am_porcomision[1]','MONEY'),0),
-			id_tiposconceptfac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 2))),
-			id_conceptofacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 3))),
+			id_tiposconceptfac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 2))),
+			id_conceptofacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 3))),
 			id_tiposservicio = ISNULL(
 				TS.id,
 				ISNULL(
-					(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(50)')))),
+					(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(50)')))),
 					ISNULL(
-						(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(100)')))),
+						(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(100)')))),
 						ISNULL(
-							(SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('ds_servicio[1]','VARCHAR(100)')))),
+							(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('ds_servicio[1]','VARCHAR(100)')))),
 							ISNULL(
-								(SELECT TOP 1 TSA2.id_TipoServicio FROM dbo.tiposServicio_asignados TSA2 JOIN dbo.TiposServicios TS2 ON TS2.id = TSA2.id_TipoServicio WHERE TSA2.id_ConceptoFacturacion = CF.id),
-								ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WHERE RTRIM(LTRIM(cd_codigo)) = 'htn'), 1)
+								(SELECT TOP 1 TSA2.id_TipoServicio FROM dbo.tiposServicio_asignados TSA2 WITH (NOLOCK) JOIN dbo.TiposServicios TS2 WITH (NOLOCK) ON TS2.id = TSA2.id_TipoServicio WHERE TSA2.id_ConceptoFacturacion = CF.id),
+								ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = 'htn'), 1)
 							)
 						)
 					)
@@ -1354,19 +1354,18 @@ BEGIN
 			OrdenGrabacion = ROW_NUMBER() OVER (ORDER BY id_item ASC)
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item') F(Item)
 		LEFT JOIN #Facturacion FF ON FF.id_factura = F.Item.value('id_factura[1]','INT')
-		LEFT JOIN dbo.Monedas_IATA M ON M.cd_codigo = F.Item.value('cd_monedas_iata[1]','VARCHAR(25)')
-		LEFT JOIN dbo.Sucursales S ON S.cd_codigo = F.Item.value('cd_sucursal[1]','VARCHAR(25)')
-		LEFT JOIN dbo.Implantes I ON I.cd_codigo = F.Item.value('cd_implante[1]','VARCHAR(25)')
-		LEFT JOIN dbo.FormasPago FP ON FP.cd_codigo = F.Item.value('cd_formasPago[1]','VARCHAR(25)')
-		LEFT JOIN dbo.TarjetasCredito TC ON TC.cd_codigo = F.Item.value('cd_tarjetascredito[1]','VARCHAR(25)')
-		LEFT JOIN dbo.TiposDocumento TD ON TD.cd_codigo = F.Item.value('cd_tiposdocumento[1]','VARCHAR(25)')
-		LEFT JOIN dbo.Entidades ED ON ED.cd_codigo = F.Item.value('cd_entdist[1]','VARCHAR(25)')
-		LEFT JOIN dbo.Entidades	EV ON EV.cd_codigo = F.Item.value('cd_entvend[1]','VARCHAR(25)')
-		LEFT JOIN dbo.Tiqueteadores	TQ ON TQ.cd_codigo = F.Item.value('cd_tiqueteadores[1]','VARCHAR(25)')
-		LEFT JOIN dbo.TiposServicios TS ON TS.cd_codigo = F.Item.value('cd_tiposservicio[1]','VARCHAR(25)')
-		LEFT JOIN dbo.ConceptoFacturacion CF ON RTRIM(LTRIM(CF.cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))
-		LEFT JOIN dbo.tiposServicio_asignados TSA ON TSA.id_ConceptoFacturacion = CF.id
-		LEFT JOIN dbo.TipoProveedores TP ON TP.cd_codigo = F.Item.value('cd_tipoproveedor[1]','VARCHAR(25)')
+		LEFT JOIN dbo.Monedas_IATA M WITH (NOLOCK) ON M.cd_codigo = F.Item.value('cd_monedas_iata[1]','VARCHAR(25)')
+		LEFT JOIN dbo.Sucursales S WITH (NOLOCK) ON S.cd_codigo = F.Item.value('cd_sucursal[1]','VARCHAR(25)')
+		LEFT JOIN dbo.Implantes I WITH (NOLOCK) ON I.cd_codigo = F.Item.value('cd_implante[1]','VARCHAR(25)')
+		LEFT JOIN dbo.FormasPago FP WITH (NOLOCK) ON FP.cd_codigo = F.Item.value('cd_formasPago[1]','VARCHAR(25)')
+		LEFT JOIN dbo.TarjetasCredito TC WITH (NOLOCK) ON TC.cd_codigo = F.Item.value('cd_tarjetascredito[1]','VARCHAR(25)')
+		LEFT JOIN dbo.TiposDocumento TD WITH (NOLOCK) ON TD.cd_codigo = F.Item.value('cd_tiposdocumento[1]','VARCHAR(25)')
+		LEFT JOIN dbo.Entidades ED WITH (NOLOCK) ON ED.cd_codigo = F.Item.value('cd_entdist[1]','VARCHAR(25)')
+		LEFT JOIN dbo.Entidades	EV WITH (NOLOCK) ON EV.cd_codigo = F.Item.value('cd_entvend[1]','VARCHAR(25)')
+		LEFT JOIN dbo.Tiqueteadores	TQ WITH (NOLOCK) ON TQ.cd_codigo = F.Item.value('cd_tiqueteadores[1]','VARCHAR(25)')
+		LEFT JOIN dbo.TiposServicios TS WITH (NOLOCK) ON TS.cd_codigo = F.Item.value('cd_tiposservicio[1]','VARCHAR(25)')
+		LEFT JOIN dbo.ConceptoFacturacion CF WITH (NOLOCK) ON RTRIM(LTRIM(CF.cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))
+		LEFT JOIN dbo.TipoProveedores TP WITH (NOLOCK) ON TP.cd_codigo = F.Item.value('cd_tipoproveedor[1]','VARCHAR(25)')
 		
 		-- Populate child tables from XML
 		DELETE FROM #Pasajeros;
@@ -1439,8 +1438,8 @@ BEGIN
 			bl_iva=ISNULL(C.Cargo.value('bl_iva[1]', 'BIT'), 0),
 			in_orden=ISNULL(C.Cargo.value('in_orden[1]', 'INT'),0)
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/CargosImpuestos') C(Cargo)
-		LEFT JOIN dbo.CargosDesc CD ON CD.cd_codigo=C.Cargo.value('cd_codigo[1]', 'VARCHAR(20)') AND C.Cargo.value('cd_tipo[1]', 'CHAR(1)') IN ('C','D')
-		LEFT JOIN dbo.ImpRet IR ON IR.cd_codigo=C.Cargo.value('cd_codigo[1]', 'VARCHAR(20)') AND C.Cargo.value('cd_tipo[1]', 'CHAR(1)') IN ('I','R'); 
+		LEFT JOIN dbo.CargosDesc CD WITH (NOLOCK) ON CD.cd_codigo=C.Cargo.value('cd_codigo[1]', 'VARCHAR(20)') AND C.Cargo.value('cd_tipo[1]', 'CHAR(1)') IN ('C','D')
+		LEFT JOIN dbo.ImpRet IR WITH (NOLOCK) ON IR.cd_codigo=C.Cargo.value('cd_codigo[1]', 'VARCHAR(20)') AND C.Cargo.value('cd_tipo[1]', 'CHAR(1)') IN ('I','R'); 
 
 		DELETE FROM #FormasPagos;
 		INSERT INTO #FormasPagos (
@@ -1468,8 +1467,8 @@ BEGIN
 			ds_PolizaAnexo=ISNULL(F.Pago.value('ds_PolizaAnexo[1]', 'VARCHAR(50)'),''),
 			am_valor=ISNULL(F.Pago.value('am_valor[1]', 'MONEY'),0)
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/Formaspago') F(Pago)
-		LEFT JOIN dbo.FormasPago FP ON FP.cd_codigo = F.Pago.value('cd_codigo[1]', 'VARCHAR(10)')
-		LEFT JOIN dbo.TarjetasCredito TC ON TC.cd_codigo = F.Pago.value('cd_tipotarjeta[1]', 'VARCHAR(10)');
+		LEFT JOIN dbo.FormasPago FP WITH (NOLOCK) ON FP.cd_codigo = F.Pago.value('cd_codigo[1]', 'VARCHAR(10)')
+		LEFT JOIN dbo.TarjetasCredito TC WITH (NOLOCK) ON TC.cd_codigo = F.Pago.value('cd_tipotarjeta[1]', 'VARCHAR(10)');
 
 		DELETE FROM #VariablesAdicionales;
 		INSERT INTO #VariablesAdicionales (
@@ -1504,8 +1503,8 @@ BEGIN
 			ds_cargonm = ISNULL(CD.ds_nombre, ISNULL(H.Htl.value('ds_cargonm[1]', 'VARCHAR(100)'), 'Tarifa')),
 			id_cargosdesc = ISNULL(CD.id, 1)
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/TiposFacturacionHoteles') H(Htl)
-		LEFT JOIN dbo.TiposFacturacionHoteles TF ON TF.cd_codigo = ISNULL(H.Htl.value('cd_tiposfacturacionhoteles[1]', 'VARCHAR(25)'), 'NCH')
-		LEFT JOIN dbo.CargosDesc CD ON CD.cd_codigo = ISNULL(H.Htl.value('cd_cargosdesc[1]', 'VARCHAR(25)'), 'TAR');
+		LEFT JOIN dbo.TiposFacturacionHoteles TF WITH (NOLOCK) ON TF.cd_codigo = ISNULL(H.Htl.value('cd_tiposfacturacionhoteles[1]', 'VARCHAR(25)'), 'NCH')
+		LEFT JOIN dbo.CargosDesc CD WITH (NOLOCK) ON CD.cd_codigo = ISNULL(H.Htl.value('cd_cargosdesc[1]', 'VARCHAR(25)'), 'TAR');
 	
 	
 	--While 1 = 1
@@ -1732,14 +1731,19 @@ BEGIN
 							va.ds_valor AS ValorObtenido,
 							ISNULL(vd.TipoDato, 'Varchar') AS TipoDato
 						FROM #VariablesAdicionales va
-						LEFT JOIN dbo.VariableDefinicion vd ON (
-							UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
+						LEFT JOIN dbo.VariableDefinicion vd WITH (NOLOCK) ON (
+							vd.Nombre = va.ds_VariableAdicional
+							OR vd.Nombre = va.cd_codigo
+							OR vd.Descripcion = va.ds_VariableAdicional
+							OR vd.Presentacion = '[' + va.ds_VariableAdicional + ']'
+							OR vd.Presentacion = '[' + va.cd_codigo + ']'
+							OR UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
 							OR UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.cd_codigo)))
 							OR UPPER(RTRIM(LTRIM(vd.Descripcion))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
 							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.ds_VariableAdicional))) + ']'
 							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.cd_codigo))) + ']'
 						)
-						LEFT JOIN dbo.VariableDefinicionMaestro vdm ON vdm.Codigo = 'Tiquetes'
+						LEFT JOIN dbo.VariableDefinicionMaestro vdm WITH (NOLOCK) ON vdm.Codigo = 'Tiquetes'
 						WHERE (va.id_item = @gen_id_item OR (va.id_facturacion = @id_facturacion AND (va.id_item IS NULL OR va.id_item = 0)))
 						  AND ISNULL(va.ds_valor, '') <> '';
 
@@ -2021,14 +2025,19 @@ BEGIN
 							va.ds_valor AS ValorObtenido,
 							ISNULL(vd.TipoDato, 'Varchar') AS TipoDato
 						FROM #VariablesAdicionales va
-						LEFT JOIN dbo.VariableDefinicion vd ON (
-							UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
+						LEFT JOIN dbo.VariableDefinicion vd WITH (NOLOCK) ON (
+							vd.Nombre = va.ds_VariableAdicional
+							OR vd.Nombre = va.cd_codigo
+							OR vd.Descripcion = va.ds_VariableAdicional
+							OR vd.Presentacion = '[' + va.ds_VariableAdicional + ']'
+							OR vd.Presentacion = '[' + va.cd_codigo + ']'
+							OR UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
 							OR UPPER(RTRIM(LTRIM(vd.Nombre))) = UPPER(RTRIM(LTRIM(va.cd_codigo)))
 							OR UPPER(RTRIM(LTRIM(vd.Descripcion))) = UPPER(RTRIM(LTRIM(va.ds_VariableAdicional)))
 							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.ds_VariableAdicional))) + ']'
 							OR UPPER(RTRIM(LTRIM(vd.Presentacion))) = '[' + UPPER(RTRIM(LTRIM(va.cd_codigo))) + ']'
 						)
-						LEFT JOIN dbo.VariableDefinicionMaestro vdm ON vdm.Codigo = 'FacturacionServicios'
+						LEFT JOIN dbo.VariableDefinicionMaestro vdm WITH (NOLOCK) ON vdm.Codigo = 'FacturacionServicios'
 						WHERE (va.id_item = @gen_id_item OR (va.id_facturacion = @id_facturacion AND (va.id_item IS NULL OR va.id_item = 0)))
 						  AND ISNULL(va.ds_valor, '') <> '';
 
@@ -2097,7 +2106,7 @@ BEGIN
 									SELECT TOP 1 
 									       @zeus_id_impret = id,
 									       @tax_acct_val = cd_cuenta
-									FROM dbo.ImpRet 
+									FROM dbo.ImpRet WITH (NOLOCK)
 									WHERE UPPER(RTRIM(LTRIM(cd_codigo))) = UPPER(RTRIM(LTRIM(@sc_codigotax)))
 									   OR UPPER(RTRIM(LTRIM(ds_nombre))) = UPPER(RTRIM(LTRIM(@sc_ds_nombretax)));
 								END;
@@ -2107,7 +2116,7 @@ BEGIN
 									SELECT TOP 1 
 									       @zeus_id_impret = id,
 									       @tax_acct_val = cd_cuenta
-									FROM dbo.ImpRet 
+									FROM dbo.ImpRet WITH (NOLOCK)
 									WHERE id = @sc_id_imptax;
 								END;
 
@@ -2116,7 +2125,7 @@ BEGIN
 									SELECT TOP 1 
 									       @zeus_id_impret = id,
 									       @tax_acct_val = cd_cuenta
-									FROM dbo.ImpRet 
+									FROM dbo.ImpRet WITH (NOLOCK)
 									WHERE UPPER(RTRIM(LTRIM(cd_codigo))) LIKE '%' + UPPER(RTRIM(LTRIM(@sc_codigotax))) + '%'
 									   OR UPPER(RTRIM(LTRIM(ds_nombre))) LIKE '%' + UPPER(RTRIM(LTRIM(@sc_ds_nombretax))) + '%';
 								END;
@@ -2157,38 +2166,38 @@ BEGIN
 						DECLARE @zeus_id_cargosdesc INT = NULL;
 						IF @sc_codigo IS NOT NULL AND RTRIM(LTRIM(@sc_codigo)) <> ''
 						BEGIN
-							SELECT TOP 1 @zeus_id_cargosdesc = id FROM dbo.CargosDesc WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(@sc_codigo));
+							SELECT TOP 1 @zeus_id_cargosdesc = id FROM dbo.CargosDesc WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(@sc_codigo));
 						END;
 						IF @zeus_id_cargosdesc IS NULL AND @sc_id_carg IS NOT NULL
 						BEGIN
-							SELECT TOP 1 @zeus_id_cargosdesc = id FROM dbo.CargosDesc WHERE id = @sc_id_carg;
+							SELECT TOP 1 @zeus_id_cargosdesc = id FROM dbo.CargosDesc WITH (NOLOCK) WHERE id = @sc_id_carg;
 						END;
 
 						IF @gen_id_tiposservicio IS NOT NULL
 						BEGIN
 							SELECT @resolved_account = cd_cuenta 
-							FROM dbo.TiposServicios 
+							FROM dbo.TiposServicios WITH (NOLOCK) 
 							WHERE id = @gen_id_tiposservicio AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
 						END;
 
 						IF (@resolved_account IS NULL OR RTRIM(LTRIM(@resolved_account)) = '') AND @gen_id_conceptofacturacion IS NOT NULL
 						BEGIN
 							SELECT @resolved_account = cd_cuenta 
-							FROM dbo.ConceptoFacturacion 
+							FROM dbo.ConceptoFacturacion WITH (NOLOCK) 
 							WHERE id = @gen_id_conceptofacturacion AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
 						END;
 
 						IF (@resolved_account IS NULL OR RTRIM(LTRIM(@resolved_account)) = '') AND @sc_codigo IS NOT NULL
 						BEGIN
 							SELECT @resolved_account = cd_cuenta 
-							FROM dbo.CargosDesc 
+							FROM dbo.CargosDesc WITH (NOLOCK) 
 							WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(@sc_codigo)) AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
 						END;
 
 						IF (@resolved_account IS NULL OR RTRIM(LTRIM(@resolved_account)) = '') AND @sc_id_carg IS NOT NULL
 						BEGIN
 							SELECT @resolved_account = cd_cuenta 
-							FROM dbo.CargosDesc 
+							FROM dbo.CargosDesc WITH (NOLOCK) 
 							WHERE id = @sc_id_carg AND cd_cuenta IS NOT NULL AND RTRIM(LTRIM(cd_cuenta)) <> '';
 						END;
 
@@ -2509,8 +2518,14 @@ BEGIN
 				-- VALIDACIÓN PREVIA DE REGLAS DE NEGOCIO Y MAESTROS ZEUS ERP
 				DECLARE @ValidacionError VARCHAR(2000) = NULL;
 
-				-- 1. Validar Cliente en Zeus ERP
-				IF @ValidacionError IS NULL AND NOT EXISTS (SELECT 1 FROM dbo.CLIENTES WITH (NOLOCK) WHERE RTRIM(IDCLIENTE) = RTRIM(@cd_cliente))
+				-- 1. Validar Cliente en Zeus ERP (por IDCLIENTE o IDTERCERO)
+				IF @ValidacionError IS NULL AND NOT EXISTS (
+					SELECT 1 FROM dbo.CLIENTES WITH (NOLOCK) 
+					WHERE RTRIM(IDCLIENTE) = RTRIM(@cd_cliente) 
+					   OR RTRIM(IDTERCERO) = RTRIM(@cd_cliente)
+					   OR RTRIM(IDCLIENTE) = RTRIM(@ds_cliid)
+					   OR RTRIM(IDTERCERO) = RTRIM(@ds_cliid)
+				)
 				BEGIN
 					SET @ValidacionError = 'El Cliente ''' + RTRIM(ISNULL(@cd_cliente, '')) + ''' no existe en la tabla de Clientes (dbo.CLIENTES) de Zeus ERP.';
 				END;
@@ -2533,14 +2548,18 @@ BEGIN
 					SET @ValidacionError = 'El Tiqueteador con ID ''' + CAST(@id_tiqueteador AS VARCHAR) + ''' no existe en la tabla dbo.Tiqueteadores de Zeus ERP.';
 				END;
 
-				-- 5. Validar Proveedores de los Ítems
+				-- 5. Validar Proveedores de los Ítems (por IDPROVE o IDTERCERO)
 				IF @ValidacionError IS NULL
 				BEGIN
 					SELECT TOP 1 @ValidacionError = 'El Proveedor con NIT/Código ''' + RTRIM(ISNULL(TI.cd_proveedores, '')) + ''' asignado al ítem ''' + RTRIM(ISNULL(TI.ds_descrip, '')) + ''' no existe en la tabla dbo.PROVEEDORES de Zeus ERP.'
 					FROM #TmpFacturaItems TI
 					WHERE TI.id_factura = @id_facturacion
 					  AND LTRIM(RTRIM(ISNULL(TI.cd_proveedores, ''))) <> ''
-					  AND NOT EXISTS (SELECT 1 FROM dbo.PROVEEDORES WITH (NOLOCK) WHERE RTRIM(IDPROVE) = RTRIM(TI.cd_proveedores));
+					  AND NOT EXISTS (
+						  SELECT 1 FROM dbo.PROVEEDORES WITH (NOLOCK) 
+						  WHERE RTRIM(IDPROVE) = RTRIM(TI.cd_proveedores) 
+							 OR RTRIM(IDTERCERO) = RTRIM(TI.cd_proveedores)
+					  );
 				END;
 
 				-- 6. Validar Tipos de Servicio de los Ítems
@@ -2664,6 +2683,25 @@ BEGIN
 					DECLARE @FacturaExecSqlStmt NVARCHAR(MAX);
 					DECLARE @MaxFacIdBefore INT = ISNULL((SELECT MAX(id) FROM dbo.fac_factura WITH (NOLOCK)), 0);
 
+					-- Resolver IDCLIENTE (Código Cliente) e IDTERCERO (NIT/Tercero) desde dbo.CLIENTES
+					DECLARE @cd_cliente_real VARCHAR(25) = NULL;
+					DECLARE @cd_tercero_real VARCHAR(25) = NULL;
+
+					SELECT TOP 1 
+						@cd_cliente_real = NULLIF(RTRIM(LTRIM(IDCLIENTE)), ''),
+						@cd_tercero_real = NULLIF(RTRIM(LTRIM(IDTERCERO)), '')
+					FROM dbo.CLIENTES WITH (NOLOCK)
+					WHERE RTRIM(IDCLIENTE) = RTRIM(@cd_cliente) 
+					   OR RTRIM(IDTERCERO) = RTRIM(@cd_cliente)
+					   OR RTRIM(IDCLIENTE) = RTRIM(@ds_cliid)
+					   OR RTRIM(IDTERCERO) = RTRIM(@ds_cliid);
+
+					IF @cd_cliente_real IS NOT NULL
+						SET @cd_cliente = @cd_cliente_real;
+
+					IF @cd_tercero_real IS NULL OR @cd_tercero_real = ''
+						SET @cd_tercero_real = @cd_cliente;
+
 					DECLARE @ZML_VariablesStr VARCHAR(MAX) = NULL;
 					
 					-- 1. Variables explícitas desde el XML
@@ -2733,7 +2771,7 @@ BEGIN
 							'@id_implante = ' + ISNULL(CAST(@id_implante AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@dt_fechacont = ' + ISNULL('''' + CONVERT(VARCHAR, @FechaCont, 120) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@dt_vence = ' + ISNULL('''' + CONVERT(VARCHAR, @FechaCont, 120) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_tercero_codigo = ' + ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@cd_tercero_codigo = ' + ISNULL('''' + REPLACE(@cd_tercero_real, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@ds_tercero_nombre = ' + ISNULL('''' + REPLACE(@ds_cliname, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@cd_cliente_codigo = ' + ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@ds_cliente_nombre = ' + ISNULL('''' + REPLACE(@ds_cliname, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +

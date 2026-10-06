@@ -7,7 +7,7 @@ BEGIN
         FROM pg_proc 
         WHERE proname ILIKE 'spQuotationStateEliminar'
     LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -20,6 +20,12 @@ CREATE OR REPLACE PROCEDURE public."spQuotationStateEliminar"(
 LANGUAGE plpgsql AS $$
 BEGIN
     DELETE FROM public."QuotationState" WHERE id = p_id;
+
+    IF NOT FOUND THEN
+        p_mensaje_resultado := 'ERROR: El estado con ID ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
     p_mensaje_resultado := 'SUCCESS: Estado de cotización eliminado correctamente.';
 EXCEPTION
     WHEN OTHERS THEN

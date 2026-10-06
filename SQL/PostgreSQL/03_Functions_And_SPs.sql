@@ -14322,7 +14322,7 @@ BEGIN
         FROM pg_proc 
         WHERE proname ILIKE 'spQuotationStateActualizar'
     LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -14333,19 +14333,27 @@ CREATE OR REPLACE PROCEDURE public."spQuotationStateActualizar"(
     p_name TEXT,
     p_color TEXT,
     p_acting_user_id INT,
-    INOUT p_mensaje_resultado TEXT
+    INOUT p_mensaje_resultado TEXT,
+    p_is_active BOOLEAN DEFAULT NULL
 )
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE public."QuotationState"
-    SET code = COALESCE(p_code, code),
-        name = COALESCE(p_name, name),
-        color = p_color
+    SET code = COALESCE(TRIM(UPPER(p_code)), code),
+        name = COALESCE(TRIM(p_name), name),
+        color = COALESCE(p_color, color),
+        "isActive" = COALESCE(p_is_active, "isActive")
     WHERE id = p_id;
+
+    IF NOT FOUND THEN
+        p_mensaje_resultado := 'ERROR: El estado con ID ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
     p_mensaje_resultado := 'SUCCESS: Estado de cotización actualizado correctamente.';
 EXCEPTION
     WHEN unique_violation THEN
-        p_mensaje_resultado := 'ERROR: El código ya existe.';
+        p_mensaje_resultado := 'ERROR: El código "' || TRIM(p_code) || '" ya existe.';
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
@@ -14362,7 +14370,7 @@ BEGIN
         FROM pg_proc 
         WHERE proname ILIKE 'spQuotationStateCrear'
     LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -14376,14 +14384,31 @@ CREATE OR REPLACE PROCEDURE public."spQuotationStateCrear"(
     INOUT p_mensaje_resultado TEXT
 )
 LANGUAGE plpgsql AS $$
+DECLARE
+    v_max INT;
 BEGIN
-    INSERT INTO public."QuotationState" (code, name, color)
-    VALUES (p_code, p_name, p_color)
+    -- Sincronizar automáticamente la secuencia al MAX(id) existente para evitar colisiones PK (error 23505)
+    BEGIN
+        SELECT MAX(id) INTO v_max FROM public."QuotationState";
+        IF v_max IS NULL THEN
+            PERFORM setval('public."QuotationState_id_seq"', 1, false);
+        ELSE
+            PERFORM setval('public."QuotationState_id_seq"', v_max, true);
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+    END;
+
+    INSERT INTO public."QuotationState" (code, name, color, "isActive")
+    VALUES (TRIM(UPPER(p_code)), TRIM(p_name), COALESCE(p_color, 'blue'), true)
     RETURNING id INTO p_id;
     p_mensaje_resultado := 'SUCCESS: Estado de cotización creado correctamente.';
 EXCEPTION
     WHEN unique_violation THEN
-        p_mensaje_resultado := 'ERROR: El código ya existe.';
+        IF EXISTS (SELECT 1 FROM public."QuotationState" WHERE UPPER(TRIM(code)) = UPPER(TRIM(p_code))) THEN
+            p_mensaje_resultado := 'ERROR: El código "' || TRIM(p_code) || '" ya existe.';
+        ELSE
+            p_mensaje_resultado := 'ERROR: Restricción única violada: ' || SQLERRM;
+        END IF;
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
@@ -14400,7 +14425,7 @@ BEGIN
         FROM pg_proc 
         WHERE proname ILIKE 'spQuotationStateEliminar'
     LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -14413,6 +14438,12 @@ CREATE OR REPLACE PROCEDURE public."spQuotationStateEliminar"(
 LANGUAGE plpgsql AS $$
 BEGIN
     DELETE FROM public."QuotationState" WHERE id = p_id;
+
+    IF NOT FOUND THEN
+        p_mensaje_resultado := 'ERROR: El estado con ID ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
     p_mensaje_resultado := 'SUCCESS: Estado de cotización eliminado correctamente.';
 EXCEPTION
     WHEN OTHERS THEN

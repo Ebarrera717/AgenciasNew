@@ -1,8 +1,8 @@
 {
   "releaseVersion": "0.1.0",
-  "build": "20261003.01",
+  "build": "20261005.01",
   "target": "ZeusAgencias_23",
-  "generatedAt": "2026-10-03T18:25:40.505Z",
+  "generatedAt": "2026-10-05T21:29:48.725Z",
   "totalObjects": 2,
   "objects": [
     {
@@ -17,7 +17,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spFacturacionesCrear",
       "sourceFile": "SQL/ZeusERP/spFacturacionesCrear.sql",
-      "hash": "f8625bab8256bd7d1e37e79dd4083b427c5eb333519b4c15686f875cc4819b40",
+      "hash": "6bd42515eaf48b3b060132a6ea9a8364311ff4d9b2cf9c2b307c5556a06e8468",
       "isMandatory": true,
       "target": "ZEUS_ERP"
     }

@@ -1070,7 +1070,8 @@ BEGIN
         code character varying(25) NOT NULL,
         name character varying(50) NOT NULL,
         color character varying(20),
-        "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+        "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        "isActive" boolean DEFAULT true NOT NULL
     );
     CREATE TABLE IF NOT EXISTS public."QuotationStateHistory" (
         id integer NOT NULL,
