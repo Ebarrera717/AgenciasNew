@@ -58,10 +58,10 @@ BEGIN
 		cd_sucursal VARCHAR(25),
 		cd_implante VARCHAR(25),
 		cd_consecutivo VARCHAR(25),
-		cd_usuario VARCHAR(25),
+		cd_usuario VARCHAR(50),
 		dt_fechacont TIMESTAMP ,
 		dt_fecha TIMESTAMP ,
-		cd_usuarioAct VARCHAR(25),
+		cd_usuarioAct VARCHAR(50),
 		dt_fechaAct TIMESTAMP ,
 		cd_tercero_codigo VARCHAR(25) ,
 		ds_tercero_nombre VARCHAR(250) ,
@@ -369,7 +369,8 @@ BEGIN
                 ELSE LPAD(q."id"::text, 8, '0')
             END,
             LPAD(q."id"::text, 8, '0')
-        ) as cd_consecutivo, 
+        ) as cd_consecutivo,
+		public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuario,		
         q.date as dt_fechacont, 
         q.date as dt_fecha,
         public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuarioAct, 

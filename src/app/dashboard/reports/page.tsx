@@ -1259,8 +1259,8 @@ export default function ReportsPage() {
             <AnimatePresence>
                 {isRuntimeFilterModalOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-zinc-900/60 backdrop-blur-sm">
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800">
-                            <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-lg max-h-[78vh] flex flex-col overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800">
+                            <div className="p-6 sm:p-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
                                 <div>
                                     <h2 className="text-2xl font-black">Filtros de Ejecución</h2>
                                     <p className="text-zinc-500 text-sm font-medium">Ingresa los parámetros para consultar el reporte.</p>
@@ -1270,7 +1270,7 @@ export default function ReportsPage() {
                                 </button>
                             </div>
                             
-                            <div className="p-8 space-y-6">
+                            <div className="p-6 sm:p-8 space-y-4 flex-1 min-h-0 overflow-y-scroll custom-scrollbar">
                                 {activeReport?.filters?.map((f: any) => (
                                     <div key={`${f.table_alias}.${f.column_name}`} className="space-y-2 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-[1.5rem] border border-zinc-200 dark:border-zinc-700 shadow-sm">
                                         <label className="text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest pl-1">{f.filter_label || f.column_name}</label>
@@ -1338,7 +1338,7 @@ export default function ReportsPage() {
                                 ))}
                             </div>
 
-                            <div className="p-8 bg-zinc-50 dark:bg-zinc-800/50 flex gap-3">
+                            <div className="p-6 sm:p-8 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 shrink-0">
                                 <button onClick={() => setIsRuntimeFilterModalOpen(false)} className="flex-1 h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl font-bold hover:bg-zinc-100 transition-colors">
                                     Cancelar
                                 </button>
@@ -1452,7 +1452,7 @@ export default function ReportsPage() {
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800"
                         >
-                            <div className="p-8 space-y-6">
+                            <div className="p-6 sm:p-8 space-y-4 flex-1 min-h-0 overflow-y-scroll custom-scrollbar">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter italic">Configurar Filtro</h3>
                                     <button onClick={() => setIsManualFilterModalOpen(false)} className="text-zinc-400 hover:bg-zinc-100 p-2 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
@@ -1540,7 +1540,7 @@ export default function ReportsPage() {
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800"
                         >
-                            <div className="p-8 space-y-6">
+                            <div className="p-6 sm:p-8 space-y-4 flex-1 min-h-0 overflow-y-scroll custom-scrollbar">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
                                         <FileText className="w-5 h-5 text-blue-600" />

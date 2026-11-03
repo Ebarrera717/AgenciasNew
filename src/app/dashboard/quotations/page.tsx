@@ -28,7 +28,11 @@ import {
     Upload,
     FileDown,
     Send,
-    Plus
+    Plus,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -60,6 +64,8 @@ export default function QuotationsListPage() {
 
     // Ordenamiento por ID (Por defecto DESC por ID de mayor a menor)
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage, setItemsPerPage] = useState(10)
 
     const [selectedIds, setSelectedIds] = useState<number[]>([])
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
@@ -113,6 +119,7 @@ export default function QuotationsListPage() {
 
             if (dbRes) setDbInfo(dbRes)
             setQuotations(Array.isArray(quoRes) ? quoRes : [])
+            setCurrentPage(1)
             if (Array.isArray(statesRes) && statesRes.length > 0) {
                 setStates(statesRes)
             } else {
@@ -170,6 +177,11 @@ export default function QuotationsListPage() {
     })
 
     const filteredQs = sortedQs
+    const totalPages = Math.max(1, Math.ceil(filteredQs.length / itemsPerPage))
+    const safeCurrentPage = Math.min(currentPage, totalPages)
+    const startIndex = (safeCurrentPage - 1) * itemsPerPage
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredQs.length)
+    const paginatedQs = filteredQs.slice(startIndex, endIndex)
 
     const handleToggleSort = () => {
         setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -674,6 +686,11 @@ export default function QuotationsListPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl">
                     <div className="flex items-center gap-3 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                         <span>Total cotizaciones: <strong className="text-blue-600 dark:text-blue-400 font-black text-sm">{filteredQs.length}</strong></span>
+                        {filteredQs.length > 0 && (
+                            <span className="text-zinc-400 dark:text-zinc-500 text-xs font-medium">
+                                (Mostrando {startIndex + 1}–{endIndex} de {filteredQs.length})
+                            </span>
+                        )}
                         {selectedIds.length > 0 && (
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-[11px] font-bold">
                                 {selectedIds.length} seleccionada(s)
@@ -711,7 +728,7 @@ export default function QuotationsListPage() {
                         <p className="text-xs">Aún no se ha emitido ninguna o no coincide con la búsqueda.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto w-full min-h-[420px] pb-36">
+                    <div><div className="overflow-x-auto w-full min-h-[420px] pb-36">
                         <table className="w-full min-w-[900px] text-left border-collapse text-xs md:text-sm">
                             <thead className="bg-zinc-50/70 dark:bg-zinc-800/40">
                                 <tr>
@@ -728,7 +745,7 @@ export default function QuotationsListPage() {
                                         className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:text-blue-600 transition-colors select-none whitespace-nowrap"
                                         title="Hacer clic para alternar orden por ID de Cotización"
                                     >
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1.5" data-pagination-controls="true">
                                             <span>ID Cotización</span>
                                             {sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />}
                                         </div>
@@ -743,7 +760,7 @@ export default function QuotationsListPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                                {filteredQs.map((q, qIndex) => (
+                                {paginatedQs.map((q, qIndex) => (
                                     <tr key={q.id} className={`group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all ${selectedIds.includes(q.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                         <td className="px-4 py-3.5">
                                             <input
@@ -830,7 +847,7 @@ export default function QuotationsListPage() {
                                                         
                                                         {/* Menú Flotante de Acciones */}
                                                         {(() => {
-                                                            const openUpwards = filteredQs.length > 3 && qIndex >= filteredQs.length - 2 && qIndex > 1;
+                                                            const openUpwards = paginatedQs.length > 3 && qIndex >= paginatedQs.length - 2 && qIndex > 1;
                                                             return (
                                                                 <motion.div
                                                                     initial={{ opacity: 0, scale: 0.95, y: openUpwards ? 4 : -4 }}
@@ -961,7 +978,7 @@ export default function QuotationsListPage() {
                                                          </motion.div>
                                                              );
                                                          })()}
-                                                     </>
+                    </>
                                                 )}
                                             </AnimatePresence>
                                         </td>
@@ -969,6 +986,99 @@ export default function QuotationsListPage() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Barra de Paginación Inferior */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-200 dark:border-zinc-800">
+                        <div className="flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
+                            <span>
+                                Mostrando <strong className="text-zinc-900 dark:text-white font-bold">{startIndex + 1}</strong> a <strong className="text-zinc-900 dark:text-white font-bold">{endIndex}</strong> de <strong className="text-blue-600 dark:text-blue-400 font-bold">{filteredQs.length}</strong> registros
+                            </span>
+                            <div className="flex items-center gap-1.5 ml-2">
+                                <span className="text-zinc-400">Filas por página:</span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => {
+                                        setItemsPerPage(Number(e.target.value))
+                                        setCurrentPage(1)
+                                    }}
+                                    className="h-8 px-2 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5" data-pagination-controls="true">
+                            <button
+                                onClick={() => setCurrentPage(1)}
+                                disabled={safeCurrentPage === 1}
+                                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Primera página"
+                            >
+                                <ChevronsLeft className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={safeCurrentPage === 1}
+                                className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 text-xs font-bold cursor-pointer"
+                                title="Página anterior"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" /> Anterior
+                            </button>
+
+                            <div className="flex items-center gap-1 px-1">
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(page => page === 1 || page === totalPages || Math.abs(page - safeCurrentPage) <= 1)
+                                    .reduce<(number | string)[]>((acc, page, idx, arr) => {
+                                        if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                                            acc.push('...')
+                                        }
+                                        acc.push(page)
+                                        return acc
+                                    }, [])
+                                    .map((item, idx) =>
+                                        item === '...' ? (
+                                            <span key={`ellipsis-${idx}`} className="px-1.5 text-xs text-zinc-400 font-bold">
+                                                ...
+                                            </span>
+                                        ) : (
+                                            <button
+                                                key={item}
+                                                onClick={() => setCurrentPage(item as number)}
+                                                className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                    safeCurrentPage === item
+                                                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                                                        : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                                                }`}
+                                            >
+                                                {item}
+                                            </button>
+                                        )
+                                    )}
+                            </div>
+
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={safeCurrentPage === totalPages}
+                                className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 text-xs font-bold cursor-pointer"
+                                title="Página siguiente"
+                            >
+                                Siguiente <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(totalPages)}
+                                disabled={safeCurrentPage === totalPages}
+                                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Última página"
+                            >
+                                <ChevronsRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
                     </div>
                 )}
             </div>

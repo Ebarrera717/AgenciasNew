@@ -1,2017 +1,1395 @@
 {
   "releaseVersion": "0.1.0",
-  "build": "20261003.01",
+  "build": "20261027.01",
   "engine": "PostgreSQL",
-  "generatedAt": "2026-10-03T18:25:40.505Z",
-  "totalObjects": 251,
+  "generatedAt": "2026-10-27T21:40:14.476Z",
+  "totalObjects": 198,
   "objects": [
     {
-      "objectType": "TABLE",
-      "objectName": "public.\"Korex_UpdateHistory\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Korex_UpdateObjects\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Korex_UpdateErrors\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Korex_Installation\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"EquivalenciasInterfaces_Log\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Attachment\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ExecutionProcedure\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ExecutionPreset\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingGDSInvoiceAutoLog\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingsGDSInvoiceAuto\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingProductFEEGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingsGDS_log\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Resolution\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingProductVariableGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingProductGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingProductItineraryGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingProductPaymentGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingProductTaxGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"BookingProductPassangerGDS\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ProviderType\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"PreQuotationStateHistory\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"PreQuotation\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ReportSorts\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ReportFilters\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ReportJoins\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ReportColumns\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Report\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Menu\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Currency\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Role\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"SystemLog\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InvoicesProductCombo\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InvoicesProductItinerary\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"TicketType\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Payment\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InvoicesProductVariable\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InvoicesProductPasenger\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InvoicesProduct\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InvoicesProductPayment\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InvoicesProductTax\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Implant\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Invoices\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Master\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Interfaces\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"EquivalencesInterfaces\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"CreditCard\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Countries\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationState\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"SystemParameter\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationProductPayment\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationProductVariable\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ChargeAndTax\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationProductTax\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationProductPassenger\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationProduct\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationCombo\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationStateHistory\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"MasterVariable\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ComboProduct\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"ComboProductTax\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Combo\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Cities\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"CellCustomization\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"Airports\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationFormat\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationManualService\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationPrintCustomization\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"QuotationPrintDefaultTemplate\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"InterfaceExtractParam\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"DocumentResolution\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"TransactionConsecutive\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"SysConsecutivo\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"TraceabilitySession\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "TABLE",
-      "objectName": "public.\"TraceabilityLog\"",
-      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
-      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectType": "FUNCTION",
+      "objectName": "public.\"fnAirportListar\"",
+      "sourceFile": "SQL/Function/fnAirportListar.sql",
+      "hash": "0586e4f0593b14eb9a901d6478d385f0d394f1dfd6083a9f949a8a8ee5a3723d",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnAirportListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnBranchListar\"",
+      "sourceFile": "SQL/Function/fnBranchListar.sql",
+      "hash": "a38b245b2f249df1333e12bcee6f8afab89c62cf8cb0cee5bfc128322ceb8cbe",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnBranchListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCellCustomizationListar\"",
+      "sourceFile": "SQL/Function/fnCellCustomizationListar.sql",
+      "hash": "392d10a5203590e80b3de60d08aeac94dec3361b6896aec4aefa6a020153a13f",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCellCustomizationListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCityListar\"",
+      "sourceFile": "SQL/Function/fnCityListar.sql",
+      "hash": "4018b4412fd288eb8317ed96fcca94fa1428b74f8154d976eda1e46b7561de11",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCityListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnClienteListar\"",
+      "sourceFile": "SQL/Function/fnClienteListar.sql",
+      "hash": "c365735febb5dc90daafb78f531ef1a4dc6d4f5b5720e50405ffb440ff78d352",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnClienteListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnComboListar\"",
+      "sourceFile": "SQL/Function/fnComboListar.sql",
+      "hash": "77b9811bf008ec8e6f14235e8ee2b2476f9283dfd71ee8e878451f0ad3e46f5e",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnComboListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCotizacion\"",
+      "sourceFile": "SQL/Function/fnCotizacion.sql",
+      "hash": "5ca2ee20725d7a338de3f6511a5c913ff2d7da1944fc5a6ef60722d802633698",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCotizacion",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCotizacionHistorial\"",
+      "sourceFile": "SQL/Function/fnCotizacionHistorial.sql",
+      "hash": "95600062e69e71ac69f960a27168d7c6e1e002e6de7a60f11e30c3f688284fcc",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCotizacionHistorial",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCotizacionListar\"",
+      "sourceFile": "SQL/Function/fnCotizacionListar.sql",
+      "hash": "676e2f22e92170606bf893aecd6a75d67a14346d1ceb3ffb66f085a8c52a1f35",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCotizacionListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCountryListar\"",
+      "sourceFile": "SQL/Function/fnCountryListar.sql",
+      "hash": "a481179ba5be32f9e48b6fd495e22fcca8dc2154e3a463155e5808542cf17f29",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCountryListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCreditCardListar\"",
+      "sourceFile": "SQL/Function/fnCreditCardListar.sql",
+      "hash": "625a5a7c9aa9d0f8d51f32cbe419ebedf2febeb0c46425b15a147943568cfc26",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCreditCardListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnCreditCardValidar\"",
+      "sourceFile": "SQL/Function/fnCreditCardValidar.sql",
+      "hash": "ecc2cc3dc5470313e89b7e70ee8620f15d81c63aca6bb7739c6ac00aaa827ccf",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnCreditCardValidar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnDocumentResolutionListar\"",
+      "sourceFile": "SQL/Function/fnDocumentResolutionListar.sql",
+      "hash": "2e17e6be7fcfbb331f2b8e8a3251f35b5915f1fbd716fa99ee5e90722aa5d7e1",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnDocumentResolutionListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnEquivalenceInterface\"",
+      "sourceFile": "SQL/Function/fnEquivalenceInterface.sql",
+      "hash": "d809c0abb46e8ee9cbe9a67077fafc56e95d5f0a45b0a42dc4860a49d23bb744",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnEquivalenceInterface",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnGetSQLServerConfig\"",
+      "sourceFile": "SQL/Function/fnGetSQLServerConfig.sql",
+      "hash": "b223179ca659a3a97101e3c3f31e8cb61142cce37d38e7327037ab05a0750c1d",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnGetSQLServerConfig",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnImplantListar\"",
+      "sourceFile": "SQL/Function/fnImplantListar.sql",
+      "hash": "88b0fa8c7bb16374c76a8a75ebe3531334758f2c27cc5a7eb37ff29d496d20d9",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnImplantListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnImpuestoListar\"",
+      "sourceFile": "SQL/Function/fnImpuestoListar.sql",
+      "hash": "ad8e190e63470bb04a28f3efbe608f4d70047b8cf8f06ebed0e2e6d53112fb4a",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnImpuestoListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnInterfaceExtractParamValue\"",
+      "sourceFile": "SQL/Function/fnInterfaceExtractParamValue.sql",
+      "hash": "31ab320626940979ebc3c801f24cd8b9e67b36431d2903dbf96e68d3949b386e",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnInterfaceExtractParamValue",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnInterfacesList\"",
+      "sourceFile": "SQL/Function/fnInterfacesList.sql",
+      "hash": "63fc5814e8cef8cbd7c27048c99473345735c9eee530a0c269c6ff20b130e4fe",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnInterfacesList",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnInvoicesListar\"",
+      "sourceFile": "SQL/Function/fnInvoicesListar.sql",
+      "hash": "86462b1e453d887b0ab62684af6d4280c75c7e5ebeaa380606b140aceaa46430",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnInvoicesListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnMasterList\"",
+      "sourceFile": "SQL/Function/fnMasterList.sql",
+      "hash": "e4ea70312b0bda184ab14a250888c617cb65d82c776b0c5d2bd85dccc8e9da8a",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnMasterList",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnMenu\"",
+      "sourceFile": "SQL/Function/fnMenu.sql",
+      "hash": "cc1f50046e5d6abf5206a5605ccc0431be228e31235badae38e9b921933805fb",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnMenu",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnMenuAll\"",
+      "sourceFile": "SQL/Function/fnMenuAll.sql",
+      "hash": "9b294c3680722c66f6a8fdc614efe799241810e1787a0f846d41eb0b5c5a8367",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnMenuAll",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnMonedaListar\"",
+      "sourceFile": "SQL/Function/fnMonedaListar.sql",
+      "hash": "2a520de9651eb85377f67c8f6816d6f9476815b74589d29d8f9c7b285686a421",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnMonedaListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnObtenerSiguienteConsecutivo\"",
+      "sourceFile": "SQL/Function/fnObtenerSiguienteConsecutivo.sql",
+      "hash": "b63a3c7e4ad9b1aeda14c37292c4b6a225ad9c6691ac71ef32917b3fca8b6a36",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnObtenerSiguienteConsecutivo",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnParameterListar\"",
+      "sourceFile": "SQL/Function/fnParameterListar.sql",
+      "hash": "67687c61c6e46e7cacc3fe4371c9d7d756b6f30492b04bed401fea83003224b4",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnParameterListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnPaymentListar\"",
+      "sourceFile": "SQL/Function/fnPaymentListar.sql",
+      "hash": "a15aa97e2852042c4388e1ef1ac1c168603db257e18488452b7f0db00ece8d19",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnPaymentListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnPreCotizacionListar\"",
+      "sourceFile": "SQL/Function/fnPreCotizacionListar.sql",
+      "hash": "0a47fd3847adfb0c9b2eccec16882366d4a1051d765c0b97171733d409c40a33",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnPreCotizacionListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnPrestadoraListar\"",
+      "sourceFile": "SQL/Function/fnPrestadoraListar.sql",
+      "hash": "2803dc573c9d4c99bf68f9add4c77f1df75d57e7b51bd9179aec16e692b09e75",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnPrestadoraListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnProductoListar\"",
+      "sourceFile": "SQL/Function/fnProductoListar.sql",
+      "hash": "a66c4f7f247aca7bb72d8dc1f5e78b30841d9ff5fd7f9161dabbcd2ef07f1f97",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnProductoListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnProveedorListar\"",
+      "sourceFile": "SQL/Function/fnProveedorListar.sql",
+      "hash": "08b247a4ef15cdef0d18ddb5ad8912fb6e1b4ab1022b738fd7ee59a8309a68e4",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnProveedorListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnProviderTypeListar\"",
+      "sourceFile": "SQL/Function/fnProviderTypeListar.sql",
+      "hash": "b3647b6153644e4cedf03529fcc056c11f30d5bbcd8347e6f88e5fb4bc015589",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnProviderTypeListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnQuitarEspeciales\"",
+      "sourceFile": "SQL/Function/fnQuitarEspeciales.sql",
+      "hash": "7638c4efff6ae209aac78196a3f737ad7da7f65a46f6949587533bfa37723e22",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnQuitarEspeciales",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnQuotationStateListar\"",
+      "sourceFile": "SQL/Function/fnQuotationStateListar.sql",
+      "hash": "0c9bfe6d9f0628c178e9e632067aedc7f0146cccd1f68d8516357d535627cc8b",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnQuotationStateListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnReportDinamic\"",
+      "sourceFile": "SQL/Function/fnReportDinamic.sql",
+      "hash": "289120dbc751fdf8e0e6ee5430fcce22ee8aee01eada8fa6f50db67bd816a790",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnReportDinamic",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnReservaBuscarParaFacturar\"",
+      "sourceFile": "SQL/Function/fnReservaBuscarParaFacturar.sql",
+      "hash": "efadececb90f403cdcb8aac271228f0026bd8d52303dba2f59099ec45f0fd2c9",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnReservaBuscarParaFacturar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnResolucionListar\"",
+      "sourceFile": "SQL/Function/fnResolucionListar.sql",
+      "hash": "56f72779cdbc4c15aa4341c457eee946fbea9a5d2e26333477f4b614a364ab55",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnResolucionListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnRoleListar\"",
+      "sourceFile": "SQL/Function/fnRoleListar.sql",
+      "hash": "86de7d75841475ffa0b0a6ff4a6f5a0c54134368e66ef4188539c961b32aedd2",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnRoleListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnRptCotizacion\"",
+      "sourceFile": "SQL/Function/fnRptCotizacion.sql",
+      "hash": "fc15115e00d3a8fa9685adb1f45316decedf5d5e549fa922cbee148381c6a991",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnRptCotizacion",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnSellerListar\"",
+      "sourceFile": "SQL/Function/fnSellerListar.sql",
+      "hash": "9faf2c02974e15003824b476dec34245e695e9e8693df90bde9630405e19061a",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnSellerListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnSysConsecutivoListar\"",
+      "sourceFile": "SQL/Function/fnSysConsecutivoListar.sql",
+      "hash": "29ed79108cd9fd308e8241104e9eab2b8214e179b4b9a11571397f9db3a197b5",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnSysConsecutivoListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnTicketPrinterListar\"",
+      "sourceFile": "SQL/Function/fnTicketPrinterListar.sql",
+      "hash": "e0489dfbbbe3c28616cd1881222089728ddcf673a7675e1dab57eb256d703bee",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnTicketPrinterListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnTicketTypeListar\"",
+      "sourceFile": "SQL/Function/fnTicketTypeListar.sql",
+      "hash": "79ea15db72e7d072262981f0431be6645f4f362af1810524197070b052916ed5",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnTicketTypeListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnTransactionConsecutiveListar\"",
+      "sourceFile": "SQL/Function/fnTransactionConsecutiveListar.sql",
+      "hash": "2a9aad5f9d390ac973236fbbbb5488e0a55b4b6b7f58cd9a7eaf1f7403a9d1d8",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnTransactionConsecutiveListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnUserPermissions\"",
+      "sourceFile": "SQL/Function/fnUserPermissions.sql",
+      "hash": "a86798c81b572d84703e5830d936326c64329ae87c24d2312d276bd28de906c6",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnUserPermissions",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnUsuarioListar\"",
+      "sourceFile": "SQL/Function/fnUsuarioListar.sql",
+      "hash": "2232013ac19d76131a54c15e18a156002607a487e985c0d89510b087d97bcd0f",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnUsuarioListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fnVariableListar\"",
+      "sourceFile": "SQL/Function/fnVariableListar.sql",
+      "hash": "1ae1c427aa4c7ce8716874753508cef0824d0f5365ba5be232a5c2ca32115c83",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fnVariableListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fn_obtener_decimales_moneda\"",
+      "sourceFile": "SQL/Function/fn_obtener_decimales_moneda.sql",
+      "hash": "55227611cbd0e9878e0097260aa23103af0583acc98cc3c0a28df052f2b9ec9b",
+      "isMandatory": true
     },
     {
       "objectType": "FUNCTION",
-      "objectName": "public.fn_obtener_decimales_moneda",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "FUNCTION",
-      "objectName": "public.fn_obtener_historial_estados",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spAirportActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spAirportCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spAirportEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spBranchActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spBranchCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spBranchEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCellCustomizationDelete",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCellCustomizationUpsert",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCityActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCityCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCityEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spClienteActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spClienteCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spClienteEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spComboActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spComboCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spComboEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCotizacionActualizarEstado",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCotizacionActualizarEstadoManual",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCotizacionDuplicar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCotizacionEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCountriesActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCountriesCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCountriesEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCountryActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCountryCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCountryEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCreditCardActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCreditCardCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spCreditCardEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spDocumentResolutionActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spDocumentResolutionCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spDocumentResolutionEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spEquivalencesInterfacesConsultar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "FUNCTION",
-      "objectName": "public.fnEquivalencesInterfacesConsultar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spEquivalencesInterfacesCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spEquivalencesInterfacesEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spExportInvoices",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spExportQuotation",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spFacturaActualizarEstado",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImplantActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImplantCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImplantEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImportInvoices",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImportQuotation",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImpuestoActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImpuestoCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spImpuestoEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spInterfaceAmadeus",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spinterfacefile",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spInterfaceFile",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spInterfaceSabre",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spinterfacesabre",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spInvoicesActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spInvoicesCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"fn_obtener_historial_estados\"",
+      "sourceFile": "SQL/Function/fn_obtener_historial_estados.sql",
+      "hash": "5bb744ad103d7c90c54349ae5d9d45f4ce144e024ba4b8e47b6759e0b834ee02",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spInvoicesEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spLimpiarMovimientosProduccion",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "FUNCTION",
-      "objectName": "public.sploglistar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spLogRegistrar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spMaestroImportar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spMonedaActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spMonedaCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spMonedaEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spMonedaListar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spParameterActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spParameterCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "PROCEDURE",
-      "objectName": "public.spParameterEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"01_Tables\"",
+      "sourceFile": "SQL/PostgreSQL/01_Tables.sql",
+      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPaymentActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"02_Seeds\"",
+      "sourceFile": "SQL/PostgreSQL/02_Seeds.sql",
+      "hash": "0d7f08bd5eae3bf0461104f64dfcd2129931969cf73f088d2421f79e31ba7bbd",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPaymentCrear",
+      "objectName": "public.\"03_Functions_And_SPs\"",
       "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
       "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPaymentEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"Actualizador\"",
+      "sourceFile": "SQL/PostgreSQL/Actualizador.sql",
+      "hash": "e209c7bdd66a9cfac5d1460a28eb3172ed00771c03ce10c91e46c040ed0e442d",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPreCotizacionConvertir",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spAirportActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spAirportActualizar.sql",
+      "hash": "423c340621f49ecdb3ff709f17859a2696c9f72df96183ec575a3c49a2171675",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPreCotizacionCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spAirportCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spAirportCrear.sql",
+      "hash": "e70930719c2b2cfd92e955f3c4467bebf12f761b60e1def272668f08332a08c9",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPreCotizacionEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spAirportEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spAirportEliminar.sql",
+      "hash": "ebb3fdad93b913c31c251f7cf9944d49291e215b3fb698c367c40d82a1b1f84e",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPrestadoraActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spBranchActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spBranchActualizar.sql",
+      "hash": "91463a072cd60e96efb8feee14256ccdd995e5c5c89443654c79cdd7cde67c0e",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPrestadoraCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spBranchCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spBranchCrear.sql",
+      "hash": "ce154a406fe2976c65b077d162a9c5d98eb24b8c2df673efaa03de93e4899c25",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spPrestadoraEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spBranchEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spBranchEliminar.sql",
+      "hash": "518d55ea66ba66f7f9626721c4fd1bdb0bc672cd11978c8df05bedd7536196a1",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProductoActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCellCustomizationDelete\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCellCustomizationDelete.sql",
+      "hash": "c1da929e2603a114924484c500535d516a57c2507d0e513cd9b6dcade8f1ac35",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProductoCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCellCustomizationUpsert\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCellCustomizationUpsert.sql",
+      "hash": "36929974785f37ab595c4eb22d95e7161835313e90ead446fe1f4251a9b8ce3b",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProductoEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCityActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCityActualizar.sql",
+      "hash": "fd5e7ed492d311d463308366a45bd3422a3f9785328896b874c1c0d8cf2379ce",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProveedorActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCityCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCityCrear.sql",
+      "hash": "3464c17d99868d99aabdd381b561d2baa884752a5953d2c69a95b199654d0de4",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProveedorCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCityEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCityEliminar.sql",
+      "hash": "22af76ea99856938ab34af010702c6e615c9beee164ad796969d873a480854cb",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProveedorEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spClienteActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spClienteActualizar.sql",
+      "hash": "9bf791e41c56081fc513e5f3b124a5f56825502fab7a7ebddee278e97566da5d",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProviderTypeActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spClienteCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spClienteCrear.sql",
+      "hash": "aaf09fba8107b1854644018d3ca27c9e5c9f100bd4df8dc66197f8352883f545",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProviderTypeCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spClienteEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spClienteEliminar.sql",
+      "hash": "6305a7a88c35a82a58ff244de5c94ef1a274d31a7b698fd531d9d44846547e93",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spProviderTypeEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spComboActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spComboActualizar.sql",
+      "hash": "47d78966cd3c1f58c88ebcb81aad35f655da98e2cc4440ffb0b20a5a84aab8a9",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spQuotationStateActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spComboCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spComboCrear.sql",
+      "hash": "8ead6b5933f5bdc15ce72cf1fe59afc4472091780d4c2467e6e3397735ea084e",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spQuotationStateCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spComboEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spComboEliminar.sql",
+      "hash": "dd543a696a78b961a26c04738d27b0aaf99f406ba92e03faebc72427807a4bdc",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spQuotationStateEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCotizacionActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCotizacionActualizar.sql",
+      "hash": "950c3e0cfa7df7f2b955ab951c2c66710b285e26b8e355015590878e472dabcd",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spResolucionActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCotizacionActualizarEstado\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCotizacionActualizarEstado.sql",
+      "hash": "1c1c7dcec528bb0568c384a6cdcd613da5e26b4bf66583a32c2d48f8c8b425c3",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spResolucionCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCotizacionActualizarEstadoManual\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCotizacionActualizarEstadoManual.sql",
+      "hash": "6275606d435d43d4b28f6b58230ebe67bbdd20b02a9e7e72557faa9154745d0b",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spResolucionEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCotizacionCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCotizacionCrear.sql",
+      "hash": "ca0d62f358c43d9031babad11ba2734b7ebd377f059c6e3a3f40b83dbdfd2165",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spRoleGuardarYPermisos",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCotizacionDuplicar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCotizacionDuplicar.sql",
+      "hash": "e5b0f46cf804d0d7b6f638d1c73461bc845960242f6b6ffa27637bdd177af047",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spSellerActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCotizacionEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCotizacionEliminar.sql",
+      "hash": "cf806ba492f5eb318fdf2c676e86834246f01e6c2584abb4fa4a1b2ebc04e9ba",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spSellerCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCountriesActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCountriesActualizar.sql",
+      "hash": "368fe59d189492a3a07ddd31d0d96172976fccdb4c21e447201f599e807cfc30",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spSellerEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCountriesCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCountriesCrear.sql",
+      "hash": "d4cf539e2f369428589b8785abd2a001d2c340f60062ddcf12e4e3b8dcefc930",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spSysConsecutivoActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCountriesEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCountriesEliminar.sql",
+      "hash": "12d5cc49a288653f8d6af8ce835981b1640cf4101665dca4e843a9c97c9a462b",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spSysConsecutivoCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCountryActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCountryActualizar.sql",
+      "hash": "4ad6e5c3313f85011b65f738f1efa795a585297fbc141cf8415a9b05d3bb584b",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spSysConsecutivoEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCountryCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCountryCrear.sql",
+      "hash": "52e0882d565533e2d7c04568cbe319cc2305fcf3e424a6d8acd8022b9c620dd2",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTicketPrinterActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCountryEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCountryEliminar.sql",
+      "hash": "c2654f8c315f1e325a98e13db6ecd76d44518ab8ed15d0465f2842220d4e8360",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTicketPrinterCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCreditCardActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCreditCardActualizar.sql",
+      "hash": "168d2bcb7c22a2eff9fa6526d44bdbf1aebc895fdd162b23033628f489bbe76a",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTicketPrinterEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCreditCardCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCreditCardCrear.sql",
+      "hash": "3ba41ca0c5b26fcefb0fc7503cc289e6cff6bb1599bff30efcc6a2f4c470cdc0",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTicketTypeActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spCreditCardEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spCreditCardEliminar.sql",
+      "hash": "8a0dbed3a18160d3bc4169f7e7e4438fca85b6e3bb70e4a432f180103e49d68d",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTicketTypeCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spDocumentResolutionActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spDocumentResolutionActualizar.sql",
+      "hash": "65a525778f52132659f1b417ec0dfa02550c7f0c9cbc91a7a6a3ba706a17c19a",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTicketTypeEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spDocumentResolutionCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spDocumentResolutionCrear.sql",
+      "hash": "3ee33a40a71eb911d4f8fbd7006fcfdc38f6910f80c498e00cae65071eccf58d",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTraceabilityClean",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "FUNCTION",
-      "objectName": "public.spTraceabilityGetDetails",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "FUNCTION",
-      "objectName": "public.spTraceabilityList",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spDocumentResolutionEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spDocumentResolutionEliminar.sql",
+      "hash": "7533a6a24faa985335b139e3f832544ddddfab7e1fb2b7231d537cd2c8b40a31",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTraceabilityLog",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spEquivalencesInterfacesConsultar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spEquivalencesInterfacesConsultar.sql",
+      "hash": "68a06390c8e3f91ac3d75a3ab4cf0f1e623daf48a86a2437cbf2863e0f356236",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTransactionConsecutiveActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spEquivalencesInterfacesCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spEquivalencesInterfacesCrear.sql",
+      "hash": "fc7484d667c413062b413ffdf335f30ca120eca998a0b293f9f5fc3ee8d7ce73",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTransactionConsecutiveCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spEquivalencesInterfacesEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spEquivalencesInterfacesEliminar.sql",
+      "hash": "5294ceef89132d31643fd38029a3903998b43bfeffaf2d45024db1ef6dec6e53",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spTransactionConsecutiveEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spExportInvoices\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spExportInvoices.sql",
+      "hash": "7eff8fa9f1767fd271670f406dfd4795927e55ea3e2618873246a6f344623c51",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spUsuarioActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
-    },
-    {
-      "objectType": "FUNCTION",
-      "objectName": "public.spUsuarioConsultar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spExportQuotation\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spExportQuotation.sql",
+      "hash": "65b2354becab2d98f29acb35ca3dcc293076151af98fa1eb9eb6726674b4609b",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spUsuarioCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spFacturaActualizarEstado\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spFacturaActualizarEstado.sql",
+      "hash": "5b44ffc328097b3f62e959486ee1ba4afc70ee7b6764441a2921e84cf75da782",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spUsuarioEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImplantActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImplantActualizar.sql",
+      "hash": "6f159427828712668d65c280ccdd4796455e24f7e0004bb5a61c3f86d3980009",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spVariableActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImplantCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImplantCrear.sql",
+      "hash": "31e87b4cd305fd3fc5e6409e5e9a463796221958e38234be254aebdf678a4af3",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spVariableCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImplantEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImplantEliminar.sql",
+      "hash": "983eaeedc572053d621d1b40b4cfc7b4193e48cf556286fb90fab54f9cd4e9f1",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spVariableEliminar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImportInvoices\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImportInvoices.sql",
+      "hash": "0c6c4c0830bc052ef7937b2942ac27fd316ef0602919a78072754864c2d149c8",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spCotizacionActualizar",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImportQuotation\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImportQuotation.sql",
+      "hash": "dbff93cbf67e82b6f2ea5ecaefc61f2cbebe77de4d7361923695b5fb03788b6f",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spCotizacionCrear",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImpuestoActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImpuestoActualizar.sql",
+      "hash": "7ecea7618802c0401e2b7eb8aad1e737d210c62655433a83d0b4663adaa9e386",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spSiteModuleMasterToggle",
-      "sourceFile": "SQL/PostgreSQL/03_Functions_And_SPs.sql",
-      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImpuestoCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImpuestoCrear.sql",
+      "hash": "7f07c2903c792b658a6dc2d1e7a4d4227695aa01972fc330b220a1fd340cf5f2",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spExportInvoices (2)",
-      "sourceFile": "SQL/PostgreSQL/SP/spExportInvoices (2).sql",
-      "hash": "ddf90bda395c7a289149c57da8e2636a4825d62e9dea9db6e0ac701934db01f4",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spImpuestoEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spImpuestoEliminar.sql",
+      "hash": "5cf5eeab25f28d8f160221b5faf74e2b9a54b7a6c40caebbd0640e055c39f54e",
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spInterfaceAmadeusPG",
+      "objectName": "public.\"spInterfaceAmadeusPG\"",
       "sourceFile": "SQL/PostgreSQL/SP/spInterfaceAmadeusPG.sql",
       "hash": "b0e25751ab0c9fdf869bb7640888938683cc6c283114442c982a3fab0ac1a33b",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spInterfaceSabrePG",
+      "objectName": "public.\"spInterfaceFile\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spInterfaceFile.sql",
+      "hash": "b0aa71725094bba4001d3307d6a2dbc44864f03627f18358c58422c0fc800f40",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spInterfaceSabre\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spInterfaceSabre.sql",
+      "hash": "72c9a0851c547a23889fec7736ede4902f1f8169d7f11455b915c11413ea8216",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spInterfaceSabrePG\"",
       "sourceFile": "SQL/PostgreSQL/SP/spInterfaceSabrePG.sql",
       "hash": "72c9a0851c547a23889fec7736ede4902f1f8169d7f11455b915c11413ea8216",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "isMandatory": true
     },
     {
       "objectType": "PROCEDURE",
-      "objectName": "public.spLogListar",
-      "sourceFile": "SQL/PostgreSQL/SP/spLogListar.sql",
-      "hash": "1c730c997938e592e173d234bf98c61c1012394183bc4e1e334fe636cffdd4b3",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "objectName": "public.\"spInvoicesActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spInvoicesActualizar.sql",
+      "hash": "d0b9fc9a19ffce17591401b7b2171045b64cc7b51ab8af0395d6eda1b140741a",
+      "isMandatory": true
     },
     {
-      "objectType": "TABLE",
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spInvoicesCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spInvoicesCrear.sql",
+      "hash": "eb5689653f89b2d25b51c696b7f16237feff37c410fe208fdf44222b58bd6458",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spInvoicesEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spInvoicesEliminar.sql",
+      "hash": "13a8dc3a34d34f52090fd258db38265cf31075ae4d15831040237931a013243f",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spLimpiarMovimientosProduccion\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spLimpiarMovimientosProduccion.sql",
+      "hash": "2a7c3ed6ec3ea69ff7f7e3cb24064ddade41f508ab390ea3b602dde0243015fb",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spLogListar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spLogListar.sql",
+      "hash": "1c730c997938e592e173d234bf98c61c1012394183bc4e1e334fe636cffdd4b3",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spLogRegistrar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spLogRegistrar.sql",
+      "hash": "a29288ba68f38c59b3273fe85ebb5911a8ed28308b39c2bc9b981b3cfc1bab60",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spMaestroImportar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spMaestroImportar.sql",
+      "hash": "8fc45e2144c28ab01b0dbacf8823269ae0c2f50e961935edbf9741b8092b3adf",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spMonedaActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spMonedaActualizar.sql",
+      "hash": "5ab970ccd2561505ca8f2e6668bff7198f8191f977ad446029bf9c54926d2d85",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spMonedaCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spMonedaCrear.sql",
+      "hash": "e3b0381b772d250e927560624f534ab2ff70a05b3312620a94ba4429ff10c969",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spMonedaEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spMonedaEliminar.sql",
+      "hash": "11a7a818d9cc41a7c39ccfe991b48cf4a6f28cc3c5c684c1637e2685de98ab27",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spMonedaListar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spMonedaListar.sql",
+      "hash": "0d67cc40ee7a12ad68ef2f4411d9b803799a877323e7f4c3f3f1e7e25a9e1b5e",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spParameterActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spParameterActualizar.sql",
+      "hash": "66c94c0f12c15dc6e51a0d7a4dd8e34ccebdadebb2b9963ccd0169199a532869",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spParameterCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spParameterCrear.sql",
+      "hash": "0cd90ff8608f879a527189217fb7d0ee0893e4a491d4c132224499d04aca7813",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spParameterEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spParameterEliminar.sql",
+      "hash": "877fa0ee5a74410286476900c85c64aa03acf7c4c12b07fda7aa508dd7780c99",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPaymentActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPaymentActualizar.sql",
+      "hash": "6e3556ed9a49dd52c9f9261718ac1da4d82e3425a60743b5f0aac648c2298bfe",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPaymentCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPaymentCrear.sql",
+      "hash": "9bb467cc748e15524c6376719399f7ce50b0df04d633a49d186d91d525a7d49d",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPaymentEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPaymentEliminar.sql",
+      "hash": "156c89051d8ab58119110387524335704d3b38e6d9332389681863f3ea3326e9",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPreCotizacionConvertir\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPreCotizacionConvertir.sql",
+      "hash": "2075f96e666f8c6de1ba2290b8c92890fb24232944d063d6a28b51d9874c901a",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPreCotizacionCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPreCotizacionCrear.sql",
+      "hash": "8a20f69b349a487f0031c8dae3d25e44e946e414c7ed3ba56a1f7f1439183e36",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPreCotizacionEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPreCotizacionEliminar.sql",
+      "hash": "f7bbd114e16057a0a6cd48c2a740cd443aa20372a3cb3f4d0a82247806ed3fee",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPrestadoraActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPrestadoraActualizar.sql",
+      "hash": "4f152e984261d67b8764d8673a1bfd78e62668424f8a27a76ce2e0dc19e5c9d0",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPrestadoraCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPrestadoraCrear.sql",
+      "hash": "effd1c8640e4215c05d241c0060f23ef67e1e21b3457a517d93a2cc6781f4694",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spPrestadoraEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spPrestadoraEliminar.sql",
+      "hash": "8315c60274dae8dddb61f39ce339685ba858bb47193c03236764da988e52d286",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProductoActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProductoActualizar.sql",
+      "hash": "e0f402a26350fbeef3d92fb9a84fa6f3aef68d11dd261e4f34407a7e221c67e8",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProductoCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProductoCrear.sql",
+      "hash": "6d7f95ff176dd1c447f319e623139a40806e3f0a0e14be1038bd715bb4130714",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProductoEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProductoEliminar.sql",
+      "hash": "2dfef2a90b76c75827ef94d0ebb17d54f97b43bebee68be5c3e2f02c5eb81eca",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProveedorActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProveedorActualizar.sql",
+      "hash": "c04ae573a895cd93c3a14bb79b828f99af1ca405c113aa79ac892657cc53e3c8",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProveedorCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProveedorCrear.sql",
+      "hash": "9e0b51597d9b2b8a1be4fb92a36ac069cc530f4ffacbf5f367301cc99094020a",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProveedorEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProveedorEliminar.sql",
+      "hash": "479b0d074aa8a2de26c7c4b66888120340776574ecc31d9a971771c668f661e1",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProviderTypeActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProviderTypeActualizar.sql",
+      "hash": "f8f248a7105d31a6040367c349940f3af7ac7d8a225f8c48b65e4a61c9eb6555",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProviderTypeCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProviderTypeCrear.sql",
+      "hash": "9770767f668e19df48ba37adf1cc887ab44990c26edae86d1b9eac9987ccd5ff",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spProviderTypeEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spProviderTypeEliminar.sql",
+      "hash": "62661f14179733e904644bc3a2c7a11f220f35d736a39d7d72d5d64af64a0493",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spQuotationStateActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spQuotationStateActualizar.sql",
+      "hash": "ebbca4d882680d3a003509e5a3918acbc4b1d2f5a39d54b240c9296e94126dfd",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spQuotationStateCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spQuotationStateCrear.sql",
+      "hash": "175181add005af15357302470fbe0495ce71850316fee18bc107675bd63d1025",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spQuotationStateEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spQuotationStateEliminar.sql",
+      "hash": "5cbf0d4979884419d21c22a49a215c649e557e8f97e9e02346c6497d88b175ea",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spResolucionActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spResolucionActualizar.sql",
+      "hash": "e4bdbb7a9b9da8ebe5606dee2f9c35fa7fcfeb2ea22d0b19a40823cbed7a1400",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spResolucionCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spResolucionCrear.sql",
+      "hash": "c9ca888c74e07e6de1a1783ea8a9b095b47d049c917538ff896efc1f96be04dd",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spResolucionEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spResolucionEliminar.sql",
+      "hash": "e8fc5e7e402c4a165bb76f19dfee7f07b5063495d6eed28a194e18870201ea28",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spRoleGuardarYPermisos\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spRoleGuardarYPermisos.sql",
+      "hash": "0862947fced12b20fa1ffb9704a331992054fb4c1c4f9e4f6300c819c551c536",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spSellerActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spSellerActualizar.sql",
+      "hash": "24a0acf59fd3248ba801ce90d0b335186469efbac972b61897199e56ef507323",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spSellerCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spSellerCrear.sql",
+      "hash": "a789d04887a66db4227533881cc5c82cc5f673993449fe03a1ebce5b36bab5bd",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spSellerEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spSellerEliminar.sql",
+      "hash": "91924b402da7415405419ddba9180170b7a376e63bbcce36aaffdffddc187a5a",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spSiteModuleMasterToggle\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spSiteModuleMasterToggle.sql",
+      "hash": "f67ca4ea78df165d8e1c73e2b9b550b1e56cb1b4ec6d8767ee97e1b5d52f5b5a",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spSysConsecutivoActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spSysConsecutivoActualizar.sql",
+      "hash": "582c9bff01051ec963bed3d0d00460bc11b250add52cc51752186d53af8c126a",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spSysConsecutivoCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spSysConsecutivoCrear.sql",
+      "hash": "0ddcb9027c31de0f5d7e57cd190c0cc618e17034af32dcf94cbd859691756bc5",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spSysConsecutivoEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spSysConsecutivoEliminar.sql",
+      "hash": "cfdb867e1057fb266782e810ded2895972cda757d117bb528da31544bcd20c85",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTicketPrinterActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTicketPrinterActualizar.sql",
+      "hash": "d0aa89e701324c2bc1de5b42bdb9d7948102d0aec69a69d0a88d8bc17616c1f2",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTicketPrinterCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTicketPrinterCrear.sql",
+      "hash": "f0840ef61682e86fb591ffeaccec001a3c683001561e2b4436d155ff745fe372",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTicketPrinterEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTicketPrinterEliminar.sql",
+      "hash": "598cfcc0fce5a5da992ae75278781ff8794c60bc7cd237b4310c41f274a9326b",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTicketTypeActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTicketTypeActualizar.sql",
+      "hash": "cc976f0c6f6a51605848bfa81e9595e9e06bf35a673d30ba4c4e1efea4555879",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTicketTypeCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTicketTypeCrear.sql",
+      "hash": "7d8ea13dff93e244f8f4afbd4d564f56cef6805c41b975c042e08cdb76ebcd4f",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTicketTypeEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTicketTypeEliminar.sql",
+      "hash": "ffd64dabf5355c1d093b53c906c350fbd4f0138de45cd012dc678f065f669550",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTraceabilityClean\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTraceabilityClean.sql",
+      "hash": "d8dbd401806727fbeb72b4b0b1645025f38358843675dfbed8e8ee69c2fb5308",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTraceabilityGetDetails\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTraceabilityGetDetails.sql",
+      "hash": "c5335c38e0b9e47b4605fd24c4b09083cb8019f8d552245d3951170d5dc88d28",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTraceabilityList\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTraceabilityList.sql",
+      "hash": "d9d79607477abca51a2baf58081a939b2bc18db8206b297104d41cf79d962a33",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTraceabilityLog\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTraceabilityLog.sql",
+      "hash": "9be155d382e2711456b448ee51b839ca2b47daae2a9b8f97670badf30a11db1f",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTransactionConsecutiveActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTransactionConsecutiveActualizar.sql",
+      "hash": "f7a048c642b91ebb26509e8ad57308b1edcb755f491d2ccd2745085b68c23d31",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTransactionConsecutiveCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTransactionConsecutiveCrear.sql",
+      "hash": "edff036f8ad60385377d78e806a2cf43cda32c7ef2e12ca6d6ba07b7a0a44e14",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spTransactionConsecutiveEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spTransactionConsecutiveEliminar.sql",
+      "hash": "9738a01f41102e971422684f2506bd62aaea3818bc0fea584999f665400b6ee7",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spUsuarioActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spUsuarioActualizar.sql",
+      "hash": "c3ba6434efb66ec201fee4588d2e8af3a7267df184126aa3af60436ec296eaf7",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spUsuarioConsultar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spUsuarioConsultar.sql",
+      "hash": "5c4f184eda2019a225d2ffcfbd3c5e559f10dc7b0cb216446cef109f1388efc7",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spUsuarioCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spUsuarioCrear.sql",
+      "hash": "eeb8465ed5b66da5b85cad9e4d117177838d1acd14e8bcee3ec9ce9cc17c79f6",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spUsuarioEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spUsuarioEliminar.sql",
+      "hash": "cf0f3c04a4efe9ae4a9598f96d00773a276203fbb3c8c26b1f5d2dbb5d76df05",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spVariableActualizar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spVariableActualizar.sql",
+      "hash": "30415dfeeb12963ca06cf52c5b4af184fc33be544541064cd19b05e7dc7c3481",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spVariableCrear\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spVariableCrear.sql",
+      "hash": "e9a48bc360be1a2e3a595a96ea945f676d64a71a218645336d44f2d60e4ea7a7",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"spVariableEliminar\"",
+      "sourceFile": "SQL/PostgreSQL/SP/spVariableEliminar.sql",
+      "hash": "b8271b26971c2b3d1712cdbbe722f0172933184fe1ad01d6803186d158b7f92e",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"Alter_New_Columns\"",
+      "sourceFile": "SQL/PostgreSQL/Table/Alter_New_Columns.sql",
+      "hash": "ace1524e042cb5c37dbc8c37dd2f4e1dbfdba6913dd8c43b7e61148f1013de80",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
       "objectName": "public.\"Branch\"",
       "sourceFile": "SQL/PostgreSQL/Table/Branch.sql",
       "hash": "7e36b67910d0154fdc73e1327ab1329bf11aae6140f0bfe37b2f048753474471",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "isMandatory": true
     },
     {
-      "objectType": "TABLE",
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"Invoices\"",
+      "sourceFile": "SQL/PostgreSQL/Table/Invoices.sql",
+      "hash": "fa6569022ddaf2b9826f903833a5ad3b166e49981723e945328b5692cebbceb1",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"InvoicesProduct\"",
+      "sourceFile": "SQL/PostgreSQL/Table/InvoicesProduct.sql",
+      "hash": "734ba99f01149265f3cfbca958136ab7f57af666f554e72226ae6d68bae58503",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"InvoicesProductCombo\"",
+      "sourceFile": "SQL/PostgreSQL/Table/InvoicesProductCombo.sql",
+      "hash": "a3b39c6a12527cf6a23b66e68e8037c11983c5c5516b9f2b388e30d92967f70b",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"InvoicesProductItinerary\"",
+      "sourceFile": "SQL/PostgreSQL/Table/InvoicesProductItinerary.sql",
+      "hash": "2384c7062c3d7e85f2ed6f8fb303127eebad1d50bbbe0d16f0c843005bdaeeec",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"InvoicesProductPasenger\"",
+      "sourceFile": "SQL/PostgreSQL/Table/InvoicesProductPasenger.sql",
+      "hash": "a8a101672f67df42d93af8822d8f36c35603c755782e09f9463908663d4d7f39",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"InvoicesProductPayment\"",
+      "sourceFile": "SQL/PostgreSQL/Table/InvoicesProductPayment.sql",
+      "hash": "9a90ffaae7b0bcf99646a76025960bc74dbe36edc1239fc514bd6479ca04d5ff",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"InvoicesProductTax\"",
+      "sourceFile": "SQL/PostgreSQL/Table/InvoicesProductTax.sql",
+      "hash": "1af45c9c1a8e4fb38b604c363ed41fac5ec94410ee96692a03f13c546c07fcb2",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"InvoicesProductVariable\"",
+      "sourceFile": "SQL/PostgreSQL/Table/InvoicesProductVariable.sql",
+      "hash": "409a046a28c49d55e6ad2cdec1688448de81b7dcb666bdb1e42bec203618c385",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"Menu\"",
+      "sourceFile": "SQL/PostgreSQL/Table/Menu.sql",
+      "hash": "88ade2cde188dc52b424733f32d815ea62570552581f66d083b72031957a0029",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
       "objectName": "public.\"Quotation\"",
       "sourceFile": "SQL/PostgreSQL/Table/Quotation.sql",
       "hash": "913f36cb530ce8e976bc91ec784eb91bfab73924dd99cc75453340d96f96323c",
-      "isMandatory": true,
-      "engine": "PostgreSQL"
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"QuotationProduct\"",
+      "sourceFile": "SQL/PostgreSQL/Table/QuotationProduct.sql",
+      "hash": "71411d986e06ddaa201381aaba6aea2a3ba80987b8a55455e10c7b7c2c3cb229",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"QuotationProductPayment\"",
+      "sourceFile": "SQL/PostgreSQL/Table/QuotationProductPayment.sql",
+      "hash": "c598a4bd9fd12e34602af4bac7e506a91504a22e04b9a6997ee5131436c44fbf",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"QuotationProduct_Alter\"",
+      "sourceFile": "SQL/PostgreSQL/Table/QuotationProduct_Alter.sql",
+      "hash": "34deac43afab0aa35bd9c072ca23f8a8e8812fb696f88a7b6817508178cf9aff",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"QuotationState\"",
+      "sourceFile": "SQL/PostgreSQL/Table/QuotationState.sql",
+      "hash": "eecc05287a0d55502064ed77624c79cb33e15dde57c83df877c591e88b5bd1a9",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"Report\"",
+      "sourceFile": "SQL/PostgreSQL/Table/Report.sql",
+      "hash": "1f8d2603d9775f72cab06aa1bfae2a6a171cb839c645ae717b869439ad5f736c",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"ReportColumns\"",
+      "sourceFile": "SQL/PostgreSQL/Table/ReportColumns.sql",
+      "hash": "f6091adfd1bbc7edf54be17fc604fbb418afd9d8af873bc006afc183f4ad10fe",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"ReportFilters\"",
+      "sourceFile": "SQL/PostgreSQL/Table/ReportFilters.sql",
+      "hash": "af815a06d0570bf3e20a194f80ab892cb4d75b31119548e8874e6ad6488460d0",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"ReportJoins\"",
+      "sourceFile": "SQL/PostgreSQL/Table/ReportJoins.sql",
+      "hash": "9f7edcbb489ef8ad1ee23b264c399f4714bfbbc8023170953dc5fd87923cf993",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"ReportSorts\"",
+      "sourceFile": "SQL/PostgreSQL/Table/ReportSorts.sql",
+      "hash": "c940f1fd3213b61f82bd7a5d57cbcb56b19daef82bc6fcb5e194bf7556cbe8ba",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"Resolution\"",
+      "sourceFile": "SQL/PostgreSQL/Table/Resolution.sql",
+      "hash": "a9c5a3ea6d05bdc0deb1627575ef844fbcbf7292ccbf6fb5b713e579d6091b65",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"SysConsecutivo\"",
+      "sourceFile": "SQL/PostgreSQL/Table/SysConsecutivo.sql",
+      "hash": "1989a3aa40676afa733bd4db76d22d9a3ce55b585b587724610e5f7906c039a4",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"TABLEINI\"",
+      "sourceFile": "SQL/PostgreSQL/Table/TABLEINI.sql",
+      "hash": "adad89d025ff44123e28b5a90924699acbe9ad5203aaca247584395f4a452c7d",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"TicketType\"",
+      "sourceFile": "SQL/PostgreSQL/Table/TicketType.sql",
+      "hash": "e1162d712b8ece8b7dbfee25f9de1429150bf042a88a686937ba67eb47b0c7d5",
+      "isMandatory": true
+    },
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "public.\"TODOS_LOS_SPS_Y_FUNCIONES_POSTGRESQL\"",
+      "sourceFile": "SQL/PostgreSQL/TODOS_LOS_SPS_Y_FUNCIONES_POSTGRESQL.sql",
+      "hash": "38129861d0baee48da1c996485a43e2c78f23d79fc54d4e7e27f12160b618c1f",
+      "isMandatory": true
     }
   ]
 }

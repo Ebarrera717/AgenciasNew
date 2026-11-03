@@ -67,49 +67,59 @@ $env:Path += ";C:\Program Files\nodejs"
 # PASO 0: DETECCIÓN, VALIDACIÓN DE HASH Y RESPALDO INVIOLABLE DE .ENV
 # =============================================================================
 $EnvFile = "$TargetDir\.env"
-if (-not (Test-Path $EnvFile)) {
-    Write-Log "ERROR CRITICO: No se encontro el archivo .env de la instalacion existente del cliente. Abortando actualizacion." "ERROR"
-    Show-Alert "Error Critico de Actualizacion" "No se encontro el archivo .env de la instalacion existente en este directorio:`n$TargetDir`n`nEl actualizador de SQL Server no puede continuar sin la configuracion previa del cliente."
-    exit 1
-}
-
-$Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$EnvBackup = "$TargetDir\.env.bak_$Timestamp"
-Copy-Item -Path $EnvFile -Destination $EnvBackup -Force
-Write-Log "Respaldo inviolable de configuracion .env generado en: $EnvBackup"
-
-# =============================================================================
-# PASO 1: LEER CONFIGURACIÓN DEL .ENV EXISTENTE
-# =============================================================================
 $DbUrl = ""
 $OldSitePort = 3000
 $OldNextjsPort = 3001
 
-$EnvContent = Get-Content $EnvFile
-foreach ($line in $EnvContent) {
-    if ($line -match '^DATABASE_URL="(.*)"') { 
-        $DbUrl = $matches[1]
-    }
-    if ($line -match '^DATABASE_URL_SQLSERVER="(.*)"') { 
-        $DbUrl = $matches[1]
-    }
-    if ($line -match '^NEXTAUTH_URL="http://[^:]+:([0-9]+)"') {
-        $OldSitePort = [int]$matches[1]
-    }
-    if ($line -match '^PORT="?([0-9]+)"?') {
-        $OldNextjsPort = [int]$matches[1]
-    }
-}
+if (Test-Path $EnvFile) {
+    $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $EnvBackup = "$TargetDir\.env.bak_$Timestamp"
+    Copy-Item -Path $EnvFile -Destination $EnvBackup -Force
+    Write-Log "Respaldo inviolable de configuracion .env generado en: $EnvBackup"
 
-if ([string]::IsNullOrWhiteSpace($DbUrl)) {
-    Write-Log "ERROR CRITICO: El archivo .env existente no contiene una variable DATABASE_URL valida." "ERROR"
-    Show-Alert "Error de Configuracion" "El archivo .env de la instalacion no contiene informacion de conexion valida.`n`nRevise el archivo .env antes de actualizar."
-    exit 1
+    $EnvContent = Get-Content $EnvFile
+    foreach ($line in $EnvContent) {
+        if ($line -match '^DATABASE_URL="(.*)"') { 
+            $DbUrl = $matches[1]
+        }
+        if ($line -match '^DATABASE_URL_SQLSERVER="(.*)"') { 
+            $DbUrl = $matches[1]
+        }
+        if ($line -match '^NEXTAUTH_URL="http://[^:]+:([0-9]+)"') {
+            $OldSitePort = [int]$matches[1]
+        }
+        if ($line -match '^PORT="?([0-9]+)"?') {
+            $OldNextjsPort = [int]$matches[1]
+        }
+    }
 }
 
 if (![string]::IsNullOrEmpty($SqlHost) -and ![string]::IsNullOrEmpty($SqlDb) -and ![string]::IsNullOrEmpty($SqlUser)) {
+    if ([string]::IsNullOrWhiteSpace($SqlPort)) { $SqlPort = "1433" }
     Write-Log "Usando parametros SQL Server recibidos: Host=$SqlHost, Port=$SqlPort, DB=$SqlDb, User=$SqlUser"
+    if (-not (Test-Path $EnvFile)) {
+        $targetSqlHost = $SqlHost
+        if ($SqlHost -eq $env:COMPUTERNAME -or $SqlHost.ToLower() -eq "localhost" -or $SqlHost -eq "." -or $SqlHost -eq "(local)") {
+            $targetSqlHost = "127.0.0.1"
+        }
+        $EncodedUser = [System.Uri]::EscapeDataString($SqlUser)
+        $EncodedPass = [System.Uri]::EscapeDataString($SqlPass)
+        $DatabaseUrlSql = "sqlserver://$($targetSqlHost):$($SqlPort);database=$($SqlDb);user=$($EncodedUser);password=$($EncodedPass);encrypt=false;trustServerCertificate=true"
+        $NewEnvContent = "DATABASE_PROVIDER=`"sqlserver`"`r`nDATABASE_URL_SQLSERVER=`"$DatabaseUrlSql`"`r`nDATABASE_URL=`"$DatabaseUrlSql`"`r`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`r`nLICENSE_SECRET=`"Korex_Master_License_Secret_Key_2026_Secure`"`r`nNEXTAUTH_URL=`"http://localhost:$OldSitePort`"`r`nPORT=`"$OldNextjsPort`"`r`n"
+        Set-Content -Path $EnvFile -Value $NewEnvContent -Encoding UTF8
+        Write-Log "Archivo .env inicial creado con exito en: $EnvFile"
+    }
 } else {
+    if (-not (Test-Path $EnvFile)) {
+        Write-Log "ERROR CRITICO: No se encontro el archivo .env de la instalacion existente del cliente ni se proporcionaron parametros SQL Server. Abortando actualizacion." "ERROR"
+        Show-Alert "Error Critico de Actualizacion" "No se encontro el archivo .env de la instalacion existente en este directorio:`n$TargetDir`n`nEl actualizador de SQL Server no puede continuar sin la configuracion previa del cliente."
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace($DbUrl)) {
+        Write-Log "ERROR CRITICO: El archivo .env existente no contiene una variable DATABASE_URL valida." "ERROR"
+        Show-Alert "Error de Configuracion" "El archivo .env de la instalacion no contiene informacion de conexion valida.`n`nRevise el archivo .env antes de actualizar."
+        exit 1
+    }
     Write-Log "Extrayendo credenciales SQL Server desde .env existente..."
     $cleanDbUrl = $DbUrl -replace '^(sqlserver|mssql)://', ''
     $parts = $cleanDbUrl -split ';'
@@ -147,8 +157,15 @@ if ($SkipDb) {
     Write-Log "[MODO MANUAL / SOLO APLICACION] Parametro -SkipDb detectado: Se omite la ejecucion de scripts T-SQL y validaciones de base de datos." "INFO"
 } else {
     Write-Log "Ejecutando actualizador T-SQL en base de datos SQL Server [$SqlHost / $SqlDb]..."
+    $env:DB_ENGINE = "sqlserver"
+    $env:DB_HOST = $SqlHost
+    $env:DB_PORT = $SqlPort
+    $env:DB_NAME = $SqlDb
+    $env:DB_USER = $SqlUser
+    $env:DB_PASSWORD = $SqlPass
+
     if (Test-Path ".\deploy\update_db_sqlserver.js") {
-        node .\deploy\update_db_sqlserver.js "$SqlHost" "" "$SqlPort" "$SqlDb" "$SqlUser" "$SqlPass" >> $LogFile 2>&1
+        node .\deploy\update_db_sqlserver.js "$SqlHost" "DEFAULT" "$SqlPort" "$SqlDb" "$SqlUser" "$SqlPass" >> $LogFile 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Log "ERROR CRITICO: Fallo al ejecutar update_db_sqlserver.js en base $SqlDb" "ERROR"
             Show-Alert "Error de Actualizacion de Base de Datos" "No fue posible aplicar los scripts T-SQL en la base de datos SQL Server '$SqlDb'."
@@ -157,12 +174,6 @@ if ($SkipDb) {
     }
 
     Write-Log "Ejecutando verificacion de objetos Korex Update Guardian en SQL Server ($SqlDb)..."
-    $env:DB_ENGINE = "sqlserver"
-    $env:DB_HOST = $SqlHost
-    $env:DB_PORT = $SqlPort
-    $env:DB_NAME = $SqlDb
-    $env:DB_USER = $SqlUser
-    $env:DB_PASSWORD = $SqlPass
 
     if (Test-Path ".\scripts\korex_updater_guardian.js") {
         node .\scripts\korex_updater_guardian.js >> $LogFile 2>&1
@@ -242,13 +253,13 @@ if ($activeMechanism -eq "TASK_SCHEDULER") {
         
         if ($svc) {
             Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 4
-            $svcRefresh = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
-            if ($svcRefresh -and $svcRefresh.Status -eq 'Running') {
+            for ($w = 0; $w -lt 12; $w++) {
+                Start-Sleep -Seconds 1
                 $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($chk) {
                     Write-Log "Servicio de Windows SQL Server ($($svc.Name)) activo y escuchando en puerto $OldNextjsPort (PID: $($chk.OwningProcess))."
                     $startedOk = $true
+                    break
                 }
             }
         }

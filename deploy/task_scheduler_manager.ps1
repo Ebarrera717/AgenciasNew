@@ -58,9 +58,9 @@ cd /d "$target"
 set PORT=$p
 set HOSTNAME=127.0.0.1
 set NODE_ENV=production
-echo [%%date%% %%time%%] Iniciando servidor Korex Standalone en puerto $p... >> "$startupLog"
+echo [%date% %time%] Iniciando servidor Korex Standalone en puerto $p... >> "$startupLog"
 "$nodeExe" "$serverJs" >> "$startupLog" 2>&1
-echo [%%date%% %%time%%] Servidor Korex finalizo con codigo %%ERRORLEVEL%% >> "$startupLog"
+echo [%date% %time%] Servidor Korex finalizo con codigo %ERRORLEVEL% >> "$startupLog"
 "@
     Set-Content -Path $runnerBat -Value $batContent -Encoding ASCII -Force
 

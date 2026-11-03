@@ -3,7 +3,6 @@ const path = require('path');
 const crypto = require('crypto');
 
 function computeHash(content) {
-  // Normalize whitespace and carriage returns for reproducible hashes
   const normalized = content.replace(/\r\n/g, '\n').trim();
   return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
 }
@@ -41,41 +40,30 @@ function generateManifest() {
   const sqlServerObjectsMap = new Map();
   const pgObjectsMap = new Map();
 
-  // Scan all SQL files recursively
   for (const fullPath of allSqlFiles) {
     const relPath = path.relative(rootDir, fullPath).replace(/\\/g, '/');
     const content = fs.readFileSync(fullPath, 'utf8');
 
-    // 1. T-SQL / SQL Server Object Extraction
-    const tsqlMatches = content.matchAll(/CREATE\s+(PROCEDURE|PROC|FUNCTION|TABLE|VIEW)\s+(?:dbo\.)?([a-zA-Z0-9_]+)/gi);
-    for (const match of tsqlMatches) {
-      const rawType = match[1].toUpperCase();
-      let objectType = 'PROCEDURE';
-      if (rawType.startsWith('FUNC')) objectType = 'FUNCTION';
-      else if (rawType === 'TABLE') objectType = 'TABLE';
-      else if (rawType === 'VIEW') objectType = 'VIEW';
+    if (relPath.includes('SQL/ZeusERP')) continue;
+    const isZeusLegacyFile = relPath.includes('spFacturacionesCrear') || relPath.includes('spCotizacionesCrear') || relPath.includes('(2)');
+    if (isZeusLegacyFile) continue;
 
-      const name = match[2];
-      const objectName = `dbo.${name}`;
+    // 1. T-SQL / SQL Server Object Extraction (exclusivo SQL/SqlServer)
+    if (relPath.startsWith('SQL/SqlServer/')) {
+      const cleanTsql = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
+      const tsqlMatches = cleanTsql.matchAll(/CREATE\s+(?:OR\s+ALTER\s+)?(PROCEDURE|PROC|FUNCTION|TABLE|VIEW)\s+(?:\[?dbo\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi);
+      for (const match of tsqlMatches) {
+        const rawType = match[1].toUpperCase();
+        let objectType = 'PROCEDURE';
+        if (rawType.startsWith('FUNC')) objectType = 'FUNCTION';
+        else if (rawType === 'TABLE') objectType = 'TABLE';
+        else if (rawType === 'VIEW') objectType = 'VIEW';
 
-      if (!sqlServerObjectsMap.has(objectName)) {
-        sqlServerObjectsMap.set(objectName, {
-          objectType,
-          objectName,
-          sourceFile: relPath,
-          hash: computeHash(content),
-          isMandatory: true
-        });
-      }
-    }
+        const name = match[2];
+        if (/^(dbo|public|if|table|temp)$/i.test(name)) continue;
+        const objectName = `dbo.${name}`;
 
-    // Fallback file name match for SQL Server files in SQL/SP/ or SQL/SqlServer/
-    if (relPath.startsWith('SQL/SP/') || relPath.startsWith('SQL/SqlServer/')) {
-      const baseName = path.basename(fullPath, '.sql');
-      if (baseName.startsWith('sp') || baseName.startsWith('fn') || baseName.startsWith('dbo.')) {
-        const objectName = baseName.startsWith('dbo.') ? baseName : `dbo.${baseName}`;
-        if (!sqlServerObjectsMap.has(objectName)) {
-          let objectType = baseName.startsWith('fn') ? 'FUNCTION' : 'PROCEDURE';
+        if (!sqlServerObjectsMap.has(objectName) && !name.startsWith('spFacturacionesCrear') && !name.startsWith('spCotizacionesCrear')) {
           sqlServerObjectsMap.set(objectName, {
             objectType,
             objectName,
@@ -88,7 +76,7 @@ function generateManifest() {
     }
 
     // 2. PostgreSQL Object Extraction
-    if (relPath.startsWith('SQL/Procedure') || relPath.startsWith('SQL/Function') || relPath.startsWith('SQL/Table')) {
+    if (relPath.startsWith('SQL/Procedure') || relPath.startsWith('SQL/Function') || relPath.startsWith('SQL/Table') || relPath.startsWith('SQL/PostgreSQL')) {
       const baseName = path.basename(fullPath, '.sql');
       let objectType = 'PROCEDURE';
       if (baseName.startsWith('fn')) objectType = 'FUNCTION';
@@ -110,8 +98,6 @@ function generateManifest() {
   const sqlServerObjects = Array.from(sqlServerObjectsMap.values());
   const pgObjects = Array.from(pgObjectsMap.values());
 
-  // REGLA ABSOLUTA DE INVENTARIO Y COBERTA (REGLAS 1, 2, 3):
-  // Compare repo SQL objects vs manifest objects
   if (sqlServerObjects.length === 0 || pgObjects.length === 0) {
     console.error('❌ ERROR CRÍTICO [Exit Code 5]: El manifest no representa el inventario completo del proyecto. Se detectaron 0 objetos.');
     process.exit(5);

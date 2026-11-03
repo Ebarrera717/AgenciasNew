@@ -15,7 +15,7 @@ export async function GET() {
             dbName = dbMatch ? dbMatch[1] : 'SQL Server'
             serverName = 'SQL Server (T-SQL)'
         } else {
-            dbName = 'Korex_colaereo'
+            const pgUrl = process.env.DATABASE_URL || ''; const pgMatch = pgUrl.match(/\/([^/?]+)(\?|$)/); dbName = pgMatch && pgMatch[1] ? pgMatch[1] : 'Korex_colaereo';
             serverName = 'PostgreSQL (Local)'
         }
 

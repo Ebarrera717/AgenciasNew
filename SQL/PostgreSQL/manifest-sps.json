@@ -1,8 +1,8 @@
 {
   "releaseVersion": "0.1.0",
-  "build": "20261003.01",
+  "build": "20261027.01",
   "engine": "PostgreSQL",
-  "generatedAt": "2026-10-03T18:25:40.505Z",
+  "generatedAt": "2026-10-27T21:34:06.956Z",
   "totalObjects": 251,
   "objects": [
     {

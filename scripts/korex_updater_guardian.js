@@ -13,14 +13,25 @@ async function runGuardianValidation() {
   console.log('============================================================');
   console.log(`Motor activo: ${isSQLServer ? 'Microsoft SQL Server' : 'PostgreSQL'}`);
 
-  // Guarantee release manifest is up to date
-  generateManifest();
-
   const manifestPath = path.resolve(
     __dirname,
     '../SQL',
     isSQLServer ? 'manifest-sqlserver.json' : 'manifest-postgresql.json'
   );
+
+  // Guarantee release manifest is up to date when running in full workspace
+  const hasFullDevRepo =
+    fs.existsSync(path.resolve(__dirname, '../SQL/Procedure')) &&
+    fs.existsSync(path.resolve(__dirname, '../SQL/SqlServer'));
+  if (hasFullDevRepo || !fs.existsSync(manifestPath)) {
+    try {
+      generateManifest();
+    } catch (e) {
+      if (!fs.existsSync(manifestPath)) {
+        throw e;
+      }
+    }
+  }
 
   if (!fs.existsSync(manifestPath)) {
     console.error(`❌ Error Crítico: No se encontró el archivo manifest: ${manifestPath}`);
@@ -38,16 +49,93 @@ async function runGuardianValidation() {
 
   if (isSQLServer) {
     const mssql = require('mssql');
+    const os = require('os');
+    const { execFileSync } = require('child_process');
+    let rawHost = process.env.DB_HOST || 'localhost';
+    let origHost = rawHost;
+    let instanceName = undefined;
+    if (rawHost.includes('\\')) {
+      const parts = rawHost.split('\\');
+      rawHost = parts[0];
+      origHost = parts[0];
+      instanceName = parts[1];
+    }
+    const localHostname = (os.hostname() || '').toLowerCase();
+    if (
+      rawHost.toLowerCase() === 'localhost' ||
+      rawHost === '.' ||
+      rawHost.toLowerCase() === '(local)' ||
+      (localHostname && rawHost.toLowerCase() === localHostname)
+    ) {
+      rawHost = '127.0.0.1';
+    }
+
+    let resolvedPort = parseInt(process.env.DB_PORT || '1433', 10);
+    let foundInstancePort = null;
+
+    if (instanceName) {
+      try {
+        const psRegCmd = `$p = Get-ItemProperty "HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL*.${instanceName}\\MSSQLServer\\SuperSocketNetLib\\Tcp\\IPAll" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p) { if ($p.TcpPort) { Write-Output $p.TcpPort } elseif ($p.TcpDynamicPorts) { Write-Output $p.TcpDynamicPorts } }`;
+        const regOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psRegCmd], {
+          encoding: 'utf8',
+          timeout: 5000,
+          stdio: ['ignore', 'pipe', 'ignore']
+        }).trim();
+        const pm = regOut.match(/(\d+)/);
+        if (pm) foundInstancePort = parseInt(pm[1], 10);
+      } catch (e) {}
+
+      if (!foundInstancePort) {
+        try {
+          const safeServer = `${origHost}\\${instanceName}`.replace(/'/g, "''");
+          const safeUser = (process.env.DB_USER || 'sa').replace(/'/g, "''");
+          const safePass = (process.env.DB_PASSWORD || '').replace(/'/g, "''");
+          const psNetCmd = `
+            $sc = 'Server=${safeServer};Database=master;User Id=${safeUser};Password=${safePass};Encrypt=False;TrustServerCertificate=True;Connection Timeout=6;';
+            $conn = New-Object System.Data.SqlClient.SqlConnection($sc);
+            $conn.Open();
+            $cmd = $conn.CreateCommand();
+            $cmd.CommandText = "SELECT local_tcp_port FROM sys.dm_exec_connections WHERE session_id = @@SPID AND local_tcp_port IS NOT NULL; EXEC xp_readerrorlog 0, 1, N'Server is listening on'";
+            $r = $cmd.ExecuteReader();
+            $foundPort = '';
+            while ($r.Read()) { if ($r[0]) { $foundPort = $r[0].ToString() } }
+            if (-not $foundPort -and $r.NextResult()) {
+                while ($r.Read()) {
+                    $txt = $r[2].ToString();
+                    if ($txt -match '<ipv4>\\s+(\\d+)') { $foundPort = $matches[1]; break }
+                }
+            }
+            $conn.Close();
+            if ($foundPort) { Write-Output $foundPort }
+          `;
+          const netOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psNetCmd], {
+            encoding: 'utf8',
+            timeout: 8000,
+            stdio: ['ignore', 'pipe', 'ignore']
+          }).trim();
+          const pm = netOut.match(/(\d+)/);
+          if (pm) foundInstancePort = parseInt(pm[1], 10);
+        } catch (e) {}
+      }
+      if (foundInstancePort) {
+        resolvedPort = foundInstancePort;
+      }
+    }
+
+    const sqlOptions = {
+      encrypt: false,
+      trustServerCertificate: true
+    };
+    if (instanceName && !foundInstancePort) {
+      sqlOptions.instanceName = instanceName;
+    }
     const sqlConfig = {
       user: process.env.DB_USER || 'sa',
       password: process.env.DB_PASSWORD || '',
-      server: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '1433', 10),
+      server: rawHost,
+      port: (instanceName && !foundInstancePort) ? undefined : resolvedPort,
       database: process.env.DB_NAME || 'Korex_pruebas',
-      options: {
-        encrypt: false,
-        trustServerCertificate: true
-      }
+      options: sqlOptions
     };
 
     try {
@@ -59,9 +147,12 @@ async function runGuardianValidation() {
         SELECT COUNT(*) as cnt FROM sys.tables WHERE name IN ('Korex_UpdateHistory', 'Korex_UpdateObjects', 'Korex_Installation')
       `);
       if (tablesCheck.recordset[0].cnt < 3) {
-        console.log('Creando estructura de control Korex Update Guardian...');
-        const initDdl = fs.readFileSync(path.resolve(__dirname, '../SQL/SqlServer/01_Tables.sql'), 'utf8');
-        await pool.request().batch(initDdl);
+        const initTablesPath = path.resolve(__dirname, '../SQL/SqlServer/01_Tables.sql');
+        if (fs.existsSync(initTablesPath)) {
+          console.log('Creando estructura de control Korex Update Guardian...');
+          const initDdl = fs.readFileSync(initTablesPath, 'utf8');
+          await pool.request().batch(initDdl);
+        }
       }
 
       // Record update start

@@ -4,7 +4,7 @@ AppVersion=1.0
 AppPublisher=Korex Corporation
 DefaultDirName=F:\Korex_Sistema_SQLServer
 DefaultGroupName=Korex
-OutputDir=F:\Proyectos\AgenciasNew\Instalador
+OutputDir=..\Instalador
 OutputBaseFilename=Korex_SQLServer_Setup
 Compression=none
 SolidCompression=no
@@ -17,9 +17,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ArchitecturesAllowed=x64compatible
 
 [Files]
-Source: "F:\Proyectos\AgenciasNew\RELEASE_KOREX\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env, *.env.*, .env, *.bak*"
-Source: "F:\Proyectos\AgenciasNew\deploy\Setup_Korex_SQLServer_Silent.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "F:\Proyectos\AgenciasNew\deploy\Korex_Diagnostics_Engine.ps1"; DestDir: "{app}\deploy"; Flags: ignoreversion
+Source: "..\RELEASE_KOREX\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env, *.env.*, .env, *.bak*"
+Source: "..\deploy\Setup_Korex_SQLServer_Silent.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\deploy\Korex_Diagnostics_Engine.ps1"; DestDir: "{app}\deploy"; Flags: ignoreversion
 
 [Code]
 var

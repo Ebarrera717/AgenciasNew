@@ -283,11 +283,29 @@ export async function getSQLServerConnection(overrideDbName?: string) {
     };
 
     if (instanceName) {
-        sqlConfig.options.instanceName = instanceName;
-        if (portVal && portVal !== '' && portVal !== '1433') {
-            sqlConfig.port = parseInt(portVal, 10);
+        let resolvedInstPort: number | null = (portVal && portVal !== '' && portVal !== '1433') ? parseInt(portVal, 10) : null;
+        if (!resolvedInstPort) {
+            try {
+                const { execFileSync } = require('child_process');
+                const psRegCmd = `$p = Get-ItemProperty "HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL*.${instanceName}\\MSSQLServer\\SuperSocketNetLib\\Tcp\\IPAll" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p) { if ($p.TcpPort) { Write-Output $p.TcpPort } elseif ($p.TcpDynamicPorts) { Write-Output $p.TcpDynamicPorts } }`;
+                const regOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psRegCmd], {
+                    encoding: 'utf8',
+                    timeout: 4000,
+                    stdio: ['ignore', 'pipe', 'ignore']
+                }).trim();
+                const pm = regOut.match(/(\d+)/);
+                if (pm) resolvedInstPort = parseInt(pm[1], 10);
+            } catch (e) {}
         }
-        console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}\\${instanceName} (Vía SQL Browser)`);
+
+        if (resolvedInstPort) {
+            sqlConfig.port = resolvedInstPort;
+            delete sqlConfig.options.instanceName;
+            console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en instancia ${host}\\${instanceName} por puerto TCP directo: ${resolvedInstPort}`);
+        } else {
+            sqlConfig.options.instanceName = instanceName;
+            console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}\\${instanceName} (Vía SQL Browser)`);
+        }
     } else if (portVal && portVal !== '') {
         sqlConfig.port = parseInt(portVal, 10);
         console.log(`[SQL_DEBUG] Conectando a [${dbVal}] en: ${host}:${sqlConfig.port}`);

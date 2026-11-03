@@ -111,5 +111,17 @@ svc.on('start', function() {
   configureServiceRecovery();
 });
 
+// Limpiar registro previo en SCM si existe para garantizar que apunte al directorio actual (__dirname)
+try { execSync('sc.exe stop korex_nextjs.exe', { stdio: 'pipe' }); } catch (e) {}
+try { execSync('sc.exe stop Korex_NextJS', { stdio: 'pipe' }); } catch (e) {}
+try { execSync('sc.exe delete korex_nextjs.exe', { stdio: 'pipe' }); } catch (e) {}
+try { execSync('sc.exe delete Korex_NextJS', { stdio: 'pipe' }); } catch (e) {}
+try {
+  var oldDaemonDir = path.join(__dirname, 'daemon');
+  if (fs.existsSync(oldDaemonDir)) {
+    fs.rmSync(oldDaemonDir, { recursive: true, force: true });
+  }
+} catch (e) {}
+
 // Instalar el servicio
 svc.install();
