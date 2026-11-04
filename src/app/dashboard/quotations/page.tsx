@@ -63,8 +63,6 @@ export default function QuotationsListPage() {
 
     // Ordenamiento por ID (Por defecto DESC por ID de mayor a menor)
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(10)
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1)
@@ -205,11 +203,6 @@ export default function QuotationsListPage() {
     })
 
     const filteredQs = sortedQs
-    const totalPages = Math.max(1, Math.ceil(filteredQs.length / itemsPerPage))
-    const safeCurrentPage = Math.min(currentPage, totalPages)
-    const startIndex = (safeCurrentPage - 1) * itemsPerPage
-    const endIndex = Math.min(startIndex + itemsPerPage, filteredQs.length)
-    const paginatedQs = filteredQs.slice(startIndex, endIndex)
 
     // Cálculos de paginación
     const totalItems = filteredQs.length
