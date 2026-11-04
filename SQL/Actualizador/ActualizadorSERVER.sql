@@ -4186,20 +4186,44 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'rate') ALTER TABLE dbo.InvoicesProductTax ADD rate FLOAT NULL DEFAULT 0;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'explicitAmount') ALTER TABLE dbo.InvoicesProductTax ADD explicitAmount FLOAT NULL DEFAULT 0;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueSnapshot FLOAT NULL DEFAULT 0;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueTypeSnapshot VARCHAR(50) NULL DEFAULT 'PERCENTAGE';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueTypeSnapshot NVARCHAR(50) NULL DEFAULT 'PERCENTAGE';
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'isMain') ALTER TABLE dbo.InvoicesProductTax ADD isMain BIT NULL DEFAULT 0;
-    ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
-    ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueTypeSnapshot VARCHAR(50) NULL;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueSnapshot' AND is_nullable = 0)
+    BEGIN
+        DECLARE @dfInvValSnap NVARCHAR(256);
+        SELECT @dfInvValSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.InvoicesProductTax') AND c.name = 'valueSnapshot';
+        IF @dfInvValSnap IS NOT NULL EXEC('ALTER TABLE dbo.InvoicesProductTax DROP CONSTRAINT [' + @dfInvValSnap + ']');
+        ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
+    END;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueTypeSnapshot' AND is_nullable = 0)
+    BEGIN
+        DECLARE @dfInvTypeSnap NVARCHAR(256);
+        SELECT @dfInvTypeSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.InvoicesProductTax') AND c.name = 'valueTypeSnapshot';
+        IF @dfInvTypeSnap IS NOT NULL EXEC('ALTER TABLE dbo.InvoicesProductTax DROP CONSTRAINT [' + @dfInvTypeSnap + ']');
+        ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueTypeSnapshot NVARCHAR(50) NULL;
+    END;
 END;
 GO
 IF OBJECT_ID('dbo.QuotationProductTax', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'rate') ALTER TABLE dbo.QuotationProductTax ADD rate FLOAT NULL DEFAULT 0;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueSnapshot FLOAT NULL DEFAULT 0;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueTypeSnapshot VARCHAR(50) NULL DEFAULT 'PERCENTAGE';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueTypeSnapshot NVARCHAR(50) NULL DEFAULT 'PERCENTAGE';
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'isMain') ALTER TABLE dbo.QuotationProductTax ADD isMain BIT NULL DEFAULT 0;
-    ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
-    ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueTypeSnapshot VARCHAR(50) NULL;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueSnapshot' AND is_nullable = 0)
+    BEGIN
+        DECLARE @dfQuotValSnap NVARCHAR(256);
+        SELECT @dfQuotValSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.QuotationProductTax') AND c.name = 'valueSnapshot';
+        IF @dfQuotValSnap IS NOT NULL EXEC('ALTER TABLE dbo.QuotationProductTax DROP CONSTRAINT [' + @dfQuotValSnap + ']');
+        ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
+    END;
+    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot' AND is_nullable = 0)
+    BEGIN
+        DECLARE @dfQuotTypeSnap NVARCHAR(256);
+        SELECT @dfQuotTypeSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.QuotationProductTax') AND c.name = 'valueTypeSnapshot';
+        IF @dfQuotTypeSnap IS NOT NULL EXEC('ALTER TABLE dbo.QuotationProductTax DROP CONSTRAINT [' + @dfQuotTypeSnap + ']');
+        ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueTypeSnapshot NVARCHAR(50) NULL;
+    END;
 END;
 GO
 IF OBJECT_ID('dbo.InvoicesProductVariable', 'U') IS NOT NULL

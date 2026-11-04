@@ -63,6 +63,8 @@ export default function QuotationsListPage() {
 
     // Ordenamiento por ID (Por defecto DESC por ID de mayor a menor)
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage, setItemsPerPage] = useState(10)
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1)
@@ -143,6 +145,7 @@ export default function QuotationsListPage() {
 
             if (dbRes) setDbInfo(dbRes)
             setQuotations(Array.isArray(quoRes) ? quoRes : [])
+            setCurrentPage(1)
             if (Array.isArray(statesRes) && statesRes.length > 0) {
                 setStates(statesRes)
             } else {
@@ -202,6 +205,11 @@ export default function QuotationsListPage() {
     })
 
     const filteredQs = sortedQs
+    const totalPages = Math.max(1, Math.ceil(filteredQs.length / itemsPerPage))
+    const safeCurrentPage = Math.min(currentPage, totalPages)
+    const startIndex = (safeCurrentPage - 1) * itemsPerPage
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredQs.length)
+    const paginatedQs = filteredQs.slice(startIndex, endIndex)
 
     // Cálculos de paginación
     const totalItems = filteredQs.length
@@ -891,7 +899,7 @@ export default function QuotationsListPage() {
                                         className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:text-blue-600 transition-colors select-none whitespace-nowrap"
                                         title="Hacer clic para alternar orden por ID de Cotización"
                                     >
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1.5" data-pagination-controls="true">
                                             <span>ID Cotización</span>
                                             {sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />}
                                         </div>
@@ -1174,7 +1182,7 @@ export default function QuotationsListPage() {
                                                          </motion.div>
                                                              );
                                                          })()}
-                                                     </>
+                    </>
                                                 )}
                                             </AnimatePresence>
                                         </td>
