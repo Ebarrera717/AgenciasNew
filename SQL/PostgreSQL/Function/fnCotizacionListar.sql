@@ -26,6 +26,26 @@ RETURNS SETOF JSONB
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- Auto-reparación de cotizaciones cuyo userId quedó en NULL o en el fallback 1 cuando el Tiqueteador corresponde a otro Usuario creador registrado
+    UPDATE public."Quotation" q_fix
+    SET "userId" = sub.real_user_id
+    FROM (
+        SELECT q2.id AS quotation_id, u2.id AS real_user_id
+        FROM public."Quotation" q2
+        LEFT JOIN public."TicketPrinter" tp ON tp.id = q2."ticketPrinterId"
+        LEFT JOIN public."User" u2 ON (
+            u2."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u2.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u2.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE (q2."userId" IS NULL OR q2."userId" = 1)
+          AND tp.id IS NOT NULL
+          AND u2.id IS NOT NULL
+          AND u2.id <> 1
+    ) sub
+    WHERE q_fix.id = sub.quotation_id
+      AND COALESCE(q_fix."userId", 0) <> sub.real_user_id;
+
     RETURN QUERY
     SELECT 
         jsonb_build_object(
@@ -51,6 +71,13 @@ BEGIN
                 0
             ),
             'state', q.state,
+            'stateColor', (
+                SELECT qs.color
+                FROM public."QuotationState" qs
+                WHERE UPPER(TRIM(qs.code)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                   OR UPPER(TRIM(qs.name)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                LIMIT 1
+            ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
             'user', CASE WHEN u.id IS NOT NULL THEN jsonb_build_object('id', u.id, 'name', u.name) ELSE NULL END,

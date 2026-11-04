@@ -68,6 +68,7 @@ BEGIN
         q.[reservationCode],
         q.[copyFieldsToProducts],
         q.[manualDescription],
+        q.[observations],
         ISNULL(q.[state], N'Nuevo') AS [state],
         q.[stateDescription],
         q.[stateUpdatedAt],

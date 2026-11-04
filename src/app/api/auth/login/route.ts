@@ -90,6 +90,8 @@ export async function POST(req: NextRequest) {
                         canEditReports: dbUser.canEditReports ?? false
                     },
                 });
+                response.cookies.set('korex_user_id', String(dbUser.id), { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
+                response.cookies.set('korex_user_email', String(dbUser.email || ''), { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
                 return response;
             } catch (err: any) {
                 if (pool) await pool.close();
@@ -166,6 +168,8 @@ export async function POST(req: NextRequest) {
                 canEditReports: user.canEditReports ?? false
             },
         })
+        response.cookies.set('korex_user_id', String(user.id), { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
+        response.cookies.set('korex_user_email', String(user.email || ''), { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
 
         try {
             const { getStoredLicenseStatus } = await import('@/lib/license');

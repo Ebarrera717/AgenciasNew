@@ -41,6 +41,7 @@ BEGIN
         DECLARE @paxChildren INT = JSON_VALUE(@p_data, '$.paxChildren');
         DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
         DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
+        DECLARE @observations NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.observations');
 
         DECLARE @actingUserId INT = @p_acting_user_id;
         IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
@@ -177,7 +178,26 @@ BEGIN
             paxAdults = @paxAdults,
             paxChildren = @paxChildren,
             reservationCode = @reservationCode,
-            manualDescription = @manualDescription
+            manualDescription = @manualDescription,
+            observations = @observations,
+            userId = COALESCE(
+                CASE
+                    WHEN userId IS NULL OR userId = 1 THEN (
+                        SELECT TOP 1 u.[id]
+                        FROM dbo.[TicketPrinter] tp
+                        JOIN dbo.[User] u ON (
+                            u.[ticketPrinterId] = tp.[id]
+                            OR (NULLIF(LTRIM(RTRIM(tp.[email])), '') IS NOT NULL AND LOWER(LTRIM(RTRIM(u.[email]))) = LOWER(LTRIM(RTRIM(tp.[email]))))
+                            OR (NULLIF(LTRIM(RTRIM(tp.[name])), '') IS NOT NULL AND UPPER(LTRIM(RTRIM(u.[name]))) = UPPER(LTRIM(RTRIM(tp.[name]))))
+                        )
+                        WHERE tp.[id] = ISNULL(@ticketPrinterId, ticketPrinterId)
+                        ORDER BY u.[id] ASC
+                    )
+                    ELSE userId
+                END,
+                userId,
+                @actingUserId
+            )
         WHERE id = @p_id;
 
         IF JSON_QUERY(@p_data, '$.items') IS NOT NULL

@@ -262,7 +262,30 @@ BEGIN
         "paxChildren" = NULLIF(p_data->>'paxChildren', '')::INT,
         "reservationCode" = p_data->>'reservationCode',
         "copyFieldsToProducts" = COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
-        "manualDescription" = p_data->>'manualDescription'
+        "manualDescription" = p_data->>'manualDescription',
+        "observations" = p_data->>'observations',
+        "userId" = COALESCE(
+            CASE
+                WHEN "userId" IS NULL OR "userId" = 1 THEN (
+                    SELECT u.id
+                    FROM public."TicketPrinter" tp
+                    JOIN public."User" u ON (
+                        u."ticketPrinterId" = tp.id
+                        OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(tp.email)))
+                        OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u.name)) = UPPER(TRIM(tp.name)))
+                    )
+                    WHERE tp.id = COALESCE(
+                        (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
+                        "ticketPrinterId"
+                    )
+                    ORDER BY u.id ASC
+                    LIMIT 1
+                )
+                ELSE "userId"
+            END,
+            "userId",
+            v_acting_user_id
+        )
     WHERE id = p_id;
 
     -- Insertar historial de estado y modificación con usuario, fecha, hora y metadata de cambios
@@ -414,7 +437,8 @@ BEGIN
                 JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
                 LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
                 WHERE qpt2."quotationProductId" = qp.id
-                  AND qpt2."isMain" = false
+                  AND COALESCE(qpt2."isMain", false) = false
+                  AND qpt2."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)
                   AND ct2."targetTaxId" IS NOT NULL
                   AND (
                       target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
@@ -447,7 +471,7 @@ BEGIN
             NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
             ROUND((COALESCE("chargesAndTaxes", 0) + 
                 COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = p_id), 0.0) +
-                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = p_id), 0.0)
+                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = p_id AND COALESCE(qpt."isMain", false) = false AND qpt."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)), 0.0)
             )::numeric, v_decimals)::double precision
         ),
         "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,

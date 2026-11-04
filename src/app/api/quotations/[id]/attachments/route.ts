@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { isSQLServerMode, getSQLServerConnection } from '@/lib/sqlserver'
+import { executePostgresQuery } from '@/lib/postgres'
 import mssql from 'mssql'
 
 export const dynamic = 'force-dynamic'
@@ -36,15 +37,36 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             return NextResponse.json(attachments)
         }
 
-        const attachmentsRaw = await prisma.attachment.findMany({
-            where: { quotationId },
-            orderBy: { createdAt: 'desc' }
-        })
-        const attachments = attachmentsRaw.map(att => ({
-            ...att,
-            fileUrl: `data:${att.fileType};base64,${Buffer.from(att.fileContent).toString('base64')}`
-        }))
-        return NextResponse.json(attachments)
+        try {
+            const attachmentsRaw = await prisma.attachment.findMany({
+                where: { quotationId },
+                orderBy: { createdAt: 'desc' }
+            })
+            const attachments = attachmentsRaw.map(att => ({
+                ...att,
+                fileUrl: `data:${att.fileType};base64,${Buffer.from(att.fileContent).toString('base64')}`
+            }))
+            return NextResponse.json(attachments)
+        } catch (prismaErr: any) {
+            console.warn('[ATTACHMENTS_GET] Prisma query falló, usando executePostgresQuery directo:', prismaErr.message)
+            const rows = await executePostgresQuery(
+                `SELECT id, "quotationId", "fileName", "fileType", "fileSize", "fileContent", "createdAt" 
+                 FROM public."Attachment" 
+                 WHERE "quotationId" = $1 
+                 ORDER BY "createdAt" DESC`,
+                [quotationId]
+            )
+            const attachments = rows.map((att: any) => ({
+                id: att.id,
+                quotationId: att.quotationId,
+                fileName: att.fileName,
+                fileType: att.fileType,
+                fileSize: att.fileSize,
+                createdAt: att.createdAt,
+                fileUrl: `data:${att.fileType};base64,${Buffer.isBuffer(att.fileContent) ? att.fileContent.toString('base64') : Buffer.from(att.fileContent || '').toString('base64')}`
+            }))
+            return NextResponse.json(attachments)
+        }
     } catch (error: any) {
         return NextResponse.json({ message: 'Error fetching attachments', error: error.message }, { status: 500 })
     }
@@ -123,16 +145,35 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
             if (!base64Data) continue
             const buffer = Buffer.from(base64Data, 'base64')
 
-            const attachment = await prisma.attachment.create({
-                data: {
-                    quotationId,
-                    fileName: item.fileName,
-                    fileType: item.fileType || 'application/octet-stream',
-                    fileSize: item.fileSize || buffer.length,
-                    fileContent: buffer
+            try {
+                const attachment = await prisma.attachment.create({
+                    data: {
+                        quotationId,
+                        fileName: item.fileName,
+                        fileType: item.fileType || 'application/octet-stream',
+                        fileSize: item.fileSize || buffer.length,
+                        fileContent: buffer
+                    }
+                })
+                insertedList.push(attachment)
+            } catch (prismaInsertErr: any) {
+                console.warn('[ATTACHMENTS_POST] Prisma insert falló, usando executePostgresQuery directo:', prismaInsertErr.message)
+                const rows = await executePostgresQuery(
+                    `INSERT INTO public."Attachment" ("quotationId", "fileName", "fileType", "fileSize", "fileContent", "createdAt")
+                     VALUES ($1, $2, $3, $4, $5, NOW())
+                     RETURNING id, "quotationId", "fileName", "fileType", "fileSize", "createdAt"`,
+                    [
+                        quotationId,
+                        item.fileName,
+                        item.fileType || 'application/octet-stream',
+                        item.fileSize || buffer.length,
+                        buffer
+                    ]
+                )
+                if (rows && rows[0]) {
+                    insertedList.push(rows[0])
                 }
-            })
-            insertedList.push(attachment)
+            }
         }
 
         import('@/lib/logger').then(({ logSystemEvent }) => {
@@ -196,12 +237,21 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
             `)
             await pool.close()
         } else {
-            await prisma.attachment.deleteMany({
-                where: {
-                    id: { in: idsToDelete },
-                    quotationId
-                }
-            })
+            try {
+                await prisma.attachment.deleteMany({
+                    where: {
+                        id: { in: idsToDelete },
+                        quotationId
+                    }
+                })
+            } catch (prismaDelErr: any) {
+                console.warn('[ATTACHMENTS_DELETE] Prisma deleteMany falló, usando executePostgresQuery directo:', prismaDelErr.message)
+                await executePostgresQuery(
+                    `DELETE FROM public."Attachment" 
+                     WHERE "quotationId" = $1 AND id = ANY($2::int[])`,
+                    [quotationId, idsToDelete]
+                )
+            }
         }
 
         import('@/lib/logger').then(({ logSystemEvent }) => {

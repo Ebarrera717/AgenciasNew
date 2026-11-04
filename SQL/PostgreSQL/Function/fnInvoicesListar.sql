@@ -68,3 +68,13 @@ BEGIN
     ORDER BY i.id DESC;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public."fnInvoicesListar"()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM public.fnInvoicesListar();
+END;
+$$;
+

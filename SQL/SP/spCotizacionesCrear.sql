@@ -365,7 +365,7 @@ BEGIN
         -- 1. Validar Cliente
         IF @val_cd_cliente_codigo IS NOT NULL AND @val_cd_cliente_codigo <> ''
         BEGIN
-            IF OBJECT_ID('dbo.CLIENTES', 'U') IS NOT NULL
+            IF OBJECT_ID('dbo.CLIENTES') IS NOT NULL
             BEGIN
                 IF NOT EXISTS (
                     SELECT 1 FROM dbo.CLIENTES WHERE LTRIM(RTRIM(IDCLIENTE)) = LTRIM(RTRIM(@val_cd_cliente_codigo))
@@ -375,7 +375,7 @@ BEGIN
                     RETURN 1;
                 END
             END
-            ELSE IF OBJECT_ID('dbo.[Client]', 'U') IS NOT NULL
+            ELSE IF OBJECT_ID('dbo.[Client]') IS NOT NULL
             BEGIN
                 IF NOT EXISTS (
                     SELECT 1 FROM dbo.[Client] WHERE document = @val_cd_cliente_codigo OR CAST(id AS VARCHAR(25)) = @val_cd_cliente_codigo
@@ -390,7 +390,7 @@ BEGIN
         -- 2. Validar Sucursal
         IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
         BEGIN
-            IF OBJECT_ID('dbo.[Branch]', 'U') IS NOT NULL
+            IF OBJECT_ID('dbo.[Branch]') IS NOT NULL
             BEGIN
                 IF NOT EXISTS (
                     SELECT 1 FROM dbo.[Branch] WHERE code = @val_cd_sucursal OR CAST(id AS VARCHAR(25)) = @val_cd_sucursal
@@ -403,7 +403,7 @@ BEGIN
         END
 
         -- 3. Validar / Resolver Vendedor
-        IF OBJECT_ID('dbo.MAEVENDE', 'U') IS NOT NULL
+        IF OBJECT_ID('dbo.MAEVENDE') IS NOT NULL
         BEGIN
             IF @val_cd_vendedor IS NOT NULL AND @val_cd_vendedor <> ''
             BEGIN
@@ -435,7 +435,7 @@ BEGIN
         -- 4. Validar Tiqueteador
         IF @val_cd_tiqueteador IS NOT NULL AND @val_cd_tiqueteador <> ''
         BEGIN
-            IF OBJECT_ID('dbo.[TicketPrinter]', 'U') IS NOT NULL
+            IF OBJECT_ID('dbo.[TicketPrinter]') IS NOT NULL
             BEGIN
                 IF NOT EXISTS (
                     SELECT 1 FROM dbo.[TicketPrinter] WHERE code = @val_cd_tiqueteador OR CAST(id AS VARCHAR(25)) = @val_cd_tiqueteador
@@ -449,7 +449,7 @@ BEGIN
 
         -- 5. Validar Proveedores de Servicios
         DECLARE @invalid_proveedor VARCHAR(25) = NULL;
-        IF OBJECT_ID('dbo.PROVEEDORES', 'U') IS NOT NULL
+        IF OBJECT_ID('dbo.PROVEEDORES') IS NOT NULL
         BEGIN
             SELECT TOP 1 @invalid_proveedor = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
             FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios') AS S(node)
@@ -459,7 +459,7 @@ BEGIN
                   SELECT 1 FROM dbo.PROVEEDORES WHERE LTRIM(RTRIM(IDPROVE)) = LTRIM(RTRIM(S.node.value('cd_proveedores[1]', 'VARCHAR(25)')))
               );
         END
-        ELSE IF OBJECT_ID('dbo.[Provider]', 'U') IS NOT NULL
+        ELSE IF OBJECT_ID('dbo.[Provider]') IS NOT NULL
         BEGIN
             SELECT TOP 1 @invalid_proveedor = S.node.value('cd_proveedores[1]', 'VARCHAR(25)')
             FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios') AS S(node)
@@ -578,7 +578,19 @@ BEGIN
 			ds_cliente_contacto_email = ISNULL(C.Cotizacion.value('ds_cliente_contacto_email[1]','VARCHAR(60)'),''),
 			id_monedas_IATA = ISNULL((SELECT TOP 1 id FROM dbo.Monedas_IATA WHERE id = 1), (SELECT TOP 1 id FROM dbo.Monedas_IATA ORDER BY id ASC)),
 			cd_vendedor = ISNULL(@val_cd_vendedor, '000'),
-			id_tiqueteador = ISNULL((SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE id = TRY_CAST(C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(6)') AS INT)), ISNULL((SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE bl_inactivo = 0 ORDER BY id ASC), 1)),
+			id_tiqueteador = ISNULL(
+				(SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(25)')))),
+				ISNULL(
+					(SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE RTRIM(LTRIM(cd_alterno)) = RTRIM(LTRIM(C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(25)')))),
+					ISNULL(
+						(SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE id = TRY_CAST(C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(25)') AS INT)),
+						ISNULL(
+							(SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE ds_nombre LIKE '%' + RTRIM(LTRIM(C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(50)'))) + '%'),
+							ISNULL((SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE bl_inactivo = 0 ORDER BY id ASC), 1)
+						)
+					)
+				)
+			),
 			bn_anexo = NULL,
 			am_tcambio = ISNULL(C.Cotizacion.value('am_tcambio[1]','SMALLMONEY'),1),
 			am_tcambiousd = ISNULL(C.Cotizacion.value('am_tcambiousd[1]','MONEY'),1),
@@ -605,10 +617,10 @@ BEGIN
 			ds_AlertaSolicitud = '',
 			bl_comisiona = 0,
 			ds_FormaDePago = ISNULL(C.Cotizacion.value('ds_FormaDePago[1]','VARCHAR(250)'),''),
-			ds_records = '',
+			ds_records = ISNULL(C.Cotizacion.value('ds_records[1]','VARCHAR(25)'),''),
 			bl_entregadoCliente = 0,
 			dt_entregadoCliente = NULL,
-			id_sys_entidades = NULL,
+			id_sys_entidades = ISNULL(NULLIF(TRY_CAST(C.Cotizacion.value('id_sys_entidades[1]','VARCHAR(25)') AS INT), 0), 65),
 			id_MonedaPagoDestino = NULL,
 			id_FormaPagoDestino = NULL,
 			ds_DocumentoPagoDestino = NULL,
@@ -620,8 +632,50 @@ BEGIN
 			id_Evento = NULL,
 			id_Cotizacion = NULL,
 			bl_existe = 0
-        FROM @xmlData.nodes('Cotizaciones/Cotizacion') AS C(Cotizacion)		 
+        FROM @xmlData.nodes('Cotizaciones/Cotizacion') AS C(Cotizacion);		 
 		
+		-- Resolver datos del Cliente (Código, Tercero, Ciudad, Dirección, Teléfono, Email, etc.) desde dbo.CLIENTES para @Cotizacion
+		IF OBJECT_ID('dbo.CLIENTES') IS NOT NULL
+		BEGIN
+			UPDATE COT
+			SET 
+				COT.cd_cliente_codigo = COALESCE(NULLIF(RTRIM(LTRIM(CL.IDCLIENTE)), ''), COT.cd_cliente_codigo),
+				COT.cd_tercero_codigo = COALESCE(NULLIF(RTRIM(LTRIM(CL.IDTERCERO)), ''), COT.cd_cliente_codigo),
+				COT.ds_cliente_nombre = LEFT(COALESCE(NULLIF(RTRIM(LTRIM(COT.ds_cliente_nombre)), ''), NULLIF(RTRIM(LTRIM(CL.RAZONCIAL)), ''), COT.ds_cliente_nombre), 250),
+				COT.ds_tercero_nombre = LEFT(COALESCE(NULLIF(RTRIM(LTRIM(COT.ds_tercero_nombre)), ''), NULLIF(RTRIM(LTRIM(CL.RAZONCIAL)), ''), COT.ds_tercero_nombre), 250),
+				COT.ds_cliente_ciudad = LEFT(COALESCE(NULLIF(RTRIM(LTRIM(CL.CIUDAD)), ''), NULLIF(RTRIM(LTRIM(COT.ds_cliente_ciudad)), '')), 40),
+				COT.ds_cliente_dir = LEFT(COALESCE(NULLIF(RTRIM(LTRIM(CL.DIRECCION)), ''), NULLIF(RTRIM(LTRIM(COT.ds_cliente_dir)), ''), COT.ds_cliente_dir), 250),
+				COT.ds_cliente_tel = LEFT(COALESCE(NULLIF(RTRIM(LTRIM(CL.TELEFONO)), ''), NULLIF(RTRIM(LTRIM(COT.ds_cliente_tel)), ''), COT.ds_cliente_tel), 25),
+				COT.ds_cliente_email = LEFT(COALESCE(NULLIF(RTRIM(LTRIM(COT.ds_cliente_email)), ''), NULLIF(RTRIM(LTRIM(CL.EMAIL)), ''), COT.ds_cliente_email), 60)
+			FROM @Cotizacion COT
+			CROSS APPLY (
+				SELECT TOP 1 IDCLIENTE, IDTERCERO, RAZONCIAL, CIUDAD, DIRECCION, TELEFONO, EMAIL
+				FROM dbo.CLIENTES CL WITH (NOLOCK)
+				WHERE RTRIM(LTRIM(CL.IDCLIENTE)) = RTRIM(LTRIM(COT.cd_cliente_codigo)) 
+				   OR RTRIM(LTRIM(CL.IDTERCERO)) = RTRIM(LTRIM(COT.cd_cliente_codigo))
+				   OR RTRIM(LTRIM(CL.IDCLIENTE)) = RTRIM(LTRIM(COT.cd_tercero_codigo))
+				   OR RTRIM(LTRIM(CL.IDTERCERO)) = RTRIM(LTRIM(COT.cd_tercero_codigo))
+				ORDER BY 
+				   CASE WHEN RTRIM(LTRIM(CL.IDCLIENTE)) = RTRIM(LTRIM(COT.cd_cliente_codigo)) THEN 0 ELSE 1 END,
+				   CL.IDCLIENTE ASC
+			) CL;
+		END;
+
+		-- Si la ciudad aún está vacía, buscar en dbo.TERCEROS si existe
+		IF OBJECT_ID('dbo.TERCEROS') IS NOT NULL
+		BEGIN
+			UPDATE COT
+			SET COT.ds_cliente_ciudad = COALESCE(NULLIF(RTRIM(LTRIM(COT.ds_cliente_ciudad)), ''), NULLIF(RTRIM(LTRIM(T.CIUDAD)), ''))
+			FROM @Cotizacion COT
+			JOIN dbo.TERCEROS T ON RTRIM(LTRIM(T.IDTERCERO)) = RTRIM(LTRIM(COT.cd_tercero_codigo)) OR RTRIM(LTRIM(T.IDTERCERO)) = RTRIM(LTRIM(COT.cd_cliente_codigo))
+			WHERE COT.ds_cliente_ciudad IS NULL OR RTRIM(LTRIM(COT.ds_cliente_ciudad)) = '';
+		END;
+
+		-- Salvaguarda: garantizar que ds_cliente_ciudad nunca quede vacía en @Cotizacion para que no detenga el proceso
+		UPDATE @Cotizacion
+		SET ds_cliente_ciudad = 'BOGOTA'
+		WHERE ds_cliente_ciudad IS NULL OR RTRIM(LTRIM(ds_cliente_ciudad)) = '';
+ 
 		-- Verificar si la cotización ya existe en Zeus ERP (por consecutivo exacto, numérico o con ceros a la izquierda)
 		IF OBJECT_ID('dbo.Cotizacion', 'U') IS NOT NULL
 		BEGIN
@@ -639,15 +693,18 @@ BEGIN
 				)
 				OR RIGHT('00000000' + RTRIM(LTRIM(EX.cd_consecutivo)), 8) = RTRIM(LTRIM(C.cd_consecutivo));
 
-			-- Normalizar consecutivo en dbo.Cotizacion si tenía formato corto sin ceros
+			-- Normalizar consecutivo, ciudad, teléfono y tiqueteador en dbo.Cotizacion si estaban vacíos o descalzados
 			UPDATE EX
-			SET EX.cd_consecutivo = C.cd_consecutivo
+			SET 
+				EX.cd_consecutivo = C.cd_consecutivo,
+				EX.ds_cliente_ciudad = CASE WHEN C.ds_cliente_ciudad IS NOT NULL AND RTRIM(LTRIM(C.ds_cliente_ciudad)) <> '' AND RTRIM(LTRIM(C.ds_cliente_ciudad)) <> 'BOGOTA' THEN C.ds_cliente_ciudad WHEN EX.ds_cliente_ciudad IS NULL OR RTRIM(LTRIM(EX.ds_cliente_ciudad)) = '' THEN C.ds_cliente_ciudad ELSE EX.ds_cliente_ciudad END,
+				EX.ds_cliente_tel = CASE WHEN C.ds_cliente_tel IS NOT NULL AND RTRIM(LTRIM(C.ds_cliente_tel)) <> '' THEN C.ds_cliente_tel ELSE EX.ds_cliente_tel END,
+				EX.id_tiqueteador = CASE WHEN C.id_tiqueteador IS NOT NULL AND C.id_tiqueteador > 0 THEN C.id_tiqueteador ELSE EX.id_tiqueteador END
 			FROM dbo.Cotizacion EX
 			JOIN @Cotizacion C ON 
-				EX.id = C.id_Cotizacion 
-				AND RTRIM(LTRIM(EX.cd_consecutivo)) <> RTRIM(LTRIM(C.cd_consecutivo));
+				EX.id = C.id_Cotizacion;
 		END;
-		
+
 		INSERT INTO @CotizacionServicios(
 			id_TiposConceptFac ,
 			id_ConceptoFacturacion ,
@@ -827,7 +884,7 @@ BEGIN
 			id_acomodacion=NULL ,
 			in_dias=ISNULL(C.CotizacionServicios.value('in_dias[1]','INT'),1),
 			in_noches=ISNULL(C.CotizacionServicios.value('in_noches[1]','INT'),1) ,
-			ds_records =ISNULL(C.CotizacionServicios.value('ds_records[1]','VARCHAR(25)'),'') ,
+			ds_records =COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(25)'))), ''), '') ,
 			id_GrConcepto=NULL,
 			in_diasSrv=0,
 			in_nochesSrv=0 ,
@@ -839,7 +896,7 @@ BEGIN
 			in_NumeroOpcion=0 ,
 			dt_FechaSalidaSrv=GETDATE() ,
 			dt_FechaLlegadaSrv=GETDATE() ,
-			cd_localizador='' ,
+			cd_localizador=COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(25)'))), ''), '') ,
 			cd_voucherpax='' ,
 			am_basecomisionableprov=0 ,
 			am_porcomisionprov=0 ,
@@ -850,7 +907,7 @@ BEGIN
 			in_habitaciones=0 ,
 			in_habitacionesSrv=0 ,
 			cd_Consecutivo_VariablesAdicionales=ISNULL(C.CotizacionServicios.value('cd_consecutivo_variablesadicionales[1]','VARCHAR(25)'),'') ,
-			cd_confirmacion='',
+			cd_confirmacion=COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_confirmacion[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(25)'))), ''), ''),
 			ds_confirmadopor='',
 			cd_paxidentificacion='',
 			bl_politicaCancelacion=0,
@@ -861,7 +918,7 @@ BEGIN
 			id_TarjetaAsistencia=NULL,
 			id_Regiones=NULL,
 			Iden_GDS=NULL,
-			id_sys_entidades=NULL,
+			id_sys_entidades=ISNULL(NULLIF(TRY_CAST(C.CotizacionServicios.value('id_sys_entidades[1]','VARCHAR(25)') AS INT), 0), 109),
 			ds_TipoAuto='',
 			ds_Origen='',
 			ds_DirOrigen='' ,
@@ -893,6 +950,16 @@ BEGIN
 		 LEFT JOIN dbo.TiposServicios TS ON TS.cd_codigo=C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(25)')
 		 LEFT JOIN dbo.Hoteles H ON H.cd_codigo=C.CotizacionServicios.value('cd_hoteles[1]','VARCHAR(25)')
         
+		-- Resolver IDTERCERO (NIT/Tercero) para Proveedores en @CotizacionServicios
+		IF OBJECT_ID('dbo.PROVEEDORES') IS NOT NULL
+		BEGIN
+			UPDATE CS
+			SET CS.cd_proveedores = COALESCE(NULLIF(RTRIM(LTRIM(P.IDTERCERO)), ''), CS.cd_proveedores)
+			FROM @CotizacionServicios CS
+			JOIN dbo.PROVEEDORES P ON RTRIM(P.IDPROVE) = RTRIM(CS.cd_proveedores) OR RTRIM(P.IDTERCERO) = RTRIM(CS.cd_proveedores)
+			WHERE P.IDTERCERO IS NOT NULL AND LTRIM(RTRIM(P.IDTERCERO)) <> '';
+		END;
+
 		INSERT INTO @CotizacionServicios_PaxAdicional(
 			id_Cotizacion,
 			id_CotizacionServicios,
@@ -938,7 +1005,7 @@ BEGIN
 		 )
 		 SELECT 
 			id_CotizacionServicios=NULL,
-			id_cargosdesc=CD.id,
+			id_cargosdesc=COALESCE(CD.id, TRY_CAST(C.CotizacionCargos.value('id_cargosdesc[1]','VARCHAR(25)') AS INT), (SELECT TOP 1 id FROM dbo.CargosDesc WHERE ds_nombre = C.CotizacionCargos.value('ds_cargonm[1]','VARCHAR(50)')), 1),
 			ds_cargonm=ISNULL(C.CotizacionCargos.value('ds_cargonm[1]','VARCHAR(50)'),''),
 			bl_noshow=ISNULL(C.CotizacionCargos.value('bl_noshow[1]','INT'),''),
 			am_contado=ISNULL(C.CotizacionCargos.value('am_contado[1]','MONEY'),''),
@@ -1253,12 +1320,46 @@ BEGIN
 		UPDATE CC
 		SET CC.id_cotizacion=C.id
 		FROM @Cotizacion CC
-		INNER JOIN dbo.Cotizacion C ON C.cd_consecutivo=CC.cd_consecutivo
+		INNER JOIN dbo.Cotizacion C ON (C.id = CC.id_Cotizacion OR C.cd_consecutivo = CC.cd_consecutivo)
+
+		UPDATE C
+		SET C.ds_observacion = CASE WHEN ISNULL(LTRIM(RTRIM(CC.ds_observacion)), '') <> '' THEN CC.ds_observacion ELSE C.ds_observacion END,
+		    C.ds_records = CASE WHEN ISNULL(LTRIM(RTRIM(CC.ds_records)), '') <> '' THEN CC.ds_records ELSE C.ds_records END
+		FROM @Cotizacion CC
+		INNER JOIN dbo.Cotizacion C ON C.id = CC.id_Cotizacion
+		WHERE CC.bl_existe=1
 
 		UPDATE CS
-		SET CS.id_cotizacion=C.id
+		SET CS.id_cotizacion=CC.id_Cotizacion
 		FROM @CotizacionServicios CS
-		INNER JOIN dbo.Cotizacion C ON C.cd_consecutivo=CS.cd_Cotizacion
+		INNER JOIN @Cotizacion CC ON CC.cd_consecutivo=CS.cd_Cotizacion
+
+		;WITH CTE_EX AS (
+			SELECT CS_EX.*, ROW_NUMBER() OVER (PARTITION BY CS_EX.id_Cotizacion ORDER BY CS_EX.id ASC) AS rn
+			FROM dbo.CotizacionServicios CS_EX
+			INNER JOIN @Cotizacion CC ON CC.id_Cotizacion = CS_EX.id_Cotizacion AND CC.bl_existe = 1
+		),
+		CTE_NEW AS (
+			SELECT CS.*, ROW_NUMBER() OVER (PARTITION BY CS.id_Cotizacion ORDER BY CS.id ASC) AS rn
+			FROM @CotizacionServicios CS
+			INNER JOIN @Cotizacion CC ON CC.id_Cotizacion = CS.id_Cotizacion AND CC.bl_existe = 1
+		)
+		UPDATE EX
+		SET EX.ds_records = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.ds_records, N1.ds_records))), '') <> '' THEN COALESCE(N.ds_records, N1.ds_records) ELSE EX.ds_records END,
+		    EX.cd_localizador = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.cd_localizador, N1.cd_localizador))), '') <> '' THEN COALESCE(N.cd_localizador, N1.cd_localizador) ELSE EX.cd_localizador END,
+		    EX.cd_confirmacion = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.cd_confirmacion, N1.cd_confirmacion))), '') <> '' THEN COALESCE(N.cd_confirmacion, N1.cd_confirmacion) ELSE EX.cd_confirmacion END,
+		    EX.ds_servicio = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_servicio)), '') <> '' THEN N.ds_servicio ELSE EX.ds_servicio END,
+		    EX.ds_descrip = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_descrip)), '') <> '' THEN N.ds_descrip ELSE EX.ds_descrip END,
+		    EX.ds_destino = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_destino)), '') <> '' THEN N.ds_destino ELSE EX.ds_destino END,
+		    EX.dt_llegada = COALESCE(N.dt_llegada, EX.dt_llegada),
+		    EX.dt_salida = COALESCE(N.dt_salida, EX.dt_salida),
+		    EX.dt_FechaSalidaSrv = COALESCE(N.dt_FechaSalidaSrv, EX.dt_FechaSalidaSrv),
+		    EX.dt_FechaLlegadaSrv = COALESCE(N.dt_FechaLlegadaSrv, EX.dt_FechaLlegadaSrv),
+		    EX.in_noches = COALESCE(N.in_noches, EX.in_noches),
+		    EX.in_dias = COALESCE(N.in_dias, EX.in_dias)
+		FROM CTE_EX EX
+		LEFT JOIN CTE_NEW N ON EX.id_Cotizacion = N.id_Cotizacion AND EX.rn = N.rn
+		LEFT JOIN CTE_NEW N1 ON EX.id_Cotizacion = N1.id_Cotizacion AND N1.rn = 1
 		
 		INSERT INTO CotizacionServicios(
 			id_TiposConceptFac,

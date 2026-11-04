@@ -193,9 +193,9 @@ export async function POST(req: NextRequest) {
                     }
 
                     const consecInfo = await getNextTransactionConsecutive('QUOTATION', branchId, implantId);
-                    const internalNum = first.Consecutivo 
+                    let internalNum = first.Consecutivo 
                         ? (first.Serie ? `${first.Serie}-${first.Consecutivo}` : first.Consecutivo)
-                        : consecInfo.formattedConsecutive;
+                        : (consecInfo.prefix ? consecInfo.formattedConsecutive : null);
                     const globalCargos = parseFloat(first.Cargos_A_Cotizacion || '0');
                     const currency = first.Moneda || 'COP';
                     const exchangeRate = parseFloat(first.Tasa_Cambio || '1');
@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
 
                     // Insert Quotation Header
                     const qRes = await new mssql.Request(transaction)
-                        .input('internalNumber', mssql.VarChar, internalNum)
+                        .input('internalNumber', mssql.VarChar, internalNum || 'TEMP')
                         .input('clientId', mssql.Int, clientId)
                         .input('currency', mssql.VarChar, currency)
                         .input('exchangeRate', mssql.Float, exchangeRate)
@@ -226,6 +226,13 @@ export async function POST(req: NextRequest) {
                         `);
 
                     const quotationId = qRes.recordset[0].id;
+                    if (!internalNum) {
+                        internalNum = String(quotationId);
+                        await new mssql.Request(transaction)
+                            .input('id', mssql.Int, quotationId)
+                            .input('internalNumber', mssql.VarChar, internalNum)
+                            .query(`UPDATE dbo.[Quotation] SET internalNumber = @internalNumber WHERE id = @id`);
+                    }
                     let quotationTotalSum = globalCargos;
 
                     // Insert Items

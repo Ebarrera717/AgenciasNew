@@ -68,6 +68,36 @@ BEGIN
         );
     END IF;
 
+    -- Garantizar secuencias y valores DEFAULT en tablas de control existentes
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "UpdateId" SET DEFAULT nextval('public."Korex_UpdateHistory_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "FechaInicio" SET DEFAULT now();
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "ExitCode" SET DEFAULT 0;
+
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateObjects_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Expected" SET DEFAULT true;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Executed" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Compiled" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Validated" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "ExecutionTimeMs" SET DEFAULT 0;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "FechaVerificacion" SET DEFAULT now();
+
+    ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateErrors_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "Fecha" SET DEFAULT now();
+
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_Installation_id_seq"'::regclass);
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "LastValidationDate" SET DEFAULT now();
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "Status" SET DEFAULT 'HEALTHY';
+
+    -- Corrección y saneamiento de consecutivos/internalNumber errados en Quotation
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        UPDATE public."Quotation"
+        SET "internalNumber" = id::text
+        WHERE "internalNumber" IS NULL 
+           OR "internalNumber" LIKE 'QUO-%' 
+           OR "internalNumber" LIKE 'TEMP_%'
+           OR "internalNumber" = '';
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'EquivalenciasInterfaces_Log') THEN
         CREATE TABLE public."EquivalenciasInterfaces_Log" (
             "id" integer DEFAULT nextval('"EquivalenciasInterfaces_Log_id_seq"'::regclass) NOT NULL,
@@ -2288,6 +2318,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'manualDescription') THEN
         ALTER TABLE public."Quotation" ADD COLUMN "manualDescription" text;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'observations') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN "observations" text;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationCombo' AND column_name = 'id') THEN
         ALTER TABLE public."QuotationCombo" ADD COLUMN "id" integer NOT NULL;

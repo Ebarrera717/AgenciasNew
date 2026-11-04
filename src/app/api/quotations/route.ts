@@ -8,8 +8,13 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
-        const userIdHeader = req.headers.get('X-User-Id')
-        const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+        const rawUserId = req.headers.get('X-User-Id') || req.cookies.get('korex_user_id')?.value || body?.userId
+        const parsedUserId = rawUserId ? parseInt(String(rawUserId), 10) : NaN
+        const actingUserId = !isNaN(parsedUserId) && parsedUserId > 0 ? parsedUserId : null
+        const cookieEmail = req.cookies.get('korex_user_email')?.value
+        if (!body.userEmail && cookieEmail) {
+            body.userEmail = cookieEmail
+        }
 
         let dbQuotationId: number | null = null;
         let message: string = '';

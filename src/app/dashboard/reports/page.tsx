@@ -325,37 +325,54 @@ export default function ReportsPage() {
             return;
         }
 
-        // Automatic table joins resolution
+        // Automatic table joins resolution (BFS - Breadth First Search)
         const requiredAliases = new Set(selectedColumns.filter(c => !c.isCalculated).map(c => c.tableAlias));
         requiredAliases.delete('t1');
-        
-        const finalJoins: any[] = [];
-        const addedAliases = new Set();
 
-        const processRelation = (table: string, currentRelations: any[], parentAlias: string) => {
-            if (!currentRelations) return;
-            currentRelations.forEach(rel => {
-                if (requiredAliases.has(rel.alias) && !addedAliases.has(rel.alias)) {
+        // Intermediate parent dependency resolution
+        if (baseTable === 'Quotation') {
+            const qpChildren = ['t_provider', 't_prestadora', 't_product'];
+            if (Array.from(requiredAliases).some(a => qpChildren.includes(a))) {
+                requiredAliases.add('t_quotationproduct');
+            }
+        } else if (baseTable === 'QuotationProduct') {
+            const quoChildren = ['t_client', 't_seller', 't_branch', 't_implant', 't_ticketprinter', 't_user'];
+            if (Array.from(requiredAliases).some(a => quoChildren.includes(a))) {
+                requiredAliases.add('t_quotation');
+            }
+        }
+
+        const finalJoins: any[] = [];
+        const addedAliases = new Set(['t1']);
+        const queue: { table: string; alias: string }[] = [{ table: baseTable, alias: 't1' }];
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            if (!current) break;
+            const mod = modules[current.table];
+            if (!mod || !mod.relations) continue;
+
+            for (const rel of mod.relations) {
+                if (addedAliases.has(rel.alias)) continue;
+
+                // Regla arquitectónica: En reportes de Cotizaciones, el Proveedor pertenece directamente a QuotationProduct, NUNCA a Prestadora
+                if ((baseTable === 'Quotation' || baseTable === 'QuotationProduct') && current.table === 'Prestadora' && rel.table === 'Provider') {
+                    continue;
+                }
+
+                if (requiredAliases.has(rel.alias)) {
                     finalJoins.push({
                         tableName: rel.table,
                         alias: rel.alias,
-                        joinType: rel.type,
+                        joinType: rel.type || 'LEFT JOIN',
                         joinCondition: rel.condition
                             .replace('{alias}', rel.alias)
-                            .replace('{parentAlias}', parentAlias)
+                            .replace('{parentAlias}', current.alias)
                     });
                     addedAliases.add(rel.alias);
-                    
-                    const nextModule = modules[rel.table];
-                    if (nextModule && nextModule.relations) {
-                        processRelation(rel.table, nextModule.relations, rel.alias);
-                    }
+                    queue.push({ table: rel.table, alias: rel.alias });
                 }
-            });
-        }
-
-        if (modules[baseTable] && modules[baseTable].relations) {
-            processRelation(baseTable, modules[baseTable].relations, 't1');
+            }
         }
 
         const payload = {
@@ -1259,8 +1276,8 @@ export default function ReportsPage() {
             <AnimatePresence>
                 {isRuntimeFilterModalOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-zinc-900/60 backdrop-blur-sm">
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800">
-                            <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-lg max-h-[78vh] flex flex-col overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800">
+                            <div className="p-6 sm:p-8 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
                                 <div>
                                     <h2 className="text-2xl font-black">Filtros de Ejecución</h2>
                                     <p className="text-zinc-500 text-sm font-medium">Ingresa los parámetros para consultar el reporte.</p>
@@ -1270,7 +1287,7 @@ export default function ReportsPage() {
                                 </button>
                             </div>
                             
-                            <div className="p-8 space-y-6">
+                            <div className="p-6 sm:p-8 space-y-4 flex-1 min-h-0 overflow-y-scroll custom-scrollbar">
                                 {activeReport?.filters?.map((f: any) => (
                                     <div key={`${f.table_alias}.${f.column_name}`} className="space-y-2 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-[1.5rem] border border-zinc-200 dark:border-zinc-700 shadow-sm">
                                         <label className="text-xs font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest pl-1">{f.filter_label || f.column_name}</label>
@@ -1338,7 +1355,7 @@ export default function ReportsPage() {
                                 ))}
                             </div>
 
-                            <div className="p-8 bg-zinc-50 dark:bg-zinc-800/50 flex gap-3">
+                            <div className="p-6 sm:p-8 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 flex gap-3 shrink-0">
                                 <button onClick={() => setIsRuntimeFilterModalOpen(false)} className="flex-1 h-14 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl font-bold hover:bg-zinc-100 transition-colors">
                                     Cancelar
                                 </button>
@@ -1452,7 +1469,7 @@ export default function ReportsPage() {
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800"
                         >
-                            <div className="p-8 space-y-6">
+                            <div className="p-6 sm:p-8 space-y-4 flex-1 min-h-0 overflow-y-scroll custom-scrollbar">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter italic">Configurar Filtro</h3>
                                     <button onClick={() => setIsManualFilterModalOpen(false)} className="text-zinc-400 hover:bg-zinc-100 p-2 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
@@ -1540,7 +1557,7 @@ export default function ReportsPage() {
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             className="bg-white dark:bg-zinc-900 rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800"
                         >
-                            <div className="p-8 space-y-6">
+                            <div className="p-6 sm:p-8 space-y-4 flex-1 min-h-0 overflow-y-scroll custom-scrollbar">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
                                         <FileText className="w-5 h-5 text-blue-600" />

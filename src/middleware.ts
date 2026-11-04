@@ -6,8 +6,10 @@ export async function middleware(req: NextRequest) {
     // Rutas públicas que NUNCA se bloquean
     if (
         pathname.startsWith('/login') ||
+        pathname.startsWith('/analytics/login') ||
         pathname.startsWith('/licencia-expirada') ||
         pathname.startsWith('/api/auth') ||
+        pathname.startsWith('/api/kax/auth') ||
         pathname.startsWith('/api/config/license') ||
         pathname.startsWith('/_next') ||
         pathname.includes('.')

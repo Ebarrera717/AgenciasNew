@@ -56,7 +56,7 @@ export async function GET() {
         }
 
         const results: any[] = await prisma.$queryRawUnsafe(
-            `SELECT * FROM public."fnInvoicesListar"()`
+            `SELECT * FROM public.fnInvoicesListar()`
         );
         const invoices = results.map(row => {
             const item = row.fninvoiceslistar || row;

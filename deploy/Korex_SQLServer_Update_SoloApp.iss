@@ -5,7 +5,7 @@ AppVersion=1.0.0
 AppPublisher=Korex Corporation
 DefaultDirName=F:\Korex_Sistema_SQLServer
 DefaultGroupName=Korex
-OutputDir=F:\Proyectos\AgenciasNew\Instalador
+OutputDir=..\Instalador
 OutputBaseFilename=Korex_SQLServer_Update_SoloApp_Setup
 Compression=none
 SolidCompression=no
@@ -24,9 +24,9 @@ VersionInfoProductName=Korex AgenciasNew
 VersionInfoProductVersion=1.0.0.0
 
 [Files]
-Source: "F:\Proyectos\AgenciasNew\RELEASE_KOREX\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env, *.env.*, .env, *.bak*"
-Source: "F:\Proyectos\AgenciasNew\deploy\Update_Korex_SQLServer.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "F:\Proyectos\AgenciasNew\deploy\Korex_Diagnostics_Engine.ps1"; DestDir: "{app}\deploy"; Flags: ignoreversion
+Source: "..\RELEASE_KOREX\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.env, *.env.*, .env, *.bak*"
+Source: "..\deploy\Update_Korex_SQLServer.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\deploy\Korex_Diagnostics_Engine.ps1"; DestDir: "{app}\deploy"; Flags: ignoreversion
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;

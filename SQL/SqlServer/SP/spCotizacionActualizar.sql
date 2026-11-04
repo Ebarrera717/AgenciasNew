@@ -42,6 +42,7 @@ BEGIN
         DECLARE @paxChildren INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxChildren') AS INT);
         DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
         DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
+        DECLARE @observations NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.observations');
 
         DECLARE @actingUserId INT = @p_acting_user_id;
         IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
@@ -147,6 +148,23 @@ BEGIN
             implantId = @implantId,
             sellerId = @sellerId,
             ticketPrinterId = @ticketPrinterId,
+            userId = CASE
+                WHEN userId IS NULL OR userId = 1 THEN COALESCE(
+                    (
+                        SELECT TOP 1 u.id
+                        FROM dbo.[TicketPrinter] tp
+                        INNER JOIN dbo.[User] u ON (
+                            u.ticketPrinterId = tp.id
+                            OR (NULLIF(LTRIM(RTRIM(tp.email)), '') IS NOT NULL AND LOWER(LTRIM(RTRIM(u.email))) = LOWER(LTRIM(RTRIM(tp.email))))
+                            OR (NULLIF(LTRIM(RTRIM(tp.name)), '') IS NOT NULL AND UPPER(LTRIM(RTRIM(u.name))) = UPPER(LTRIM(RTRIM(tp.name))))
+                        )
+                        WHERE tp.id = ISNULL(@ticketPrinterId, dbo.[Quotation].ticketPrinterId)
+                        ORDER BY CASE WHEN u.ticketPrinterId = tp.id THEN 0 ELSE 1 END, u.id ASC
+                    ),
+                    userId
+                )
+                ELSE userId
+            END,
             totalAmount = @totalAmount,
             baseCommissionable = @baseCommissionable,
             chargesAndTaxes = @chargesAndTaxes,
@@ -161,7 +179,8 @@ BEGIN
             paxAdults = @paxAdults,
             paxChildren = @paxChildren,
             reservationCode = @reservationCode,
-            manualDescription = @manualDescription
+            manualDescription = @manualDescription,
+            observations = @observations
         WHERE id = @p_id;
 
         IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
@@ -290,7 +309,7 @@ BEGIN
             DEALLOCATE item_cur_upd;
         END;
 
-        -- Recalculate totalAmount if 0 or missing
+        -- Recalculate totalAmount and internal financial summary (valorBase without duplicating mainTaxId)
         DECLARE @calcTotalUpd FLOAT = (
             SELECT SUM(ISNULL(qpt.explicitAmount, 0))
             FROM dbo.[QuotationProductTax] qpt
@@ -306,20 +325,49 @@ BEGIN
             );
         END;
 
-        IF @calcTotalUpd IS NOT NULL AND @calcTotalUpd > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @calcTotalUpd,
-                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotalUpd),
-                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotalUpd)
-            WHERE id = @p_id;
-        END
-        ELSE IF @totalAmount > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @totalAmount
-            WHERE id = @p_id;
-        END;
+        DECLARE @costoTotalUpd FLOAT = 0;
+        DECLARE @valorBaseUpd FLOAT = 0;
+        SELECT
+            @costoTotalUpd = ISNULL(SUM(ISNULL(qp.cost, 0)), 0),
+            @valorBaseUpd = ISNULL(SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1) + ISNULL(add_base.extraBase, 0)), 0)
+        FROM dbo.[QuotationProduct] qp
+        OUTER APPLY (
+            SELECT SUM(ISNULL(qpt2.explicitAmount, 0)) AS extraBase
+            FROM dbo.[QuotationProductTax] qpt2
+            JOIN dbo.[ChargeAndTax] ct2 ON ct2.id = qpt2.chargeAndTaxId
+            LEFT JOIN dbo.[ChargeAndTax] target_ct ON target_ct.id = ct2.targetTaxId
+            WHERE qpt2.quotationProductId = qp.id
+              AND ISNULL(qpt2.isMain, 0) = 0
+              AND qpt2.chargeAndTaxId <> ISNULL(qp.mainTaxId, -1)
+              AND ct2.targetTaxId IS NOT NULL
+              AND (
+                  target_ct.[type] = 'PRINCIPAL' OR ISNULL(target_ct.isEditable, 1) = 0 OR target_ct.code = 'TAR' OR target_ct.[name] LIKE '%TARIFA%' OR target_ct.id = qp.mainTaxId
+              )
+        ) add_base
+        WHERE qp.quotationId = @p_id;
+
+        DECLARE @utilidadUpd FLOAT = @valorBaseUpd - @costoTotalUpd;
+        DECLARE @comisionUtilidadPctUpd FLOAT = CASE WHEN @valorBaseUpd > 0 THEN ROUND((@utilidadUpd / @valorBaseUpd) * 100.0, 2) ELSE 0 END;
+        DECLARE @comisionTotalPctUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.comisionTotalPercentage') AS FLOAT), @commissionPercentage);
+        DECLARE @comisionFreelancePctUpd FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@p_data, '$.comisionFreelancePercentage') AS FLOAT), 0);
+        DECLARE @mostrarTotalizacionUpd BIT = CASE WHEN EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE code = 'MOSTRAR_TOTALIZACION_COTIZACION' AND [value] = 'true') THEN 1 ELSE 0 END;
+        DECLARE @comisionPropiaPctUpd FLOAT = CASE WHEN @mostrarTotalizacionUpd = 1 THEN (@comisionUtilidadPctUpd - @comisionFreelancePctUpd) ELSE (@comisionTotalPctUpd - @comisionFreelancePctUpd) END;
+
+        UPDATE dbo.[Quotation]
+        SET totalAmount = CASE WHEN @calcTotalUpd IS NOT NULL AND @calcTotalUpd > 0 THEN @calcTotalUpd WHEN @totalAmount > 0 THEN @totalAmount ELSE totalAmount END,
+            baseCommissionable = CASE WHEN @calcTotalUpd IS NOT NULL AND @calcTotalUpd > 0 THEN ISNULL(NULLIF(@baseCommissionable, 0), @calcTotalUpd) ELSE baseCommissionable END,
+            chargesAndTaxes = CASE WHEN @calcTotalUpd IS NOT NULL AND @calcTotalUpd > 0 THEN ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotalUpd) ELSE chargesAndTaxes END,
+            costoTotal = @costoTotalUpd,
+            valorBase = @valorBaseUpd,
+            utilidad = @utilidadUpd,
+            comisionTotalPercentage = @comisionTotalPctUpd,
+            comisionFreelancePercentage = @comisionFreelancePctUpd,
+            comisionPropiaPercentage = @comisionPropiaPctUpd,
+            commissionPercentage = @comisionPropiaPctUpd,
+            comisionUtilidadPercentage = @comisionUtilidadPctUpd,
+            comisionFreelanceValue = (@comisionFreelancePctUpd / 100.0) * @valorBaseUpd,
+            comisionPropiaValue = (@comisionPropiaPctUpd / 100.0) * @valorBaseUpd
+        WHERE id = @p_id;
 
         COMMIT TRANSACTION;
 

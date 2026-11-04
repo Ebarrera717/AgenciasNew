@@ -105,12 +105,23 @@ async function syncToZeusERP(silentSuccess = false) {
         dbsToSync.unshift(envDbName);
     }
 
+    const crypto = require('crypto');
+    const forceSync = process.argv.includes('--force');
+    const cacheFilePath = path.join(rootDir, 'SQL', '.zeus_sync_cache.json');
+    let syncCache = {};
+    if (!forceSync && fs.existsSync(cacheFilePath)) {
+        try {
+            syncCache = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
+        } catch {}
+    }
+
     let overallSuccess = true;
 
     for (const targetDb of dbsToSync) {
         let pool = null;
         let batchCount = 0;
         let successCount = 0;
+        let executedCount = 0;
 
         let spsSqlPath = (targetDb.toLowerCase() === zeusDbName.toLowerCase())
             ? path.join(rootDir, 'SQL', 'ZeusERP', 'TODOS_LOS_SPS_ZEUSERP.sql')
@@ -126,28 +137,48 @@ async function syncToZeusERP(silentSuccess = false) {
 
         try {
             const dbConfig = { ...config, database: targetDb };
-            console.log(`  -> Conectando a BD SQL Server [${targetDb}] en ${dbConfig.server}:${dbConfig.port || 1433}...`);
-            pool = await mssql.connect(dbConfig);
-            console.log(`  -> ¡Conexión con SQL Server [${targetDb}] establecida!`);
+            const dbKey = `${dbConfig.server}:${dbConfig.port || 1433}/${targetDb}`;
+            if (!syncCache[dbKey]) syncCache[dbKey] = {};
 
             const batches = sqlContent
                 .split(/^GO\s*$/mi)
                 .map(b => b.trim())
                 .filter(b => b.length > 0);
 
-            console.log(`  -> Aplicando ${batches.length} lotes de actualización en [${targetDb}]...`);
-
-            for (const batch of batches) {
-                batchCount++;
-                try {
-                    await pool.request().batch(batch);
+            const pendingBatches = [];
+            for (let i = 0; i < batches.length; i++) {
+                const batch = batches[i];
+                const hash = crypto.createHash('sha256').update(batch).digest('hex');
+                if (forceSync || !syncCache[dbKey][hash]) {
+                    pendingBatches.push({ index: i + 1, batch, hash });
+                } else {
                     successCount++;
+                }
+            }
+
+            if (pendingBatches.length === 0) {
+                console.log(`  -> [CACHE OK] 0 lotes cambiados en [${targetDb}] (${batches.length}/${batches.length} lotes ya sincronizados en ${dbConfig.server}).`);
+                continue;
+            }
+
+            console.log(`  -> Conectando a BD SQL Server [${targetDb}] en ${dbConfig.server}:${dbConfig.port || 1433}...`);
+            pool = await mssql.connect(dbConfig);
+            console.log(`  -> ¡Conexión con SQL Server [${targetDb}] establecida!`);
+            console.log(`  -> Aplicando ${pendingBatches.length} lote(s) modificado(s) de ${batches.length} en [${targetDb}]...`);
+
+            for (const item of pendingBatches) {
+                batchCount = item.index;
+                try {
+                    await pool.request().batch(item.batch);
+                    syncCache[dbKey][item.hash] = true;
+                    successCount++;
+                    executedCount++;
                 } catch (bErr) {
                     console.warn(`  [WARN Batch #${batchCount} en ${targetDb}]: ${bErr.message.slice(0, 150)}...`);
                 }
             }
 
-            const logMsg = `[${new Date().toISOString()}] Sincronización completada: ${successCount}/${batches.length} lotes aplicados exitosamente en [${targetDb}] (${dbConfig.server}).\n`;
+            const logMsg = `[${new Date().toISOString()}] Sincronización completada: ${successCount}/${batches.length} lotes (${executedCount} ejecutados, ${batches.length - pendingBatches.length} en caché) en [${targetDb}] (${dbConfig.server}).\n`;
             console.log(`  -> ${logMsg.trim()}`);
             const logFilePath = path.join(rootDir, 'SQL', 'Zeus_Sync.log');
             fs.appendFileSync(logFilePath, logMsg, 'utf8');
@@ -162,6 +193,10 @@ async function syncToZeusERP(silentSuccess = false) {
             overallSuccess = false;
         }
     }
+
+    try {
+        fs.writeFileSync(cacheFilePath, JSON.stringify(syncCache, null, 2), 'utf8');
+    } catch {}
 
     return overallSuccess;
 }

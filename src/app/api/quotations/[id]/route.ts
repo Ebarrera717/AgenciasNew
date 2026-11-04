@@ -123,8 +123,13 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         if (isNaN(id)) return NextResponse.json({ message: 'ID inválido' }, { status: 400 })
 
         const body = await request.json()
-        const userIdHeader = request.headers.get('X-User-Id')
-        const actingUserId = userIdHeader ? parseInt(userIdHeader) : 1
+        const rawUserId = request.headers.get('X-User-Id') || request.cookies.get('korex_user_id')?.value || body?.userId
+        const parsedUserId = rawUserId ? parseInt(String(rawUserId), 10) : NaN
+        const actingUserId = !isNaN(parsedUserId) && parsedUserId > 0 ? parsedUserId : null
+        const cookieEmail = request.cookies.get('korex_user_email')?.value
+        if (!body.userEmail && cookieEmail) {
+            body.userEmail = cookieEmail
+        }
 
         let message: string = '';
         if (isSQLServerMode()) {
@@ -162,7 +167,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         let autoExportResult = null;
         try {
             const { autoExportQuotationToZeusERP } = await import('@/lib/zeus-auto-export');
-            autoExportResult = await autoExportQuotationToZeusERP(id, actingUserId);
+            autoExportResult = await autoExportQuotationToZeusERP(id, actingUserId ?? undefined);
         } catch (expErr: any) {
             console.warn('[AUTO_EXPORT] Auto-export to Zeus ERP warning on update:', expErr?.message);
         }
@@ -194,7 +199,7 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
             message = Array.isArray(results) ? results[0]?.p_mensaje_resultado || '' : '';
         } else {
             const results: any[] = await prisma.$queryRawUnsafe(
-                `CALL public."spCotizacionEliminar"($1::INT, $2::INT, $3::TEXT)`,
+                `CALL public.spCotizacionEliminar($1::INT, $2::INT, $3::TEXT)`,
                 id,
                 actingUserId,
                 '' // p_mensaje_resultado

@@ -60,6 +60,10 @@ export default function InvoicesListPage() {
     // Ordenamiento por Referencia / ID
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1)
+    const [pageSize, setPageSize] = useState<number>(25)
+
     const loadInvoices = () => {
         setLoading(true)
         Promise.all([
@@ -85,6 +89,10 @@ export default function InvoicesListPage() {
     useEffect(() => {
         loadInvoices()
     }, [])
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [filterReferencia, filterFechaDesde, filterFechaHasta, filterCliente, filterElaboradoPor, filterMontoTotal, filterEstado, filterReserva, filterPasajero])
 
     const isInvoiceExported = (q: any) => {
         const st = (q?.state || '').toUpperCase();
@@ -161,8 +169,18 @@ export default function InvoicesListPage() {
         return sortDirection === 'asc' ? numA - numB : numB - numA;
     });
 
+    // Cálculos de paginación
+    const totalItems = sortedInvoices.length;
+    const effectivePageSize = pageSize > 0 ? pageSize : Math.max(totalItems, 1);
+    const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const startIdx = totalItems === 0 ? 0 : (safeCurrentPage - 1) * effectivePageSize;
+    const endIdx = Math.min(startIdx + effectivePageSize, totalItems);
+    const paginatedInvoices = pageSize > 0 ? sortedInvoices.slice(startIdx, endIdx) : sortedInvoices;
+
     const handleToggleSort = () => {
         setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        setCurrentPage(1);
     };
 
     const handleClearFilters = () => {
@@ -175,6 +193,7 @@ export default function InvoicesListPage() {
         setFilterEstado('')
         setFilterReserva('')
         setFilterPasajero('')
+        setCurrentPage(1)
     };
 
     const selectableInvoices = sortedInvoices.filter(q => !isInvoiceExported(q));
@@ -627,10 +646,34 @@ export default function InvoicesListPage() {
 
             {/* Contenedor de Tabla con Barra de Herramientas de Exportación */}
             <div className="w-full max-w-full overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm min-h-[450px]">
-                {/* Barra Superior de Herramientas Excel */}
+                {/* Barra Superior de Herramientas Excel y Paginación */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl">
-                    <div className="flex items-center gap-3 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        <span>Total facturas: <strong className="text-blue-600 dark:text-blue-400 font-black text-sm">{sortedInvoices.length}</strong></span>
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <span>Total facturas: <strong className="text-blue-600 dark:text-blue-400 font-black text-sm">{totalItems}</strong></span>
+                        {totalItems > 0 && (
+                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">
+                                (Mostrando <strong className="text-zinc-800 dark:text-zinc-200">{startIdx + 1}</strong> a <strong className="text-zinc-800 dark:text-zinc-200">{endIdx}</strong>)
+                            </span>
+                        )}
+                        <div className="flex items-center gap-1.5 ml-1">
+                            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Mostrar:</span>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="h-7 px-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                                <option value={200}>200</option>
+                                <option value={500}>500</option>
+                                <option value={0}>Todas</option>
+                            </select>
+                        </div>
                         {selectedIds.length > 0 && (
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-[11px] font-bold">
                                 {selectedIds.length} seleccionada(s)
@@ -638,7 +681,47 @@ export default function InvoicesListPage() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1 mr-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-1.5 py-1">
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    disabled={safeCurrentPage <= 1}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Primera página"
+                                >
+                                    «
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={safeCurrentPage <= 1}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Página anterior"
+                                >
+                                    ‹ Ant
+                                </button>
+                                <span className="px-2 text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                    Pág. <strong className="text-blue-600 dark:text-blue-400">{safeCurrentPage}</strong> de {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={safeCurrentPage >= totalPages}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Página siguiente"
+                                >
+                                    Sig ›
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    disabled={safeCurrentPage >= totalPages}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Última página"
+                                >
+                                    »
+                                </button>
+                            </div>
+                        )}
+
                         <button
                             onClick={handleCopyToClipboard}
                             className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
@@ -668,6 +751,7 @@ export default function InvoicesListPage() {
                         <p className="text-xs">Aún no se ha emitido ninguna o no coincide con la búsqueda.</p>
                     </div>
                 ) : (
+                    <>
                     <div className="overflow-x-auto w-full min-h-[420px]">
                         <table className="w-full text-left border-collapse text-xs md:text-sm">
                             <thead className="bg-zinc-50/70 dark:bg-zinc-800/40">
@@ -701,7 +785,7 @@ export default function InvoicesListPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                                {sortedInvoices.map((q) => {
+                                {paginatedInvoices.map((q) => {
                                     const mainProd = q.products?.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
                                     const firstProd = mainProd;
                                     const paxNameDisplay = q.paxName || (firstProd?.passengers && Array.isArray(firstProd.passengers) && firstProd.passengers.length > 0 ? firstProd.passengers[0].name : (firstProd?.passengerName || 'Mismo titular'));
@@ -819,6 +903,97 @@ export default function InvoicesListPage() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Barra Inferior de Paginación */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-200 dark:border-zinc-800 rounded-b-2xl text-xs">
+                        <div className="flex flex-wrap items-center gap-3 text-zinc-600 dark:text-zinc-400 font-medium">
+                            <span>
+                                Mostrando <strong className="text-zinc-900 dark:text-white">{totalItems === 0 ? 0 : startIdx + 1}</strong> a <strong className="text-zinc-900 dark:text-white">{endIdx}</strong> de <strong className="text-blue-600 dark:text-blue-400">{totalItems}</strong> facturas
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <span>Filas por página:</span>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => {
+                                        setPageSize(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={200}>200</option>
+                                    <option value={500}>500</option>
+                                    <option value={0}>Todas</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                            <button
+                                onClick={() => setCurrentPage(1)}
+                                disabled={safeCurrentPage <= 1}
+                                className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Ir a la primera página"
+                            >
+                                « Inicio
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={safeCurrentPage <= 1}
+                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Página anterior"
+                            >
+                                ‹ Anterior
+                            </button>
+
+                            {(() => {
+                                const pages: number[] = [];
+                                const maxButtons = 5;
+                                let startPage = Math.max(1, safeCurrentPage - Math.floor(maxButtons / 2));
+                                const endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                                if (endPage - startPage + 1 < maxButtons) {
+                                    startPage = Math.max(1, endPage - maxButtons + 1);
+                                }
+                                for (let i = startPage; i <= endPage; i++) {
+                                    pages.push(i);
+                                }
+                                return pages.map(p => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setCurrentPage(p)}
+                                        className={`min-w-[32px] h-8 px-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                                            p === safeCurrentPage
+                                                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                                                : 'border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                        }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ));
+                            })()}
+
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={safeCurrentPage >= totalPages}
+                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Página siguiente"
+                            >
+                                Siguiente ›
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(totalPages)}
+                                disabled={safeCurrentPage >= totalPages}
+                                className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Ir a la última página"
+                            >
+                                Fin »
+                            </button>
+                        </div>
+                    </div>
+                    </>
                 )}
             </div>
 

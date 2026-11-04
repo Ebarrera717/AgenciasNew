@@ -78,6 +78,7 @@ if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" set "ISCC_PATH=%ProgramFiles%\In
 if exist "%ProgramFiles(x86)%\Inno Setup 5\ISCC.exe" set "ISCC_PATH=%ProgramFiles(x86)%\Inno Setup 5\ISCC.exe"
 if exist "%ProgramFiles%\Inno Setup 5\ISCC.exe" set "ISCC_PATH=%ProgramFiles%\Inno Setup 5\ISCC.exe"
 if exist "C:\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Inno Setup 6\ISCC.exe"
+if exist "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" set "ISCC_PATH=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
 if exist "C:\Users\rubie\AppData\Local\Programs\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Users\rubie\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
 
 if "%ISCC_PATH%"=="" (
@@ -87,8 +88,8 @@ if "%ISCC_PATH%"=="" (
     exit /b 1
 )
 
-echo Usando compilador en: "%ISCC_PATH%"
-"%ISCC_PATH%" "%~dp0deploy\Korex_SQLServer.iss"
+echo Usando compilador en: "%ISCC_PATH%" (Modo Rapido /Qp)
+"%ISCC_PATH%" /Qp "%~dp0deploy\Korex_SQLServer.iss"
 if %errorlevel% neq 0 (
     echo Error compilando instalador SQL Server con Inno Setup.
     pause

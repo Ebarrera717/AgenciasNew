@@ -13,14 +13,25 @@ async function runGuardianValidation() {
   console.log('============================================================');
   console.log(`Motor activo: ${isSQLServer ? 'Microsoft SQL Server' : 'PostgreSQL'}`);
 
-  // Guarantee release manifest is up to date
-  generateManifest();
-
   const manifestPath = path.resolve(
     __dirname,
     '../SQL',
     isSQLServer ? 'manifest-sqlserver.json' : 'manifest-postgresql.json'
   );
+
+  // Guarantee release manifest is up to date when running in full workspace
+  const hasFullDevRepo =
+    fs.existsSync(path.resolve(__dirname, '../SQL/Procedure')) &&
+    fs.existsSync(path.resolve(__dirname, '../SQL/SqlServer'));
+  if (hasFullDevRepo || !fs.existsSync(manifestPath)) {
+    try {
+      generateManifest();
+    } catch (e) {
+      if (!fs.existsSync(manifestPath)) {
+        throw e;
+      }
+    }
+  }
 
   if (!fs.existsSync(manifestPath)) {
     console.error(`❌ Error Crítico: No se encontró el archivo manifest: ${manifestPath}`);
@@ -38,16 +49,93 @@ async function runGuardianValidation() {
 
   if (isSQLServer) {
     const mssql = require('mssql');
-    const sqlConfig = {
-      user: process.env.DB_USER || 'sa',
-      password: process.env.DB_PASSWORD || '',
-      server: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '1433', 10),
-      database: process.env.DB_NAME || 'Korex_pruebas',
-      options: {
-        encrypt: false,
-        trustServerCertificate: true
+    const os = require('os');
+    const { execFileSync } = require('child_process');
+    let rawHost = process.env.DB_HOST || process.env.SQLSERVER_HOST || 'localhost';
+    let origHost = rawHost;
+    let instanceName = undefined;
+    if (rawHost.includes('\\')) {
+      const parts = rawHost.split('\\');
+      rawHost = parts[0];
+      origHost = parts[0];
+      instanceName = parts[1];
+    }
+    const localHostname = (os.hostname() || '').toLowerCase();
+    if (
+      rawHost.toLowerCase() === 'localhost' ||
+      rawHost === '.' ||
+      rawHost.toLowerCase() === '(local)' ||
+      (localHostname && rawHost.toLowerCase() === localHostname)
+    ) {
+      rawHost = '127.0.0.1';
+    }
+
+    let resolvedPort = parseInt(process.env.DB_PORT || process.env.SQLSERVER_PORT || '1433', 10);
+    let foundInstancePort = null;
+
+    if (instanceName) {
+      try {
+        const psRegCmd = `$p = Get-ItemProperty "HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL*.${instanceName}\\MSSQLServer\\SuperSocketNetLib\\Tcp\\IPAll" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p) { if ($p.TcpPort) { Write-Output $p.TcpPort } elseif ($p.TcpDynamicPorts) { Write-Output $p.TcpDynamicPorts } }`;
+        const regOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psRegCmd], {
+          encoding: 'utf8',
+          timeout: 5000,
+          stdio: ['ignore', 'pipe', 'ignore']
+        }).trim();
+        const pm = regOut.match(/(\d+)/);
+        if (pm) foundInstancePort = parseInt(pm[1], 10);
+      } catch (e) {}
+
+      if (!foundInstancePort) {
+        try {
+          const safeServer = `${origHost}\\${instanceName}`.replace(/'/g, "''");
+          const safeUser = (process.env.DB_USER || process.env.SQLSERVER_USER || 'sa').replace(/'/g, "''");
+          const safePass = (process.env.DB_PASSWORD || process.env.SQLSERVER_PASSWORD || '').replace(/'/g, "''");
+          const psNetCmd = `
+            $sc = 'Server=${safeServer};Database=master;User Id=${safeUser};Password=${safePass};Encrypt=False;TrustServerCertificate=True;Connection Timeout=6;';
+            $conn = New-Object System.Data.SqlClient.SqlConnection($sc);
+            $conn.Open();
+            $cmd = $conn.CreateCommand();
+            $cmd.CommandText = "SELECT local_tcp_port FROM sys.dm_exec_connections WHERE session_id = @@SPID AND local_tcp_port IS NOT NULL; EXEC xp_readerrorlog 0, 1, N'Server is listening on'";
+            $r = $cmd.ExecuteReader();
+            $foundPort = '';
+            while ($r.Read()) { if ($r[0]) { $foundPort = $r[0].ToString() } }
+            if (-not $foundPort -and $r.NextResult()) {
+                while ($r.Read()) {
+                    $txt = $r[2].ToString();
+                    if ($txt -match '<ipv4>\\s+(\\d+)') { $foundPort = $matches[1]; break }
+                }
+            }
+            $conn.Close();
+            if ($foundPort) { Write-Output $foundPort }
+          `;
+          const netOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psNetCmd], {
+            encoding: 'utf8',
+            timeout: 8000,
+            stdio: ['ignore', 'pipe', 'ignore']
+          }).trim();
+          const pm = netOut.match(/(\d+)/);
+          if (pm) foundInstancePort = parseInt(pm[1], 10);
+        } catch (e) {}
       }
+      if (foundInstancePort) {
+        resolvedPort = foundInstancePort;
+      }
+    }
+
+    const sqlOptions = {
+      encrypt: false,
+      trustServerCertificate: true
+    };
+    if (instanceName && !foundInstancePort) {
+      sqlOptions.instanceName = instanceName;
+    }
+    const sqlConfig = {
+      user: process.env.DB_USER || process.env.SQLSERVER_USER || 'sa',
+      password: process.env.DB_PASSWORD || process.env.SQLSERVER_PASSWORD || '',
+      server: rawHost,
+      port: (instanceName && !foundInstancePort) ? undefined : resolvedPort,
+      database: process.env.DB_NAME || process.env.SQLSERVER_DB || 'Korex_pruebas',
+      options: sqlOptions
     };
 
     try {
@@ -59,9 +147,12 @@ async function runGuardianValidation() {
         SELECT COUNT(*) as cnt FROM sys.tables WHERE name IN ('Korex_UpdateHistory', 'Korex_UpdateObjects', 'Korex_Installation')
       `);
       if (tablesCheck.recordset[0].cnt < 3) {
-        console.log('Creando estructura de control Korex Update Guardian...');
-        const initDdl = fs.readFileSync(path.resolve(__dirname, '../SQL/SqlServer/01_Tables.sql'), 'utf8');
-        await pool.request().batch(initDdl);
+        const initTablesPath = path.resolve(__dirname, '../SQL/SqlServer/01_Tables.sql');
+        if (fs.existsSync(initTablesPath)) {
+          console.log('Creando estructura de control Korex Update Guardian...');
+          const initDdl = fs.readFileSync(initTablesPath, 'utf8');
+          await pool.request().batch(initDdl);
+        }
       }
 
       // Record update start
@@ -194,23 +285,117 @@ async function runGuardianValidation() {
       await client.connect();
       console.log(`Conectado exitosamente a PostgreSQL [${clientConfig.host || 'remote'}:${clientConfig.database || 'Korex_colaereo'}]`);
 
-      // Ensure control tables exist
-      const checkTables = await client.query(`
-        SELECT COUNT(*) as cnt FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_name IN ('Korex_UpdateHistory', 'Korex_UpdateObjects', 'Korex_Installation')
+      // Ensure control tables, sequences and DEFAULT constraints exist and are self-healed
+      await client.query(`
+        DO $$
+        BEGIN
+          CREATE SEQUENCE IF NOT EXISTS public."Korex_UpdateHistory_id_seq" START WITH 1;
+          CREATE SEQUENCE IF NOT EXISTS public."Korex_UpdateObjects_id_seq" START WITH 1;
+          CREATE SEQUENCE IF NOT EXISTS public."Korex_UpdateErrors_id_seq" START WITH 1;
+          CREATE SEQUENCE IF NOT EXISTS public."Korex_Installation_id_seq" START WITH 1;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_UpdateHistory') THEN
+            CREATE TABLE public."Korex_UpdateHistory" (
+              "UpdateId" integer DEFAULT nextval('public."Korex_UpdateHistory_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+              "VersionAnterior" character varying(50),
+              "VersionNueva" character varying(50) NOT NULL,
+              "Build" character varying(50),
+              "Motor" character varying(50) NOT NULL,
+              "Servidor" character varying(255),
+              "BaseDatos" character varying(255),
+              "FechaInicio" timestamp without time zone DEFAULT now() NOT NULL,
+              "FechaFin" timestamp without time zone,
+              "Estado" character varying(50) NOT NULL,
+              "ExitCode" integer DEFAULT 0 NOT NULL,
+              "Usuario" character varying(150),
+              "Equipo" character varying(150),
+              "ResumenLog" text
+            );
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_UpdateObjects') THEN
+            CREATE TABLE public."Korex_UpdateObjects" (
+              "id" integer DEFAULT nextval('public."Korex_UpdateObjects_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+              "UpdateId" integer NOT NULL,
+              "ObjectType" character varying(50) NOT NULL,
+              "ObjectName" character varying(255) NOT NULL,
+              "Expected" boolean DEFAULT true NOT NULL,
+              "Executed" boolean DEFAULT false NOT NULL,
+              "Compiled" boolean DEFAULT false NOT NULL,
+              "Validated" boolean DEFAULT false NOT NULL,
+              "HashExpected" character varying(128),
+              "HashActual" character varying(128),
+              "Status" character varying(50) NOT NULL,
+              "ErrorMessage" text,
+              "ExecutionTimeMs" integer DEFAULT 0,
+              "FechaVerificacion" timestamp without time zone DEFAULT now() NOT NULL
+            );
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_UpdateErrors') THEN
+            CREATE TABLE public."Korex_UpdateErrors" (
+              "id" integer DEFAULT nextval('public."Korex_UpdateErrors_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+              "UpdateId" integer NOT NULL,
+              "ObjectName" character varying(255),
+              "ErrorNumber" integer,
+              "ErrorMessage" text NOT NULL,
+              "StackTrace" text,
+              "Fecha" timestamp without time zone DEFAULT now() NOT NULL
+            );
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_Installation') THEN
+            CREATE TABLE public."Korex_Installation" (
+              "id" integer DEFAULT nextval('public."Korex_Installation_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+              "AppVersion" character varying(50) NOT NULL,
+              "DbVersion" character varying(50) NOT NULL,
+              "Build" character varying(50),
+              "Motor" character varying(50) NOT NULL,
+              "LastValidationDate" timestamp without time zone DEFAULT now() NOT NULL,
+              "Status" character varying(50) DEFAULT 'HEALTHY' NOT NULL,
+              "Environment" character varying(50) DEFAULT 'PRODUCTION'
+            );
+          END IF;
+
+          -- Self-heal DEFAULT constraints in case tables were previously created without DEFAULT
+          ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "UpdateId" SET DEFAULT nextval('public."Korex_UpdateHistory_id_seq"'::regclass);
+          ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "FechaInicio" SET DEFAULT now();
+          ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "ExitCode" SET DEFAULT 0;
+
+          ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateObjects_id_seq"'::regclass);
+          ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Expected" SET DEFAULT true;
+          ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Executed" SET DEFAULT false;
+          ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Compiled" SET DEFAULT false;
+          ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Validated" SET DEFAULT false;
+          ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "ExecutionTimeMs" SET DEFAULT 0;
+          ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "FechaVerificacion" SET DEFAULT now();
+
+          ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateErrors_id_seq"'::regclass);
+          ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "Fecha" SET DEFAULT now();
+
+          ALTER TABLE public."Korex_Installation" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_Installation_id_seq"'::regclass);
+          ALTER TABLE public."Korex_Installation" ALTER COLUMN "LastValidationDate" SET DEFAULT now();
+          ALTER TABLE public."Korex_Installation" ALTER COLUMN "Status" SET DEFAULT 'HEALTHY';
+
+          -- Synchronize sequence values with existing rows
+          PERFORM setval('public."Korex_UpdateHistory_id_seq"', COALESCE((SELECT MAX("UpdateId") FROM public."Korex_UpdateHistory"), 0) + 1, false);
+          PERFORM setval('public."Korex_UpdateObjects_id_seq"', COALESCE((SELECT MAX("id") FROM public."Korex_UpdateObjects"), 0) + 1, false);
+          PERFORM setval('public."Korex_UpdateErrors_id_seq"', COALESCE((SELECT MAX("id") FROM public."Korex_UpdateErrors"), 0) + 1, false);
+          PERFORM setval('public."Korex_Installation_id_seq"', COALESCE((SELECT MAX("id") FROM public."Korex_Installation"), 0) + 1, false);
+        END $$;
       `);
-      if (parseInt(checkTables.rows[0].cnt, 10) < 3) {
-        console.log('Creando estructura de control Korex Update Guardian en PostgreSQL...');
-        const initDdl = fs.readFileSync(path.resolve(__dirname, '../SQL/Table/Alter_New_Columns.sql'), 'utf8');
-        await client.query(initDdl);
-      }
 
       // Record update start
       const histRes = await client.query(`
         INSERT INTO public."Korex_UpdateHistory" ("VersionNueva", "Build", "Motor", "Servidor", "BaseDatos", "Estado", "ExitCode")
         VALUES ($1, $2, 'PostgreSQL', $3, $4, 'EN_PROCESO', 0)
         RETURNING "UpdateId";
-      `, [manifest.releaseVersion, manifest.build, process.env.DB_HOST || 'localhost', process.env.DB_NAME || 'Korex_colaereo']);
+      `, [
+        manifest.releaseVersion,
+        manifest.build,
+        clientConfig.host || process.env.DB_HOST || 'localhost',
+        clientConfig.database || process.env.DB_NAME || 'Korex_colaereo'
+      ]);
       updateId = histRes.rows[0].UpdateId;
 
       let idx = 1;
@@ -272,11 +457,19 @@ async function runGuardianValidation() {
       `, [finalState, exitCode, `Total: ${manifest.totalObjects}, OK: ${totalOk}, Errores: ${totalErrors}`, updateId]);
 
       if (exitCode === 0) {
-        await client.query(`
-          INSERT INTO public."Korex_Installation" ("AppVersion", "DbVersion", "Build", "Motor", "Status")
-          VALUES ($1, $2, $3, 'PostgreSQL', 'HEALTHY')
-          ON CONFLICT (id) DO UPDATE SET "AppVersion" = EXCLUDED."AppVersion", "DbVersion" = EXCLUDED."DbVersion", "Build" = EXCLUDED."Build", "LastValidationDate" = now(), "Status" = 'HEALTHY';
-        `, [manifest.releaseVersion, manifest.releaseVersion, manifest.build]);
+        const instCheck = await client.query(`SELECT "id" FROM public."Korex_Installation" ORDER BY "id" DESC LIMIT 1`);
+        if (instCheck.rows.length === 0) {
+          await client.query(`
+            INSERT INTO public."Korex_Installation" ("AppVersion", "DbVersion", "Build", "Motor", "Status")
+            VALUES ($1, $2, $3, 'PostgreSQL', 'HEALTHY');
+          `, [manifest.releaseVersion, manifest.releaseVersion, manifest.build]);
+        } else {
+          await client.query(`
+            UPDATE public."Korex_Installation"
+            SET "AppVersion" = $1, "DbVersion" = $2, "Build" = $3, "LastValidationDate" = now(), "Status" = 'HEALTHY'
+            WHERE "id" = $4;
+          `, [manifest.releaseVersion, manifest.releaseVersion, manifest.build, instCheck.rows[0].id]);
+        }
       }
 
       await client.end();

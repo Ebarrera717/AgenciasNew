@@ -21,11 +21,9 @@ export default function AnalyticsLayout({ children }: { children: React.ReactNod
     const [mobileOpen, setMobileOpen] = useState(false);
 
     const navItems = [
-        { name: 'Dashboard', href: '/analytics', icon: Activity },
         { name: 'Ejecuciones', href: '/analytics/executions', icon: Play },
         { name: 'SQL Server', href: '/analytics/sqlserver', icon: Database },
-        { name: 'Parámetros', href: '/analytics/parameters', icon: Sliders },
-        { name: 'Historial', href: '/analytics/history', icon: History }
+        { name: 'Parámetros', href: '/analytics/parameters', icon: Sliders }
     ];
 
     return (

@@ -1,4 +1,4 @@
-﻿const path = require('path');
+const path = require('path');
 const dotenv = require('dotenv');
 
 const rootDir = path.join(__dirname, '..');
@@ -42,16 +42,33 @@ async function validatePostgresOnly() {
         await client.connect();
         console.log(' -> [OK] Conectado exitosamente a PostgreSQL.\n');
 
-        for (const item of PG_TABLES_TO_VALIDATE) {
+        let batchCounts = null;
+        try {
+            const unionSql = PG_TABLES_TO_VALIDATE.map(
+                (item, idx) => `SELECT ${idx} AS idx, COUNT(*)::int AS c FROM public."${item.table}"`
+            ).join(' UNION ALL ');
+            const r = await client.query(unionSql);
+            batchCounts = new Map(r.rows.map(row => [Number(row.idx), row.c]));
+        } catch (batchErr) {
+            batchCounts = null;
+        }
+
+        for (let idx = 0; idx < PG_TABLES_TO_VALIDATE.length; idx++) {
+            const item = PG_TABLES_TO_VALIDATE[idx];
             let ok = false;
             let count = 0;
 
-            try {
-                const r = await client.query(`SELECT COUNT(*) AS c FROM public."${item.table}"`);
+            if (batchCounts && batchCounts.has(idx)) {
                 ok = true;
-                count = r.rows[0].c;
-            } catch (e1) {
-                ok = false;
+                count = batchCounts.get(idx);
+            } else {
+                try {
+                    const r = await client.query(`SELECT COUNT(*) AS c FROM public."${item.table}"`);
+                    ok = true;
+                    count = r.rows[0].c;
+                } catch (e1) {
+                    ok = false;
+                }
             }
 
             results.push({

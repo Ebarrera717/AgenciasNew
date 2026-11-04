@@ -885,7 +885,8 @@ BEGIN
         "paxChildren" integer,
         "reservationCode" character varying(255),
         "copyFieldsToProducts" boolean DEFAULT true,
-        "manualDescription" text
+        "manualDescription" text,
+        "observations" text
     );
     CREATE TABLE IF NOT EXISTS public."QuotationCombo" (
         id integer NOT NULL,

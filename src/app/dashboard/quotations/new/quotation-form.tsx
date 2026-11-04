@@ -38,6 +38,7 @@ interface QuotationFormData {
     reservationCode?: string;
     copyFieldsToProducts?: boolean;
     manualDescription?: string;
+    observations?: string;
     manualServices?: ManualServiceItem[];
     items: {
         productId: string;
@@ -89,20 +90,40 @@ const formatMoney = (val: any, decimals: number = 2) => {
 };
 
 const getStateColorClass = (stateName: string, statesList: any[]) => {
-    const stateObj = (statesList || []).find((s: any) => s.code === stateName || s.name === stateName);
-    const color = stateObj?.color?.toLowerCase() || 'blue';
-    
-    if (color === 'emerald' || color === 'green') {
+    const cleanState = String(stateName || '').trim().toUpperCase();
+    const stateObj = (statesList || []).find(
+        (s: any) =>
+            String(s.code || '').trim().toUpperCase() === cleanState ||
+            String(s.name || '').trim().toUpperCase() === cleanState
+    );
+    const color = String(stateObj?.color || 'blue').trim().toLowerCase();
+
+    if (['emerald', 'green', 'verde', 'esmeralda', 'lime', 'lima'].includes(color)) {
         return "bg-emerald-50/50 dark:bg-emerald-500/5 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 focus:ring-emerald-500";
     }
-    if (color === 'red' || color === 'rose') {
+    if (['red', 'rose', 'rojo', 'crimson', 'vino'].includes(color)) {
         return "bg-red-50/50 dark:bg-red-500/5 border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 focus:ring-red-500";
     }
-    if (color === 'amber' || color === 'orange' || color === 'yellow') {
+    if (['amber', 'yellow', 'amarillo', 'ámbar', 'ambar', 'gold', 'dorado'].includes(color)) {
         return "bg-amber-50/50 dark:bg-amber-500/5 border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400 focus:ring-amber-500";
     }
-    if (color === 'purple' || color === 'violet') {
+    if (['orange', 'naranja', 'anaranjado'].includes(color)) {
+        return "bg-orange-50/50 dark:bg-orange-500/5 border-orange-200 dark:border-orange-500/20 text-orange-600 dark:text-orange-400 focus:ring-orange-500";
+    }
+    if (['purple', 'violet', 'morado', 'violeta', 'lila', 'fuchsia', 'fucsia'].includes(color)) {
         return "bg-purple-50/50 dark:bg-purple-500/5 border-purple-200 dark:border-purple-500/20 text-purple-600 dark:text-purple-400 focus:ring-purple-500";
+    }
+    if (['cyan', 'celeste', 'teal', 'turquesa', 'sky', 'aqua'].includes(color)) {
+        return "bg-cyan-50/50 dark:bg-cyan-500/5 border-cyan-200 dark:border-cyan-500/20 text-cyan-600 dark:text-cyan-400 focus:ring-cyan-500";
+    }
+    if (['gray', 'grey', 'gris', 'zinc', 'slate', 'neutral'].includes(color)) {
+        return "bg-zinc-100/80 dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:ring-zinc-500";
+    }
+    if (['pink', 'rosa', 'rosado'].includes(color)) {
+        return "bg-pink-50/50 dark:bg-pink-500/5 border-pink-200 dark:border-pink-500/20 text-pink-600 dark:text-pink-400 focus:ring-pink-500";
+    }
+    if (['indigo', 'añil', 'anil', 'navy', 'azul oscuro'].includes(color)) {
+        return "bg-indigo-50/50 dark:bg-indigo-500/5 border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 focus:ring-indigo-500";
     }
     return "bg-blue-50/50 dark:bg-blue-500/5 border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 focus:ring-blue-500";
 };
@@ -172,6 +193,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
         reservationCode: '',
         copyFieldsToProducts: true,
         manualDescription: '',
+        observations: '',
         manualServices: [],
         items: [],
         selectedCombos: [],
@@ -337,6 +359,11 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
             const endpoint = quotationId ? `/api/quotations/${quotationId}` : '/api/quotations';
             const method = quotationId ? 'PUT' : 'POST';
             const loggedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const fullPayload = {
+                ...payload,
+                userId: loggedUser?.id || null,
+                userEmail: loggedUser?.email || null
+            };
 
             const res = await fetch(endpoint, {
                 method,
@@ -344,7 +371,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                     'Content-Type': 'application/json',
                     'X-User-Id': loggedUser.id?.toString() || ''
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(fullPayload)
             })
 
             const result = await res.json()
@@ -371,17 +398,23 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
 
             const targetId = result.quotation?.id || quotationId;
 
-            // Si hay adjuntos pendientes cargados antes de guardar la cotización, subirlos automáticamente
+            // Si hay adjuntos pendientes cargados antes o durante la edición, subirlos automáticamente
             if (targetId && pendingAttachments.length > 0) {
                 try {
-                    await fetch(`/api/quotations/${targetId}/attachments`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-User-Id': loggedUser.id?.toString() || ''
-                        },
-                        body: JSON.stringify({ files: pendingAttachments })
-                    });
+                    for (const pendingFile of pendingAttachments) {
+                        try {
+                            await fetch(`/api/quotations/${targetId}/attachments`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-User-Id': loggedUser.id?.toString() || ''
+                                },
+                                body: JSON.stringify({ files: [pendingFile] })
+                            });
+                        } catch (subErr) {
+                            console.error('Error subiendo adjunto individual:', pendingFile.fileName, subErr);
+                        }
+                    }
                     setPendingAttachments([]);
                 } catch (attErr) {
                     console.error('Error subiendo adjuntos pendientes:', attErr);
@@ -463,27 +496,47 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
 
             if (quotationId) {
                 const loggedUser = JSON.parse(localStorage.getItem('user') || '{}');
-                const res = await fetch(`/api/quotations/${quotationId}/attachments`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-User-Id': loggedUser.id?.toString() || ''
-                    },
-                    body: JSON.stringify({ files: processedFiles })
-                })
+                let successfulCount = 0;
+                const failedFiles: typeof processedFiles = [];
 
-                if (res.ok) {
-                    fetchAttachments()
-                } else {
-                    const result = await res.json()
-                    alert(result.message || 'Error al cargar adjunto(s)')
+                // Enviar archivo por archivo para evitar limites de carga y cuellos de botella
+                for (const fileItem of processedFiles) {
+                    try {
+                        const res = await fetch(`/api/quotations/${quotationId}/attachments`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-User-Id': loggedUser.id?.toString() || ''
+                            },
+                            body: JSON.stringify({ files: [fileItem] })
+                        })
+
+                        if (res.ok) {
+                            successfulCount++
+                        } else {
+                            failedFiles.push(fileItem)
+                        }
+                    } catch (netErr) {
+                        failedFiles.push(fileItem)
+                    }
+                }
+
+                if (successfulCount > 0) {
+                    await fetchAttachments()
+                }
+
+                if (failedFiles.length > 0) {
+                    // Si alguno no se pudo subir inmediatamente a la BD, se agrega a pendientes
+                    // para que al hacer clic en 'Guardar' se vuelva a intentar guardar con la cotización
+                    setPendingAttachments(prev => [...prev, ...failedFiles])
+                    alert(`Aviso: ${successfulCount} archivo(s) subido(s) exitosamente. ${failedFiles.length} archivo(s) quedaron en cola pendiente y se guardarán al pulsar el botón "Guardar".`)
                 }
             } else {
                 setPendingAttachments(prev => [...prev, ...processedFiles])
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err)
-            alert('Error al procesar el archivo o archivos seleccionados')
+            alert(err?.message || 'Error al procesar el archivo o archivos seleccionados')
         } finally {
             setUploadingAttachment(false)
             setUploadProgress(null)
@@ -670,11 +723,18 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
     const costoTotal = formData.items.reduce((sum, item) => sum + (item.cost || 0), 0);
     const valorBase = React.useMemo(() => {
         let baseSum = 0;
+        const defaultMainTax = data?.taxes?.find((t: any) => t.type === 'PRINCIPAL' || t.code === 'TAR' || t.name?.toUpperCase().includes('TARIFA'));
         formData.items.forEach(item => {
+            const mainTaxIdNum = item.mainTaxId != null ? Number(item.mainTaxId) : (defaultMainTax ? Number(defaultMainTax.id) : null);
             let itemBase = (item.price || 0) * (item.quantity || 1);
             (item.appliedTaxes || []).forEach((tax: any) => {
                 const rawTaxId = tax.id ?? tax.chargeAndTaxId;
                 const taxId = rawTaxId != null ? Number(rawTaxId) : null;
+                if (taxId == null) return;
+                // Si el cargo es el Cargo Principal del propio ítem, su valor ya está en (item.price * item.quantity); no sumarlo dos veces aunque tenga targetTaxId
+                if ((mainTaxIdNum != null && taxId === mainTaxIdNum) || tax.isMain === true) {
+                    return;
+                }
                 const master = data?.taxes?.find((t: any) => Number(t.id) === taxId);
                 if (master && master.targetTaxId) {
                     const targetMaster = data?.taxes?.find((t: any) => Number(t.id) === Number(master.targetTaxId));
@@ -836,6 +896,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                             reservationCode: qData.reservationCode || '',
                             copyFieldsToProducts: qData.copyFieldsToProducts ?? true,
                             manualDescription: qData.manualDescription || '',
+                            observations: qData.observations || '',
                             manualServices: qData.manualServices || [],
                             state: qData.state || 'Nuevo',
                             stateDescription: qData.stateDescription || '',
@@ -1403,6 +1464,17 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                             <option key={s.id || s.code} value={s.code}>{s.name.toUpperCase()}</option>
                                         ))}
                                     </select>
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2 space-y-2">
+                                    <label className="text-sm font-semibold text-zinc-500">Observaciones</label>
+                                    <textarea
+                                        rows={2}
+                                        className="w-full rounded-xl p-3.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white resize-y text-sm"
+                                        value={formData.observations || ''}
+                                        onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                                        placeholder="Observaciones generales de la cotización (se envían al campo Observaciones en Zeus ERP)..."
+                                    />
                                 </div>
 
                                 {formData.state !== originalState && (

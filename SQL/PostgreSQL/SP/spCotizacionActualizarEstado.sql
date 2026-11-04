@@ -190,3 +190,14 @@ BEGIN
     END IF;
 END;
 $$;
+
+CREATE OR REPLACE PROCEDURE public."spCotizacionActualizarEstado"(
+    p_response JSONB
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionActualizarEstado(p_response);
+END;
+$$;
+

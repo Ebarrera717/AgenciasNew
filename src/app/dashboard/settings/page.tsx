@@ -2585,7 +2585,53 @@ export default function SettingsPage() {
                                     <tr key={item.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all text-sm">
                                         <td className="px-8 py-6 font-black text-blue-600 tracking-tighter text-base">{item.code || '-'}</td>
                                         <td className="px-8 py-6">
-                                            <div className="text-zinc-600 dark:text-zinc-300 font-bold">{item.name}</div>
+                                            <div className="flex items-center gap-2.5 flex-wrap">
+                                                <div className="text-zinc-600 dark:text-zinc-300 font-bold">{item.name}</div>
+                                                {activeTab === 'estados-cotizacion' && item.color && (() => {
+                                                    const c = String(item.color).trim().toLowerCase();
+                                                    const isHex = c.startsWith('#') || c.startsWith('rgb');
+                                                    const clsMap: Record<string, string> = {
+                                                        yellow: 'bg-amber-100 text-amber-800 border-amber-300',
+                                                        amber: 'bg-amber-100 text-amber-800 border-amber-300',
+                                                        amarillo: 'bg-amber-100 text-amber-800 border-amber-300',
+                                                        green: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+                                                        emerald: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+                                                        verde: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+                                                        red: 'bg-red-100 text-red-700 border-red-300',
+                                                        rose: 'bg-rose-100 text-rose-700 border-rose-300',
+                                                        rojo: 'bg-red-100 text-red-700 border-red-300',
+                                                        orange: 'bg-orange-100 text-orange-800 border-orange-300',
+                                                        naranja: 'bg-orange-100 text-orange-800 border-orange-300',
+                                                        purple: 'bg-purple-100 text-purple-700 border-purple-300',
+                                                        violet: 'bg-violet-100 text-violet-700 border-violet-300',
+                                                        morado: 'bg-purple-100 text-purple-700 border-purple-300',
+                                                        violeta: 'bg-violet-100 text-violet-700 border-violet-300',
+                                                        cyan: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+                                                        celeste: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+                                                        teal: 'bg-teal-100 text-teal-800 border-teal-300',
+                                                        turquesa: 'bg-teal-100 text-teal-800 border-teal-300',
+                                                        indigo: 'bg-indigo-100 text-indigo-700 border-indigo-300',
+                                                        añil: 'bg-indigo-100 text-indigo-700 border-indigo-300',
+                                                        pink: 'bg-pink-100 text-pink-700 border-pink-300',
+                                                        rosa: 'bg-pink-100 text-pink-700 border-pink-300',
+                                                        rosado: 'bg-pink-100 text-pink-700 border-pink-300',
+                                                        gray: 'bg-zinc-100 text-zinc-700 border-zinc-300',
+                                                        zinc: 'bg-zinc-100 text-zinc-700 border-zinc-300',
+                                                        gris: 'bg-zinc-100 text-zinc-700 border-zinc-300',
+                                                        blue: 'bg-blue-100 text-blue-700 border-blue-300',
+                                                        azul: 'bg-blue-100 text-blue-700 border-blue-300',
+                                                    };
+                                                    const cls = clsMap[c] || 'bg-blue-100 text-blue-700 border-blue-300';
+                                                    return (
+                                                        <span
+                                                            className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${isHex ? '' : cls}`}
+                                                            style={isHex ? { backgroundColor: `${c}20`, color: c, borderColor: `${c}60` } : undefined}
+                                                        >
+                                                            {item.color}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </div>
                                             {(activeTab === 'vendedores' || activeTab === 'tiqueteadores') && item.email && (
                                                 <div className="text-zinc-400 text-xs flex items-center gap-1 mt-1"><Mail className="w-3 h-3" /> {item.email}</div>
                                             )}

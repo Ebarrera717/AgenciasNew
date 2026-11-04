@@ -56,6 +56,35 @@ BEGIN
         END IF;
     END IF;
 
+    -- Auto-reparación de cotizaciones cuyo userId quedó en NULL o en el fallback 1 cuando el Tiqueteador corresponde a otro Usuario creador registrado
+    UPDATE public."Quotation" q_fix
+    SET "userId" = sub.real_user_id
+    FROM (
+        SELECT q2.id AS quotation_id, u2.id AS real_user_id
+        FROM public."Quotation" q2
+        LEFT JOIN public."TicketPrinter" tp ON tp.id = q2."ticketPrinterId"
+        LEFT JOIN public."User" u2 ON (
+            u2."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u2.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u2.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE (q2."userId" IS NULL OR q2."userId" = 1)
+          AND tp.id IS NOT NULL
+          AND u2.id IS NOT NULL
+          AND u2.id <> 1
+    ) sub
+    WHERE q_fix.id = sub.quotation_id
+      AND COALESCE(q_fix."userId", 0) <> sub.real_user_id;
+
+    UPDATE public."QuotationStateHistory" qsh_fix
+    SET "userId" = q_src."userId"
+    FROM public."Quotation" q_src
+    WHERE qsh_fix."quotationId" = q_src.id
+      AND qsh_fix.state = 'NUEVO'
+      AND (qsh_fix."userId" IS NULL OR qsh_fix."userId" = 1)
+      AND q_src."userId" IS NOT NULL
+      AND q_src."userId" <> 1;
+
     RETURN QUERY
     SELECT 
         jsonb_build_object(
@@ -86,8 +115,30 @@ BEGIN
                 0
             ),
             'currency', q.currency,
-            'userName', COALESCE(u.name, 'Sistema'),
+            'userName', COALESCE(
+                (
+                    SELECT u_init.name
+                    FROM public."QuotationStateHistory" qsh_init
+                    LEFT JOIN public."User" u_init ON u_init.id = qsh_init."userId"
+                    WHERE qsh_init."quotationId" = q.id
+                      AND qsh_init.state = 'NUEVO'
+                      AND qsh_init."userId" IS NOT NULL
+                      AND u_init.id IS NOT NULL
+                      AND (qsh_init."userId" <> 1 OR q."userId" = 1)
+                    ORDER BY qsh_init.id ASC
+                    LIMIT 1
+                ),
+                u.name,
+                'Sistema'
+            ),
             'state', COALESCE(q.state, 'NUEVO'),
+            'stateColor', (
+                SELECT qs.color
+                FROM public."QuotationState" qs
+                WHERE UPPER(TRIM(qs.code)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                   OR UPPER(TRIM(qs.name)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                LIMIT 1
+            ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
             'nights', COALESCE((

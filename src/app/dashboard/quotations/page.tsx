@@ -28,7 +28,10 @@ import {
     Upload,
     FileDown,
     Send,
-    Plus
+    Plus,
+    AlertCircle,
+    ExternalLink,
+    Check
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -61,6 +64,10 @@ export default function QuotationsListPage() {
     // Ordenamiento por ID (Por defecto DESC por ID de mayor a menor)
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1)
+    const [pageSize, setPageSize] = useState<number>(25)
+
     const [selectedIds, setSelectedIds] = useState<number[]>([])
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
     const [invoiceQuotationId, setInvoiceQuotationId] = useState<number | null>(null)
@@ -74,6 +81,29 @@ export default function QuotationsListPage() {
 
     // Modal de Detalle
     const [detailQuotation, setDetailQuotation] = useState<any | null>(null)
+
+    // Modal de Resultado de Exportación a Zeus ERP (Copiable y con link a Diagnóstico)
+    const [exportModal, setExportModal] = useState<{
+        isOpen: boolean;
+        isError: boolean;
+        title: string;
+        message: string;
+        traceCode?: string;
+        items?: Array<{
+            cotDisplay: string;
+            statusType: 'success' | 'warning' | 'error';
+            message: string;
+            idZeus?: string | number;
+        }>;
+    }>({
+        isOpen: false,
+        isError: false,
+        title: '',
+        message: '',
+        items: []
+    })
+    const [copiedTrace, setCopiedTrace] = useState(false)
+    const [copiedDetails, setCopiedDetails] = useState(false)
 
     const [dbInfo, setDbInfo] = useState<{ isSQLServer: boolean; shortName: string; dbName: string; name: string } | null>(null)
 
@@ -132,6 +162,7 @@ export default function QuotationsListPage() {
     }
 
     const handleApplyFilters = () => {
+        setCurrentPage(1)
         fetchQuotations({
             referencia: filterReferencia,
             fechaDesde: filterFechaDesde,
@@ -155,6 +186,7 @@ export default function QuotationsListPage() {
         setFilterEstado('')
         setFilterReserva('')
         setFilterPasajero('')
+        setCurrentPage(1)
         fetchQuotations({})
     }
 
@@ -171,8 +203,18 @@ export default function QuotationsListPage() {
 
     const filteredQs = sortedQs
 
+    // Cálculos de paginación
+    const totalItems = filteredQs.length
+    const effectivePageSize = pageSize > 0 ? pageSize : Math.max(totalItems, 1)
+    const totalPages = Math.max(1, Math.ceil(totalItems / effectivePageSize))
+    const safeCurrentPage = Math.min(currentPage, totalPages)
+    const startIdx = totalItems === 0 ? 0 : (safeCurrentPage - 1) * effectivePageSize
+    const endIdx = Math.min(startIdx + effectivePageSize, totalItems)
+    const paginatedQs = pageSize > 0 ? filteredQs.slice(startIdx, endIdx) : filteredQs
+
     const handleToggleSort = () => {
         setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+        setCurrentPage(1)
     }
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -358,7 +400,13 @@ export default function QuotationsListPage() {
     // Exportar a Zeus ERP
     const handleExportZeus = async () => {
         if (selectedIds.length === 0) {
-            alert('Por favor selecciona al menos una cotización para exportar a Zeus ERP.')
+            setExportModal({
+                isOpen: true,
+                isError: true,
+                title: 'Selección requerida',
+                message: 'Por favor selecciona al menos una cotización para exportar a Zeus ERP.',
+                items: []
+            })
             return
         }
 
@@ -377,38 +425,88 @@ export default function QuotationsListPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                alert("ERROR DE EXPORTACIÓN ZEUS ERP:\n" + (data.message || "Error desconocido") + (data.details ? "\nDetalles: " + data.details : ""));
+                setExportModal({
+                    isOpen: true,
+                    isError: true,
+                    title: 'Error de exportación a Zeus ERP',
+                    message: data.message || 'Error desconocido al conectar con Zeus ERP.',
+                    traceCode: data.traceCode,
+                    items: []
+                });
                 return;
             }
 
             if (data.success) {
-                let detalle = "✅ EXPORTACIÓN A ZEUS ERP COMPLETADA\n\n";
+                const items: Array<{
+                    cotDisplay: string;
+                    statusType: 'success' | 'warning' | 'error';
+                    message: string;
+                    idZeus?: string | number;
+                }> = [];
+
                 if (data.spResult && data.spResult.length > 0) {
-                    detalle += "Detalle de exportación por cotización:\n";
                     data.spResult.forEach((row: any) => {
                         const cotNum = row.Cotizacion || row.cd_consecutivo || row.IdProcesado || selectedIds.join(', ');
                         const cotDisplay = String(cotNum).startsWith('#') ? String(cotNum) : `#${cotNum}`;
                         const idZeus = row.IdProcesado || row.id_Cotizacion || row.id;
                         const isAlreadyExisted = row.bl_existe === 1 || row.bl_existe === true || (row.Estado && String(row.Estado).toLowerCase().includes('ya existe'));
+                        const resp = String(row.Respuesta || row.respuesta || row.Estado || '').toLowerCase();
+                        const isErr = resp.includes('error') || resp.includes('no existe') || resp.includes('no válido') || resp.includes('no valido');
 
-                        if (isAlreadyExisted) {
-                            detalle += `  • Cotización ${cotDisplay}: ⚠️ Ya existe en Zeus ERP${idZeus ? ` (ID Zeus: #${idZeus})` : ''}\n`;
+                        if (isErr) {
+                            items.push({
+                                cotDisplay,
+                                statusType: 'error',
+                                message: row.Respuesta || row.respuesta || row.Estado || 'Error al procesar en Zeus ERP',
+                                idZeus
+                            });
+                        } else if (isAlreadyExisted) {
+                            items.push({
+                                cotDisplay,
+                                statusType: 'warning',
+                                message: 'Ya existe registrada en Zeus ERP',
+                                idZeus
+                            });
                         } else {
-                            detalle += `  • Cotización ${cotDisplay}: ✅ Creada exitosamente en Zeus ERP${idZeus ? ` (ID Zeus: #${idZeus})` : ''}\n`;
+                            items.push({
+                                cotDisplay,
+                                statusType: 'success',
+                                message: 'Creada exitosamente en Zeus ERP',
+                                idZeus
+                            });
                         }
                     });
-                } else {
-                    detalle += data.message || "Cotización enviada a SQL Server correctamente.";
                 }
-                alert(detalle);
+
+                setExportModal({
+                    isOpen: true,
+                    isError: false,
+                    title: 'Exportación a Zeus ERP Completada',
+                    message: data.message || 'El proceso de exportación finalizó correctamente.',
+                    traceCode: data.traceCode,
+                    items
+                });
                 fetchQuotations();
             } else {
-                alert("❌ ERROR EN ZEUS ERP:\n" + data.message);
+                setExportModal({
+                    isOpen: true,
+                    isError: true,
+                    title: 'Error en Zeus ERP',
+                    message: data.message || 'Ocurrió un problema durante la exportación a Zeus ERP.',
+                    traceCode: data.traceCode,
+                    items: []
+                });
             }
 
         } catch (error: any) {
             console.error('Export error:', error);
-            alert(`Error crítico al conectar con el servidor: ${error.message}`);
+            setExportModal({
+                isOpen: true,
+                isError: true,
+                title: 'Error crítico de comunicación',
+                message: `No fue posible conectar con el servidor: ${error.message}`,
+                items: []
+            });
         }
     }
 
@@ -670,10 +768,34 @@ export default function QuotationsListPage() {
 
             {/* Contenedor de Tabla con Barra de Herramientas de Exportación */}
             <div className="w-full max-w-full overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm min-h-[450px]">
-                {/* Barra Superior de Herramientas Excel */}
+                {/* Barra Superior de Herramientas Excel y Paginación */}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 rounded-t-2xl">
-                    <div className="flex items-center gap-3 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        <span>Total cotizaciones: <strong className="text-blue-600 dark:text-blue-400 font-black text-sm">{filteredQs.length}</strong></span>
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        <span>Total cotizaciones: <strong className="text-blue-600 dark:text-blue-400 font-black text-sm">{totalItems}</strong></span>
+                        {totalItems > 0 && (
+                            <span className="text-zinc-500 dark:text-zinc-400 font-medium">
+                                (Mostrando <strong className="text-zinc-800 dark:text-zinc-200">{startIdx + 1}</strong> a <strong className="text-zinc-800 dark:text-zinc-200">{endIdx}</strong>)
+                            </span>
+                        )}
+                        <div className="flex items-center gap-1.5 ml-1">
+                            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Mostrar:</span>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="h-7 px-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                                <option value={200}>200</option>
+                                <option value={500}>500</option>
+                                <option value={0}>Todas</option>
+                            </select>
+                        </div>
                         {selectedIds.length > 0 && (
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-[11px] font-bold">
                                 {selectedIds.length} seleccionada(s)
@@ -681,7 +803,47 @@ export default function QuotationsListPage() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1 mr-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-1.5 py-1">
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    disabled={safeCurrentPage <= 1}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Primera página"
+                                >
+                                    «
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={safeCurrentPage <= 1}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Página anterior"
+                                >
+                                    ‹ Ant
+                                </button>
+                                <span className="px-2 text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                                    Pág. <strong className="text-blue-600 dark:text-blue-400">{safeCurrentPage}</strong> de {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={safeCurrentPage >= totalPages}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Página siguiente"
+                                >
+                                    Sig ›
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    disabled={safeCurrentPage >= totalPages}
+                                    className="px-2 py-0.5 text-[11px] font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    title="Última página"
+                                >
+                                    »
+                                </button>
+                            </div>
+                        )}
+
                         <button
                             onClick={handleCopyToClipboard}
                             className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm font-bold transition-all flex items-center gap-1.5 text-xs cursor-pointer active:scale-95"
@@ -711,6 +873,7 @@ export default function QuotationsListPage() {
                         <p className="text-xs">Aún no se ha emitido ninguna o no coincide con la búsqueda.</p>
                     </div>
                 ) : (
+                    <>
                     <div className="overflow-x-auto w-full min-h-[420px] pb-36">
                         <table className="w-full min-w-[900px] text-left border-collapse text-xs md:text-sm">
                             <thead className="bg-zinc-50/70 dark:bg-zinc-800/40">
@@ -743,7 +906,7 @@ export default function QuotationsListPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                                {filteredQs.map((q, qIndex) => (
+                                {paginatedQs.map((q, qIndex) => (
                                     <tr key={q.id} className={`group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-all ${selectedIds.includes(q.id) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
                                         <td className="px-4 py-3.5">
                                             <input
@@ -793,15 +956,65 @@ export default function QuotationsListPage() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3.5 whitespace-nowrap">
-                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                                q.state === 'ENVIADO' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                                q.state === 'APROBADO' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' :
-                                                q.state === 'RECHAZADO' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                                q.state === 'CANCELADO' ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400' :
-                                                'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                            }`}>
-                                                {q.state || 'NUEVO'}
-                                            </span>
+                                            {(() => {
+                                                const rawState = (q.state || 'NUEVO').trim();
+                                                const stateUpper = rawState.toUpperCase();
+                                                const matchedState = (states || []).find(
+                                                    (s: any) =>
+                                                        String(s.code || '').trim().toUpperCase() === stateUpper ||
+                                                        String(s.name || '').trim().toUpperCase() === stateUpper
+                                                );
+                                                const rawColor = String(matchedState?.color || q.stateColor || '').trim().toLowerCase();
+
+                                                let badgeClass = 'bg-blue-100 text-blue-700 border border-blue-200/80 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50';
+                                                let inlineStyle: React.CSSProperties | undefined = undefined;
+
+                                                if (rawColor.startsWith('#') || rawColor.startsWith('rgb')) {
+                                                    badgeClass = 'border';
+                                                    inlineStyle = {
+                                                        backgroundColor: rawColor.startsWith('#') && rawColor.length === 7 ? `${rawColor}22` : rawColor,
+                                                        color: rawColor,
+                                                        borderColor: rawColor.startsWith('#') && rawColor.length === 7 ? `${rawColor}55` : rawColor
+                                                    };
+                                                } else if (['yellow', 'amarillo', 'amber', 'ámbar', 'ambar', 'gold', 'dorado'].includes(rawColor)) {
+                                                    badgeClass = 'bg-amber-100 text-amber-800 border border-amber-300/80 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700/50';
+                                                } else if (['green', 'verde', 'emerald', 'esmeralda', 'lime', 'lima'].includes(rawColor)) {
+                                                    badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-300/80 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700/50';
+                                                } else if (['red', 'rojo', 'rose', 'crimson', 'vino'].includes(rawColor)) {
+                                                    badgeClass = 'bg-red-100 text-red-700 border border-red-300/80 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700/50';
+                                                } else if (['orange', 'naranja', 'anaranjado'].includes(rawColor)) {
+                                                    badgeClass = 'bg-orange-100 text-orange-800 border border-orange-300/80 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-700/50';
+                                                } else if (['purple', 'morado', 'violet', 'violeta', 'lila', 'fuchsia', 'fucsia'].includes(rawColor)) {
+                                                    badgeClass = 'bg-purple-100 text-purple-800 border border-purple-300/80 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700/50';
+                                                } else if (['cyan', 'celeste', 'teal', 'turquesa', 'sky', 'aqua'].includes(rawColor)) {
+                                                    badgeClass = 'bg-cyan-100 text-cyan-800 border border-cyan-300/80 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-700/50';
+                                                } else if (['indigo', 'añil', 'anil', 'navy', 'azul oscuro'].includes(rawColor)) {
+                                                    badgeClass = 'bg-indigo-100 text-indigo-800 border border-indigo-300/80 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700/50';
+                                                } else if (['pink', 'rosa', 'rosado'].includes(rawColor)) {
+                                                    badgeClass = 'bg-pink-100 text-pink-800 border border-pink-300/80 dark:bg-pink-900/40 dark:text-pink-300 dark:border-pink-700/50';
+                                                } else if (['gray', 'grey', 'gris', 'zinc', 'slate', 'neutral'].includes(rawColor)) {
+                                                    badgeClass = 'bg-zinc-200 text-zinc-700 border border-zinc-300/80 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700';
+                                                } else if (['blue', 'azul'].includes(rawColor)) {
+                                                    badgeClass = 'bg-blue-100 text-blue-700 border border-blue-200/80 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50';
+                                                } else if (!rawColor) {
+                                                    if (stateUpper === 'ENVIADO' || stateUpper === 'APROBADO' || stateUpper === 'FACTURADO') {
+                                                        badgeClass = 'bg-emerald-100 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-900/30 dark:text-emerald-400';
+                                                    } else if (stateUpper.includes('RECHAZAD') || stateUpper.includes('ANULAD')) {
+                                                        badgeClass = 'bg-red-100 text-red-700 border border-red-200/80 dark:bg-red-900/30 dark:text-red-400';
+                                                    } else if (stateUpper.includes('CANCELAD')) {
+                                                        badgeClass = 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400';
+                                                    }
+                                                }
+
+                                                return (
+                                                    <span
+                                                        style={inlineStyle}
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block ${badgeClass}`}
+                                                    >
+                                                        {rawState}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-4 py-3.5 text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-zinc-900/95 group-hover:bg-zinc-50/95 dark:group-hover:bg-zinc-800/90 backdrop-blur-sm z-10 transition-colors shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">
                                             <button
@@ -830,7 +1043,7 @@ export default function QuotationsListPage() {
                                                         
                                                         {/* Menú Flotante de Acciones */}
                                                         {(() => {
-                                                            const openUpwards = filteredQs.length > 3 && qIndex >= filteredQs.length - 2 && qIndex > 1;
+                                                            const openUpwards = paginatedQs.length > 3 && qIndex >= paginatedQs.length - 2 && qIndex > 1;
                                                             return (
                                                                 <motion.div
                                                                     initial={{ opacity: 0, scale: 0.95, y: openUpwards ? 4 : -4 }}
@@ -970,6 +1183,97 @@ export default function QuotationsListPage() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Barra Inferior de Paginación */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-200 dark:border-zinc-800 rounded-b-2xl text-xs">
+                        <div className="flex flex-wrap items-center gap-3 text-zinc-600 dark:text-zinc-400 font-medium">
+                            <span>
+                                Mostrando <strong className="text-zinc-900 dark:text-white">{totalItems === 0 ? 0 : startIdx + 1}</strong> a <strong className="text-zinc-900 dark:text-white">{endIdx}</strong> de <strong className="text-blue-600 dark:text-blue-400">{totalItems}</strong> cotizaciones
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <span>Filas por página:</span>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => {
+                                        setPageSize(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="h-8 px-2.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={200}>200</option>
+                                    <option value={500}>500</option>
+                                    <option value={0}>Todas</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                            <button
+                                onClick={() => setCurrentPage(1)}
+                                disabled={safeCurrentPage <= 1}
+                                className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Ir a la primera página"
+                            >
+                                « Inicio
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={safeCurrentPage <= 1}
+                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Página anterior"
+                            >
+                                ‹ Anterior
+                            </button>
+
+                            {(() => {
+                                const pages: number[] = [];
+                                const maxButtons = 5;
+                                let startPage = Math.max(1, safeCurrentPage - Math.floor(maxButtons / 2));
+                                const endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                                if (endPage - startPage + 1 < maxButtons) {
+                                    startPage = Math.max(1, endPage - maxButtons + 1);
+                                }
+                                for (let i = startPage; i <= endPage; i++) {
+                                    pages.push(i);
+                                }
+                                return pages.map(p => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setCurrentPage(p)}
+                                        className={`min-w-[32px] h-8 px-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                                            p === safeCurrentPage
+                                                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                                                : 'border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                        }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ));
+                            })()}
+
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={safeCurrentPage >= totalPages}
+                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Página siguiente"
+                            >
+                                Siguiente ›
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(totalPages)}
+                                disabled={safeCurrentPage >= totalPages}
+                                className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                                title="Ir a la última página"
+                            >
+                                Fin »
+                            </button>
+                        </div>
+                    </div>
+                    </>
                 )}
             </div>
 
@@ -1117,6 +1421,178 @@ export default function QuotationsListPage() {
                                     className="px-4 h-10 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold"
                                 >
                                     Cerrar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal de Resultado de Exportación a Zeus ERP (Copiable, Estado Visual y Link Directo a Diagnóstico) */}
+            <AnimatePresence>
+                {exportModal.isOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-xl w-full shadow-2xl border border-zinc-200 dark:border-zinc-800 space-y-5"
+                        >
+                            {/* Encabezado */}
+                            <div className="flex items-start justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2.5 rounded-2xl ${
+                                        exportModal.isError 
+                                            ? 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400' 
+                                            : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400'
+                                    }`}>
+                                        {exportModal.isError ? (
+                                            <AlertCircle className="w-6 h-6" />
+                                        ) : (
+                                            <CheckCircle2 className="w-6 h-6" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-zinc-900 dark:text-white">
+                                            {exportModal.title}
+                                        </h3>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                            {exportModal.message}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setExportModal(prev => ({ ...prev, isOpen: false }))}
+                                    className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Detalle de ítems exportados */}
+                            {exportModal.items && exportModal.items.length > 0 && (
+                                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                                        Detalle por Cotización:
+                                    </span>
+                                    {exportModal.items.map((item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className={`p-3 rounded-2xl flex items-center justify-between gap-3 border text-xs ${
+                                                item.statusType === 'error'
+                                                    ? 'bg-rose-50/80 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/40 text-rose-800 dark:text-rose-300'
+                                                    : item.statusType === 'warning'
+                                                    ? 'bg-amber-50/80 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/40 text-amber-800 dark:text-amber-300'
+                                                    : 'bg-emerald-50/80 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {item.statusType === 'error' && <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />}
+                                                {item.statusType === 'warning' && <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+                                                {item.statusType === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />}
+                                                <span className="font-bold">Cotización {item.cotDisplay}:</span>
+                                                <span>{item.message}</span>
+                                            </div>
+                                            {item.idZeus && (
+                                                <span className="px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-[10px] font-mono font-bold whitespace-nowrap">
+                                                    ID Zeus: #{item.idZeus}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Tarjeta de Trazabilidad y Diagnóstico */}
+                            {exportModal.traceCode && (
+                                <div className="bg-zinc-50 dark:bg-zinc-800/60 p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 space-y-2">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="font-bold text-zinc-500 dark:text-zinc-400">
+                                            Código de Traza Único:
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <code className="px-2 py-1 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700 font-mono font-bold text-blue-600 dark:text-blue-400 select-all">
+                                                {exportModal.traceCode}
+                                            </code>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(exportModal.traceCode || '')
+                                                    setCopiedTrace(true)
+                                                    setTimeout(() => setCopiedTrace(false), 2000)
+                                                }}
+                                                className="px-2.5 py-1 bg-white hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 text-[11px] font-medium transition"
+                                                title="Copiar código al portapapeles"
+                                            >
+                                                {copiedTrace ? (
+                                                    <>
+                                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                        <span className="text-emerald-600 font-bold">¡Copiado!</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                        <span>Copiar</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/60 flex items-center justify-between text-[11px]">
+                                        <span className="text-zinc-400">
+                                            Auditado en módulo de Trazabilidad y Diagnóstico
+                                        </span>
+                                        <Link
+                                            href={`/dashboard/diagnostics?code=${exportModal.traceCode}`}
+                                            target="_blank"
+                                            className="text-blue-600 dark:text-blue-400 hover:underline font-bold flex items-center gap-1"
+                                        >
+                                            Ver traza detallada <ExternalLink className="w-3 h-3" />
+                                        </Link>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Botones de acción */}
+                            <div className="flex items-center justify-between pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const textToCopy = [
+                                            `[${exportModal.title}]`,
+                                            exportModal.message,
+                                            exportModal.traceCode ? `Código de Traza: ${exportModal.traceCode}` : '',
+                                            exportModal.items && exportModal.items.length > 0
+                                                ? '\nDetalle:\n' + exportModal.items.map(it => `• Cotización ${it.cotDisplay}: ${it.message}${it.idZeus ? ` (ID Zeus: #${it.idZeus})` : ''}`).join('\n')
+                                                : ''
+                                        ].filter(Boolean).join('\n');
+
+                                        navigator.clipboard.writeText(textToCopy);
+                                        setCopiedDetails(true);
+                                        setTimeout(() => setCopiedDetails(false), 2000);
+                                    }}
+                                    className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+                                >
+                                    {copiedDetails ? (
+                                        <>
+                                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                            <span className="text-emerald-600">¡Texto copiado!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy className="w-3.5 h-3.5" />
+                                            <span>Copiar mensaje completo</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setExportModal(prev => ({ ...prev, isOpen: false }))}
+                                    className="px-5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 rounded-xl text-xs font-bold transition shadow-sm"
+                                >
+                                    Aceptar
                                 </button>
                             </div>
                         </motion.div>

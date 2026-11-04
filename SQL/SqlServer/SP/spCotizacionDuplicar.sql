@@ -42,7 +42,7 @@ BEGIN
             comisionFreelancePercentage, comisionFreelanceValue,
             comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
             destination, startDate, endDate, passenger, paxAdults, paxChildren,
-            reservationCode, copyFieldsToProducts, manualDescription
+            reservationCode, copyFieldsToProducts, manualDescription, observations
         )
         SELECT
             ISNULL(@internalNumber, N'TEMP'), GETDATE(), clientId, currency, exchangeRate,
@@ -53,7 +53,7 @@ BEGIN
             comisionFreelancePercentage, comisionFreelanceValue,
             comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
             destination, startDate, endDate, passenger, paxAdults, paxChildren,
-            reservationCode, copyFieldsToProducts, manualDescription
+            reservationCode, copyFieldsToProducts, manualDescription, observations
         FROM dbo.[Quotation]
         WHERE id = @p_quotation_id;
 

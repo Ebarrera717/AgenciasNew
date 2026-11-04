@@ -157,6 +157,15 @@ async function run() {
                     
                     // Si la columna no existe en el cliente
                     if (!liveCol) {
+                        if (colMeta.columnDefault && colMeta.columnDefault.includes('nextval')) {
+                            const seqMatch = colMeta.columnDefault.match(/nextval\('"?([^"']+)"?'::regclass\)/i);
+                            if (seqMatch) {
+                                const seqName = seqMatch[1].replace(/^public\./, '').replace(/"/g, '');
+                                try {
+                                    await dbClient.query(`CREATE SEQUENCE IF NOT EXISTS public."${seqName}";`);
+                                } catch (seqErr) {}
+                            }
+                        }
                         const colDefSql = getColumnSqlDefinitionForAdd(colName, colMeta);
                         const addColSql = `ALTER TABLE public."${tblName}" ADD COLUMN ${colDefSql};`;
                         console.log(`  ${colors.yellow}[ADD COLUMN] Tabla "${tblName}": agregando campo faltante "${colName}"...${colors.reset}`);
@@ -174,6 +183,7 @@ async function run() {
                     // Comparar tipo de datos, nullability y valor por defecto
                     let needsAlterType = false;
                     let needsAlterNull = false;
+                    let needsAlterDefault = false;
 
                     // Normalizar tipos comunes para evitar falsos positivos
                     const refType = normalizeDataType(colMeta.dataType);
@@ -184,6 +194,9 @@ async function run() {
                     }
                     if (colMeta.isNullable !== liveCol.isNullable) {
                         needsAlterNull = true;
+                    }
+                    if (colMeta.columnDefault !== null && colMeta.columnDefault !== undefined && (!liveCol.columnDefault || liveCol.columnDefault === null)) {
+                        needsAlterDefault = true;
                     }
 
                     if (needsAlterType) {
@@ -199,6 +212,28 @@ async function run() {
                             changesApplied++;
                         } catch (err) {
                             console.error(`    ${colors.red}[AVISO] No se pudo cambiar tipo automáticamente en "${tblName}.${colName}": ${err.message}${colors.reset}`);
+                            warningsCount++;
+                        }
+                    }
+
+                    if (needsAlterDefault) {
+                        if (colMeta.columnDefault.includes('nextval')) {
+                            const seqMatch = colMeta.columnDefault.match(/nextval\('"?([^"']+)"?'::regclass\)/i);
+                            if (seqMatch) {
+                                const seqName = seqMatch[1].replace(/^public\./, '').replace(/"/g, '');
+                                try {
+                                    await dbClient.query(`CREATE SEQUENCE IF NOT EXISTS public."${seqName}";`);
+                                } catch (seqErr) {}
+                            }
+                        }
+                        const alterDefSql = `ALTER TABLE public."${tblName}" ALTER COLUMN "${colName}" SET DEFAULT ${colMeta.columnDefault};`;
+                        console.log(`  ${colors.cyan}[MODIFY DEFAULT] Tabla "${tblName}": restaurando DEFAULT en "${colName}" -> ${colMeta.columnDefault}...${colors.reset}`);
+                        try {
+                            await dbClient.query(alterDefSql);
+                            console.log(`    ${colors.green}[OK] Valor por defecto actualizado.${colors.reset}`);
+                            changesApplied++;
+                        } catch (err) {
+                            console.error(`    ${colors.red}[ERROR] Falló configurar DEFAULT en "${tblName}.${colName}": ${err.message}${colors.reset}`);
                             warningsCount++;
                         }
                     }
@@ -372,6 +407,11 @@ function getColumnSqlDefinition(colName, colMeta) {
         sql += `(${colMeta.maxLength})`;
     }
     
+    // Valor por defecto
+    if (colMeta.columnDefault !== null && colMeta.columnDefault !== undefined) {
+        sql += ` DEFAULT ${colMeta.columnDefault}`;
+    }
+
     // Nulidad
     if (colMeta.isNullable === 'NO') {
         sql += ' NOT NULL';
@@ -379,7 +419,6 @@ function getColumnSqlDefinition(colName, colMeta) {
         sql += ' NULL';
     }
     
-    // Valor por defecto
     return sql;
 }
 

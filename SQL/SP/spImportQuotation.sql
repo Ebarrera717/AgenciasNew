@@ -231,7 +231,7 @@ BEGIN
         -- Obtener decimales de la moneda
         v_decimals := public.fn_obtener_decimales_moneda(COALESCE(v_quotation_record.moneda, 'COP'));
 
-        v_internal_number := 'QUO-SP-' || to_char(now(), 'YYYYMMDD') || '-' || floor(random() * 10000)::TEXT;
+        v_internal_number := 'TEMP_' || gen_random_uuid()::TEXT;
 
         INSERT INTO public."Quotation" (
             "internalNumber", "date", "clientId", "currency", "exchangeRate", 
@@ -243,6 +243,11 @@ BEGIN
             v_ticket_printer_id, 0, ROUND(COALESCE(v_quotation_record.comision_global, 0)::numeric, v_decimals)::double precision, 
             ROUND(COALESCE(v_quotation_record.cargos_global, 0)::numeric, v_decimals)::double precision, 0, p_user_id
         ) RETURNING id INTO v_quotation_id;
+
+        v_internal_number := v_quotation_id::TEXT;
+        UPDATE public."Quotation"
+        SET "internalNumber" = v_internal_number
+        WHERE id = v_quotation_id;
 
         v_created_ids := v_created_ids || v_quotation_id || ',';
 

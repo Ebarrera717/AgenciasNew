@@ -237,6 +237,18 @@ export default function DiagnosticsPage() {
         fetchSessions();
     }, [filterCode, filterModule, filterStatus]);
 
+    // Auto-búsqueda por parámetro URL (?code=TRC-... o ?search=TRC-...)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const codeParam = params.get('code') || params.get('search');
+            if (codeParam) {
+                setFilterCode(codeParam);
+                handleOpenDetails(codeParam);
+            }
+        }
+    }, []);
+
     // Cambiar modo de trazabilidad
     const handleModeChange = async (newMode: 'OFF' | 'BASIC' | 'DETAILED' | 'DIAGNOSTIC') => {
         setUpdatingMode(true);

@@ -72,3 +72,6 @@ tmp/
 Diagnosticos/
 
 
+RELEASE_KOREX_SQLSERVER_BD/
+SQL/.pg_sync_cache.json
+SQL/.zeus_sync_cache.json

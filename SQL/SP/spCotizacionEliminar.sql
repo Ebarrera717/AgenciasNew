@@ -41,3 +41,15 @@ EXCEPTION
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END;
 $$;
+
+CREATE OR REPLACE PROCEDURE public."spCotizacionEliminar"(
+    p_quotation_id INT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionEliminar(p_quotation_id, p_acting_user_id, p_mensaje_resultado);
+END;
+$$;

@@ -104,13 +104,15 @@ class KorexDatabaseReleaseGuardian {
         continue;
       }
 
-      // Check if file is explicitly T-SQL / SQL Server
-      const isExplicitTsql = relPath.includes('SQL/SqlServer') || /\bdbo\./i.test(content) || /^\s*GO\b/im.test(content) || /sys\.objects/i.test(content);
+      // Check if file is explicitly T-SQL / SQL Server (Korex internal DB)
+      const isZeusLegacyFile = relPath.includes('spFacturacionesCrear') || relPath.includes('spCotizacionesCrear') || relPath.includes('(2)');
+      const isExplicitTsql = !isZeusLegacyFile && relPath.includes('SQL/SqlServer');
       const isExplicitPlpgsql = relPath.includes('SQL/PostgreSQL') || /plpgsql/i.test(content) || /\bDO\s+\$\$/i.test(content) || (relPath.includes('SQL/Table') && !relPath.includes('SqlServer'));
 
       // SQL Server Objects (Korex)
       if (isExplicitTsql) {
-        const tsqlMatches = content.matchAll(/CREATE\s+(?:OR\s+ALTER\s+)?(PROCEDURE|PROC|FUNCTION|TABLE|VIEW)\s+(?:dbo\.)?([a-zA-Z0-9_]+)/gi);
+        const cleanTsql = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
+        const tsqlMatches = cleanTsql.matchAll(/CREATE\s+(?:OR\s+ALTER\s+)?(PROCEDURE|PROC|FUNCTION|TABLE|VIEW)\s+(?:\[?dbo\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi);
         for (const match of tsqlMatches) {
           const rawType = match[1].toUpperCase();
           let objectType = 'PROCEDURE';
@@ -119,6 +121,7 @@ class KorexDatabaseReleaseGuardian {
           else if (rawType === 'VIEW') objectType = 'VIEW';
 
           const name = match[2];
+          if (/^(dbo|public|if|table|temp)$/i.test(name)) continue;
           const objectName = `dbo.${name}`;
 
           if (!sqlServerObjects.has(objectName) && !name.startsWith('spFacturacionesCrear') && !name.startsWith('spCotizacionesCrear')) {
@@ -158,7 +161,8 @@ class KorexDatabaseReleaseGuardian {
 
       // PostgreSQL Objects (Korex)
       if (isExplicitPlpgsql || (!isExplicitTsql && (relPath.includes('SQL/SP') || relPath.includes('SQL/Function') || relPath.includes('SQL/Procedure')))) {
-        const pgMatches = content.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?(PROCEDURE|FUNCTION|TABLE|VIEW)\s+(?:public\.)?("?[a-zA-Z0-9_]+"|sp[a-zA-Z0-9_]+|fn[a-zA-Z0-9_]+)/gi);
+        let matchedPgInFile = 0;
+        const pgMatches = content.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?(PROCEDURE|FUNCTION|TABLE|VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?("?[a-zA-Z0-9_]+"|sp[a-zA-Z0-9_]+|fn[a-zA-Z0-9_]+)/gi);
         for (const match of pgMatches) {
           const rawType = match[1].toUpperCase();
           let objectType = 'PROCEDURE';
@@ -167,7 +171,9 @@ class KorexDatabaseReleaseGuardian {
           else if (rawType === 'VIEW') objectType = 'VIEW';
 
           const rawName = match[2].replace(/"/g, '');
+          if (/^(dbo|public|if|table|temp)$/i.test(rawName)) continue;
           const objectName = objectType === 'TABLE' ? `public."${rawName}"` : `public.${rawName}`;
+          matchedPgInFile++;
 
           if (!pgObjects.has(objectName)) {
             pgObjects.set(objectName, {
@@ -182,7 +188,7 @@ class KorexDatabaseReleaseGuardian {
         }
 
         const baseName = path.basename(filePath, '.sql');
-        if (relPath.includes('PostgreSQL/SP/') && !pgObjects.has(`public.${baseName}`)) {
+        if (matchedPgInFile === 0 && relPath.includes('PostgreSQL/SP/') && !pgObjects.has(`public.${baseName}`)) {
           pgObjects.set(`public.${baseName}`, {
             objectType: 'PROCEDURE',
             objectName: `public.${baseName}`,
@@ -191,7 +197,7 @@ class KorexDatabaseReleaseGuardian {
             isMandatory: true,
             engine: 'PostgreSQL'
           });
-        } else if (relPath.includes('PostgreSQL/Function/') && !pgObjects.has(`public.${baseName}`)) {
+        } else if (matchedPgInFile === 0 && relPath.includes('PostgreSQL/Function/') && !pgObjects.has(`public.${baseName}`)) {
           pgObjects.set(`public.${baseName}`, {
             objectType: 'FUNCTION',
             objectName: `public.${baseName}`,

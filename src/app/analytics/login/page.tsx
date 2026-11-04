@@ -22,7 +22,18 @@ export default function AnalyticsLoginPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
-            const data = await res.json();
+
+            let data: any = {};
+            const rawText = await res.text();
+            try {
+                data = JSON.parse(rawText);
+            } catch {
+                data = {
+                    success: false,
+                    message: `Error en respuesta del servidor (HTTP ${res.status}): ${rawText.slice(0, 150)}`
+                };
+            }
+
             if (!res.ok || !data.success) {
                 setError(data.message || 'Credenciales inválidas');
             } else {

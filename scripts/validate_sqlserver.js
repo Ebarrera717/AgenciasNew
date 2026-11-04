@@ -108,7 +108,7 @@ async function validateSqlServerOnly() {
         pool = await mssql.connect(config);
         console.log(' -> [OK] Conectado exitosamente a SQL Server.\n');
 
-        for (const item of SQL_TABLES_TO_VALIDATE) {
+        const tableChecks = await Promise.all(SQL_TABLES_TO_VALIDATE.map(async (item) => {
             let ok = false;
             let count = 0;
             let usedTable = item.table;
@@ -132,13 +132,14 @@ async function validateSqlServerOnly() {
                 }
             }
 
-            results.push({
+            return {
                 Componente: item.label,
                 Tabla: usedTable,
                 Estado: ok ? `✅ PASS (${count} reg)` : '❌ FAIL',
                 Resultado: ok ? 'PASS' : 'FAIL'
-            });
-        }
+            };
+        }));
+        results.push(...tableChecks);
 
         // SPs
         let spCotizOk = false;

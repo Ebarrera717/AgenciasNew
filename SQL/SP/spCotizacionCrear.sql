@@ -37,10 +37,24 @@ BEGIN
         DECLARE @paxChildren INT = JSON_VALUE(@p_data, '$.paxChildren');
         DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
         DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
+        DECLARE @observations NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.observations');
 
-        DECLARE @actingUserId INT = @p_acting_user_id;
+        DECLARE @actingUserId INT = TRY_CAST(JSON_VALUE(@p_data, '$.userId') AS INT);
         IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
             SET @actingUserId = NULL;
+
+        IF @actingUserId IS NULL AND NULLIF(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userEmail'))), '') IS NOT NULL
+        BEGIN
+            SELECT TOP 1 @actingUserId = [id]
+            FROM dbo.[User]
+            WHERE LOWER(LTRIM(RTRIM([email]))) = LOWER(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userEmail'))))
+            ORDER BY [id] ASC;
+        END;
+
+        IF @actingUserId IS NULL AND @p_acting_user_id IS NOT NULL
+        BEGIN
+            SELECT TOP 1 @actingUserId = [id] FROM dbo.[User] WHERE id = @p_acting_user_id;
+        END;
 
         IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
             SET @clientId = NULL;
@@ -52,6 +66,25 @@ BEGIN
             SET @implantId = NULL;
         IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
             SET @ticketPrinterId = NULL;
+
+        -- Si no vino usuario explícito en @p_data (o cayó en el fallback 1) y el Tiqueteador seleccionado corresponde a un Usuario del sistema, asignar ese Usuario creador
+        IF (@actingUserId IS NULL OR (@actingUserId = 1 AND NULLIF(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userId'))), '') IS NULL AND NULLIF(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userEmail'))), '') IS NULL))
+           AND @ticketPrinterId IS NOT NULL
+        BEGIN
+            DECLARE @tpUserId INT = NULL;
+            SELECT TOP 1 @tpUserId = u.[id]
+            FROM dbo.[TicketPrinter] tp
+            JOIN dbo.[User] u ON (
+                u.[ticketPrinterId] = tp.[id]
+                OR (NULLIF(LTRIM(RTRIM(tp.[email])), '') IS NOT NULL AND LOWER(LTRIM(RTRIM(u.[email]))) = LOWER(LTRIM(RTRIM(tp.[email]))))
+                OR (NULLIF(LTRIM(RTRIM(tp.[name])), '') IS NOT NULL AND UPPER(LTRIM(RTRIM(u.[name]))) = UPPER(LTRIM(RTRIM(tp.[name]))))
+            )
+            WHERE tp.[id] = @ticketPrinterId
+            ORDER BY u.[id] ASC;
+
+            IF @tpUserId IS NOT NULL
+                SET @actingUserId = @tpUserId;
+        END;
 
         DECLARE @internalNum NVARCHAR(100) = NULL;
         EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @internalNum OUTPUT;
@@ -155,11 +188,11 @@ BEGIN
         INSERT INTO dbo.[Quotation] (
             internalNumber, [date], clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
             baseCommissionable, chargesAndTaxes, totalAmount, commissionPercentage, userId, state, stateDescription, stateUpdatedAt,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren, reservationCode, manualDescription
+            destination, startDate, endDate, passenger, paxAdults, paxChildren, reservationCode, manualDescription, observations
         ) VALUES (
             ISNULL(@internalNum, N'TEMP'), GETDATE(), @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId, @ticketPrinterId,
             @baseCommissionable, @chargesAndTaxes, @totalAmount, @commissionPercentage, @actingUserId, N'NUEVO', N'Creación de cotización', GETDATE(),
-            @destination, @startDate, @endDate, @passenger, @paxAdults, @paxChildren, @reservationCode, @manualDescription
+            @destination, @startDate, @endDate, @passenger, @paxAdults, @paxChildren, @reservationCode, @manualDescription, @observations
         );
 
         SET @p_quotation_id = SCOPE_IDENTITY();

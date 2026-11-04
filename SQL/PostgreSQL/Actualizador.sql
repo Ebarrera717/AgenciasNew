@@ -75,6 +75,36 @@ BEGIN
         );
     END IF;
 
+    -- Garantizar secuencias y valores DEFAULT en tablas de control existentes
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "UpdateId" SET DEFAULT nextval('public."Korex_UpdateHistory_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "FechaInicio" SET DEFAULT now();
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "ExitCode" SET DEFAULT 0;
+
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateObjects_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Expected" SET DEFAULT true;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Executed" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Compiled" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Validated" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "ExecutionTimeMs" SET DEFAULT 0;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "FechaVerificacion" SET DEFAULT now();
+
+    ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateErrors_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "Fecha" SET DEFAULT now();
+
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_Installation_id_seq"'::regclass);
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "LastValidationDate" SET DEFAULT now();
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "Status" SET DEFAULT 'HEALTHY';
+
+    -- Corrección y saneamiento de consecutivos/internalNumber errados en Quotation
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        UPDATE public."Quotation"
+        SET "internalNumber" = id::text
+        WHERE "internalNumber" IS NULL 
+           OR "internalNumber" LIKE 'QUO-%' 
+           OR "internalNumber" LIKE 'TEMP_%'
+           OR "internalNumber" = '';
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'EquivalenciasInterfaces_Log') THEN
         CREATE TABLE public."EquivalenciasInterfaces_Log" (
             "id" integer DEFAULT nextval('"EquivalenciasInterfaces_Log_id_seq"'::regclass) NOT NULL,
@@ -2295,6 +2325,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'manualDescription') THEN
         ALTER TABLE public."Quotation" ADD COLUMN "manualDescription" text;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'observations') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN "observations" text;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationCombo' AND column_name = 'id') THEN
         ALTER TABLE public."QuotationCombo" ADD COLUMN "id" integer NOT NULL;
@@ -5375,6 +5408,8 @@ BEGIN
             'state', q.state,
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'manualDescription', q."manualDescription",
+            'observations', q."observations",
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,
                 'name', c.name,
@@ -5535,6 +5570,35 @@ BEGIN
         END IF;
     END IF;
 
+    -- Auto-reparación de cotizaciones cuyo userId quedó en NULL o en el fallback 1 cuando el Tiqueteador corresponde a otro Usuario creador registrado
+    UPDATE public."Quotation" q_fix
+    SET "userId" = sub.real_user_id
+    FROM (
+        SELECT q2.id AS quotation_id, u2.id AS real_user_id
+        FROM public."Quotation" q2
+        LEFT JOIN public."TicketPrinter" tp ON tp.id = q2."ticketPrinterId"
+        LEFT JOIN public."User" u2 ON (
+            u2."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u2.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u2.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE (q2."userId" IS NULL OR q2."userId" = 1)
+          AND tp.id IS NOT NULL
+          AND u2.id IS NOT NULL
+          AND u2.id <> 1
+    ) sub
+    WHERE q_fix.id = sub.quotation_id
+      AND COALESCE(q_fix."userId", 0) <> sub.real_user_id;
+
+    UPDATE public."QuotationStateHistory" qsh_fix
+    SET "userId" = q_src."userId"
+    FROM public."Quotation" q_src
+    WHERE qsh_fix."quotationId" = q_src.id
+      AND qsh_fix.state = 'NUEVO'
+      AND (qsh_fix."userId" IS NULL OR qsh_fix."userId" = 1)
+      AND q_src."userId" IS NOT NULL
+      AND q_src."userId" <> 1;
+
     RETURN QUERY
     SELECT 
         jsonb_build_object(
@@ -5565,8 +5629,30 @@ BEGIN
                 0
             ),
             'currency', q.currency,
-            'userName', COALESCE(u.name, 'Sistema'),
+            'userName', COALESCE(
+                (
+                    SELECT u_init.name
+                    FROM public."QuotationStateHistory" qsh_init
+                    LEFT JOIN public."User" u_init ON u_init.id = qsh_init."userId"
+                    WHERE qsh_init."quotationId" = q.id
+                      AND qsh_init.state = 'NUEVO'
+                      AND qsh_init."userId" IS NOT NULL
+                      AND u_init.id IS NOT NULL
+                      AND (qsh_init."userId" <> 1 OR q."userId" = 1)
+                    ORDER BY qsh_init.id ASC
+                    LIMIT 1
+                ),
+                u.name,
+                'Sistema'
+            ),
             'state', COALESCE(q.state, 'NUEVO'),
+            'stateColor', (
+                SELECT qs.color
+                FROM public."QuotationState" qs
+                WHERE UPPER(TRIM(qs.code)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                   OR UPPER(TRIM(qs.name)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                LIMIT 1
+            ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
             'nights', COALESCE((
@@ -5676,6 +5762,26 @@ RETURNS SETOF JSONB
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- Auto-reparación de cotizaciones cuyo userId quedó en NULL o en el fallback 1 cuando el Tiqueteador corresponde a otro Usuario creador registrado
+    UPDATE public."Quotation" q_fix
+    SET "userId" = sub.real_user_id
+    FROM (
+        SELECT q2.id AS quotation_id, u2.id AS real_user_id
+        FROM public."Quotation" q2
+        LEFT JOIN public."TicketPrinter" tp ON tp.id = q2."ticketPrinterId"
+        LEFT JOIN public."User" u2 ON (
+            u2."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u2.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u2.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE (q2."userId" IS NULL OR q2."userId" = 1)
+          AND tp.id IS NOT NULL
+          AND u2.id IS NOT NULL
+          AND u2.id <> 1
+    ) sub
+    WHERE q_fix.id = sub.quotation_id
+      AND COALESCE(q_fix."userId", 0) <> sub.real_user_id;
+
     RETURN QUERY
     SELECT 
         jsonb_build_object(
@@ -5701,6 +5807,13 @@ BEGIN
                 0
             ),
             'state', q.state,
+            'stateColor', (
+                SELECT qs.color
+                FROM public."QuotationState" qs
+                WHERE UPPER(TRIM(qs.code)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                   OR UPPER(TRIM(qs.name)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                LIMIT 1
+            ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
             'user', CASE WHEN u.id IS NOT NULL THEN jsonb_build_object('id', u.id, 'name', u.name) ELSE NULL END,
@@ -6365,6 +6478,15 @@ BEGIN
     FROM public."Invoices" i
     LEFT JOIN public."Client" c ON c.id = i."clientId"
     ORDER BY i.id DESC;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public."fnInvoicesListar"()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM public.fnInvoicesListar();
 END;
 $$;
 
@@ -9057,6 +9179,16 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE public."spCotizacionActualizarEstado"(
+    p_response JSONB
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionActualizarEstado(p_response);
+END;
+$$;
+
 -- ============================================================================
 -- Procedimiento Almacenado: spCotizacionActualizarEstadoManual.sql
 -- ============================================================================
@@ -9082,9 +9214,11 @@ CREATE OR REPLACE PROCEDURE public.spCotizacionActualizarEstadoManual(
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_resolved_state TEXT;
 BEGIN
     -- Validaciones
-    IF p_state IS NULL OR p_state = '' THEN
+    IF p_state IS NULL OR TRIM(p_state) = '' THEN
         p_mensaje_resultado := 'ERROR: El estado es obligatorio.';
         RETURN;
     END IF;
@@ -9094,21 +9228,26 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Validar si el estado existe en la tabla de estados
-    IF NOT EXISTS (SELECT 1 FROM public."QuotationState" WHERE code = p_state) THEN
-        p_mensaje_resultado := 'ERROR: El estado "' || p_state || '" no es válido.';
-        RETURN;
+    -- Resolver código del estado por code o por name (insensible a mayúsculas/minúsculas)
+    SELECT code INTO v_resolved_state
+    FROM public."QuotationState"
+    WHERE UPPER(TRIM(code)) = UPPER(TRIM(p_state))
+       OR UPPER(TRIM(name)) = UPPER(TRIM(p_state))
+    LIMIT 1;
+
+    IF v_resolved_state IS NULL THEN
+        v_resolved_state := TRIM(p_state);
     END IF;
 
     UPDATE public."Quotation" SET
-        "state" = p_state,
+        "state" = v_resolved_state,
         "stateDescription" = p_description,
         "stateUpdatedAt" = CURRENT_TIMESTAMP
     WHERE id = p_quotation_id;
 
     -- Insertar historial de estado
     INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
-    VALUES (p_quotation_id, p_state, p_description, CURRENT_TIMESTAMP, p_acting_user_id);
+    VALUES (p_quotation_id, v_resolved_state, p_description, CURRENT_TIMESTAMP, p_acting_user_id);
 
     p_mensaje_resultado := 'SUCCESS: Estado de cotización actualizado correctamente.';
 
@@ -9117,14 +9256,28 @@ BEGIN
         p_acting_user_id, 
         'QUOTATION', 
         'UPDATE_STATE', 
-        'Se cambió el estado de la cotización ID ' || p_quotation_id || ' a ' || p_state || '. Descripción: ' || COALESCE(p_description, ''), 
-        jsonb_build_object('quotationId', p_quotation_id, 'state', p_state, 'description', p_description), 
+        'Se cambió el estado de la cotización ID ' || p_quotation_id || ' a ' || v_resolved_state || '. Descripción: ' || COALESCE(p_description, ''), 
+        jsonb_build_object('quotationId', p_quotation_id, 'state', v_resolved_state, 'description', p_description), 
         p_quotation_id
     );
 
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE public."spCotizacionActualizarEstadoManual"(
+    p_quotation_id INT,
+    p_state TEXT,
+    p_description TEXT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionActualizarEstadoManual(p_quotation_id, p_state, p_description, p_acting_user_id, p_mensaje_resultado);
 END;
 $$;
 
@@ -9144,7 +9297,7 @@ BEGIN
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spCotizacionDuplicar(
+CREATE OR REPLACE PROCEDURE public."spCotizacionDuplicar"(
     IN p_quotation_id INT,
     IN p_acting_user_id INT,
     INOUT p_new_quotation_id INT DEFAULT 0,
@@ -9179,13 +9332,15 @@ BEGIN
         v_user_id := v_orig_quotation."userId";
     END IF;
 
-    -- Generar consecutivo único interno desde TransactionConsecutive
-    SELECT x.v_consec_json->>'formattedConsecutive' INTO v_internal_number
-    FROM (SELECT public."fnObtenerSiguienteConsecutivo"('QUOTATION', v_orig_quotation."branchId", v_orig_quotation."implantId") AS v_consec_json) x;
-
-    IF v_internal_number IS NULL OR v_internal_number = '' THEN
-        v_internal_number := 'COT-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+    -- Sincronizar secuencia si la tabla quedó vacía o desalineada
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    ELSE
+        PERFORM setval('public."Quotation_id_seq"', GREATEST((SELECT COALESCE(MAX(id), 0) FROM public."Quotation"), 1), true);
     END IF;
+
+    -- Generar consecutivo temporal seguro para la inserción
+    v_internal_number := 'TEMP_' || gen_random_uuid()::text;
 
     -- Insertar la cabecera duplicada de la cotización
     INSERT INTO public."Quotation" (
@@ -9197,7 +9352,7 @@ BEGIN
         "comisionFreelancePercentage", "comisionFreelanceValue",
         "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
         "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
     ) VALUES (
         v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
         v_orig_quotation."branchId", v_orig_quotation."implantId", v_orig_quotation."sellerId", v_orig_quotation."ticketPrinterId",
@@ -9207,8 +9362,14 @@ BEGIN
         v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
         v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
         v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
-        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription"
+        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription", v_orig_quotation."observations"
     ) RETURNING id INTO v_new_id;
+
+    -- Asignar el número interno definitivo exactamente igual al ID generado
+    v_internal_number := v_new_id::text;
+    UPDATE public."Quotation"
+    SET "internalNumber" = v_internal_number
+    WHERE id = v_new_id;
 
     -- Insertar registro inicial en el historial de estados
     INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
@@ -9237,13 +9398,15 @@ BEGIN
             "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
             "serviceType", "destination", "reservationCode", "sellerCommission",
             "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger"
+            "service", "servicios", "descripcion", "passenger",
+            "providerDueDate", "providerInvoice"
         ) VALUES (
             v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
             v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
             v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
             v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
+            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger",
+            v_orig_qp."providerDueDate", v_orig_qp."providerInvoice"
         ) RETURNING id INTO v_new_qp_id;
 
         -- Duplicar Pasajeros del producto
@@ -9335,6 +9498,18 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE public."spCotizacionEliminar"(
+    p_quotation_id INT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionEliminar(p_quotation_id, p_acting_user_id, p_mensaje_resultado);
 END;
 $$;
 
@@ -12243,181 +12418,181 @@ BEGIN
     -- 3. Crear Tablas Temporales (ESQUEMA COMPLETO)
     CREATE TEMP TABLE IF NOT EXISTS Cotizacion (
 		id INT GENERATED ALWAYS AS IDENTITY,
-		cd_sucursal VARCHAR(25),
-		cd_implante VARCHAR(25),
-		cd_consecutivo VARCHAR(25),
-		cd_usuario VARCHAR(25),
+		cd_sucursal VARCHAR(250),
+		cd_implante VARCHAR(250),
+		cd_consecutivo VARCHAR(250),
+		cd_usuario VARCHAR(250),
 		dt_fechacont TIMESTAMP ,
 		dt_fecha TIMESTAMP ,
-		cd_usuarioAct VARCHAR(25),
+		cd_usuarioAct VARCHAR(250),
 		dt_fechaAct TIMESTAMP ,
-		cd_tercero_codigo VARCHAR(25) ,
+		cd_tercero_codigo VARCHAR(250) ,
 		ds_tercero_nombre VARCHAR(250) ,
-		cd_cliente_codigo VARCHAR(25) ,
+		cd_cliente_codigo VARCHAR(250) ,
 		ds_cliente_nombre VARCHAR(250) ,
 		ds_cliente_dir VARCHAR(250) ,
-		ds_cliente_ciudad VARCHAR(100) ,
-		ds_cliente_tel VARCHAR(25) ,
+		ds_cliente_ciudad VARCHAR(250) ,
+		ds_cliente_tel VARCHAR(250) ,
 		ds_cliente_dirdesp VARCHAR(250) ,
-		ds_cliente_email VARCHAR(60) ,
-		ds_cliente_contacto VARCHAR(100) ,
-		ds_cliente_contacto_email VARCHAR(60) ,
-		cd_monedas_IATA VARCHAR(25),
-		cd_vendedor VARCHAR(25) ,
-		cd_tiqueteador VARCHAR(25) ,
+		ds_cliente_email VARCHAR(250) ,
+		ds_cliente_contacto VARCHAR(250) ,
+		ds_cliente_contacto_email VARCHAR(250) ,
+		cd_monedas_IATA VARCHAR(250),
+		cd_vendedor VARCHAR(250) ,
+		cd_tiqueteador VARCHAR(250) ,
 		bn_anexo BYTEA ,
 		am_tcambio DECIMAL ,
 		am_tcambiousd DECIMAL ,
-		cd_cencosto VARCHAR(16) ,
+		cd_cencosto VARCHAR(250) ,
 		ds_observacion VARCHAR(8000) ,
 		ds_Campo_libre1 VARCHAR(500) ,
 		ds_Campo_libre2 VARCHAR(500) ,
-		cd_tipoventa VARCHAR(25),
+		cd_tipoventa VARCHAR(250),
 		in_estado INT ,
 		dt_vence TIMESTAMP ,
-		cd_Etapa VARCHAR(25),
+		cd_Etapa VARCHAR(250),
 		ds_seguimiento_etapa VARCHAR(500) ,
 		bl_ManejaOpciones BIT(1) DEFAULT B'0',
 		in_NumeroOpciones INT ,
 		bl_CerrarCotizacion BIT(1) DEFAULT B'0',
 		in_OpcionSeleccionada INT ,
 		bl_grupos BIT(1) DEFAULT B'0',
-		gk_sabre VARCHAR(25) ,
-		cd_Especialista VARCHAR(25),
-		cd_TipoFormaPagoProveedor VARCHAR(25),
-		cd_MedioReservacion VARCHAR(25),
+		gk_sabre VARCHAR(250) ,
+		cd_Especialista VARCHAR(250),
+		cd_TipoFormaPagoProveedor VARCHAR(250),
+		cd_MedioReservacion VARCHAR(250),
 		bl_bloqueada BIT(1) DEFAULT B'0',
-		cd_usuario_Bloqueo VARCHAR(25),
+		cd_usuario_Bloqueo VARCHAR(250),
 		ds_AlertaSolicitud VARCHAR(8000) ,
 		bl_comisiona BIT(1) DEFAULT B'0',
-		ds_FormaDePago VARCHAR(250) ,
-		ds_records VARCHAR(25) ,
+		ds_FormaDePago VARCHAR(500) ,
+		ds_records VARCHAR(250) ,
 		bl_entregadoCliente BIT(1) DEFAULT B'0',
 		dt_entregadoCliente TIMESTAMP ,
 		id_sys_entidades INT ,
-		cd_MonedaPagoDestino VARCHAR(25) ,
-		cd_FormaPagoDestino VARCHAR(25) ,
-		ds_DocumentoPagoDestino VARCHAR(50) ,
+		cd_MonedaPagoDestino VARCHAR(250) ,
+		cd_FormaPagoDestino VARCHAR(250) ,
+		ds_DocumentoPagoDestino VARCHAR(250) ,
 		dt_CheckInPagoDestino TIMESTAMP ,
 		dt_CheckOutPagoDestino TIMESTAMP ,
 		bl_fechaPagoDestino BIT(1) DEFAULT B'0',
-		ds_hotelTieneTiquete VARCHAR(2),
-		ds_GDS VARCHAR(2),
-		cd_Evento VARCHAR(25),
+		ds_hotelTieneTiquete VARCHAR(20),
+		ds_GDS VARCHAR(20),
+		cd_Evento VARCHAR(250),
         orig_id_ref INT
     ) ON COMMIT DROP;
 
 	CREATE TEMP TABLE IF NOT EXISTS CotizacionServicios(
 		id INT GENERATED ALWAYS AS IDENTITY,
-		cd_TiposConceptFac VARCHAR(25),
-		cd_ConceptoFacturacion VARCHAR(25),
-		cd_TiposServicio VARCHAR(25) ,
-		cd_Cotizacion VARCHAR(25) ,
-		cd_fac_factura VARCHAR(25) ,
-		cd_fac_remision VARCHAR(25) ,
-		cd_proveedores VARCHAR(25) ,
-		ds_tiposervnm VARCHAR(50) ,
-		cd_prov_hotel VARCHAR(10) ,
-		cd_prov_car VARCHAR(10) ,
-		cd_prov_air VARCHAR(10) ,
-		ds_destino VARCHAR(30) ,
-		ds_servicio VARCHAR(250) ,
+		cd_TiposConceptFac VARCHAR(250),
+		cd_ConceptoFacturacion VARCHAR(250),
+		cd_TiposServicio VARCHAR(250) ,
+		cd_Cotizacion VARCHAR(250) ,
+		cd_fac_factura VARCHAR(250) ,
+		cd_fac_remision VARCHAR(250) ,
+		cd_proveedores VARCHAR(250) ,
+		ds_tiposervnm VARCHAR(250) ,
+		cd_prov_hotel VARCHAR(250) ,
+		cd_prov_car VARCHAR(250) ,
+		cd_prov_air VARCHAR(250) ,
+		ds_destino VARCHAR(250) ,
+		ds_servicio VARCHAR(500) ,
 		ds_descrip VARCHAR(4000) ,
-		ds_paxname VARCHAR(20) ,
-		ds_paxape VARCHAR(20) ,
-		cd_paxtype VARCHAR(25) ,
+		ds_paxname VARCHAR(250) ,
+		ds_paxape VARCHAR(250) ,
+		cd_paxtype VARCHAR(250) ,
 		in_nacionalidad INT ,
-		cd_voucher VARCHAR(20) ,
+		cd_voucher VARCHAR(250) ,
 		in_cantpax INT ,
 		dt_llegada TIMESTAMP ,
 		dt_salida TIMESTAMP ,
-		cd_cencosto VARCHAR(16) ,
-		cd_auxiliar VARCHAR(16) ,
-		cd_item VARCHAR(16) ,
+		cd_cencosto VARCHAR(250) ,
+		cd_auxiliar VARCHAR(250) ,
+		cd_item VARCHAR(250) ,
 		am_valorprov DECIMAL ,
-		cd_monedaprov VARCHAR(25) ,
+		cd_monedaprov VARCHAR(250) ,
 		ds_InfoAdicional VARCHAR(8000) ,
-		cd_carrental VARCHAR(25) ,
-		cd_hoteles VARCHAR(25) ,
+		cd_carrental VARCHAR(250) ,
+		cd_hoteles VARCHAR(250) ,
 		bl_anulado BIT(1) DEFAULT B'0' ,
-		cd_tiquete VARCHAR(11) ,
-		cd_fuente_anul VARCHAR(2) ,
-		cd_serie_anul VARCHAR(2) ,
-		cd_consecutivo_anul VARCHAR(8) ,
-		cd_usuario_anul VARCHAR(25),
-		cd_sucursal_anul VARCHAR(25) ,
-		cd_implante_anul VARCHAR(25) ,
+		cd_tiquete VARCHAR(250) ,
+		cd_fuente_anul VARCHAR(20) ,
+		cd_serie_anul VARCHAR(20) ,
+		cd_consecutivo_anul VARCHAR(50) ,
+		cd_usuario_anul VARCHAR(250),
+		cd_sucursal_anul VARCHAR(250) ,
+		cd_implante_anul VARCHAR(250) ,
 		am_basecomisionable DECIMAL ,
 		am_porcomision NUMERIC(8, 4) ,
-		cd_voucherPrefijo VARCHAR(25) ,
+		cd_voucherPrefijo VARCHAR(250) ,
 		bl_notdomicilionacional BIT(1) DEFAULT B'0' ,
 		Valor_Comision DECIMAL ,
 		Valor_Recaudo DECIMAL ,
 		dias_recaudo INT ,
-		ds_paxClasificacion VARCHAR(7) ,
-		cd_tipoplan VARCHAR(25) ,
-		cd_acomodacion VARCHAR(25) ,
+		ds_paxClasificacion VARCHAR(50) ,
+		cd_tipoplan VARCHAR(250) ,
+		cd_acomodacion VARCHAR(250) ,
 		in_dias INT ,
 		in_noches INT ,
-		ds_records VARCHAR(25) ,
-		cd_GrConcepto VARCHAR(25) ,
+		ds_records VARCHAR(250) ,
+		cd_GrConcepto VARCHAR(250) ,
 		in_diasSrv INT ,
 		in_nochesSrv INT ,
-		cd_Especialista VARCHAR(25),
+		cd_Especialista VARCHAR(250),
 		am_porcentaje_descuento NUMERIC(8, 4) ,
 		am_valor_descuento DECIMAL ,
 		ds_motivo_descuento VARCHAR(1000) ,
-		cd_cargosdesc_descuento VARCHAR(25) ,
+		cd_cargosdesc_descuento VARCHAR(250) ,
 		in_NumeroOpcion INT ,
 		dt_FechaSalidaSrv TIMESTAMP ,
 		dt_FechaLlegadaSrv TIMESTAMP ,
-		cd_localizador VARCHAR(25) ,
-		cd_voucherpax VARCHAR(25) ,
+		cd_localizador VARCHAR(250) ,
+		cd_voucherpax VARCHAR(250) ,
 		am_basecomisionableprov DECIMAL ,
 		am_porcomisionprov NUMERIC(8, 4) ,
-		cd_NumeFac VARCHAR(15) ,
+		cd_NumeFac VARCHAR(250) ,
 		dt_VenceFac TIMESTAMP ,
-		cd_AcomodacionSrv VARCHAR(25) ,
-		cd_TipoPlanSrv VARCHAR(25) ,
+		cd_AcomodacionSrv VARCHAR(250) ,
+		cd_TipoPlanSrv VARCHAR(250) ,
 		in_habitaciones INT ,
 		in_habitacionesSrv INT ,
-		cd_Consecutivo_VARiablesAdicionales VARCHAR(8) ,
-		cd_confirmacion VARCHAR(25) ,
+		cd_Consecutivo_VARiablesAdicionales VARCHAR(50) ,
+		cd_confirmacion VARCHAR(250) ,
 		ds_confirmadopor VARCHAR(250) ,
-		cd_paxidentificacion VARCHAR(25) ,
+		cd_paxidentificacion VARCHAR(250) ,
 		bl_politicaCancelacion BIT(1) DEFAULT B'0' ,
 		dt_politicaCancelacion TIMESTAMP ,
-		cd_tipoHabitacionacion VARCHAR(25) ,
-		cd_fac_facturaComision VARCHAR(25) ,
-		cd_fac_remisionComision VARCHAR(25) ,
-		cd_TarjetaAsistencia VARCHAR(25) ,
-		cd_Regiones VARCHAR(25) ,
+		cd_tipoHabitacionacion VARCHAR(250) ,
+		cd_fac_facturaComision VARCHAR(250) ,
+		cd_fac_remisionComision VARCHAR(250) ,
+		cd_TarjetaAsistencia VARCHAR(250) ,
+		cd_Regiones VARCHAR(250) ,
 		Iden_GDS INT ,
 		id_sys_entidades INT ,
-		ds_TipoAuto VARCHAR(50) ,
-		ds_Origen VARCHAR(30) ,
+		ds_TipoAuto VARCHAR(250) ,
+		ds_Origen VARCHAR(250) ,
 		ds_DirOrigen VARCHAR(250) ,
 		ds_DirDestino VARCHAR(250) ,
-		ds_TipoTarifa VARCHAR(50) ,
+		ds_TipoTarifa VARCHAR(250) ,
 		am_ValorUSD DECIMAL ,
-		ds_NoVuelo VARCHAR(25) ,
+		ds_NoVuelo VARCHAR(250) ,
 		ds_Vehiculo VARCHAR(250) ,
-		ds_Placa VARCHAR(25) ,
+		ds_Placa VARCHAR(250) ,
 		ds_CategoriaVehiculo VARCHAR(250) ,
-		ds_NombreConductor VARCHAR(50) ,
-		ds_telefono VARCHAR(25) ,
-		ds_IdiomaConductor VARCHAR(25) ,
-		cd_MonedaSrv VARCHAR(25) ,
-		cd_TipoServicio VARCHAR(25) ,
-		cd_Aerolinea VARCHAR(25) ,
+		ds_NombreConductor VARCHAR(250) ,
+		ds_telefono VARCHAR(250) ,
+		ds_IdiomaConductor VARCHAR(250) ,
+		cd_MonedaSrv VARCHAR(250) ,
+		cd_TipoServicio VARCHAR(250) ,
+		cd_Aerolinea VARCHAR(250) ,
 		in_EdadPax INT ,
 		am_PorFacParcial NUMERIC(8, 4) ,
-		ds_GDS VARCHAR(25) ,
+		ds_GDS VARCHAR(250) ,
 		dt_fechaficheroBBVA TIMESTAMP ,
 		bl_tiquete BIT(1) DEFAULT B'0' ,
 		am_basedescuento DECIMAL ,
 		am_pordescuento NUMERIC(18, 4) ,
-		cd_CotizacionServicios_Depende VARCHAR(25),
+		cd_CotizacionServicios_Depende VARCHAR(250),
         orig_id_ref INT,
 		orig_id_quotationref INT,
 		mainTaxId INT
@@ -12558,6 +12733,7 @@ BEGIN
             END,
             LPAD(q."id"::text, 8, '0')
         ) as cd_consecutivo, 
+        public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuario,
         q.date as dt_fechacont, 
         q.date as dt_fecha,
         public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuarioAct, 
@@ -12568,7 +12744,7 @@ BEGIN
         public."fnQuitarEspeciales"(c.name) as ds_cliente_nombre, 
         public."fnQuitarEspeciales"(COALESCE(c.address, '')) as ds_cliente_dir, 
         '' as ds_cliente_ciudad, 
-        '' as ds_cliente_tel, 
+        public."fnQuitarEspeciales"(COALESCE(c."contactInfo", '')) as ds_cliente_tel, 
         '' as ds_cliente_dirdesp, 
         COALESCE(u.email, '') as ds_cliente_email, 
         public."fnQuitarEspeciales"(c.name) as ds_cliente_contacto, 
@@ -12580,7 +12756,7 @@ BEGIN
         q."exchangeRate" as am_tcambio, 
         q."exchangeRate" as am_tcambiousd, 
         '' as cd_cencosto,
-        '' as ds_observacion, 
+        public."fnQuitarEspeciales"(COALESCE(q."observations", '')) as ds_observacion, 
         '' as ds_Campo_libre1, 
         '' as ds_Campo_libre2, 
         '' as cd_tipoventa, 
@@ -12609,10 +12785,10 @@ BEGIN
               AND qpmt."paymentMethod" IS NOT NULL
               AND qpmt."paymentMethod" <> ''
         ), '') as ds_FormaDePago, 
-        '' as ds_records, 
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(q."reservationCode", '')), 1, 25) as ds_records, 
         B'0' as bl_entregadoCliente, 
         q.date as dt_entregadoCliente, 
-        0 as id_sys_entidades, 
+        65 as id_sys_entidades, 
         '' as cd_MonedaPagoDestino, 
         '' as cd_FormaPagoDestino, 
         '' as ds_DocumentoPagoDestino, 
@@ -12738,7 +12914,7 @@ BEGIN
         '' as cd_acomodacion, 
         0 as in_dias,
         COALESCE(qp.nights, 0) as in_noches, 
-        '' as ds_records, 
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(NULLIF(TRIM(qp."reservationCode"), ''), NULLIF(TRIM(qt."reservationCode"), ''), '')), 1, 25) as ds_records, 
         '' as cd_GrConcepto, 
         0 as in_diasSrv, 
         0 as in_nochesSrv, 
@@ -12750,7 +12926,7 @@ BEGIN
         0 as in_NumeroOpcion, 
         COALESCE(qp."checkInDate", q.dt_fecha) as dt_FechaSalidaSrv, 
         COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha) as dt_FechaLlegadaSrv,
-        '' as cd_localizador, 
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(NULLIF(TRIM(qp."reservationCode"), ''), NULLIF(TRIM(qt."reservationCode"), ''), '')), 1, 25) as cd_localizador, 
         '' as cd_voucherpax, 
         0 as am_basecomisionableprov, 
         0 as am_porcomisionprov,
@@ -12761,7 +12937,7 @@ BEGIN
         0 as in_habitaciones,
         0 as in_habitacionesSrv, 
         'Q' || LPAD(qp."id"::text, 7, '0') as cd_Consecutivo_VARiablesAdicionales, 
-        '' as cd_confirmacion,
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(NULLIF(TRIM(qp."reservationCode"), ''), NULLIF(TRIM(qt."reservationCode"), ''), '')), 1, 25) as cd_confirmacion,
         '' as ds_confirmadopor, 
         COALESCE(qpp.document,'') as cd_paxidentificacion, 
         B'0' as bl_politicaCancelacion,
@@ -12772,7 +12948,7 @@ BEGIN
         '' as cd_TarjetaAsistencia, 
         '' as cd_Regiones, 
         0 as Iden_GDS, 
-        0 as id_sys_entidades,
+        109 as id_sys_entidades,
         '' as ds_TipoAuto, 
         '' as ds_Origen, 
         '' as ds_DirOrigen, 
@@ -14391,7 +14567,7 @@ BEGIN
         -- Obtener decimales de la moneda
         v_decimals := public.fn_obtener_decimales_moneda(COALESCE(v_quotation_record.moneda, 'COP'));
 
-        v_internal_number := 'QUO-SP-' || to_char(now(), 'YYYYMMDD') || '-' || floor(random() * 10000)::TEXT;
+        v_internal_number := 'TEMP_' || gen_random_uuid()::TEXT;
 
         INSERT INTO public."Quotation" (
             "internalNumber", "date", "clientId", "currency", "exchangeRate", 
@@ -14403,6 +14579,11 @@ BEGIN
             v_ticket_printer_id, 0, ROUND(COALESCE(v_quotation_record.comision_global, 0)::numeric, v_decimals)::double precision, 
             ROUND(COALESCE(v_quotation_record.cargos_global, 0)::numeric, v_decimals)::double precision, 0, p_user_id
         ) RETURNING id INTO v_quotation_id;
+
+        v_internal_number := v_quotation_id::TEXT;
+        UPDATE public."Quotation"
+        SET "internalNumber" = v_internal_number
+        WHERE id = v_quotation_id;
 
         v_created_ids := v_created_ids || v_quotation_id || ',';
 
@@ -21340,7 +21521,30 @@ BEGIN
         "paxChildren" = NULLIF(p_data->>'paxChildren', '')::INT,
         "reservationCode" = p_data->>'reservationCode',
         "copyFieldsToProducts" = COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
-        "manualDescription" = p_data->>'manualDescription'
+        "manualDescription" = p_data->>'manualDescription',
+        "observations" = p_data->>'observations',
+        "userId" = COALESCE(
+            CASE
+                WHEN "userId" IS NULL OR "userId" = 1 THEN (
+                    SELECT u.id
+                    FROM public."TicketPrinter" tp
+                    JOIN public."User" u ON (
+                        u."ticketPrinterId" = tp.id
+                        OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(tp.email)))
+                        OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u.name)) = UPPER(TRIM(tp.name)))
+                    )
+                    WHERE tp.id = COALESCE(
+                        (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
+                        "ticketPrinterId"
+                    )
+                    ORDER BY u.id ASC
+                    LIMIT 1
+                )
+                ELSE "userId"
+            END,
+            "userId",
+            v_acting_user_id
+        )
     WHERE id = p_id;
 
     -- Insertar historial de estado y modificación con usuario, fecha, hora y metadata de cambios
@@ -21492,7 +21696,8 @@ BEGIN
                 JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
                 LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
                 WHERE qpt2."quotationProductId" = qp.id
-                  AND qpt2."isMain" = false
+                  AND COALESCE(qpt2."isMain", false) = false
+                  AND qpt2."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)
                   AND ct2."targetTaxId" IS NOT NULL
                   AND (
                       target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
@@ -21525,7 +21730,7 @@ BEGIN
             NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
             ROUND((COALESCE("chargesAndTaxes", 0) + 
                 COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = p_id), 0.0) +
-                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = p_id), 0.0)
+                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = p_id AND COALESCE(qpt."isMain", false) = false AND qpt."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)), 0.0)
             )::numeric, v_decimals)::double precision
         ),
         "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,
@@ -21627,13 +21832,39 @@ DECLARE
     v_valor_base DOUBLE PRECISION;
     v_decimals INT;
     v_acting_user_id INT := NULL;
+    v_tp_user_id INT := NULL;
     v_permitir_sin_productos TEXT := '1';
 BEGIN
-    -- Resolución segura de p_acting_user_id para evitar violación de Quotation_userId_fkey
-    IF p_acting_user_id IS NOT NULL THEN
-        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id;
-        IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
-            SELECT id INTO v_acting_user_id FROM public."User" WHERE UPPER(email) = UPPER(p_data->>'userEmail');
+    -- Resolución segura y determinista del usuario creador (Elaborado por)
+    IF NULLIF(p_data->>'userId', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = NULLIF(p_data->>'userId', '')::INT LIMIT 1;
+    END IF;
+
+    IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE LOWER(TRIM(email)) = LOWER(TRIM(p_data->>'userEmail')) LIMIT 1;
+    END IF;
+
+    IF v_acting_user_id IS NULL AND p_acting_user_id IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id LIMIT 1;
+    END IF;
+
+    -- Si no vino usuario explícito en p_data (o cayó en el fallback 1 por sesión no enviada) y el Tiqueteador seleccionado corresponde a un Usuario del sistema, asignar ese Usuario creador
+    IF (v_acting_user_id IS NULL OR (v_acting_user_id = 1 AND NULLIF(p_data->>'userId', '') IS NULL AND NULLIF(p_data->>'userEmail', '') IS NULL))
+       AND (NULLIF(p_data->>'ticketPrinterId', '') IS NOT NULL OR NULLIF(p_data->>'ticketPrinterCode', '') IS NOT NULL) THEN
+        SELECT u.id INTO v_tp_user_id
+        FROM public."TicketPrinter" tp
+        JOIN public."User" u ON (
+            u."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE tp.id = NULLIF(p_data->>'ticketPrinterId', '')::INT
+           OR (tp.code IS NOT NULL AND UPPER(tp.code) = UPPER(p_data->>'ticketPrinterCode'))
+        ORDER BY u.id ASC
+        LIMIT 1;
+
+        IF v_tp_user_id IS NOT NULL THEN
+            v_acting_user_id := v_tp_user_id;
         END IF;
     END IF;
 
@@ -21811,7 +22042,7 @@ BEGIN
         "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
         "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
         "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
     ) VALUES (
         COALESCE(v_internal_number, 'TEMP_' || gen_random_uuid()::text), CURRENT_TIMESTAMP,
         (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
@@ -21833,7 +22064,8 @@ BEGIN
         NULLIF(p_data->>'paxChildren', '')::INT,
         p_data->>'reservationCode',
         COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
-        p_data->>'manualDescription'
+        p_data->>'manualDescription',
+        p_data->>'observations'
     ) RETURNING id INTO v_quotation_id;
 
     IF v_internal_number IS NULL OR v_internal_number = '' THEN
@@ -21990,7 +22222,8 @@ BEGIN
                 JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
                 LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
                 WHERE qpt2."quotationProductId" = qp.id
-                  AND qpt2."isMain" = false
+                  AND COALESCE(qpt2."isMain", false) = false
+                  AND qpt2."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)
                   AND ct2."targetTaxId" IS NOT NULL
                   AND (
                       target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
@@ -22023,7 +22256,7 @@ BEGIN
             NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
             ROUND((COALESCE("chargesAndTaxes", 0) + 
                 COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = v_quotation_id), 0.0) +
-                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = v_quotation_id), 0.0)
+                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = v_quotation_id AND COALESCE(qpt."isMain", false) = false AND qpt."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)), 0.0)
             )::numeric, v_decimals)::double precision
         ),
         "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,

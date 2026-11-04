@@ -36,6 +36,8 @@ BEGIN
             'state', q.state,
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'manualDescription', q."manualDescription",
+            'observations', q."observations",
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,
                 'name', c.name,

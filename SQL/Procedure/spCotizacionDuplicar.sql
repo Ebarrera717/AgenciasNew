@@ -46,8 +46,15 @@ BEGIN
         v_user_id := v_orig_quotation."userId";
     END IF;
 
-    -- Generar consecutivo único interno
-    v_internal_number := 'QUO-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+    -- Sincronizar secuencia si la tabla quedó vacía o desalineada
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    ELSE
+        PERFORM setval('public."Quotation_id_seq"', GREATEST((SELECT COALESCE(MAX(id), 0) FROM public."Quotation"), 1), true);
+    END IF;
+
+    -- Generar consecutivo temporal seguro para la inserción
+    v_internal_number := 'TEMP_' || gen_random_uuid()::text;
 
     -- Insertar la cabecera duplicada de la cotización
     INSERT INTO public."Quotation" (
@@ -59,7 +66,7 @@ BEGIN
         "comisionFreelancePercentage", "comisionFreelanceValue",
         "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
         "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
     ) VALUES (
         v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
         v_orig_quotation."branchId", v_orig_quotation."implantId", v_orig_quotation."sellerId", v_orig_quotation."ticketPrinterId",
@@ -69,8 +76,14 @@ BEGIN
         v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
         v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
         v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
-        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription"
+        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription", v_orig_quotation."observations"
     ) RETURNING id INTO v_new_id;
+
+    -- Asignar el número interno definitivo exactamente igual al ID generado
+    v_internal_number := v_new_id::text;
+    UPDATE public."Quotation"
+    SET "internalNumber" = v_internal_number
+    WHERE id = v_new_id;
 
     -- Insertar registro inicial en el historial de estados
     INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")

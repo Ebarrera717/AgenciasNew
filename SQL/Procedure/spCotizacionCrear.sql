@@ -61,13 +61,39 @@ DECLARE
     v_valor_base DOUBLE PRECISION;
     v_decimals INT;
     v_acting_user_id INT := NULL;
+    v_tp_user_id INT := NULL;
     v_permitir_sin_productos TEXT := '1';
 BEGIN
-    -- Resolución segura de p_acting_user_id para evitar violación de Quotation_userId_fkey
-    IF p_acting_user_id IS NOT NULL THEN
-        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id;
-        IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
-            SELECT id INTO v_acting_user_id FROM public."User" WHERE UPPER(email) = UPPER(p_data->>'userEmail');
+    -- Resolución segura y determinista del usuario creador (Elaborado por)
+    IF NULLIF(p_data->>'userId', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = NULLIF(p_data->>'userId', '')::INT LIMIT 1;
+    END IF;
+
+    IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE LOWER(TRIM(email)) = LOWER(TRIM(p_data->>'userEmail')) LIMIT 1;
+    END IF;
+
+    IF v_acting_user_id IS NULL AND p_acting_user_id IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id LIMIT 1;
+    END IF;
+
+    -- Si no vino usuario explícito en p_data (o cayó en el fallback 1 por sesión no enviada) y el Tiqueteador seleccionado corresponde a un Usuario del sistema, asignar ese Usuario creador
+    IF (v_acting_user_id IS NULL OR (v_acting_user_id = 1 AND NULLIF(p_data->>'userId', '') IS NULL AND NULLIF(p_data->>'userEmail', '') IS NULL))
+       AND (NULLIF(p_data->>'ticketPrinterId', '') IS NOT NULL OR NULLIF(p_data->>'ticketPrinterCode', '') IS NOT NULL) THEN
+        SELECT u.id INTO v_tp_user_id
+        FROM public."TicketPrinter" tp
+        JOIN public."User" u ON (
+            u."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE tp.id = NULLIF(p_data->>'ticketPrinterId', '')::INT
+           OR (tp.code IS NOT NULL AND UPPER(tp.code) = UPPER(p_data->>'ticketPrinterCode'))
+        ORDER BY u.id ASC
+        LIMIT 1;
+
+        IF v_tp_user_id IS NOT NULL THEN
+            v_acting_user_id := v_tp_user_id;
         END IF;
     END IF;
 
@@ -245,7 +271,7 @@ BEGIN
         "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
         "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
         "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
     ) VALUES (
         COALESCE(v_internal_number, 'TEMP_' || gen_random_uuid()::text), CURRENT_TIMESTAMP,
         (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
@@ -267,7 +293,8 @@ BEGIN
         NULLIF(p_data->>'paxChildren', '')::INT,
         p_data->>'reservationCode',
         COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
-        p_data->>'manualDescription'
+        p_data->>'manualDescription',
+        p_data->>'observations'
     ) RETURNING id INTO v_quotation_id;
 
     IF v_internal_number IS NULL OR v_internal_number = '' THEN
@@ -424,7 +451,8 @@ BEGIN
                 JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
                 LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
                 WHERE qpt2."quotationProductId" = qp.id
-                  AND qpt2."isMain" = false
+                  AND COALESCE(qpt2."isMain", false) = false
+                  AND qpt2."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)
                   AND ct2."targetTaxId" IS NOT NULL
                   AND (
                       target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
@@ -457,7 +485,7 @@ BEGIN
             NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
             ROUND((COALESCE("chargesAndTaxes", 0) + 
                 COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = v_quotation_id), 0.0) +
-                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = v_quotation_id), 0.0)
+                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = v_quotation_id AND COALESCE(qpt."isMain", false) = false AND qpt."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)), 0.0)
             )::numeric, v_decimals)::double precision
         ),
         "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,

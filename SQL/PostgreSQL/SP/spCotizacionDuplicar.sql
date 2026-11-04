@@ -11,7 +11,7 @@ BEGIN
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spCotizacionDuplicar(
+CREATE OR REPLACE PROCEDURE public."spCotizacionDuplicar"(
     IN p_quotation_id INT,
     IN p_acting_user_id INT,
     INOUT p_new_quotation_id INT DEFAULT 0,
@@ -46,13 +46,15 @@ BEGIN
         v_user_id := v_orig_quotation."userId";
     END IF;
 
-    -- Generar consecutivo único interno desde TransactionConsecutive
-    SELECT x.v_consec_json->>'formattedConsecutive' INTO v_internal_number
-    FROM (SELECT public."fnObtenerSiguienteConsecutivo"('QUOTATION', v_orig_quotation."branchId", v_orig_quotation."implantId") AS v_consec_json) x;
-
-    IF v_internal_number IS NULL OR v_internal_number = '' THEN
-        v_internal_number := 'COT-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+    -- Sincronizar secuencia si la tabla quedó vacía o desalineada
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    ELSE
+        PERFORM setval('public."Quotation_id_seq"', GREATEST((SELECT COALESCE(MAX(id), 0) FROM public."Quotation"), 1), true);
     END IF;
+
+    -- Generar consecutivo temporal seguro para la inserción
+    v_internal_number := 'TEMP_' || gen_random_uuid()::text;
 
     -- Insertar la cabecera duplicada de la cotización
     INSERT INTO public."Quotation" (
@@ -64,7 +66,7 @@ BEGIN
         "comisionFreelancePercentage", "comisionFreelanceValue",
         "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
         "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
     ) VALUES (
         v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
         v_orig_quotation."branchId", v_orig_quotation."implantId", v_orig_quotation."sellerId", v_orig_quotation."ticketPrinterId",
@@ -74,8 +76,14 @@ BEGIN
         v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
         v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
         v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
-        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription"
+        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription", v_orig_quotation."observations"
     ) RETURNING id INTO v_new_id;
+
+    -- Asignar el número interno definitivo exactamente igual al ID generado
+    v_internal_number := v_new_id::text;
+    UPDATE public."Quotation"
+    SET "internalNumber" = v_internal_number
+    WHERE id = v_new_id;
 
     -- Insertar registro inicial en el historial de estados
     INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
@@ -104,13 +112,15 @@ BEGIN
             "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
             "serviceType", "destination", "reservationCode", "sellerCommission",
             "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger"
+            "service", "servicios", "descripcion", "passenger",
+            "providerDueDate", "providerInvoice"
         ) VALUES (
             v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
             v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
             v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
             v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
+            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger",
+            v_orig_qp."providerDueDate", v_orig_qp."providerInvoice"
         ) RETURNING id INTO v_new_qp_id;
 
         -- Duplicar Pasajeros del producto

@@ -64,12 +64,9 @@ async function validateAndPrepareSchema(customConnStr) {
   }
 
   let injectedPreSeq = 0;
+  const preSeqQueries = [];
   for (const seqName of detectedSequences) {
-    // 1. Crear en Postgres local inmediatamente
-    try {
-      await client.query(`CREATE SEQUENCE IF NOT EXISTS public."${seqName}" START WITH 1;`);
-      await client.query(`CREATE SEQUENCE IF NOT EXISTS public.${seqName} START WITH 1;`);
-    } catch (e) {}
+    preSeqQueries.push(`CREATE SEQUENCE IF NOT EXISTS public."${seqName}" START WITH 1; CREATE SEQUENCE IF NOT EXISTS public.${seqName} START WITH 1;`);
 
     // 2. Garantizar en Alter_New_Columns.sql en nivel superior
     const topSeqRegex = new RegExp(`CREATE\\s+SEQUENCE\\s+IF\\s+NOT\\s+EXISTS\\s+public\\.${seqName}\\b`, 'i');
@@ -79,6 +76,11 @@ async function validateAndPrepareSchema(customConnStr) {
       injectedPreSeq++;
     }
   }
+  if (preSeqQueries.length > 0) {
+    try {
+      await client.query(preSeqQueries.join('\n'));
+    } catch (e) {}
+  }
 
   if (injectedPreSeq > 0) {
     fs.writeFileSync(alterColumnsPath, alterContentPre, 'utf8');
@@ -87,6 +89,20 @@ async function validateAndPrepareSchema(customConnStr) {
     console.log(`  [OK] Se verificaron ${detectedSequences.size} secuencia(s) autodetectada(s) sin ausencias.`);
   }
 
+  const crypto = require('crypto');
+  const forcePgSync = process.argv.includes('--force');
+  const pgCachePath = path.join(rootDir, 'SQL', '.pg_sync_cache.json');
+  let pgSyncCache = {};
+  if (!forcePgSync && fs.existsSync(pgCachePath)) {
+    try {
+      pgSyncCache = JSON.parse(fs.readFileSync(pgCachePath, 'utf8'));
+    } catch {}
+  }
+  const pgDbKey = connectionString.replace(/:[^:@]+@/, ':***@');
+  if (!pgSyncCache[pgDbKey]) pgSyncCache[pgDbKey] = {};
+
+  let pgExecutedFiles = 0;
+  let pgCachedFiles = 0;
   const folders = ['SQL/Table', 'SQL/Function', 'SQL/SP', 'SQL/Procedure'];
   for (const folder of folders) {
     const dirPath = path.join(rootDir, folder);
@@ -114,14 +130,23 @@ async function validateAndPrepareSchema(customConnStr) {
         console.log(`  [AUTO-FIX] Inyectado bloque DO $$ de limpieza dinámica en ${folder}/${file}`);
       }
 
+      const relKey = `${folder}/${file}`;
+      const fileHash = crypto.createHash('sha256').update(sql).digest('hex');
+      if (!forcePgSync && pgSyncCache[pgDbKey][relKey] === fileHash) {
+        pgCachedFiles++;
+        continue;
+      }
+
       try {
         await client.query(sql);
+        pgSyncCache[pgDbKey][relKey] = fileHash;
+        pgExecutedFiles++;
       } catch (err) {
         console.warn(`  [WARN] Error compilando ${folder}/${file}: ${err.message}`);
       }
     }
   }
-  console.log("  [OK] Despliegue en PostgreSQL local completado.");
+  console.log(`  [OK] Despliegue en PostgreSQL local completado (${pgExecutedFiles} ejecutados, ${pgCachedFiles} en caché sin cambios).`);
 
   // 2. Verificar integridad de tablas referenciadas en Alter_New_Columns.sql
   console.log("\n[PASO 2/4] Verificando integridad de tablas en Alter_New_Columns.sql...");
@@ -191,49 +216,45 @@ async function validateAndPrepareSchema(customConnStr) {
     console.log("  [OK] Todas las tablas referenciadas cuentan con CREATE TABLE IF NOT EXISTS.");
   }
 
-  // 2.5 Verificación de Secuencias y Autoincremento en columnas "id"
-  console.log("\n[PASO 2.5/5] Verificando secuencias autoincrementales en llaves primarias ('id')...");
-  const idColsRes = await client.query(`
-    SELECT table_name, column_name, data_type, column_default 
-    FROM information_schema.columns 
-    WHERE table_schema = 'public' AND column_name = 'id' AND data_type IN ('integer', 'bigint');
+  // 2.5 Verificación de Secuencias y Autoincremento en llaves primarias ('id' y 'UpdateId')
+  console.log("\n[PASO 2.5/5] Verificando secuencias autoincrementales en llaves primarias ('id' / 'UpdateId')...");
+  await client.query(`
+    DO $$
+    DECLARE
+        r RECORD;
+        seq_name TEXT;
+    BEGIN
+        FOR r IN
+            SELECT table_name, column_name, column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND (column_name = 'id' OR (table_name = 'Korex_UpdateHistory' AND column_name = 'UpdateId'))
+              AND data_type IN ('integer', 'bigint')
+        LOOP
+            IF r.column_default IS NULL OR r.column_default NOT LIKE '%nextval%' THEN
+                seq_name := 'public."' || r.table_name || '_id_seq"';
+                EXECUTE 'CREATE SEQUENCE IF NOT EXISTS ' || seq_name;
+                EXECUTE 'ALTER TABLE public."' || r.table_name || '" ALTER COLUMN "' || r.column_name || '" SET DEFAULT nextval(''' || seq_name || '''::regclass)';
+                EXECUTE 'ALTER SEQUENCE ' || seq_name || ' OWNED BY public."' || r.table_name || '"."' || r.column_name || '"';
+            END IF;
+            BEGIN
+                SELECT pg_get_serial_sequence('public."' || r.table_name || '"', r.column_name) INTO seq_name;
+                IF seq_name IS NOT NULL THEN
+                    EXECUTE 'SELECT setval(''' || seq_name || ''', GREATEST(COALESCE((SELECT MAX("' || r.column_name || '") FROM public."' || r.table_name || '"), 1), 1))';
+                END IF;
+            EXCEPTION WHEN OTHERS THEN
+                NULL;
+            END;
+        END LOOP;
+    END $$;
   `);
-
-  let fixedSeqCount = 0;
-  for (const row of idColsRes.rows) {
-    const tbl = row.table_name;
-    const hasNextval = row.column_default && row.column_default.includes('nextval');
-    if (!hasNextval) {
-      console.log(`  [AUTO-FIX] Asignando secuencia autoincremental a public."${tbl}".id...`);
-      const seqName = `${tbl}_id_seq`;
-      await client.query(`
-        CREATE SEQUENCE IF NOT EXISTS public."${seqName}";
-        ALTER TABLE public."${tbl}" ALTER COLUMN id SET DEFAULT nextval('public."${seqName}"'::regclass);
-        ALTER SEQUENCE public."${seqName}" OWNED BY public."${tbl}".id;
-      `);
-      fixedSeqCount++;
-    }
-    // Sincronizar valor actual de la secuencia al MAX(id) para prevenir colisiones PK
-    try {
-      const seqRes = await client.query(`SELECT pg_get_serial_sequence('public."${tbl}"', 'id') as seq;`);
-      const seq = seqRes.rows[0]?.seq;
-      if (seq) {
-        await client.query(`SELECT setval('${seq}', GREATEST(COALESCE((SELECT MAX(id) FROM public."${tbl}"), 1), 1));`);
-      }
-    } catch (e) {
-      // Ignorar si la tabla no tiene secuencia serial estándar
-    }
-  }
-  if (fixedSeqCount > 0) {
-    console.log(`  [OK] Se fijó la secuencia autoincremental en ${fixedSeqCount} tabla(s) y se sincronizaron sus valores actuales.`);
-  } else {
-    console.log("  [OK] Todas las tablas cuentan con secuencias autoincrementales ('nextval') y valores sincronizados.");
-  }
+  console.log("  [OK] Todas las tablas cuentan con secuencias autoincrementales ('nextval') y valores sincronizados.");
 
   // 2.5.5 Verificación y Siembra Automática de Secuencias Personalizadas (nextval en SPs)
   console.log("\n[PASO 2.5.5/5] Auditando secuencias personalizadas referenciadas en Stored Procedures...");
   let alterSqlContent = fs.readFileSync(alterColumnsPath, 'utf8');
   let customSeqInjected = 0;
+  const customSeqQueries = [];
 
   // Scan all SP files for nextval('public.seq_name') or nextval('seq_name')
   const spDir = path.join(__dirname, '..', 'SQL', 'SP');
@@ -244,11 +265,7 @@ async function validateAndPrepareSchema(customConnStr) {
       const seqMatches = content.matchAll(/nextval\(['"](?:public\.)?([A-Za-z0-9_]+)['"]\)/gi);
       for (const match of seqMatches) {
         const seqName = match[1];
-        // Ensure sequence exists in database
-        try {
-          await client.query(`CREATE SEQUENCE IF NOT EXISTS public."${seqName}" START WITH 1;`);
-          await client.query(`CREATE SEQUENCE IF NOT EXISTS public.${seqName} START WITH 1;`);
-        } catch (e) {}
+        customSeqQueries.push(`CREATE SEQUENCE IF NOT EXISTS public."${seqName}" START WITH 1; CREATE SEQUENCE IF NOT EXISTS public.${seqName} START WITH 1;`);
 
         if (!alterSqlContent.includes(seqName)) {
           console.log(`  [AUTO-FIX] Inyectando CREATE SEQUENCE IF NOT EXISTS public.${seqName} en Alter_New_Columns.sql...`);
@@ -257,6 +274,11 @@ async function validateAndPrepareSchema(customConnStr) {
         }
       }
     }
+  }
+  if (customSeqQueries.length > 0) {
+    try {
+      await client.query(customSeqQueries.join('\n'));
+    } catch (e) {}
   }
 
   if (customSeqInjected > 0) {
@@ -294,7 +316,7 @@ async function validateAndPrepareSchema(customConnStr) {
   }
   console.log("  [OK] Restricciones UNIQUE para operaciones de Upsert verificadas.");
 
-  // 2.6.5 Verificación y Auto-Inyección de Columna "isActive" en Tablas Maestras
+  // 2.6.5 Verificación y Auto-Inyección de Columna "isActive" en Tablas Maestras (En 1 sola consulta)
   console.log("\n[PASO 2.6.5/5] Verificando presencia de la columna 'isActive' en tablas maestras...");
   const masterTablesForIsActive = [
     'ChargeAndTax', 'Client', 'User', 'Branch', 'Implant', 'Provider', 'Prestadora',
@@ -304,30 +326,45 @@ async function validateAndPrepareSchema(customConnStr) {
     'QuotationState', 'QuotationFormat', 'InterfaceExtractParam', 'Role'
   ];
 
-  for (const tbl of masterTablesForIsActive) {
-    const tblExists = await client.query(`SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1`, [tbl]);
-    if (tblExists.rows.length > 0) {
-      const colExists = await client.query(`SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'isActive'`, [tbl]);
-      if (colExists.rows.length === 0) {
-        console.log(`  [AUTO-FIX] Agregando columna 'isActive' a public."${tbl}"...`);
-        await client.query(`ALTER TABLE public."${tbl}" ADD COLUMN "isActive" boolean DEFAULT true NOT NULL;`);
-      }
-    }
+  const missingIsActiveRes = await client.query(`
+    SELECT t.table_name
+    FROM information_schema.tables t
+    LEFT JOIN information_schema.columns c
+      ON c.table_schema = t.table_schema AND c.table_name = t.table_name AND c.column_name = 'isActive'
+    WHERE t.table_schema = 'public'
+      AND t.table_name = ANY($1::text[])
+      AND c.column_name IS NULL;
+  `, [masterTablesForIsActive]);
+
+  for (const row of missingIsActiveRes.rows) {
+    console.log(`  [AUTO-FIX] Agregando columna 'isActive' a public."${row.table_name}"...`);
+    await client.query(`ALTER TABLE public."${row.table_name}" ADD COLUMN "isActive" boolean DEFAULT true NOT NULL;`);
   }
   console.log("  [OK] Columna 'isActive' verificada y garantizada en todas las tablas maestras.");
 
-  // 2.7 Verificación de Prisma Schema y Regeneración del Cliente Prisma Client
+  // 2.7 Verificación de Prisma Schema y Regeneración del Cliente Prisma Client (Con caché de hash SHA-256)
   console.log("\n[PASO 2.7/5] Verificando Prisma Schema y regenerando Prisma Client...");
   const prismaSchemaPath = path.join(rootDir, 'prisma', 'schema.prisma');
   if (fs.existsSync(prismaSchemaPath)) {
-    const { execSync } = require('child_process');
-    try {
-      execSync('npx prisma generate', { cwd: rootDir, stdio: 'pipe' });
-      console.log("  [OK] Prisma Client regenerado exitosamente con 'npx prisma generate'.");
-    } catch (prismaErr) {
-      console.warn(`  [WARN] Error ejecutando 'npx prisma generate': ${prismaErr.message}`);
+    const prismaHash = crypto.createHash('sha256').update(fs.readFileSync(prismaSchemaPath, 'utf8')).digest('hex');
+    const prismaClientIndex = path.join(rootDir, 'node_modules', '.prisma', 'client', 'index.js');
+    if (!forcePgSync && pgSyncCache.__prismaSchemaHash === prismaHash && fs.existsSync(prismaClientIndex)) {
+      console.log("  [OK] Prisma Client ya sincronizado con schema.prisma (caché SHA-256 verificada).");
+    } else {
+      const { execSync } = require('child_process');
+      try {
+        const npxCmd = process.platform === 'win32' ? 'npx.cmd prisma generate' : 'npx prisma generate';
+        execSync(npxCmd, { cwd: rootDir, stdio: 'pipe', timeout: 30000 });
+        pgSyncCache.__prismaSchemaHash = prismaHash;
+        console.log("  [OK] Prisma Client regenerado exitosamente con 'npx prisma generate'.");
+      } catch (prismaErr) {
+        console.warn(`  [WARN] Error ejecutando 'npx prisma generate': ${prismaErr.message}`);
+      }
     }
   }
+  try {
+    fs.writeFileSync(pgCachePath, JSON.stringify(pgSyncCache, null, 2), 'utf8');
+  } catch {}
 
   // 2.8 Verificación y Sembrado de Módulos del Menú de Navegación (public."Menu")
   console.log("\n[PASO 2.8/5] Verificando semillas de Módulos de Navegación ('Menu')...");
@@ -554,8 +591,14 @@ async function validateAndPrepareSchema(customConnStr) {
   `);
 
   const dbProcs = new Map();
+  const dbProcsExact = new Map();
   for (const row of procRes.rows) {
     dbProcs.set(row.proname.toLowerCase(), {
+      name: row.proname,
+      argCount: parseInt(row.pronargs),
+      args: row.args
+    });
+    dbProcsExact.set(row.proname, {
       name: row.proname,
       argCount: parseInt(row.pronargs),
       args: row.args
@@ -588,16 +631,23 @@ async function validateAndPrepareSchema(customConnStr) {
 
     const matches = content.matchAll(/(?:CALL|FROM)\s+(?:public\.)?("?[a-zA-Z0-9_]+"|sp[a-zA-Z0-9_]+|fn[a-zA-Z0-9_]+)\s*\(([\s\S]*?)\)/gi);
     for (const m of matches) {
+      const isQuoted = m[1].startsWith('"') && m[1].endsWith('"');
       const rawName = m[1].replace(/"/g, '');
       const argsStr = m[2];
       const nameLower = rawName.toLowerCase();
 
       if (nameLower.startsWith('sp') || nameLower.startsWith('fn')) {
         const argCount = countCallArguments(argsStr);
-        const dbProc = dbProcs.get(nameLower);
+        const dbProc = isQuoted ? dbProcsExact.get(rawName) : dbProcsExact.get(nameLower);
+        const dbProcAnyCase = dbProcs.get(nameLower);
 
-        if (!dbProc) {
+        if (!dbProcAnyCase) {
           console.warn(`  [WARN] Invocación en ${relFile} a '${rawName}' que no existe aún en PostgreSQL local.`);
+        } else if (!dbProc) {
+          console.error(`  [ERROR CRITICO CASE-SENSITIVITY] Mismatch de comillas/mayúsculas en ${relFile}:`);
+          console.error(`     Invocación Next.js: ${m[1]} (busca '${isQuoted ? rawName : nameLower}' en pg_proc)`);
+          console.error(`     Definición real en DB: '${dbProcAnyCase.name}'`);
+          paramMismatchErrors++;
         } else if (argCount !== dbProc.argCount) {
           console.error(`  [ERROR CRITICO PARAMETROS] Mismatch en ${relFile}:`);
           console.error(`     Invocación Next.js: ${rawName} con ${argCount} argumentos`);

@@ -19,23 +19,51 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         if (isSQLServerMode()) {
             let pool;
             try {
-                pool = await getSQLServerConnection();
-                await pool.request()
-                    .input('id', id)
-                    .input('state', state)
-                    .query(`UPDATE dbo.[Quotation] SET [state] = @state, [updatedAt] = GETDATE() WHERE [id] = @id`);
-                await pool.close();
-                message = 'Estado de cotización actualizado en SQL Server';
+                const { executeSQLServerProcedure } = await import('@/lib/sqlserver');
+                const res = await executeSQLServerProcedure('spCotizacionActualizarEstadoManual', {
+                    p_quotation_id: id,
+                    p_state: state,
+                    p_description: description || null,
+                    p_acting_user_id: actingUserId
+                });
+                const row = Array.isArray(res) ? res[0] : {};
+                message = row?.p_mensaje_resultado || 'Estado de cotización actualizado en SQL Server';
+                if (message.startsWith('ERROR')) {
+                    throw new Error(message);
+                }
             } catch (sqlErr: any) {
-                if (pool) await pool.close();
-                console.warn('Warning updating quotation state in SQL Server:', sqlErr.message);
-                message = 'Estado actualizado';
+                if (sqlErr.message?.startsWith('ERROR')) throw sqlErr;
+                try {
+                    pool = await getSQLServerConnection();
+                    await pool.request()
+                        .input('id', id)
+                        .input('state', state)
+                        .query(`UPDATE dbo.[Quotation] SET [state] = @state, [updatedAt] = GETDATE() WHERE [id] = @id`);
+                    await pool.close();
+                    message = 'Estado de cotización actualizado en SQL Server';
+                } catch (fallbackErr: any) {
+                    if (pool) await pool.close();
+                    console.warn('Warning updating quotation state in SQL Server:', fallbackErr.message);
+                    message = 'Estado actualizado';
+                }
             }
         } else {
-            const results: any[] = await executePostgresQuery(
-                `CALL public."spCotizacionActualizarEstadoManual"($1::INT, $2::TEXT, $3::TEXT, $4::INT, $5::TEXT)`,
-                [id, state, description || null, actingUserId, '']
-            );
+            let results: any[];
+            try {
+                results = await executePostgresQuery(
+                    `CALL public.spCotizacionActualizarEstadoManual($1::INT, $2::TEXT, $3::TEXT, $4::INT, $5::TEXT)`,
+                    [id, state, description || null, actingUserId, '']
+                );
+            } catch (pgErr: any) {
+                if (pgErr.message?.includes('does not exist')) {
+                    results = await executePostgresQuery(
+                        `CALL public."spCotizacionActualizarEstadoManual"($1::INT, $2::TEXT, $3::TEXT, $4::INT, $5::TEXT)`,
+                        [id, state, description || null, actingUserId, '']
+                    );
+                } else {
+                    throw pgErr;
+                }
+            }
             message = results[0]?.p_mensaje_resultado || '';
             if (message.startsWith('ERROR')) {
                 throw new Error(message);

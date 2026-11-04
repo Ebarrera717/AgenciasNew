@@ -216,6 +216,7 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { name: 'Moneda y Tasa de Cambio', type: 'Selector / Numérico', description: 'Define la divisa de la transacción (COP, USD, EUR) y la tasa de conversión.' },
                     { name: 'Sucursal / Implant', type: 'Selector', description: 'Asigna la sucursal emisora para definir logos y plantillas.' },
                     { name: 'Vendedor', type: 'Selector', description: 'Asigna el asesor comercial para el cálculo de comisiones de venta.' },
+                    { name: 'Observaciones', type: 'Texto Multilínea (Cabecera)', description: 'Observaciones generales de la cotización en la sección Cliente y Origen, enviadas automáticamente al campo Observaciones (ds_observacion) de dbo.Cotizacion en Zeus ERP.' },
                     { name: 'Productos y Servicios', type: 'Grilla de Ítems', description: 'Permite incorporar vuelos, hoteles, tours o servicios manuales.' },
                     { name: 'Fecha Vencimiento Proveedor', type: 'Fecha (Opcional)', description: 'Fecha límite de pago o vencimiento emitida por el proveedor del servicio.' },
                     { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura, recibo o soporte entregado por el proveedor.' },

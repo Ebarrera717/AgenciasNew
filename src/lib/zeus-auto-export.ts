@@ -77,8 +77,9 @@ export async function isAutoExportEnabled(type: 'QUOTATION' | 'INVOICE'): Promis
  */
 export async function autoExportQuotationToZeusERP(
     quotationIds: number | string | (number | string)[],
-    userId: number = 1
+    userId: number | null | undefined = 1
 ): Promise<{ exported: boolean; success?: boolean; message?: string; spResult?: any; xml?: string }> {
+    const safeUserId = Number(userId) || 1;
     const traceCode = generateTraceCode();
     const idsStr = Array.isArray(quotationIds) ? quotationIds.join(',') : String(quotationIds);
 
@@ -112,7 +113,7 @@ export async function autoExportQuotationToZeusERP(
 
         if (!xmlStr || typeof xmlStr !== 'string' || !xmlStr.trim().startsWith('<') || xmlStr.startsWith('ERROR')) {
             console.warn(`[ZEUS_AUTO_EXPORT] No se pudo generar XML válido para cotización(es) [${idsStr}]: ${xmlStr}`);
-            await registerLog(userId, 'QUOTATION', 'AUTO_EXPORT_ERROR', `ID(s) ${idsStr}: Error en generación de XML: ${xmlStr}`, { xml: xmlStr });
+            await registerLog(safeUserId, 'QUOTATION', 'AUTO_EXPORT_ERROR', `ID(s) ${idsStr}: Error en generación de XML: ${xmlStr}`, { xml: xmlStr });
             return { exported: true, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
         }
 
@@ -131,7 +132,7 @@ export async function autoExportQuotationToZeusERP(
             try {
                 if (!isSQLServerMode()) {
                     await executePostgresQuery(
-                        `CALL public."spCotizacionActualizarEstado"($1::JSONB)`,
+                        `CALL public.spCotizacionActualizarEstado($1::JSONB)`,
                         [JSON.stringify(spResult)]
                     );
                 }
@@ -141,7 +142,7 @@ export async function autoExportQuotationToZeusERP(
         }
 
         await registerLog(
-            userId,
+            safeUserId,
             'QUOTATION',
             success ? 'AUTO_EXPORT_SUCCESS' : 'AUTO_EXPORT_SP_ERROR',
             `ID(s) ${idsStr}: Exportación automática a Zeus ERP completada (${success ? 'Éxito' : 'Con observaciones'})`,
@@ -157,7 +158,7 @@ export async function autoExportQuotationToZeusERP(
         };
     } catch (error: any) {
         console.error(`[ZEUS_AUTO_EXPORT] Excepción en exportación automática de cotización [${idsStr}]:`, error.message);
-        await registerLog(userId, 'QUOTATION', 'AUTO_EXPORT_EXCEPTION', `ID(s) ${idsStr}: ${error.message}`, { error: error.message });
+        await registerLog(safeUserId, 'QUOTATION', 'AUTO_EXPORT_EXCEPTION', `ID(s) ${idsStr}: ${error.message}`, { error: error.message });
         return { exported: false, success: false, message: error.message };
     }
 }
@@ -167,8 +168,9 @@ export async function autoExportQuotationToZeusERP(
  */
 export async function autoExportInvoiceToZeusERP(
     invoiceIds: number | string | (number | string)[],
-    userId: number = 1
+    userId: number | null | undefined = 1
 ): Promise<{ exported: boolean; success?: boolean; message?: string; spResult?: any; xml?: string }> {
+    const safeUserId = Number(userId) || 1;
     const traceCode = generateTraceCode();
     const idsStr = Array.isArray(invoiceIds) ? invoiceIds.join(',') : String(invoiceIds);
 
@@ -186,7 +188,7 @@ export async function autoExportInvoiceToZeusERP(
         if (isSQLServerMode()) {
             const sqlResult = await executeSQLServerProcedure('spExportInvoices', {
                 Envoices_id: idsStr,
-                User_id: Number(userId) || 1
+                User_id: safeUserId
             });
             xmlStr = Array.isArray(sqlResult) && sqlResult.length > 0
                 ? (sqlResult[0]?.mensaje_resultado || sqlResult[0]?.xml || '')
@@ -194,7 +196,7 @@ export async function autoExportInvoiceToZeusERP(
         } else {
             const result = await executePostgresQuery(
                 `CALL public.spExportInvoices($1, $2, $3)`,
-                [idsStr, Number(userId) || 1, '']
+                [idsStr, safeUserId, '']
             );
             const row = result && result.length > 0 ? result[0] : null;
             xmlStr = (row?.mensaje_resultado || row?.p_mensaje_resultado || (row && typeof row === 'object' ? Object.values(row)[0] : '')) as string;
@@ -202,7 +204,7 @@ export async function autoExportInvoiceToZeusERP(
 
         if (!xmlStr || typeof xmlStr !== 'string' || !xmlStr.trim().startsWith('<') || xmlStr.startsWith('ERROR')) {
             console.warn(`[ZEUS_AUTO_EXPORT] No se pudo generar XML válido para factura(s) [${idsStr}]: ${xmlStr}`);
-            await registerLog(userId, 'INVOICE', 'AUTO_EXPORT_ERROR', `ID(s) ${idsStr}: Error en generación de XML: ${xmlStr}`, { xml: xmlStr });
+            await registerLog(safeUserId, 'INVOICE', 'AUTO_EXPORT_ERROR', `ID(s) ${idsStr}: Error en generación de XML: ${xmlStr}`, { xml: xmlStr });
             return { exported: true, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
         }
 
@@ -270,7 +272,7 @@ export async function autoExportInvoiceToZeusERP(
         }
 
         await registerLog(
-            userId,
+            safeUserId,
             'INVOICE',
             success ? 'AUTO_EXPORT_SUCCESS' : 'AUTO_EXPORT_SP_ERROR',
             `ID(s) ${idsStr}: Exportación automática de facturación completada (${success ? 'Éxito' : 'Con errores'})`,
@@ -291,7 +293,7 @@ export async function autoExportInvoiceToZeusERP(
         };
     } catch (error: any) {
         console.error(`[ZEUS_AUTO_EXPORT] Excepción en exportación automática de factura [${idsStr}]:`, error.message);
-        await registerLog(userId, 'INVOICE', 'AUTO_EXPORT_EXCEPTION', `ID(s) ${idsStr}: ${error.message}`, { error: error.message });
+        await registerLog(safeUserId, 'INVOICE', 'AUTO_EXPORT_EXCEPTION', `ID(s) ${idsStr}: ${error.message}`, { error: error.message });
         return { exported: true, success: false, message: error.message };
     }
 }

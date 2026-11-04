@@ -3,7 +3,6 @@ const path = require('path');
 const crypto = require('crypto');
 
 function computeHash(content) {
-  // Normalize whitespace and carriage returns for reproducible hashes
   const normalized = content.replace(/\r\n/g, '\n').trim();
   return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
 }
@@ -35,47 +34,57 @@ function generateManifest() {
   const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const build = `${todayStr}.01`;
 
-  const sqlRootDir = path.join(rootDir, 'SQL');
-  const allSqlFiles = scanDirectoryRecursive(sqlRootDir);
+  const sourceFolders = [
+    'SQL/SqlServer',
+    'SQL/SqlServer/SP',
+    'SQL/SqlServer/Function',
+    'SQL/PostgreSQL',
+    'SQL/PostgreSQL/SP',
+    'SQL/PostgreSQL/Function',
+    'SQL/PostgreSQL/Table',
+    'SQL/SP',
+    'SQL/Function',
+    'SQL/Procedure',
+    'SQL/Table'
+  ];
+
+  const allFilesSet = new Set();
+  for (const folder of sourceFolders) {
+    const dirPath = path.join(rootDir, folder);
+    if (fs.existsSync(dirPath)) {
+      const found = scanDirectoryRecursive(dirPath);
+      found.forEach(f => allFilesSet.add(f));
+    }
+  }
+  const allSqlFiles = Array.from(allFilesSet);
 
   const sqlServerObjectsMap = new Map();
   const pgObjectsMap = new Map();
 
-  // Scan all SQL files recursively
   for (const fullPath of allSqlFiles) {
     const relPath = path.relative(rootDir, fullPath).replace(/\\/g, '/');
     const content = fs.readFileSync(fullPath, 'utf8');
 
-    // 1. T-SQL / SQL Server Object Extraction
-    const tsqlMatches = content.matchAll(/CREATE\s+(PROCEDURE|PROC|FUNCTION|TABLE|VIEW)\s+(?:dbo\.)?([a-zA-Z0-9_]+)/gi);
-    for (const match of tsqlMatches) {
-      const rawType = match[1].toUpperCase();
-      let objectType = 'PROCEDURE';
-      if (rawType.startsWith('FUNC')) objectType = 'FUNCTION';
-      else if (rawType === 'TABLE') objectType = 'TABLE';
-      else if (rawType === 'VIEW') objectType = 'VIEW';
+    if (relPath.includes('SQL/ZeusERP')) continue;
+    const isZeusLegacyFile = relPath.includes('spFacturacionesCrear') || relPath.includes('spCotizacionesCrear') || relPath.includes('(2)');
+    if (isZeusLegacyFile) continue;
 
-      const name = match[2];
-      const objectName = `dbo.${name}`;
+    // 1. T-SQL / SQL Server Object Extraction (exclusivo SQL/SqlServer)
+    if (relPath.startsWith('SQL/SqlServer/')) {
+      const cleanTsql = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--.*$/gm, '');
+      const tsqlMatches = cleanTsql.matchAll(/CREATE\s+(?:OR\s+ALTER\s+)?(PROCEDURE|PROC|FUNCTION|TABLE|VIEW)\s+(?:\[?dbo\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi);
+      for (const match of tsqlMatches) {
+        const rawType = match[1].toUpperCase();
+        let objectType = 'PROCEDURE';
+        if (rawType.startsWith('FUNC')) objectType = 'FUNCTION';
+        else if (rawType === 'TABLE') objectType = 'TABLE';
+        else if (rawType === 'VIEW') objectType = 'VIEW';
 
-      if (!sqlServerObjectsMap.has(objectName)) {
-        sqlServerObjectsMap.set(objectName, {
-          objectType,
-          objectName,
-          sourceFile: relPath,
-          hash: computeHash(content),
-          isMandatory: true
-        });
-      }
-    }
+        const name = match[2];
+        if (/^(dbo|public|if|table|temp)$/i.test(name)) continue;
+        const objectName = `dbo.${name}`;
 
-    // Fallback file name match for SQL Server files in SQL/SP/ or SQL/SqlServer/
-    if (relPath.startsWith('SQL/SP/') || relPath.startsWith('SQL/SqlServer/')) {
-      const baseName = path.basename(fullPath, '.sql');
-      if (baseName.startsWith('sp') || baseName.startsWith('fn') || baseName.startsWith('dbo.')) {
-        const objectName = baseName.startsWith('dbo.') ? baseName : `dbo.${baseName}`;
-        if (!sqlServerObjectsMap.has(objectName)) {
-          let objectType = baseName.startsWith('fn') ? 'FUNCTION' : 'PROCEDURE';
+        if (!sqlServerObjectsMap.has(objectName) && !name.startsWith('spFacturacionesCrear') && !name.startsWith('spCotizacionesCrear')) {
           sqlServerObjectsMap.set(objectName, {
             objectType,
             objectName,
@@ -88,30 +97,100 @@ function generateManifest() {
     }
 
     // 2. PostgreSQL Object Extraction
-    if (relPath.startsWith('SQL/Procedure') || relPath.startsWith('SQL/Function') || relPath.startsWith('SQL/Table')) {
-      const baseName = path.basename(fullPath, '.sql');
-      let objectType = 'PROCEDURE';
-      if (baseName.startsWith('fn')) objectType = 'FUNCTION';
-      else if (relPath.startsWith('SQL/Table')) objectType = 'TABLE';
+    const isExplicitTsql = !isZeusLegacyFile && relPath.includes('SQL/SqlServer');
+    const isExplicitPlpgsql = relPath.includes('SQL/PostgreSQL') || /plpgsql/i.test(content) || /\bDO\s+\$\$/i.test(content) || (relPath.includes('SQL/Table') && !relPath.includes('SqlServer'));
 
-      const pgObjName = `public."${baseName}"`;
-      if (!pgObjectsMap.has(pgObjName)) {
-        pgObjectsMap.set(pgObjName, {
-          objectType,
-          objectName: pgObjName,
+    if (isExplicitPlpgsql || (!isExplicitTsql && (relPath.includes('SQL/SP') || relPath.includes('SQL/Function') || relPath.includes('SQL/Procedure')))) {
+      let matchedPgInFile = 0;
+      const pgMatches = content.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?(PROCEDURE|FUNCTION|TABLE|VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?("?[a-zA-Z0-9_]+"|sp[a-zA-Z0-9_]+|fn[a-zA-Z0-9_]+)/gi);
+      for (const match of pgMatches) {
+        const rawType = match[1].toUpperCase();
+        let objectType = 'PROCEDURE';
+        if (rawType.startsWith('FUNC')) objectType = 'FUNCTION';
+        else if (rawType === 'TABLE') objectType = 'TABLE';
+        else if (rawType === 'VIEW') objectType = 'VIEW';
+
+        const rawName = match[2].replace(/"/g, '');
+        if (/^(dbo|public|if|table|temp)$/i.test(rawName)) continue;
+        const pgObjName = objectType === 'TABLE' ? `public."${rawName}"` : `public.${rawName}`;
+        matchedPgInFile++;
+
+        if (!pgObjectsMap.has(pgObjName)) {
+          pgObjectsMap.set(pgObjName, {
+            objectType,
+            objectName: pgObjName,
+            sourceFile: relPath,
+            hash: computeHash(content),
+            isMandatory: true,
+            engine: 'PostgreSQL'
+          });
+        }
+      }
+
+      const baseName = path.basename(fullPath, '.sql');
+      if (matchedPgInFile === 0 && relPath.includes('PostgreSQL/SP/') && !pgObjectsMap.has(`public.${baseName}`)) {
+        pgObjectsMap.set(`public.${baseName}`, {
+          objectType: 'PROCEDURE',
+          objectName: `public.${baseName}`,
           sourceFile: relPath,
           hash: computeHash(content),
-          isMandatory: true
+          isMandatory: true,
+          engine: 'PostgreSQL'
+        });
+      } else if (matchedPgInFile === 0 && relPath.includes('PostgreSQL/Function/') && !pgObjectsMap.has(`public.${baseName}`)) {
+        pgObjectsMap.set(`public.${baseName}`, {
+          objectType: 'FUNCTION',
+          objectName: `public.${baseName}`,
+          sourceFile: relPath,
+          hash: computeHash(content),
+          isMandatory: true,
+          engine: 'PostgreSQL'
         });
       }
     }
   }
 
+  const controlTablesSqlServer = [
+    'dbo.Korex_UpdateHistory',
+    'dbo.Korex_UpdateObjects',
+    'dbo.Korex_UpdateErrors',
+    'dbo.Korex_Installation'
+  ];
+  controlTablesSqlServer.forEach(tbl => {
+    if (!sqlServerObjectsMap.has(tbl)) {
+      sqlServerObjectsMap.set(tbl, {
+        objectType: 'TABLE',
+        objectName: tbl,
+        sourceFile: 'SQL/SqlServer/01_Tables.sql',
+        hash: 'KOREX_CONTROL_TABLE',
+        isMandatory: true,
+        engine: 'SQLServer'
+      });
+    }
+  });
+
+  const controlTablesPg = [
+    'public."Korex_UpdateHistory"',
+    'public."Korex_UpdateObjects"',
+    'public."Korex_UpdateErrors"',
+    'public."Korex_Installation"'
+  ];
+  controlTablesPg.forEach(tbl => {
+    if (!pgObjectsMap.has(tbl)) {
+      pgObjectsMap.set(tbl, {
+        objectType: 'TABLE',
+        objectName: tbl,
+        sourceFile: 'SQL/Table/TABLEINI.sql',
+        hash: 'KOREX_CONTROL_TABLE',
+        isMandatory: true,
+        engine: 'PostgreSQL'
+      });
+    }
+  });
+
   const sqlServerObjects = Array.from(sqlServerObjectsMap.values());
   const pgObjects = Array.from(pgObjectsMap.values());
 
-  // REGLA ABSOLUTA DE INVENTARIO Y COBERTA (REGLAS 1, 2, 3):
-  // Compare repo SQL objects vs manifest objects
   if (sqlServerObjects.length === 0 || pgObjects.length === 0) {
     console.error('❌ ERROR CRÍTICO [Exit Code 5]: El manifest no representa el inventario completo del proyecto. Se detectaron 0 objetos.');
     process.exit(5);

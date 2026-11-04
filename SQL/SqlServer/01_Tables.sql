@@ -254,9 +254,12 @@ BEGIN
         [paxChildren] INT NULL,
         [reservationCode] NVARCHAR(255) NULL,
         [copyFieldsToProducts] BIT NULL CONSTRAINT DF_Quotation_CopyFields DEFAULT 1,
-        [manualDescription] NVARCHAR(MAX) NULL
+        [manualDescription] NVARCHAR(MAX) NULL,
+        [observations] NVARCHAR(MAX) NULL
     );
 END;
+IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'observations')
+    ALTER TABLE dbo.[Quotation] ADD [observations] NVARCHAR(MAX) NULL;
 
 -- 14. Currency
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Currency' AND schema_id = SCHEMA_ID('dbo'))
@@ -2706,6 +2709,17 @@ BEGIN
         [Status] NVARCHAR(50) NOT NULL DEFAULT 'HEALTHY',
         [Environment] NVARCHAR(50) NULL DEFAULT 'PRODUCTION'
     );
+END;
+
+-- Corrección y saneamiento de consecutivos/internalNumber errados en Quotation
+IF OBJECT_ID('dbo.Quotation', 'U') IS NOT NULL
+BEGIN
+    UPDATE dbo.[Quotation]
+    SET internalNumber = CAST(id AS NVARCHAR(50))
+    WHERE internalNumber IS NULL 
+       OR internalNumber LIKE 'QUO-%' 
+       OR internalNumber LIKE 'TEMP_%'
+       OR internalNumber = '';
 END;
 
 PRINT 'Tablas de la base de datos SQL Server estructuradas exitosamente.';
