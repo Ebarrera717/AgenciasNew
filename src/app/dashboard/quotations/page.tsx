@@ -36,7 +36,6 @@ import {
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import * as XLSX from 'xlsx'
 import QuotationInvoiceModal from './QuotationInvoiceModal'
 import ExcelImportQuotations from '@/components/excel-import-quotations'
 import { downloadQuotationTemplate } from '@/lib/excel-templates'
@@ -367,7 +366,7 @@ export default function QuotationsListPage() {
     }
 
     // Exportar a Excel (.xlsx)
-    const handleDownloadExcel = () => {
+    const handleDownloadExcel = async () => {
         const listToDownload = selectedIds.length > 0
             ? filteredQs.filter(q => selectedIds.includes(q.id))
             : filteredQs;
@@ -377,25 +376,31 @@ export default function QuotationsListPage() {
             return
         }
 
-        const dataForExcel = listToDownload.map(q => ({
-            'ID Cotización': q.id,
-            'No. Referencia': q.internalNumber || '',
-            'Fecha': format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy'),
-            'Reserva / Localizador': q.reservationCode || '',
-            'Cliente': q.clientName || '',
-            'Pasajero / Titular': q.passengerName || 'Mismo titular',
-            'Elaborado por': q.userName || '',
-            'Proveedor': q.providerName || '',
-            'Noches': q.nights || 1,
-            'Monto Total': parseFloat(q.totalAmount) || 0,
-            'Moneda': q.currency || 'USD',
-            'Estado': q.state || 'NUEVO'
-        }))
+        try {
+            const XLSX = await import('xlsx');
+            const dataForExcel = listToDownload.map(q => ({
+                'ID Cotización': q.id,
+                'No. Referencia': q.internalNumber || '',
+                'Fecha': format(new Date(q.createdAt || new Date()), 'dd/MM/yyyy'),
+                'Reserva / Localizador': q.reservationCode || '',
+                'Cliente': q.clientName || '',
+                'Pasajero / Titular': q.passengerName || 'Mismo titular',
+                'Elaborado por': q.userName || '',
+                'Proveedor': q.providerName || '',
+                'Noches': q.nights || 1,
+                'Monto Total': parseFloat(q.totalAmount) || 0,
+                'Moneda': q.currency || 'USD',
+                'Estado': q.state || 'NUEVO'
+            }))
 
-        const worksheet = XLSX.utils.json_to_sheet(dataForExcel)
-        const workbook = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Cotizaciones')
-        XLSX.writeFile(workbook, `Historial_Cotizaciones_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`)
+            const worksheet = XLSX.utils.json_to_sheet(dataForExcel)
+            const workbook = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Cotizaciones')
+            XLSX.writeFile(workbook, `Historial_Cotizaciones_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`)
+        } catch (err: any) {
+            console.error('Error al exportar a Excel:', err);
+            alert('Ocurrió un error al generar el archivo Excel: ' + (err?.message || 'Error desconocido'));
+        }
     }
 
     // Exportar a Zeus ERP
@@ -903,7 +908,7 @@ export default function QuotationsListPage() {
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap min-w-[120px]">Elaborado por</th>
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Monto Total</th>
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Estado</th>
-                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right whitespace-nowrap sticky right-0 bg-zinc-50 dark:bg-zinc-800/95 backdrop-blur-sm z-10 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">Acciones</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right whitespace-nowrap sticky right-0 bg-zinc-50 dark:bg-zinc-800 z-10 border-l border-zinc-200 dark:border-zinc-800 shadow-sm">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -1017,7 +1022,7 @@ export default function QuotationsListPage() {
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-4 py-3.5 text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-zinc-900/95 group-hover:bg-zinc-50/95 dark:group-hover:bg-zinc-800/90 backdrop-blur-sm z-10 transition-colors shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">
+                                        <td className="px-4 py-3.5 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-800 z-10 transition-colors border-l border-zinc-200 dark:border-zinc-800 shadow-sm">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

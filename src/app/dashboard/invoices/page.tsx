@@ -29,7 +29,6 @@ import {
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import Link from 'next/link'
-import * as XLSX from 'xlsx'
 import { generateInvoicePDF } from '@/lib/pdf-utils'
 import ExcelImportInvoices from '@/components/excel-import-invoices'
 import { downloadInvoiceTemplate } from '@/lib/excel-templates'
@@ -299,7 +298,7 @@ export default function InvoicesListPage() {
     };
 
     // Descargar a archivo Excel (.xlsx)
-    const handleDownloadExcel = () => {
+    const handleDownloadExcel = async () => {
         const listToDownload = selectedIds.length > 0
             ? sortedInvoices.filter(q => selectedIds.includes(q.id))
             : sortedInvoices;
@@ -309,30 +308,36 @@ export default function InvoicesListPage() {
             return;
         }
 
-        const dataForExcel = listToDownload.map(q => {
-            const mainProd = q.products?.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
-            const pax = q.paxName || (mainProd?.passengers?.[0]?.name || mainProd?.passengerName || 'Mismo titular');
-            const prov = q.providerName || mainProd?.prestadora?.name || 'Varios/Ninguno';
-            const zeusNum = q.zeusInvoiceNumber || (isInvoiceExported(q) && q.consecutivo ? `${q.serie || ''}${q.consecutivo}` : '-');
-            return {
-                'Referencia ID': q.id,
-                'No. Interno': q.internalNumber || `FAC-${q.id}`,
-                'Factura Zeus ERP': zeusNum,
-                'Fecha': q.date ? format(new Date(q.date), 'dd/MM/yyyy') : '',
-                'Cliente': q.client?.name || q.clientName || 'Consumidor Final',
-                'Pasajero / Titular': pax,
-                'Elaborado por': q.userName || q.sellerName || 'Sistema',
-                'Proveedor': prov,
-                'Monto Total': Number(q.totalAmount) || 0,
-                'Moneda': q.currency || 'COP',
-                'Estado': q.state || 'NUEVO'
-            };
-        });
+        try {
+            const XLSX = await import('xlsx');
+            const dataForExcel = listToDownload.map(q => {
+                const mainProd = q.products?.find((p: any) => p.mainTaxId) || (q.products && q.products.length > 0 ? q.products[0] : null);
+                const pax = q.paxName || (mainProd?.passengers?.[0]?.name || mainProd?.passengerName || 'Mismo titular');
+                const prov = q.providerName || mainProd?.prestadora?.name || 'Varios/Ninguno';
+                const zeusNum = q.zeusInvoiceNumber || (isInvoiceExported(q) && q.consecutivo ? `${q.serie || ''}${q.consecutivo}` : '-');
+                return {
+                    'Referencia ID': q.id,
+                    'No. Interno': q.internalNumber || `FAC-${q.id}`,
+                    'Factura Zeus ERP': zeusNum,
+                    'Fecha': q.date ? format(new Date(q.date), 'dd/MM/yyyy') : '',
+                    'Cliente': q.client?.name || q.clientName || 'Consumidor Final',
+                    'Pasajero / Titular': pax,
+                    'Elaborado por': q.userName || q.sellerName || 'Sistema',
+                    'Proveedor': prov,
+                    'Monto Total': Number(q.totalAmount) || 0,
+                    'Moneda': q.currency || 'COP',
+                    'Estado': q.state || 'NUEVO'
+                };
+            });
 
-        const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Facturas');
-        XLSX.writeFile(workbook, `Historial_Facturas_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+            const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Facturas');
+            XLSX.writeFile(workbook, `Historial_Facturas_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+        } catch (err: any) {
+            console.error('Error al exportar a Excel:', err);
+            alert('Ocurrió un error al generar el archivo Excel: ' + (err?.message || 'Error desconocido'));
+        }
     };
 
     const handleExportSelectedToZeus = async () => {
@@ -781,7 +786,7 @@ export default function InvoicesListPage() {
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Fechas</th>
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Monto Total</th>
                                     <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 whitespace-nowrap">Estado</th>
-                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right whitespace-nowrap sticky right-0 bg-zinc-50 dark:bg-zinc-800/95 backdrop-blur-sm z-10 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">Acciones</th>
+                                    <th className="px-4 py-3.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right whitespace-nowrap sticky right-0 bg-zinc-50 dark:bg-zinc-800 z-10 border-l border-zinc-200 dark:border-zinc-800 shadow-sm">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -853,7 +858,7 @@ export default function InvoicesListPage() {
                                                     {q.state || 'NUEVO'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3.5 text-right whitespace-nowrap sticky right-0 bg-white/95 dark:bg-zinc-900/95 group-hover:bg-zinc-50/95 dark:group-hover:bg-zinc-800/90 backdrop-blur-sm z-10 transition-colors shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)]">
+                                            <td className="px-4 py-3.5 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-zinc-900 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-800 z-10 transition-colors border-l border-zinc-200 dark:border-zinc-800 shadow-sm">
                                                 <div className="flex items-center justify-end gap-1">
                                                     <button
                                                         onClick={() => handleExportXml(q)}
