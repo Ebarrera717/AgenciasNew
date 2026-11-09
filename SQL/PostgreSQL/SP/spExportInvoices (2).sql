@@ -382,7 +382,7 @@ BEGIN
         '' AS ds_numeracion_autorizada,
         NULL AS dt_fecha_resolucion,
         '' AS CodigoArchivoFisico,
-        '' AS ds_Observacion,
+        public."fnQuitarEspeciales"(COALESCE(e.observations, '')) AS ds_Observacion,
         '' AS ds_Campo_libre1,
         '' AS ds_Campo_libre2,
         '' AS cd_fuente_Reemplaza,

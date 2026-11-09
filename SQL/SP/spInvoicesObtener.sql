@@ -83,7 +83,8 @@ BEGIN
         i.[serie],
         i.[consecutivo],
         ISNULL(i.[isExcelImport], 0) AS [isExcelImport],
-        i.[zeusInvoiceNumber]
+        i.[zeusInvoiceNumber],
+        i.[observations]
     FROM dbo.[Invoices] i
     LEFT JOIN dbo.[Client] c ON i.[clientId] = c.[id]
     LEFT JOIN dbo.[Branch] b ON i.[branchId] = b.[id]

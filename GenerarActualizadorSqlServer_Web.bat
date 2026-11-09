@@ -8,7 +8,7 @@ echo =======================================================================
 echo.
 
 echo [PASO 1/2] Compilando y empaquetando el proyecto Web Next.js...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0deploy\Generar_Empaquetado.ps1"
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "%~dp0deploy\Generar_Empaquetado.ps1"
 if %errorlevel% neq 0 (
     echo Error durante el empaquetado del Sitio Web.
     pause

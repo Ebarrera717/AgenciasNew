@@ -110,6 +110,22 @@ SET standard_conforming_strings = on;
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
+-- Safeguards de Columnas Críticas para compilación limpia de SPs y Funciones
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'observations') THEN
+            ALTER TABLE public."Quotation" ADD COLUMN "observations" text;
+        END IF;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Invoices') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'observations') THEN
+            ALTER TABLE public."Invoices" ADD COLUMN "observations" text;
+        END IF;
+    END IF;
+END $$;
+
+
 `;
 
     // Agregar todas las funciones

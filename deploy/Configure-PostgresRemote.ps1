@@ -9,7 +9,7 @@ param([switch]$Elevated)
 if (-not $Elevated) {
     if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host "Elevando privilegios de Administrador para configurar Red y Firewall..." -ForegroundColor Yellow
-        Start-Process PowerShell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Elevated" -Verb RunAs
+        Start-Process PowerShell -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -File `"$PSCommandPath`" -Elevated" -Verb RunAs
         exit
     }
 }

@@ -3,7 +3,7 @@ IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spInvoicesListar;
 GO
 
-CREATE PROCEDURE dbo.spInvoicesListar
+CREATE OR ALTER PROCEDURE dbo.spInvoicesListar
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -39,6 +39,7 @@ BEGIN
         i.[fuente],
         i.[serie],
         i.[consecutivo],
+        i.[observations],
         (
             SELECT TOP 1 ipp.[name]
             FROM dbo.[InvoicesProduct] ip

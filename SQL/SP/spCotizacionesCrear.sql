@@ -18,7 +18,7 @@ IF OBJECT_ID('dbo.spCotizacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spCotizacionesCrear;
 GO
 
-CREATE PROCEDURE dbo.spCotizacionesCrear
+CREATE OR ALTER PROCEDURE dbo.spCotizacionesCrear
 (
     @xml VARCHAR(MAX)
 )
@@ -356,9 +356,12 @@ BEGIN
 			RETURN 1;
         END
 
-        -- Extraer los principales códigos maestros del XML para validarlos
+        -- Extraer los principales códigos maestros del XML para validarlos y resolverlos
         DECLARE @val_cd_cliente_codigo VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_cliente_codigo)[1]', 'VARCHAR(25)');
         DECLARE @val_cd_sucursal VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_sucursal)[1]', 'VARCHAR(25)');
+        DECLARE @val_ds_sucursal VARCHAR(100) = @xmlData.value('(Cotizaciones/Cotizacion/ds_sucursal)[1]', 'VARCHAR(100)');
+        DECLARE @val_cd_implante VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_implante)[1]', 'VARCHAR(25)');
+        DECLARE @val_ds_implante VARCHAR(100) = @xmlData.value('(Cotizaciones/Cotizacion/ds_implante)[1]', 'VARCHAR(100)');
         DECLARE @val_cd_vendedor VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_vendedor)[1]', 'VARCHAR(25)');
         DECLARE @val_cd_tiqueteador VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_tiqueteador)[1]', 'VARCHAR(25)');
 
@@ -387,20 +390,134 @@ BEGIN
             END
         END
 
-        -- 2. Validar Sucursal
-        IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
+        -- 2. Resolver Sucursal de forma dinámica y tolerante (Zeus ERP dbo.Sucursales / Korex dbo.Branch)
+        DECLARE @val_id_sucursal INT = NULL;
+        IF OBJECT_ID('dbo.Sucursales') IS NOT NULL
         BEGIN
-            IF OBJECT_ID('dbo.[Branch]') IS NOT NULL
+            IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
             BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM dbo.[Branch] WHERE code = @val_cd_sucursal OR CAST(id AS VARCHAR(25)) = @val_cd_sucursal
-                )
-                BEGIN
-                    SELECT 'sucursal ' + @val_cd_sucursal + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-                    RETURN 1;
-                END
+                -- 2.1 Por cd_codigo exacto
+                SELECT TOP 1 @val_id_sucursal = id 
+                FROM dbo.Sucursales 
+                WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@val_cd_sucursal));
+
+                -- 2.2 Por cd_alterno
+                IF @val_id_sucursal IS NULL
+                    SELECT TOP 1 @val_id_sucursal = id 
+                    FROM dbo.Sucursales 
+                    WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@val_cd_sucursal));
+
+                -- 2.3 Por ID numérico directo
+                IF @val_id_sucursal IS NULL AND TRY_CAST(@val_cd_sucursal AS INT) IS NOT NULL
+                    SELECT TOP 1 @val_id_sucursal = id 
+                    FROM dbo.Sucursales 
+                    WHERE id = TRY_CAST(@val_cd_sucursal AS INT);
+
+                -- 2.4 Por coincidencia de texto en ds_nombre usando el código
+                IF @val_id_sucursal IS NULL
+                    SELECT TOP 1 @val_id_sucursal = id 
+                    FROM dbo.Sucursales 
+                    WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_cd_sucursal)) + '%';
+            END
+
+            -- 2.5 Por ds_sucursal (nombre descriptivo enviado desde Korex)
+            IF @val_id_sucursal IS NULL AND @val_ds_sucursal IS NOT NULL AND @val_ds_sucursal <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_sucursal = id 
+                FROM dbo.Sucursales 
+                WHERE LTRIM(RTRIM(ds_nombre)) = LTRIM(RTRIM(@val_ds_sucursal))
+                   OR LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_ds_sucursal)) + '%';
+            END
+
+            -- 2.6 Fallback seguro a primera sucursal existente en Zeus ERP
+            IF @val_id_sucursal IS NULL
+                SELECT TOP 1 @val_id_sucursal = id FROM dbo.Sucursales ORDER BY id ASC;
+        END
+        ELSE IF OBJECT_ID('dbo.[Branch]') IS NOT NULL
+        BEGIN
+            IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_sucursal = id 
+                FROM dbo.[Branch] 
+                WHERE code = @val_cd_sucursal OR id = TRY_CAST(@val_cd_sucursal AS INT);
+            END
+            IF @val_id_sucursal IS NULL
+                SELECT TOP 1 @val_id_sucursal = id FROM dbo.[Branch] ORDER BY id ASC;
+        END
+
+        IF @val_id_sucursal IS NULL SET @val_id_sucursal = 1;
+
+        -- 2.b Resolver Implante de forma dinámica y tolerante (Zeus ERP dbo.Implantes / Korex dbo.Implant)
+        DECLARE @val_id_implante INT = NULL;
+        IF OBJECT_ID('dbo.Implantes') IS NOT NULL
+        BEGIN
+            IF @val_cd_implante IS NOT NULL AND @val_cd_implante <> ''
+            BEGIN
+                -- 2.b.1 Por cd_codigo dentro de la sucursal asignada
+                SELECT TOP 1 @val_id_implante = id 
+                FROM dbo.Implantes 
+                WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@val_cd_implante)) 
+                  AND id_sucursal = @val_id_sucursal;
+
+                -- 2.b.2 Por cd_alterno dentro de la sucursal asignada
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@val_cd_implante)) 
+                      AND id_sucursal = @val_id_sucursal;
+
+                -- 2.b.3 Por cd_codigo general
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@val_cd_implante));
+
+                -- 2.b.4 Por cd_alterno general
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@val_cd_implante));
+
+                -- 2.b.5 Por ID numérico
+                IF @val_id_implante IS NULL AND TRY_CAST(@val_cd_implante AS INT) IS NOT NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE id = TRY_CAST(@val_cd_implante AS INT);
+
+                -- 2.b.6 Por coincidencia en ds_nombre usando el código
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_cd_implante)) + '%';
+            END
+
+            -- 2.b.7 Por ds_implante (nombre descriptivo enviado desde Korex)
+            IF @val_id_implante IS NULL AND @val_ds_implante IS NOT NULL AND @val_ds_implante <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_implante = id 
+                FROM dbo.Implantes 
+                WHERE (LTRIM(RTRIM(ds_nombre)) = LTRIM(RTRIM(@val_ds_implante))
+                       OR LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_ds_implante)) + '%')
+                  AND id_sucursal = @val_id_sucursal;
+
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(ds_nombre)) = LTRIM(RTRIM(@val_ds_implante))
+                       OR LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_ds_implante)) + '%';
             END
         END
+        ELSE IF OBJECT_ID('dbo.[Implant]') IS NOT NULL
+        BEGIN
+            IF @val_cd_implante IS NOT NULL AND @val_cd_implante <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_implante = id 
+                FROM dbo.[Implant] 
+                WHERE code = @val_cd_implante OR id = TRY_CAST(@val_cd_implante AS INT);
+            END
+        END
+
+        IF @val_id_implante IS NULL SET @val_id_implante = 0;
 
         -- 3. Validar / Resolver Vendedor
         IF OBJECT_ID('dbo.MAEVENDE') IS NOT NULL
@@ -552,8 +669,8 @@ BEGIN
 			bl_existe
 		)	
         SELECT 
-			id_sucursal = ISNULL(TRY_CAST(C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)') AS INT), 1),
-			id_implante = TRY_CAST(C.Cotizacion.value('cd_implante[1]','VARCHAR(25)') AS INT),
+			id_sucursal = ISNULL(@val_id_sucursal, 1),
+			id_implante = ISNULL(@val_id_implante, 0),
 			cd_consecutivo = CASE 
 				WHEN ISNUMERIC(RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')))) = 1 
 				     AND LEN(RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')))) < 8

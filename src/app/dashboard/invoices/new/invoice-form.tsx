@@ -70,6 +70,7 @@ interface InvoiceFormData {
     consecutivo?: string;
     date?: string;
     dueDate?: string;
+    observations?: string;
 }
 
 export function computeItinerarySummaries(itineraryList: any[]) {
@@ -137,7 +138,8 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
         serie: '',
         consecutivo: '',
         date: new Date().toISOString().split('T')[0],
-        dueDate: new Date().toISOString().split('T')[0]
+        dueDate: new Date().toISOString().split('T')[0],
+        observations: ''
     })
     const [saving, setSaving] = useState(false)
     const [isGlobalPaymentOpen, setIsGlobalPaymentOpen] = useState(false)
@@ -910,6 +912,7 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                             fuente: '',
                             serie: '',
                             consecutivo: '',
+                            observations: qData.observations || qData.ds_observacion || '',
                             selectedCombos: (qData.combos || []).map((c: any) => ({ id: c.comboId || c.id, name: c.name })),
                             items: (qData.products || []).map((p: any) => {
                                 const safeAppliedTaxes = Array.isArray(p.appliedTaxes) ? p.appliedTaxes.map((t: any) => ({
@@ -991,6 +994,7 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                             consecutivo: qData.consecutivo || '',
                             date: qData.date ? new Date(qData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                             dueDate: qData.dueDate ? new Date(qData.dueDate).toISOString().split('T')[0] : (qData.date ? new Date(qData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+                            observations: qData.observations || '',
                             items: (qData.products || []).map((p: any) => {
                                 const safeAppliedTaxes = Array.isArray(p.appliedTaxes) ? p.appliedTaxes : [];
                                 const safeVariables = Array.isArray(p.variables) ? p.variables : [];
@@ -1498,6 +1502,19 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                 />
                             </div>
                             
+                            <div className="col-span-full space-y-2">
+                                <label className="text-sm font-semibold text-zinc-500">Observaciones</label>
+                                <textarea
+                                    rows={2}
+                                    readOnly={isReadOnly}
+                                    disabled={isReadOnly}
+                                    className="w-full rounded-xl p-3.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white resize-y text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                                    value={formData.observations || ''}
+                                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                                    placeholder="Observaciones generales de la factura (se envían al campo Observaciones en Zeus ERP)..."
+                                />
+                            </div>
+
                             <div className="col-span-full pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-zinc-100 dark:border-zinc-800">
                                 <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
                                     <FileText className="w-4 h-4 text-blue-600 shrink-0" />

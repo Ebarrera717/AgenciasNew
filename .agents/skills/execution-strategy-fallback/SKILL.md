@@ -149,13 +149,13 @@ Si tanto el Servicio de Windows como el Task Scheduler están bloqueados por pol
 
 - **Administración de Task Scheduler**:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File deploy\task_scheduler_manager.ps1 -Action Register -Engine POSTGRESQL -Port 3001
-  powershell -ExecutionPolicy Bypass -File deploy\task_scheduler_manager.ps1 -Action Start -Engine POSTGRESQL -Port 3001
-  powershell -ExecutionPolicy Bypass -File deploy\task_scheduler_manager.ps1 -Action Status -Engine POSTGRESQL -Port 3001
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File deploy\task_scheduler_manager.ps1 -Action Register -Engine POSTGRESQL -Port 3001
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File deploy\task_scheduler_manager.ps1 -Action Start -Engine POSTGRESQL -Port 3001
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File deploy\task_scheduler_manager.ps1 -Action Status -Engine POSTGRESQL -Port 3001
   ```
 - **Diagnóstico y Autoreparación**:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File deploy\Korex_Diagnostics_Engine.ps1 -Engine POSTGRESQL -Mode Reparacion
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File deploy\Korex_Diagnostics_Engine.ps1 -Engine POSTGRESQL -Mode Reparacion
   ```
 - **Suite de Validación**:
   ```bash

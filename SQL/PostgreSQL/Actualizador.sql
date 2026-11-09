@@ -1957,6 +1957,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'zeusInvoiceNumber') THEN
         ALTER TABLE public."Invoices" ADD COLUMN "zeusInvoiceNumber" character varying(100);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'observations') THEN
+        ALTER TABLE public."Invoices" ADD COLUMN "observations" text;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProduct' AND column_name = 'id') THEN
         ALTER TABLE public."InvoicesProduct" ADD COLUMN "id" integer NOT NULL;
     END IF;
@@ -5114,6 +5117,22 @@ SET standard_conforming_strings = on;
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 
+-- Safeguards de Columnas Críticas para compilación limpia de SPs y Funciones
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'observations') THEN
+            ALTER TABLE public."Quotation" ADD COLUMN "observations" text;
+        END IF;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Invoices') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'observations') THEN
+            ALTER TABLE public."Invoices" ADD COLUMN "observations" text;
+        END IF;
+    END IF;
+END $$;
+
+
 
 -- ############################################################################
 -- 1. FUNCIONES SQL (PL/pgSQL)
@@ -6435,6 +6454,7 @@ BEGIN
             'internalNumber', i."internalNumber",
             'date', i.date,
             'dueDate', i."dueDate",
+            'observations', COALESCE(i.observations, ''),
             'state', COALESCE(i.state, 'NUEVO'),
             'isExcelImport', COALESCE(i."isExcelImport", false),
             'zeusInvoiceNumber', i."zeusInvoiceNumber",
@@ -10675,7 +10695,7 @@ BEGIN
         '' AS ds_numeracion_autorizada,
         NULL AS dt_fecha_resolucion,
         '' AS CodigoArchivoFisico,
-        '' AS ds_Observacion,
+        public."fnQuitarEspeciales"(COALESCE(e.observations, '')) AS ds_Observacion,
         '' AS ds_Campo_libre1,
         '' AS ds_Campo_libre2,
         '' AS cd_fuente_Reemplaza,
@@ -11591,8 +11611,8 @@ BEGIN
             LPAD(e.id::text, 8, '0')
         ) AS cd_consecutivo,
         User_id AS cd_usuario,
-        SUBSTRING(COALESCE(b.code, 'OFP'), 1, 3) AS cd_sucursal,
-        SUBSTRING(COALESCE(i.code, ''), 1, 3) AS cd_implante,
+        SUBSTRING(COALESCE(b.code, 'OFP'), 1, 25) AS cd_sucursal,
+        SUBSTRING(COALESCE(i.code, ''), 1, 25) AS cd_implante,
         e.date AS dt_fechacont,
         e.date AS dt_vence,
         SUBSTRING(COALESCE(c.document, ''), 1, 25) AS cd_tercero_codigo,
@@ -11619,7 +11639,7 @@ BEGIN
         '' AS ds_numeracion_autorizada,
         NULL AS dt_fecha_resolucion,
         '' AS CodigoArchivoFisico,
-        '' AS ds_Observacion,
+        public."fnQuitarEspeciales"(COALESCE(e.observations, '')) AS ds_Observacion,
         '' AS ds_Campo_libre1,
         '' AS ds_Campo_libre2,
         '' AS cd_fuente_Reemplaza,
@@ -12419,7 +12439,9 @@ BEGIN
     CREATE TEMP TABLE IF NOT EXISTS Cotizacion (
 		id INT GENERATED ALWAYS AS IDENTITY,
 		cd_sucursal VARCHAR(250),
+		ds_sucursal VARCHAR(250),
 		cd_implante VARCHAR(250),
+		ds_implante VARCHAR(250),
 		cd_consecutivo VARCHAR(250),
 		cd_usuario VARCHAR(250),
 		dt_fechacont TIMESTAMP ,
@@ -12708,7 +12730,7 @@ BEGIN
     -- 4. Poblar Tablas Temporales (POBLANDO TODAS LAS COLUMNAS CON NOMBRES EXPLÍCITOS)
     
     INSERT INTO Cotizacion (
-        cd_sucursal, cd_implante, cd_consecutivo, cd_usuario, dt_fechacont, dt_fecha, 
+        cd_sucursal, ds_sucursal, cd_implante, ds_implante, cd_consecutivo, cd_usuario, dt_fechacont, dt_fecha, 
         cd_usuarioAct, dt_fechaAct, cd_tercero_codigo, ds_tercero_nombre, cd_cliente_codigo, 
         ds_cliente_nombre, ds_cliente_dir, ds_cliente_ciudad, ds_cliente_tel, ds_cliente_dirdesp, 
         ds_cliente_email, ds_cliente_contacto, ds_cliente_contacto_email, cd_monedas_IATA, 
@@ -12724,7 +12746,9 @@ BEGIN
     )
     SELECT 
         COALESCE(b.code, '') as cd_sucursal, 
+        NULLIF(COALESCE(b.name, ''), '') as ds_sucursal, 
         COALESCE(i.code, '') as cd_implante, 
+        NULLIF(COALESCE(i.name, ''), '') as ds_implante, 
         COALESCE(
             CASE 
                 WHEN TRIM(COALESCE(q."internalNumber", '')) ~ '^[0-9]+$' THEN LPAD(TRIM(q."internalNumber"), 8, '0')
@@ -13221,7 +13245,7 @@ BEGIN
             xmlagg(
                 xmlelement(name "Cotizacion",
                     xmlforest(
-                        q.cd_sucursal, q.cd_implante, q.cd_consecutivo, q.cd_usuario,
+                        q.cd_sucursal, q.ds_sucursal, q.cd_implante, q.ds_implante, q.cd_consecutivo, q.cd_usuario,
                         q.dt_fechacont, q.dt_fecha, q.cd_usuarioAct, q.dt_fechaAct,
                         q.cd_tercero_codigo, q.ds_tercero_nombre, q.cd_cliente_codigo,
                         q.ds_cliente_nombre, q.ds_cliente_dir, q.ds_cliente_ciudad,
@@ -17265,7 +17289,8 @@ BEGIN
         "date" = CURRENT_TIMESTAMP,
         "fuente" = NULLIF(p_data->>'fuente', ''),
         "serie" = NULLIF(p_data->>'serie', ''),
-        "consecutivo" = NULLIF(p_data->>'consecutivo', '')
+        "consecutivo" = NULLIF(p_data->>'consecutivo', ''),
+        "observations" = p_data->>'observations'
     WHERE id = p_id;
 
     DELETE FROM public."InvoicesProductCombo" WHERE "invoiceId" = p_id;
@@ -17848,13 +17873,13 @@ BEGIN
             "internalNumber", "date", "dueDate", "clientId", "currency", "exchangeRate", 
             "branchId", "implantId", "sellerId", "ticketPrinterId", 
             "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
-            "totalAmount", "userId", "state", "fuente", "serie", "consecutivo"
+            "totalAmount", "userId", "state", "fuente", "serie", "consecutivo", "observations"
         ) VALUES (
             v_internal_number, v_date, v_due_date, v_client_id, p_data->>'currency', COALESCE(NULLIF(p_data->>'exchangeRate', '')::FLOAT, 1.0),
             v_branch_id, v_implant_id, NULLIF(p_data->>'sellerId', '')::INT, NULLIF(p_data->>'ticketPrinterId', '')::INT,
             0, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::FLOAT, 0.0), COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0.0),
             COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0.0), p_acting_user_id, 'NUEVO',
-            v_fuente_val, v_serie_val, v_consec_val
+            v_fuente_val, v_serie_val, v_consec_val, NULLIF(p_data->>'observations', '')
         ) RETURNING id INTO v_invoice_id;
 
         FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)

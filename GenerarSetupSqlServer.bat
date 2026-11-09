@@ -63,7 +63,7 @@ if /i "%COMPILAR_NEXT%"=="N" (
 echo.
 
 echo Paso 1: Ejecutando script de empaquetado...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0deploy\Generar_Empaquetado.ps1" %ARGS_EMPAQUETAR%
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "%~dp0deploy\Generar_Empaquetado.ps1" %ARGS_EMPAQUETAR%
 if %errorlevel% neq 0 (
     echo Error durante el empaquetado.
     pause

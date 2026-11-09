@@ -1,7 +1,3 @@
--- ==========================================
--- Procedimiento Standalone: spInvoicesListar.sql
--- ==========================================
-
 -- 2.29. spInvoicesListar
 IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spInvoicesListar;

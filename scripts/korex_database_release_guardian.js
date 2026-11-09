@@ -105,7 +105,7 @@ class KorexDatabaseReleaseGuardian {
       }
 
       // Check if file is explicitly T-SQL / SQL Server (Korex internal DB)
-      const isZeusLegacyFile = relPath.includes('spFacturacionesCrear') || relPath.includes('spCotizacionesCrear') || relPath.includes('(2)');
+      const isZeusLegacyFile = relPath.includes('spFacturacionesCrear') || relPath.includes('spCotizacionesCrear') || relPath.includes('spCotizacionEliminarZeus') || relPath.includes('(2)');
       const isExplicitTsql = !isZeusLegacyFile && relPath.includes('SQL/SqlServer');
       const isExplicitPlpgsql = relPath.includes('SQL/PostgreSQL') || /plpgsql/i.test(content) || /\bDO\s+\$\$/i.test(content) || (relPath.includes('SQL/Table') && !relPath.includes('SqlServer'));
 
@@ -124,7 +124,7 @@ class KorexDatabaseReleaseGuardian {
           if (/^(dbo|public|if|table|temp)$/i.test(name)) continue;
           const objectName = `dbo.${name}`;
 
-          if (!sqlServerObjects.has(objectName) && !name.startsWith('spFacturacionesCrear') && !name.startsWith('spCotizacionesCrear')) {
+          if (!sqlServerObjects.has(objectName) && !name.startsWith('spFacturacionesCrear') && !name.startsWith('spCotizacionesCrear') && !name.startsWith('spCotizacionEliminarZeus')) {
             sqlServerObjects.set(objectName, {
               objectType,
               objectName,

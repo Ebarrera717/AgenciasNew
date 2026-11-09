@@ -473,6 +473,7 @@ model Invoices {
   dueDate              DateTime? @db.Timestamp(6)
   isExcelImport        Boolean?  @default(false)
   zeusInvoiceNumber    String?   @db.VarChar(100)
+  observations         String?
 }
 
 model InvoicesProduct {

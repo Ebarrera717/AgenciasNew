@@ -7,7 +7,7 @@ IF OBJECT_ID('dbo.spFacturacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spFacturacionesCrear;
 GO
 
-CREATE PROCEDURE dbo.spFacturacionesCrear
+CREATE OR ALTER PROCEDURE dbo.spFacturacionesCrear
 (
     @xml VARCHAR(MAX)
 )
@@ -1598,16 +1598,45 @@ BEGIN
 					SELECT TOP 1 @cd_vendedor = IDVENDE FROM dbo.MAEVENDE WITH (NOLOCK) WHERE IDVENDE IS NOT NULL ORDER BY IDVENDE ASC;
 				END;
 
-				-- Resolve IDs for headers
-				IF ISNULL(@cd_sucursal,'')=''
+				-- Resolve IDs for headers (Sucursales e Implantes con búsqueda multi-criterio)
+				SET @id_sucursal = NULL;
+				IF ISNULL(@cd_sucursal,'') <> ''
 				BEGIN
-					SET @cd_sucursal='01'
-					SET @cd_implante=NULL
+					-- 1. Por cd_codigo exacto
+					SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_sucursal));
+					-- 2. Por cd_alterno
+					IF @id_sucursal IS NULL
+						SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@cd_sucursal));
+					-- 3. Por ID numérico
+					IF @id_sucursal IS NULL AND TRY_CAST(@cd_sucursal AS INT) IS NOT NULL
+						SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE id = TRY_CAST(@cd_sucursal AS INT);
+					-- 4. Por coincidencia en ds_nombre
+					IF @id_sucursal IS NULL
+						SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@cd_sucursal)) + '%';
 				END
-				SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE cd_codigo = @cd_sucursal;
 				IF @id_sucursal IS NULL SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) ORDER BY id;
 
-				SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE cd_codigo = @cd_implante AND id_sucursal = @id_sucursal;
+				SET @id_implante = NULL;
+				IF ISNULL(@cd_implante,'') <> ''
+				BEGIN
+					-- 1. Por cd_codigo dentro de la sucursal
+					SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_implante)) AND id_sucursal = @id_sucursal;
+					-- 2. Por cd_alterno dentro de la sucursal
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@cd_implante)) AND id_sucursal = @id_sucursal;
+					-- 3. Por cd_codigo general
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_implante));
+					-- 4. Por cd_alterno general
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@cd_implante));
+					-- 5. Por ID numérico
+					IF @id_implante IS NULL AND TRY_CAST(@cd_implante AS INT) IS NOT NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE id = TRY_CAST(@cd_implante AS INT);
+					-- 6. Por coincidencia en ds_nombre
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@cd_implante)) + '%';
+				END
 				SELECT TOP 1 @id_monedas_iata = id FROM dbo.Monedas_IATA WITH (NOLOCK) WHERE cd_codigo = @ds_moneda;
 				IF @id_monedas_iata IS NULL SELECT TOP 1 @id_monedas_iata = id FROM dbo.Monedas_IATA WITH (NOLOCK) ORDER BY id;
 
@@ -2590,12 +2619,31 @@ BEGIN
 					JOIN dbo.VariableDefinicion VD WITH (NOLOCK) ON VD.IDEN = CCV.Iden_Variable
 					WHERE RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
 					  AND CCV.bl_Exige = 1
-					  AND CCV.IDEN_Maestro IN (35, 37)
+					  AND (
+						  -- Maestro 35: Tiquetes -> Solo validar si la factura contiene tiquetes (Aire / in_tipoitem = 1)
+						  (CCV.IDEN_Maestro = 35 AND EXISTS (
+							  SELECT 1 FROM #TmpFacturaItems TI 
+							  WHERE TI.id_factura = @id_facturacion 
+							    AND (TI.tipo_item = 'Aire' OR TI.in_tipoitem = 1)
+						  ))
+						  OR
+						  -- Maestro 37: Servicios -> Solo validar si la factura contiene servicios (tipo_item <> 'Aire')
+						  (CCV.IDEN_Maestro = 37 AND EXISTS (
+							  SELECT 1 FROM #TmpFacturaItems TI 
+							  WHERE TI.id_factura = @id_facturacion 
+							    AND (TI.tipo_item IN ('SRV', 'Hotel', 'Auto', 'TAO') OR (TI.tipo_item <> 'Aire' AND ISNULL(TI.in_tipoitem, 0) <> 1))
+						  ))
+					  )
 					  AND NOT EXISTS (
 						  SELECT 1 FROM #VariablesAdicionales VA
 						  WHERE VA.id_facturacion = @id_facturacion
 						    AND RTRIM(LTRIM(VA.ds_VariableAdicional)) = RTRIM(LTRIM(VD.Nombre))
 						    AND LTRIM(RTRIM(ISNULL(VA.ds_valor, ''))) <> ''
+						    AND (
+							    (CCV.IDEN_Maestro = 35 AND (VA.ds_maestro IN ('Tiquetes', 'FacturacionTiquetes') OR VA.in_tipoitem = 1 OR ISNULL(VA.ds_maestro, '') = ''))
+							    OR
+							    (CCV.IDEN_Maestro = 37 AND (VA.ds_maestro IN ('FacturacionServicios', 'Servicios') OR VA.in_tipoitem <> 1 OR ISNULL(VA.ds_maestro, '') = ''))
+						    )
 					  )
 					  AND ISNULL(LTRIM(RTRIM(VD.DefaultVarchar)), '') = '';
 				END;
@@ -2731,7 +2779,7 @@ BEGIN
 					CROSS JOIN dbo.Cliente_ConfiguracionVariables CCV
 					JOIN dbo.VariableDefinicion VD ON VD.IDEN = CCV.Iden_Variable
 					WHERE FI.id_factura = @id_facturacion 
-					  AND FI.tipo_item IN ('SRV', 'Hotel', 'Auto')
+					  AND (FI.tipo_item IN ('SRV', 'Hotel', 'Auto', 'TAO') OR (FI.tipo_item <> 'Aire' AND ISNULL(FI.in_tipoitem, 0) <> 1))
 					  AND CCV.IDEN_Maestro = 37
 					  AND RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
 					  AND CCV.bl_Exige = 1
@@ -2753,7 +2801,7 @@ BEGIN
 					CROSS JOIN dbo.Cliente_ConfiguracionVariables CCV
 					JOIN dbo.VariableDefinicion VD ON VD.IDEN = CCV.Iden_Variable
 					WHERE FI.id_factura = @id_facturacion 
-					  AND FI.tipo_item IN ('Aire')
+					  AND (FI.tipo_item = 'Aire' OR FI.in_tipoitem = 1)
 					  AND CCV.IDEN_Maestro = 35
 					  AND RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
 					  AND CCV.bl_Exige = 1

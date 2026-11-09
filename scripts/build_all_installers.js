@@ -26,12 +26,12 @@ runStep('KorexValidator Pre-Build SQL Server', 'node scripts/korex_validator.js 
 // 2. Compilación del Instalador y Actualizador SQL Server
 runStep('Compilando Actualizador SQL Server (Korex_SQLServer_Update_Setup.exe)', `${iscc} deploy/Korex_SQLServer_Update.iss`);
 runStep('Compilando Instalador SQL Server (Korex_SQLServer_Setup.exe)', `${iscc} deploy/Korex_SQLServer.iss`);
-runStep('Empaquetando ZIP Actualización Directa SQL Server', `powershell -ExecutionPolicy Bypass -Command "Compress-Archive -Path RELEASE_KOREX\\* -DestinationPath Instalador/Korex_SQLServer_Update_Directo.zip -Force"`);
+runStep('Empaquetando ZIP Actualización Directa SQL Server', `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -Command "Compress-Archive -Path RELEASE_KOREX\\* -DestinationPath Instalador/Korex_SQLServer_Update_Directo.zip -Force"`);
 
 // 3. Compilación del Instalador y Actualizador PostgreSQL
 runStep('Compilando Actualizador PostgreSQL (Korex_Update_Setup.exe)', `${iscc} deploy/Korex_Update.iss`);
 runStep('Compilando Instalador PostgreSQL (Korex_Setup.exe)', `${iscc} deploy/Korex.iss`);
-runStep('Empaquetando ZIP Actualización Directa PostgreSQL', `powershell -ExecutionPolicy Bypass -Command "Compress-Archive -Path RELEASE_KOREX\\* -DestinationPath Instalador/Korex_Update_Directo.zip -Force"`);
+runStep('Empaquetando ZIP Actualización Directa PostgreSQL', `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -Command "Compress-Archive -Path RELEASE_KOREX\\* -DestinationPath Instalador/Korex_Update_Directo.zip -Force"`);
 
 console.log(`\n==========================================================================`);
 console.log(`  🎉 TODOS LOS INSTALADORES Y ACTUALIZADORES COMPILADOS CON ÉXITO!`);

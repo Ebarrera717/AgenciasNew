@@ -1,12 +1,9 @@
--- ============================================================================
--- spInvoicesListar - Listado Completo de Facturas (SQL Server / T-SQL)
--- ============================================================================
-
+-- 2.29. spInvoicesListar
 IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spInvoicesListar;
 GO
 
-CREATE PROCEDURE dbo.spInvoicesListar
+CREATE OR ALTER PROCEDURE dbo.spInvoicesListar
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -17,15 +14,32 @@ BEGIN
         i.[dueDate],
         i.[clientId],
         c.[name] AS [clientName],
-        c.[document] AS [clientDocument],
-        ISNULL(NULLIF(i.[totalAmount], 0), 0) AS [totalAmount],
-        ISNULL(i.[currency], 'COP') AS [currency],
+        COALESCE(
+            NULLIF(
+                (
+                    SELECT SUM(ipt.[explicitAmount])
+                    FROM dbo.[InvoicesProductTax] ipt
+                    JOIN dbo.[InvoicesProduct] ip ON ipt.[invoiceProductId] = ip.[id]
+                    WHERE ip.[invoiceId] = i.[id]
+                ), 0
+            ),
+            NULLIF(
+                (
+                    SELECT SUM(ip.[price] * ip.[quantity])
+                    FROM dbo.[InvoicesProduct] ip
+                    WHERE ip.[invoiceId] = i.[id]
+                ), 0
+            ),
+            i.[totalAmount],
+            0
+        ) AS [totalAmount],
         ISNULL(i.[state], 'NUEVO') AS [state],
         ISNULL(i.[isExcelImport], 0) AS [isExcelImport],
         i.[zeusInvoiceNumber],
         i.[fuente],
         i.[serie],
         i.[consecutivo],
+        i.[observations],
         (
             SELECT TOP 1 ipp.[name]
             FROM dbo.[InvoicesProduct] ip

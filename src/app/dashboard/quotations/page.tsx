@@ -31,7 +31,8 @@ import {
     Plus,
     AlertCircle,
     ExternalLink,
-    Check
+    Check,
+    Undo2
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -48,6 +49,7 @@ export default function QuotationsListPage() {
     const [isImportOpen, setIsImportOpen] = useState(false)
     const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
     const [exportingXmlId, setExportingXmlId] = useState<number | null>(null)
+    const [deletingZeusId, setDeletingZeusId] = useState<number | null>(null)
     
     // Filtros de búsqueda
     const [filterReferencia, setFilterReferencia] = useState('')
@@ -534,6 +536,59 @@ export default function QuotationsListPage() {
         } catch (error) {
             console.error('Error deleting quotation:', error);
             alert('Ocurrió un error al eliminar la cotización.');
+        }
+    }
+
+    const handleDeleteFromZeus = async (q: any) => {
+        const consecDisplay = q.internalNumber || q.id;
+        if (!confirm(`¿Estás seguro de eliminar la cotización #${consecDisplay} de Zeus ERP?\n\n• Solamente se eliminará si NO está facturada o liquidada en Zeus ERP.\n• Si hay cambios pendientes, podrás probarlos y enviar la cotización de nuevo a Zeus ERP sin tener que anular todo el proceso.`)) {
+            return;
+        }
+
+        setDeletingZeusId(q.id);
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const res = await fetch('/api/quotations/zeus-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    quotationId: q.id,
+                    consecutive: q.internalNumber || String(q.id),
+                    userId: user.id
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                // Actualizar estado local a PENDIENTE en la lista
+                setQuotations(prev => prev.map(item => item.id === q.id ? { ...item, state: 'PENDIENTE' } : item));
+                setExportModal({
+                    isOpen: true,
+                    isError: false,
+                    title: 'Eliminación en Zeus ERP Exitosa',
+                    message: data.message || `La cotización #${consecDisplay} fue eliminada de Zeus ERP. Su estado quedó en 'PENDIENTE' y puedes editarla o re-exportarla.`,
+                    traceCode: data.traceCode,
+                    items: [{
+                        cotDisplay: `#${consecDisplay}`,
+                        isError: false,
+                        message: 'Eliminada en Zeus ERP',
+                        idZeus: data.idZeusEliminado
+                    }]
+                });
+            } else {
+                setExportModal({
+                    isOpen: true,
+                    isError: true,
+                    title: data.isFacturada ? 'No se puede eliminar (Facturada en Zeus)' : 'No se pudo eliminar en Zeus ERP',
+                    message: data.message || 'Error al intentar eliminar la cotización en Zeus ERP.',
+                    traceCode: data.traceCode
+                });
+            }
+        } catch (error: any) {
+            console.error('Error al eliminar de Zeus ERP:', error);
+            alert('Error de conexión al intentar eliminar la cotización en Zeus ERP.');
+        } finally {
+            setDeletingZeusId(null);
         }
     }
 
@@ -1161,6 +1216,25 @@ export default function QuotationsListPage() {
                                                             >
                                                                 <Eye className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
                                                                 <span>Ver Detalle</span>
+                                                            </button>
+
+                                                            {/* 7.5 Eliminar de Zeus ERP (solo si no está facturada) */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveMenuId(null);
+                                                                    handleDeleteFromZeus(q);
+                                                                }}
+                                                                disabled={deletingZeusId === q.id}
+                                                                className="w-full px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
+                                                                title="Elimina la cotización en Zeus ERP (solo si no está facturada) para permitir editarla y enviarla de nuevo"
+                                                            >
+                                                                {deletingZeusId === q.id ? (
+                                                                    <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                                                                ) : (
+                                                                    <Undo2 className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                                                                )}
+                                                                <span>Eliminar de Zeus ERP</span>
                                                             </button>
 
                                                             <div className="h-px bg-zinc-100 dark:bg-zinc-800/80 my-1" />

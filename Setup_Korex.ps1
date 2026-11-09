@@ -11,7 +11,7 @@ $ProgressPreference = 'SilentlyContinue'
 if (-not $Elevated) {
     if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host "Elevando privilegios de Administrador..." -ForegroundColor Yellow
-        Start-Process PowerShell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Elevated" -Verb RunAs
+        Start-Process PowerShell -ArgumentList "-NoProfile -ExecutionPolicy RemoteSigned -File `"$PSCommandPath`" -Elevated" -Verb RunAs
         exit
     }
 }
@@ -150,6 +150,13 @@ if (Test-Path $AppCmd) {
     & $AppCmd set config -section:system.webServer/proxy /enabled:"True" /commit:apphost | Out-Null
 }
 
+# 2.5 Habilitar Acceso Remoto PostgreSQL y Firewall de Windows
+Write-Step "Configurando acceso remoto PostgreSQL y reglas de Firewall..."
+$RemoteScript = Join-Path $PSScriptRoot "Configure-PostgresRemote.ps1"
+if (Test-Path $RemoteScript) {
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$RemoteScript" -Elevated
+}
+
 # 3. Comprobar Conectividad con Postgres
 Write-Step "Verificando conexion TCP con base de datos en $($PgHost):$($PgPort)..."
 $tcpClient = New-Object System.Net.Sockets.TcpClient
@@ -175,11 +182,11 @@ try {
 # ==========================================
 Write-Step "Verificando disponibilidad de puertos de red..."
 
-# Detener procesos previos de la app para no colisionar en los puertos 3000 y 3001
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+# Detener procesos previos de la app de forma ordenada para no colisionar en los puertos 3000 y 3001
+Stop-Service -Name "Korex_NextJS" -NoWait -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
+Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { try { $_.Path -like "*$TargetDir*" } catch { $false } } | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
+Start-Sleep -Seconds 1
 
 # Función para resolver puertos
 function Resolve-PortConflict($port, $defaultFallback) {
@@ -262,10 +269,10 @@ if ($pgConnected) {
 Write-Step "Registrando servicio de segundo plano (Korex_NextJS)..."
 Set-Location $TargetDir
 
-# Detener servicio anterior si existe
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+# Detener servicio anterior si existe de forma ordenada
+Stop-Service -Name "Korex_NextJS" -NoWait -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
+Start-Sleep -Seconds 1
 
 if (Test-Path ".\install-service.js") {
     node .\install-service.js | Out-Null

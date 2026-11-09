@@ -61,6 +61,11 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'observations') ALTER TABLE dbo.[Quotation] ADD [observations] NVARCHAR(MAX) NULL;
 END;
 GO
+IF OBJECT_ID('dbo.Invoices', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'observations') ALTER TABLE dbo.[Invoices] ADD [observations] NVARCHAR(MAX) NULL;
+END;
+GO
 IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo') ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';

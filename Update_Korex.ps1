@@ -7,6 +7,14 @@ param(
 )
 
 $TargetDir = $PSScriptRoot
+if (-not (Test-Path "$TargetDir\.env")) {
+    $parent = Split-Path -Parent $PSScriptRoot
+    if (Test-Path "$parent\.env") {
+        $TargetDir = $parent
+    } elseif (Test-Path ".\.env") {
+        $TargetDir = (Get-Location).Path
+    }
+}
 Set-Location -Path $TargetDir
 $ProgressPreference = 'SilentlyContinue'
 
@@ -27,12 +35,19 @@ function Write-Log($message, $level = "INFO") {
 }
 
 function Show-Alert($title, $message, $icon = "Error") {
+    Write-Host "====================================================" -ForegroundColor Red
+    Write-Host "[$title] $message" -ForegroundColor Yellow
+    Write-Host "====================================================" -ForegroundColor Red
     try {
-        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
         [System.Windows.Forms.MessageBox]::Show($message, $title, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::$icon) | Out-Null
     } catch {
-        $wshell = New-Object -ComObject Wscript.Shell
-        $wshell.Popup($message, 0, $title, 16) | Out-Null
+        try {
+            $wshell = New-Object -ComObject Wscript.Shell -ErrorAction Stop
+            $wshell.Popup($message, 0, $title, 16) | Out-Null
+        } catch {
+            # Silencioso en modo de lenguaje restringido
+        }
     }
 }
 
@@ -56,8 +71,14 @@ function Resolve-PortConflict($port, $defaultFallback) {
         
         # Si es un proceso node o de nuestro servicio, podemos intentar matarlo
         if ($pName -eq "node" -or $pName -like "*korex_nextjs*" -or $pName -eq "korex_nextjs") {
-            Write-Log "Intentando detener proceso remanente de nuestra app en puerto $port..."
-            Stop-Process -Id $owningPid -Force -ErrorAction SilentlyContinue
+            Write-Log "Solicitando cierre ordenado de proceso remanente en puerto $port..."
+            try {
+                if ($pInfo -and $pInfo.MainWindowHandle -ne [IntPtr]::Zero) { $pInfo.CloseMainWindow() | Out-Null }
+                $pInfo.WaitForExit(2000) | Out-Null
+            } catch {}
+            if (Get-Process -Id $owningPid -ErrorAction SilentlyContinue) {
+                Stop-Process -Id $owningPid -ErrorAction SilentlyContinue
+            }
             Start-Sleep -Seconds 2
             
             # Verificar si se liberó
@@ -110,14 +131,60 @@ function Check-PostgresConnection($pgHost, $pgPort) {
 # ==========================================
 
 # Paso 1. Detener procesos previos para liberar bloqueos
-Write-Log "Deteniendo el servicio Windows Korex_NextJS..."
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Write-Log "Deteniendo instancias previas (Servicio o Tarea Programada)..."
+function Stop-KorexServiceGraceful($name, $timeoutSec = 10) {
+    $svc = Get-Service -Name $name -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -eq 'Running') {
+        Write-Log "Solicitando detencion limpia y ordenada de servicio $name..."
+        try {
+            Stop-Service -Name $name -NoWait -ErrorAction SilentlyContinue
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($sw.Elapsed.TotalSeconds -lt $timeoutSec) {
+                Start-Sleep -Milliseconds 500
+                $svc.Refresh()
+                if ($svc.Status -eq 'Stopped') {
+                    Write-Log "Servicio $name detenido ordenadamente."
+                    return $true
+                }
+            }
+            Write-Log "Tiempo de espera superado ($timeoutSec s) al detener servicio $name." "WARN"
+        } catch {
+            Write-Log "Aviso al detener servicio $name: $_" "WARN"
+        }
+    }
+    return $false
+}
+
+Stop-KorexServiceGraceful "Korex_NextJS"
+Stop-KorexServiceGraceful "korex_nextjs.exe"
+Stop-KorexServiceGraceful "AgenciasNew_NextJS"
+
+# Cierre ordenado de procesos Node.js de la aplicación con tiempo de gracia
+Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object {
+    try { $_.Path -like "*$TargetDir*" } catch { $false }
+} | ForEach-Object {
+    Write-Log "Solicitando cierre ordenado de proceso Node.js (PID: $($_.Id)) en $TargetDir..."
+    try { $_.CloseMainWindow() | Out-Null } catch {}
+    if (-not $_.WaitForExit(3000)) {
+        try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {}
+    }
+}
+
+# Detener tarea programada si existe
+$taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+if (Test-Path $taskMgrScript) {
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Stop -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort > $null 2>&1
+}
 
 Write-Log "Deteniendo el sitio web Korex en IIS para liberar puertos..."
-Import-Module WebAdministration -ErrorAction SilentlyContinue
-Stop-Website -Name "Korex" -ErrorAction SilentlyContinue
+try {
+    Import-Module WebAdministration -ErrorAction SilentlyContinue
+    if (Test-Path "IIS:\Sites\Korex") {
+        Stop-Website -Name "Korex" -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Log "Aviso IIS previo: $_" "WARN"
+}
 Start-Sleep -Seconds 2
 
 # Paso 2. Extraer configuración de base de datos (priorizando parámetros de instalación)
@@ -126,35 +193,47 @@ $DbUrl = ""
 $OldSitePort = 3000
 $OldNextjsPort = 3001
 
-# Primero, leer puertos y conexión existentes en el .env si este existe
-if (Test-Path $EnvFile) {
-    $EnvContent = Get-Content $EnvFile
-    foreach ($line in $EnvContent) {
-        if ($line -match '^NEXTAUTH_URL="http://localhost:(\d+)"') {
-            $OldSitePort = [int]$matches[1]
-        }
-        if ($line -match '^PORT="?(\d+)"?') {
-            $OldNextjsPort = [int]$matches[1]
-        }
-        if ($line -match '^DATABASE_URL="(.*)"') {
-            $DbUrl = $matches[1]
-        }
+# Primero, verificar y leer el archivo .env existente
+if (-not (Test-Path $EnvFile)) {
+    Write-Log "ERROR CRITICO: No se encontro el archivo .env de la instalacion existente del cliente. Abortando actualizacion." "ERROR"
+    Show-Alert "Error Critico de Actualizacion" "No se encontro el archivo .env de la instalacion existente en este directorio:`n$TargetDir`n`nEl actualizador de PostgreSQL no puede continuar sin la configuracion previa del cliente."
+    exit 1
+}
+
+$EnvContent = Get-Content $EnvFile
+foreach ($line in $EnvContent) {
+    if ($line -match '^NEXTAUTH_URL="http://localhost:(\d+)"') {
+        $OldSitePort = [int]$matches[1]
     }
+    if ($line -match '^PORT="?(\d+)"?') {
+        $OldNextjsPort = [int]$matches[1]
+    }
+    if ($line -match '^DATABASE_URL="(.*)"') {
+        $DbUrl = $matches[1]
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($DbUrl)) {
+    Write-Log "ERROR CRITICO: El archivo .env existente no contiene una variable DATABASE_URL valida." "ERROR"
+    Show-Alert "Error de Configuracion" "El archivo .env de la instalacion no contiene informacion de conexion valida.`n`nRevise el archivo .env antes de actualizar."
+    exit 1
 }
 
 # Si se pasaron los parámetros completos por linea de comandos, los usamos
 if (![string]::IsNullOrEmpty($PgHost) -and ![string]::IsNullOrEmpty($PgPort) -and ![string]::IsNullOrEmpty($PgDb) -and ![string]::IsNullOrEmpty($PgUser)) {
     Write-Log "Usando configuracion de conexion DB recibida por parametros: Host=$PgHost, Port=$PgPort, DB=$PgDb, User=$PgUser"
 } else {
-    Write-Log "No se recibieron parametros completos de conexion. Leyendo del archivo .env..."
-    if ($DbUrl -and ($DbUrl -match '^postgresql://([^:]+):([^@]*)@([^:]+):([0-9]+)/([^?]+)')) {
+    Write-Log "Extrayendo credenciales PostgreSQL desde .env existente..."
+    if ($DbUrl -match '^postgresql://([^:]+):([^@]*)@([^:]+):([0-9]+)/([^?]+)') {
         $PgUser = [System.Uri]::UnescapeDataString($matches[1])
         $PgPass = [System.Uri]::UnescapeDataString($matches[2])
         $PgHost = $matches[3]
         $PgPort = $matches[4]
         $PgDb = $matches[5]
     } else {
-        $PgUser = "postgres"; $PgPass = ""; $PgHost = "localhost"; $PgPort = "5432"; $PgDb = "agencias_new"
+        Write-Log "ERROR CRITICO: No fue posible parsear el string de conexion PostgreSQL desde el .env del cliente." "ERROR"
+        Show-Alert "Error de Formato de Conexion" "La cadena de conexion en .env no tiene el formato esperado de PostgreSQL (postgresql://user:pass@host:port/db)."
+        exit 1
     }
 }
 
@@ -168,7 +247,7 @@ $NextjsPort = Resolve-PortConflict $OldNextjsPort 3020
 if ($DbUrl) {
     Write-Log "Actualizando archivo .env con puertos (IIS=$SitePort, Next.js=$NextjsPort)..."
     $DatabaseUrl = "postgresql://$($PgUser):$($PgPass)@$($PgHost):$($PgPort)/$($PgDb)?schema=public"
-    $NewEnvContent = "DATABASE_URL=`"$DatabaseUrl`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
+    $NewEnvContent = "DATABASE_PROVIDER=`"postgresql`"`nDATABASE_URL=`"$DatabaseUrl`"`nNEXTAUTH_SECRET=`"KorexProductionSecretKey2024_Security`"`nNEXTAUTH_URL=`"http://localhost:$SitePort`"`nPORT=`"$NextjsPort`"`n"
     Set-Content -Path $EnvFile -Value $NewEnvContent -Encoding UTF8
 }
 
@@ -195,6 +274,16 @@ if ($DbUrl) {
                 Show-Alert "Fallo de Base de Datos" "El comparador inteligente falló al aplicar la actualización de base de datos.`n`nPor favor revise el log detallado de errores en: $LogFile"
                 exit 1
             }
+
+            Write-Log "Ejecutando verificador Korex Update Guardian en PostgreSQL ($PgDb)..."
+            if (Test-Path ".\scripts\korex_updater_guardian.js") {
+                node .\scripts\korex_updater_guardian.js >> $LogFile 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Log "ERROR CRITICO: Korex Update Guardian detecto objetos faltantes o erroneos en PostgreSQL ($PgDb)." "ERROR"
+                    Show-Alert "Error Critico de Verificacion" "El actualizador detecto que uno o mas objetos obligatorios (SPs/Tablas) no quedaron creados en la base de datos '$PgDb'.`n`nConsulte install_log.txt para ver el detalle."
+                    exit 1
+                }
+            }
         } else {
             Write-Log "No se encontro el archivo db_installer.js en la carpeta del sitio." "ERROR"
             Show-Alert "Error de Archivos" "No se encontró el ejecutable db_installer.js en el directorio de la aplicación."
@@ -209,64 +298,117 @@ if ($DbUrl) {
 
 # Paso 5. Re-registrar e Iniciar el Servicio Windows (Total Update)
 Write-Log "Deteniendo servicio de Windows para aplicar la nueva versión de la aplicación..."
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+Stop-Service -Name "Korex_NextJS" -NoWait -ErrorAction SilentlyContinue
+Stop-Service -Name "AgenciasNew_NextJS" -NoWait -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
+Start-Sleep -Seconds 1
 
 if (Test-Path ".\install-service.js") {
     Write-Log "Ejecutando install-service.js con la nueva versión..."
     node .\install-service.js >> $LogFile 2>&1
-    Start-Sleep -Seconds 2
+    Start-Sleep -Seconds 4
 }
 
 # Forzar arranque y verificar estado
-if (Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue) {
-    $svcStatus = (Get-Service -Name "Korex_NextJS").Status
-    if ($svcStatus -ne 'Running') {
-        Start-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 4
-        $svcStatus = (Get-Service -Name "Korex_NextJS").Status
-    }
-    if ($svcStatus -ne 'Running') {
-        Write-Log "ERROR: El servicio Korex_NextJS está registrado pero no pudo iniciarse de forma estable en el arranque." "ERROR"
-        
-        # Intentar extraer el error desde el log de daemon
-        $errLogPath = "$TargetDir\daemon\korex_nextjs.err.log"
-        $errDetails = ""
-        if (Test-Path $errLogPath) {
-            $errDetails = Get-Content $errLogPath -Tail 20 | Out-String
+# Paso 5. Reanudar / Actualizar el mecanismo de ejecucion activo
+$activeMechanism = "WINDOWS_SERVICE"
+if (Test-Path $EnvFile) {
+    $envLines = Get-Content $EnvFile
+    foreach ($el in $envLines) {
+        if ($el -match '^EXECUTION_MECHANISM="?(TASK_SCHEDULER|WINDOWS_SERVICE)"?') {
+            $activeMechanism = $matches[1]
         }
-        if (-not $errDetails) {
-            $errDetails = "No se pudieron recuperar detalles adicionales del log de daemon."
-        }
-        
-        Show-Alert "Fallo de Inicio del Servicio" "El servicio de Windows 'Korex_NextJS' se registró pero se cerró inmediatamente en el arranque.`n`nDetalle del error en el servidor (Node.js):`n$errDetails"
-        exit 1
     }
-    Write-Log "Estado final del servicio: $svcStatus"
+}
+
+Write-Log "Mecanismo de ejecucion activo detectado: $activeMechanism"
+
+$startedOk = $false
+
+if ($activeMechanism -eq "TASK_SCHEDULER") {
+    Write-Log "Actualizando y reiniciando via Windows Task Scheduler (Korex NextJS - Startup)..."
+    $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+    if (Test-Path $taskMgrScript) {
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 2
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        Start-Sleep -Seconds 3
+        
+        $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($chk) {
+            Write-Log "Task Scheduler reiniciado exitosamente. Backend escuchando en puerto $NextjsPort (PID: $($chk.OwningProcess))."
+            $startedOk = $true
+        }
+    }
 } else {
-    Write-Log "ERROR: El servicio Korex_NextJS no está registrado en el sistema." "ERROR"
-    Show-Alert "Error del Servicio de Windows" "No se pudo registrar el servicio Windows 'Korex_NextJS'.`n`nPor favor verifique los permisos administrativos."
+    # Intentar Windows Service
+    try {
+        $svc = Get-Service -Name "korex_nextjs.exe" -ErrorAction SilentlyContinue
+        if (-not $svc) {
+            $svc = Get-Service -Name "Korex_NextJS" -ErrorAction SilentlyContinue
+        }
+        
+        if ($svc) {
+            Write-Log "Iniciando Servicio de Windows $($svc.Name)..."
+            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 4
+            $svcRefresh = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            if ($svcRefresh -and $svcRefresh.Status -eq 'Running') {
+                $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($chk) {
+                    Write-Log "Servicio de Windows $($svc.Name) activo y escuchando en puerto $NextjsPort (PID: $($chk.OwningProcess))."
+                    $startedOk = $true
+                }
+            }
+        }
+    } catch {
+        Write-Log "Aviso al interactuar con el Servicio Windows: $_" "WARN"
+    }
+    
+    # Si fallo el servicio en actualizacion, fallback a Task Scheduler
+    if (-not $startedOk) {
+        Write-Log "Aviso: Servicio Windows fallo al reiniciar. Activando fallback a Task Scheduler..." "WARN"
+        $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
+        if (Test-Path $taskMgrScript) {
+            & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+            Start-Sleep -Seconds 2
+            & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+            Start-Sleep -Seconds 3
+            $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($chk) {
+                Write-Log "Fallback a Task Scheduler completado exitosamente en puerto $NextjsPort."
+                $startedOk = $true
+                Add-Content -Path $EnvFile -Value "EXECUTION_MECHANISM=`"TASK_SCHEDULER`"" -Encoding UTF8
+            }
+        }
+    }
+}
+
+if (-not $startedOk) {
+    Write-Log "ERROR CRITICO: No fue posible reanudar el backend tras la actualizacion." "ERROR"
+    Show-Alert "Fallo de Inicio del Backend" "La aplicacion se actualizo pero no fue posible reiniciar el proceso en el puerto $NextjsPort.`n`nPor favor revise update_log.txt."
     exit 1
 }
 
 # Paso 6. Recrear el sitio web y AppPool de IIS para asegurar configuración limpia
 $SiteName = "Korex"
 Write-Log "Reconfigurando el sitio web y AppPool de '$SiteName' en IIS..."
-Import-Module WebAdministration
-
-if (Get-Website -Name $SiteName -ErrorAction SilentlyContinue) {
-    Write-Log "Removiendo sitio IIS existente..."
-    Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
-    Remove-Website -Name $SiteName -Force -Confirm:$false -ErrorAction SilentlyContinue
-    Remove-Item "IIS:\Sites\$SiteName" -Recurse -Force -ErrorAction SilentlyContinue
+try {
+    Import-Module WebAdministration -ErrorAction SilentlyContinue
+    if (Test-Path "IIS:\Sites\$SiteName") {
+        Write-Log "Removiendo sitio IIS existente..."
+        Stop-Website -Name $SiteName -ErrorAction SilentlyContinue
+        Remove-Website -Name $SiteName -Force -Confirm:$false -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Log "Aviso al remover sitio previo ${SiteName}: $_" "WARN"
 }
-
-if (Get-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue) {
-    Write-Log "Removiendo AppPool IIS existente..."
-    Remove-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue
-}
+try {
+    if (Get-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue) {
+        Write-Log "Removiendo AppPool IIS existente..."
+        Remove-WebAppPool -Name $SiteName -ErrorAction SilentlyContinue
+    }
+} catch {}
 
 try {
     Write-Log "Creando nuevo sitio IIS y AppPool '$SiteName' en puerto $SitePort..."
@@ -312,30 +454,22 @@ Get-Website | ForEach-Object {
         Write-Log "No se encontró AppPool con nombre '$SiteName'."
     }
 
-# Paso 7. Verificación de salud HTTP final
-Write-Log "Realizando verificación de salud HTTP en http://localhost:$SitePort/..."
-$healthSuccess = $false
-for ($i = 1; $i -le 6; $i++) {
-    Write-Log "Intento $i de 6 para conectar al portal web..."
-    try {
-        $response = Invoke-WebRequest -Uri "http://localhost:$SitePort/" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-        if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
-            Write-Log "Verificación de salud exitosa: El portal respondió con código $($response.StatusCode)."
-            $healthSuccess = $true
-            break
-        } else {
-            Write-Log "El servidor respondió con código de estado HTTP: $($response.StatusCode)" "WARN"
-        }
-    } catch {
-        Write-Log "El portal web no respondió en este intento. Detalles: $_" "WARN"
-    }
-    Start-Sleep -Seconds 2
-}
-
-if (-not $healthSuccess) {
-    Write-Log "ERROR CRITICO: La verificación de salud HTTP falló. El portal no respondió exitosamente." "ERROR"
-    Show-Alert "Fallo de Verificación de Salud" "La actualización de archivos se completó, pero el portal web en http://localhost:$SitePort/ no responde o devolvió un error.`n`nPor favor verifique los logs de error en: $LogFile"
-    exit 1
+# Paso 7. Diagnóstico Profundo, Validación y Soporte Remoto (PostgreSQL)
+Write-Log "Ejecutando motor de diagnóstico profundo y validación para PostgreSQL..."
+$DiagScript = Join-Path $TargetDir "deploy\Korex_Diagnostics_Engine.ps1"
+if (Test-Path $DiagScript) {
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$DiagScript" `
+        -Engine "POSTGRESQL" `
+        -Mode "Reparacion" `
+        -TargetDir "$TargetDir" `
+        -PgHost "$PgHost" `
+        -PgPort "$PgPort" `
+        -PgDb "$PgDb" `
+        -PgUser "$PgUser" `
+        -PgPass "$PgPass" `
+        -SitePort $SitePort `
+        -NextjsPort $NextjsPort `
+        -GenerateZip
 }
 
 Write-Log "PROCESO DE ACTUALIZACION FINALIZADO CON EXITO."

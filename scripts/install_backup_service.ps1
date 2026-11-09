@@ -120,7 +120,7 @@ Write-Host "Registrando Tarea Programada en Windows..." -ForegroundColor Yellow
 $TaskName = "Backup_Korex_$DbName"
 
 try {
-    $Action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$BackupScriptPath`""
+    $Action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-NoProfile -ExecutionPolicy RemoteSigned -File `"$BackupScriptPath`""
     $Trigger = New-ScheduledTaskTrigger -Daily -At 11:00PM
     $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
     

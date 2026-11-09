@@ -514,7 +514,8 @@ BEGIN
         [consecutivo] NVARCHAR(50) NULL,
         [dueDate] DATETIME2 NULL,
         [isExcelImport] BIT NULL CONSTRAINT DF_Invoices_IsExcelImport DEFAULT 0,
-        [zeusInvoiceNumber] NVARCHAR(100) NULL
+        [zeusInvoiceNumber] NVARCHAR(100) NULL,
+        [observations] NVARCHAR(MAX) NULL
     );
 END;
 
@@ -523,6 +524,9 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoic
 
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'zeusInvoiceNumber')
     ALTER TABLE dbo.[Invoices] ADD [zeusInvoiceNumber] NVARCHAR(100) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'observations')
+    ALTER TABLE dbo.[Invoices] ADD [observations] NVARCHAR(MAX) NULL;
 
 -- 20a. InvoicesProduct
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProduct' AND schema_id = SCHEMA_ID('dbo'))

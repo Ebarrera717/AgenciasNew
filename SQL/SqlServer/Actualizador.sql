@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-11-04T02:34:21.340Z
+-- Fecha de Generación: 2026-11-09T21:14:34.148Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -528,7 +528,8 @@ BEGIN
         [consecutivo] NVARCHAR(50) NULL,
         [dueDate] DATETIME2 NULL,
         [isExcelImport] BIT NULL CONSTRAINT DF_Invoices_IsExcelImport DEFAULT 0,
-        [zeusInvoiceNumber] NVARCHAR(100) NULL
+        [zeusInvoiceNumber] NVARCHAR(100) NULL,
+        [observations] NVARCHAR(MAX) NULL
     );
 END;
 
@@ -537,6 +538,9 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoic
 
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'zeusInvoiceNumber')
     ALTER TABLE dbo.[Invoices] ADD [zeusInvoiceNumber] NVARCHAR(100) NULL;
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'observations')
+    ALTER TABLE dbo.[Invoices] ADD [observations] NVARCHAR(MAX) NULL;
 
 -- 20a. InvoicesProduct
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProduct' AND schema_id = SCHEMA_ID('dbo'))
@@ -3985,6 +3989,11 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'observations') ALTER TABLE dbo.[Quotation] ADD [observations] NVARCHAR(MAX) NULL;
 END;
 GO
+IF OBJECT_ID('dbo.Invoices', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'observations') ALTER TABLE dbo.[Invoices] ADD [observations] NVARCHAR(MAX) NULL;
+END;
+GO
 IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo') ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
@@ -4186,44 +4195,20 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'rate') ALTER TABLE dbo.InvoicesProductTax ADD rate FLOAT NULL DEFAULT 0;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'explicitAmount') ALTER TABLE dbo.InvoicesProductTax ADD explicitAmount FLOAT NULL DEFAULT 0;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueSnapshot FLOAT NULL DEFAULT 0;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueTypeSnapshot NVARCHAR(50) NULL DEFAULT 'PERCENTAGE';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.InvoicesProductTax ADD valueTypeSnapshot VARCHAR(50) NULL DEFAULT 'PERCENTAGE';
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'isMain') ALTER TABLE dbo.InvoicesProductTax ADD isMain BIT NULL DEFAULT 0;
-    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueSnapshot' AND is_nullable = 0)
-    BEGIN
-        DECLARE @dfInvValSnap NVARCHAR(256);
-        SELECT @dfInvValSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.InvoicesProductTax') AND c.name = 'valueSnapshot';
-        IF @dfInvValSnap IS NOT NULL EXEC('ALTER TABLE dbo.InvoicesProductTax DROP CONSTRAINT [' + @dfInvValSnap + ']');
-        ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
-    END;
-    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductTax') AND name = 'valueTypeSnapshot' AND is_nullable = 0)
-    BEGIN
-        DECLARE @dfInvTypeSnap NVARCHAR(256);
-        SELECT @dfInvTypeSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.InvoicesProductTax') AND c.name = 'valueTypeSnapshot';
-        IF @dfInvTypeSnap IS NOT NULL EXEC('ALTER TABLE dbo.InvoicesProductTax DROP CONSTRAINT [' + @dfInvTypeSnap + ']');
-        ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueTypeSnapshot NVARCHAR(50) NULL;
-    END;
+    ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
+    ALTER TABLE dbo.InvoicesProductTax ALTER COLUMN valueTypeSnapshot VARCHAR(50) NULL;
 END;
 GO
 IF OBJECT_ID('dbo.QuotationProductTax', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'rate') ALTER TABLE dbo.QuotationProductTax ADD rate FLOAT NULL DEFAULT 0;
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueSnapshot FLOAT NULL DEFAULT 0;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueTypeSnapshot NVARCHAR(50) NULL DEFAULT 'PERCENTAGE';
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot') ALTER TABLE dbo.QuotationProductTax ADD valueTypeSnapshot VARCHAR(50) NULL DEFAULT 'PERCENTAGE';
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'isMain') ALTER TABLE dbo.QuotationProductTax ADD isMain BIT NULL DEFAULT 0;
-    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueSnapshot' AND is_nullable = 0)
-    BEGIN
-        DECLARE @dfQuotValSnap NVARCHAR(256);
-        SELECT @dfQuotValSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.QuotationProductTax') AND c.name = 'valueSnapshot';
-        IF @dfQuotValSnap IS NOT NULL EXEC('ALTER TABLE dbo.QuotationProductTax DROP CONSTRAINT [' + @dfQuotValSnap + ']');
-        ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
-    END;
-    IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductTax') AND name = 'valueTypeSnapshot' AND is_nullable = 0)
-    BEGIN
-        DECLARE @dfQuotTypeSnap NVARCHAR(256);
-        SELECT @dfQuotTypeSnap = dc.name FROM sys.default_constraints dc JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id WHERE dc.parent_object_id = OBJECT_ID('dbo.QuotationProductTax') AND c.name = 'valueTypeSnapshot';
-        IF @dfQuotTypeSnap IS NOT NULL EXEC('ALTER TABLE dbo.QuotationProductTax DROP CONSTRAINT [' + @dfQuotTypeSnap + ']');
-        ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueTypeSnapshot NVARCHAR(50) NULL;
-    END;
+    ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueSnapshot FLOAT NULL;
+    ALTER TABLE dbo.QuotationProductTax ALTER COLUMN valueTypeSnapshot VARCHAR(50) NULL;
 END;
 GO
 IF OBJECT_ID('dbo.InvoicesProductVariable', 'U') IS NOT NULL
@@ -7909,8 +7894,8 @@ BEGIN
             '33' AS [cd_serie],
             '' AS [cd_consecutivo],
             1 AS [cd_usuario],
-            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-            SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 25) AS [cd_sucursal],
+            SUBSTRING(ISNULL(imp.code, ''), 1, 25) AS [cd_implante],
             CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_fechacont],
             CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_vence],
             SUBSTRING(ISNULL(c.document, ''), 1, 15) AS [cd_tercero_codigo],
@@ -7930,7 +7915,7 @@ BEGIN
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [am_tcambiousd],
             1 AS [id_tipoventa],
-            '' AS [ds_Observacion],
+            ISNULL(e.observations, '') AS [ds_Observacion],
             CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [TotalFactura],
             CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [ValorFactura],
             -- Items
@@ -8036,8 +8021,8 @@ BEGIN
                     0 AS [in_cc_cuotas2],
                     ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
                     CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
-                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-                    SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 25) AS [cd_sucursal],
+                    SUBSTRING(ISNULL(imp.code, ''), 1, 25) AS [cd_implante],
                     0 AS [bl_ahorro],
                     'ACT' AS [cd_TipoTiqueteGDS],
                     '' AS [cd_TiposDocumento],
@@ -8430,7 +8415,7 @@ IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spInvoicesListar;
 GO
 
-CREATE PROCEDURE dbo.spInvoicesListar
+CREATE OR ALTER PROCEDURE dbo.spInvoicesListar
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -8466,6 +8451,7 @@ BEGIN
         i.[fuente],
         i.[serie],
         i.[consecutivo],
+        i.[observations],
         (
             SELECT TOP 1 ipp.[name]
             FROM dbo.[InvoicesProduct] ip
@@ -9207,8 +9193,8 @@ BEGIN
             '33' AS [cd_serie],
             '' AS [cd_consecutivo],
             1 AS [cd_usuario],
-            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-            SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 25) AS [cd_sucursal],
+            SUBSTRING(ISNULL(imp.code, ''), 1, 25) AS [cd_implante],
             CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_fechacont],
             CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_vence],
             SUBSTRING(ISNULL(c.document, ''), 1, 15) AS [cd_tercero_codigo],
@@ -9228,7 +9214,7 @@ BEGIN
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [am_tcambiousd],
             1 AS [id_tipoventa],
-            '' AS [ds_Observacion],
+            ISNULL(e.observations, '') AS [ds_Observacion],
             CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [TotalFactura],
             CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [ValorFactura],
             -- Items
@@ -9334,8 +9320,8 @@ BEGIN
                     0 AS [in_cc_cuotas2],
                     ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
                     CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
-                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-                    SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 25) AS [cd_sucursal],
+                    SUBSTRING(ISNULL(imp.code, ''), 1, 25) AS [cd_implante],
                     0 AS [bl_ahorro],
                     'ACT' AS [cd_TipoTiqueteGDS],
                     '' AS [cd_TiposDocumento],

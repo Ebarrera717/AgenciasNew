@@ -71,8 +71,14 @@ function Resolve-PortConflict($port, $defaultFallback) {
         
         # Si es un proceso node o de nuestro servicio, podemos intentar matarlo
         if ($pName -eq "node" -or $pName -like "*korex_nextjs*" -or $pName -eq "korex_nextjs") {
-            Write-Log "Intentando detener proceso remanente de nuestra app en puerto $port..."
-            Stop-Process -Id $owningPid -Force -ErrorAction SilentlyContinue
+            Write-Log "Solicitando cierre ordenado de proceso remanente en puerto $port..."
+            try {
+                if ($pInfo -and $pInfo.MainWindowHandle -ne [IntPtr]::Zero) { $pInfo.CloseMainWindow() | Out-Null }
+                $pInfo.WaitForExit(2000) | Out-Null
+            } catch {}
+            if (Get-Process -Id $owningPid -ErrorAction SilentlyContinue) {
+                Stop-Process -Id $owningPid -ErrorAction SilentlyContinue
+            }
             Start-Sleep -Seconds 2
             
             # Verificar si se liberó
@@ -126,16 +132,48 @@ function Check-PostgresConnection($pgHost, $pgPort) {
 
 # Paso 1. Detener procesos previos para liberar bloqueos
 Write-Log "Deteniendo instancias previas (Servicio o Tarea Programada)..."
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+function Stop-KorexServiceGraceful($name, $timeoutSec = 10) {
+    $svc = Get-Service -Name $name -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -eq 'Running') {
+        Write-Log "Solicitando detencion limpia y ordenada de servicio $name..."
+        try {
+            Stop-Service -Name $name -NoWait -ErrorAction SilentlyContinue
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($sw.Elapsed.TotalSeconds -lt $timeoutSec) {
+                Start-Sleep -Milliseconds 500
+                $svc.Refresh()
+                if ($svc.Status -eq 'Stopped') {
+                    Write-Log "Servicio $name detenido ordenadamente."
+                    return $true
+                }
+            }
+            Write-Log "Tiempo de espera superado ($timeoutSec s) al detener servicio $name." "WARN"
+        } catch {
+            Write-Log "Aviso al detener servicio $name: $_" "WARN"
+        }
+    }
+    return $false
+}
+
+Stop-KorexServiceGraceful "Korex_NextJS"
+Stop-KorexServiceGraceful "korex_nextjs.exe"
+Stop-KorexServiceGraceful "AgenciasNew_NextJS"
+
+# Cierre ordenado de procesos Node.js de la aplicación con tiempo de gracia
+Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object {
+    try { $_.Path -like "*$TargetDir*" } catch { $false }
+} | ForEach-Object {
+    Write-Log "Solicitando cierre ordenado de proceso Node.js (PID: $($_.Id)) en $TargetDir..."
+    try { $_.CloseMainWindow() | Out-Null } catch {}
+    if (-not $_.WaitForExit(3000)) {
+        try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {}
+    }
+}
 
 # Detener tarea programada si existe
 $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
 if (Test-Path $taskMgrScript) {
-    & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Stop -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort > $null 2>&1
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Stop -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort > $null 2>&1
 }
 
 Write-Log "Deteniendo el sitio web Korex en IIS para liberar puertos..."
@@ -260,10 +298,10 @@ if ($DbUrl) {
 
 # Paso 5. Re-registrar e Iniciar el Servicio Windows (Total Update)
 Write-Log "Deteniendo servicio de Windows para aplicar la nueva versión de la aplicación..."
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+Stop-Service -Name "Korex_NextJS" -NoWait -ErrorAction SilentlyContinue
+Stop-Service -Name "AgenciasNew_NextJS" -NoWait -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
+Start-Sleep -Seconds 1
 
 if (Test-Path ".\install-service.js") {
     Write-Log "Ejecutando install-service.js con la nueva versión..."
@@ -291,9 +329,9 @@ if ($activeMechanism -eq "TASK_SCHEDULER") {
     Write-Log "Actualizando y reiniciando via Windows Task Scheduler (Korex NextJS - Startup)..."
     $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
     if (Test-Path $taskMgrScript) {
-        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
         Start-Sleep -Seconds 2
-        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
         Start-Sleep -Seconds 3
         
         $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -332,9 +370,9 @@ if ($activeMechanism -eq "TASK_SCHEDULER") {
         Write-Log "Aviso: Servicio Windows fallo al reiniciar. Activando fallback a Task Scheduler..." "WARN"
         $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
         if (Test-Path $taskMgrScript) {
-            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+            & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Register -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
             Start-Sleep -Seconds 2
-            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+            & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Start -Engine POSTGRESQL -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
             Start-Sleep -Seconds 3
             $chk = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($chk) {
@@ -420,7 +458,7 @@ Get-Website | ForEach-Object {
 Write-Log "Ejecutando motor de diagnóstico profundo y validación para PostgreSQL..."
 $DiagScript = Join-Path $TargetDir "deploy\Korex_Diagnostics_Engine.ps1"
 if (Test-Path $DiagScript) {
-    & powershell.exe -ExecutionPolicy Bypass -File "$DiagScript" `
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$DiagScript" `
         -Engine "POSTGRESQL" `
         -Mode "Reparacion" `
         -TargetDir "$TargetDir" `

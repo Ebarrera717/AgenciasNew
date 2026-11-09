@@ -24,7 +24,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [PASO 2/3] Empaquetando scripts y herramientas exclusivas de Base de Datos...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0deploy\Generar_Empaquetado_SQLServer_BD.ps1"
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "%~dp0deploy\Generar_Empaquetado_SQLServer_BD.ps1"
 if %errorlevel% neq 0 (
     echo Error durante el empaquetado de Base de Datos.
     pause

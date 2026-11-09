@@ -58,9 +58,13 @@ function Resolve-PortConflict($port, $defaultFallback) {
         Write-Log "Puerto $port ocupado por proceso: $pName (PID: $owningPid)" "WARN"
         
         if ($pName -eq "node" -or $pName -like "*korex*" -or $pName -eq "korex_nextjs") {
-            Write-Log "Intentando detener proceso remanente en puerto $port..."
-            Stop-Process -Id $owningPid -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 2
+            Write-Log "Solicitando detencion ordenada de proceso remanente en puerto $port (PID: $owningPid)..."
+            try { $pInfo.CloseMainWindow() | Out-Null } catch {}
+            Start-Sleep -Seconds 1
+            if ($pInfo -and -not $pInfo.HasExited) {
+                try { Stop-Process -Id $owningPid -ErrorAction SilentlyContinue } catch {}
+            }
+            Start-Sleep -Seconds 1
             
             $stillProc = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
             if (-not $stillProc) {
@@ -189,11 +193,11 @@ if (Test-Path $AppCmd) {
 }
 
 # Paso 3. DETENER SERVICIOS REMANENTES Y RESOLVER PUERTOS
-Write-Log "Deteniendo procesos previos para liberar puertos..."
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Write-Log "Solicitando detencion ordenada de procesos previos para liberar puertos..."
+Stop-Service -Name "Korex_NextJS" -NoWait -ErrorAction SilentlyContinue
+Stop-Service -Name "Korex_SQLServer_Service" -NoWait -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
+Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { try { $_.Path -like "*$TargetDir*" } catch { $false } } | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
 
 try {
     Import-Module WebAdministration -ErrorAction SilentlyContinue
@@ -247,17 +251,23 @@ Check-SQLServerConnection $SqlHost $SqlPort $SqlDb $SqlUser $SqlPass
 $executionMechanism = "NONE"
 $serviceSuccess = $false
 
-Write-Log "Deteniendo instancias y servicios previos para inicio limpio en SQL Server..."
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
-Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Write-Log "Solicitando detencion limpia de instancias y servicios previos para inicio limpio en SQL Server..."
+Stop-Service -Name "Korex_NextJS" -NoWait -ErrorAction SilentlyContinue
+Stop-Service -Name "korex_nextjs.exe" -NoWait -ErrorAction SilentlyContinue
+Stop-Service -Name "Korex_SQLServer_Service" -NoWait -ErrorAction SilentlyContinue
+Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {}; if (-not $_.WaitForExit(2000)) { try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {} } }
 
 # Liberar cualquier proceso residual que mantenga bloqueado el puerto de backend ($NextjsPort)
 $portOwner = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($portOwner) {
-    Write-Log "Detectado proceso residual en puerto $NextjsPort (PID: $($portOwner.OwningProcess)). Finalizando..." "WARN"
-    Stop-Process -Id $portOwner.OwningProcess -Force -ErrorAction SilentlyContinue
+    Write-Log "Detectado proceso residual en puerto $NextjsPort (PID: $($portOwner.OwningProcess)). Solicitando cierre ordenado..." "WARN"
+    $poProc = Get-Process -Id $portOwner.OwningProcess -ErrorAction SilentlyContinue
+    if ($poProc) {
+        try { $poProc.CloseMainWindow() | Out-Null } catch {}
+        if (-not $poProc.WaitForExit(2000)) {
+            try { Stop-Process -Id $portOwner.OwningProcess -ErrorAction SilentlyContinue } catch {}
+        }
+    }
     Start-Sleep -Seconds 1
 }
 
@@ -325,10 +335,11 @@ if (-not $serviceSuccess) {
     Write-Log "  Motivo: Politica de seguridad o restriccion en Windows Service " "WARN"
     Write-Log "=================================================================" "WARN"
     
-    # Detener servicio previo fallido
-    Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-    Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
-    Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
+    # Detener servicio previo fallido de forma ordenada
+    Stop-Service -Name "Korex_NextJS" -NoWait -ErrorAction SilentlyContinue
+    Stop-Service -Name "korex_nextjs.exe" -NoWait -ErrorAction SilentlyContinue
+    Stop-Service -Name "Korex_SQLServer_Service" -NoWait -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
     
     $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
     if (-not (Test-Path $taskMgrScript)) {
@@ -337,11 +348,11 @@ if (-not $serviceSuccess) {
     
     if (Test-Path $taskMgrScript) {
         Write-Log "Configurando tarea programada ONSTART (Korex SQLServer - Startup)..."
-        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
         Start-Sleep -Seconds 2
         
         Write-Log "Iniciando tarea programada y validando escucha en puerto $NextjsPort..."
-        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $NextjsPort >> $LogFile 2>&1
         Start-Sleep -Seconds 3
         
         $taskPortCheck = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -424,7 +435,7 @@ if (Test-Path $AppCmd) {
 Write-Log "Ejecutando motor de diagnóstico profundo y validación para SQL Server..."
 $DiagScript = Join-Path $TargetDir "deploy\Korex_Diagnostics_Engine.ps1"
 if (Test-Path $DiagScript) {
-    & powershell.exe -ExecutionPolicy Bypass -File "$DiagScript" `
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$DiagScript" `
         -Engine "SQLSERVER" `
         -Mode "Reparacion" `
         -TargetDir "$TargetDir" `

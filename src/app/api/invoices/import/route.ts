@@ -431,13 +431,14 @@ export async function POST(req: NextRequest) {
                             .input('fuente', mssql.VarChar, fuenteVal)
                             .input('serie', mssql.VarChar, serieVal)
                             .input('consecutivo', mssql.VarChar, consecVal)
+                            .input('observations', mssql.NVarChar, (getRowValue(first, 'Observaciones', 'Observacion', 'Observations', 'Notas') || '').toString().trim() || null)
                             .query(`
                                 INSERT INTO dbo.[Invoices] (
                                     internalNumber, clientId, currency, exchangeRate, branchId, implantId, sellerId,
-                                    ticketPrinterId, baseCommissionable, commissionPercentage, chargesAndTaxes, totalAmount, userId, fuente, serie, consecutivo, isExcelImport, [state]
+                                    ticketPrinterId, baseCommissionable, commissionPercentage, chargesAndTaxes, totalAmount, userId, fuente, serie, consecutivo, isExcelImport, [state], observations
                                 ) OUTPUT INSERTED.id VALUES (
                                     @internalNumber, @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId,
-                                    @ticketPrinterId, @baseCommissionable, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId, @fuente, @serie, @consecutivo, 1, 'NUEVO'
+                                    @ticketPrinterId, @baseCommissionable, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId, @fuente, @serie, @consecutivo, 1, 'NUEVO', @observations
                                 )
                             `);
                         invoiceId = invRes.recordset[0].id;
@@ -914,8 +915,35 @@ export async function POST(req: NextRequest) {
                 createdConsecutives = createdIds.map(id => mapIdToConsec.get(id) || id.toString());
                 const createdConsecutiveStr = createdConsecutives.join(', ');
                 dbMessage = dbMessage.replace(/\[[^\]]+\]/, `[${createdConsecutiveStr}]`);
+
+                // Sincronizar observaciones por grupo en PostgreSQL
+                const distinctGroups: string[] = [];
+                const groupObsMap = new Map<string, string>();
+                for (const r of rows) {
+                    const gKey = (getRowValue(r, 'Grupo_Factura', 'Grupo', 'Group') || '1').toString();
+                    if (!groupObsMap.has(gKey)) {
+                        distinctGroups.push(gKey);
+                        const obs = (getRowValue(r, 'Observaciones', 'Observacion', 'Observations', 'Notas') || '').toString().trim();
+                        groupObsMap.set(gKey, obs);
+                    }
+                }
+                for (let i = 0; i < createdIds.length; i++) {
+                    const invId = createdIds[i];
+                    const gKey = distinctGroups[i];
+                    const obs = gKey ? groupObsMap.get(gKey) : null;
+                    if (obs) {
+                        try {
+                            await executePostgresQuery(
+                                `UPDATE public."Invoices" SET "observations" = $1 WHERE id = $2`,
+                                [obs, invId]
+                            );
+                        } catch (err) {
+                            console.warn(`[IMPORT API] Could not update observations for Invoice #${invId}:`, err);
+                        }
+                    }
+                }
             } catch (e) {
-                console.warn('[IMPORT API] Could not fetch internalNumbers for created invoices:', e);
+                console.warn('[IMPORT API] Could not fetch internalNumbers or update observations for created invoices:', e);
             }
         }
 

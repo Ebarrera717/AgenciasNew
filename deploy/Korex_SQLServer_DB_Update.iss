@@ -118,7 +118,7 @@ begin
     StringChangeEx(SafePass, '''', '''''', True);
 
     // Conectar a 'master' para validar credenciales y verificar si la BD existe (Exit 0 = Existe, Exit 2 = No existe, Exit 1 = Error de conexión)
-    Cmd := '-ExecutionPolicy Bypass -Command "' +
+    Cmd := '-NoProfile -ExecutionPolicy RemoteSigned -Command "' +
            '$sc = ''Server=' + ServerSpec + ';Database=master;User Id=' + SafeUser + ';Password=' + SafePass + ';Encrypt=False;TrustServerCertificate=True;Connection Timeout=8;''; ' +
            '$conn = New-Object System.Data.SqlClient.SqlConnection($sc); ' +
            'try { ' +
@@ -166,4 +166,4 @@ begin
 end;
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\Update_Korex_SQLServer_BD.ps1"" -SqlHost ""{code:GetSqlHost}"" -SqlPort ""{code:GetSqlPort}"" -SqlDb ""{code:GetSqlDb}"" -SqlUser ""{code:GetSqlUser}"" -SqlPass ""{code:GetSqlPass}"""; Flags: waituntilterminated; StatusMsg: "Verificando/creando base de datos y aplicando actualización en SQL Server..."
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -File ""{app}\Update_Korex_SQLServer_BD.ps1"" -SqlHost ""{code:GetSqlHost}"" -SqlPort ""{code:GetSqlPort}"" -SqlDb ""{code:GetSqlDb}"" -SqlUser ""{code:GetSqlUser}"" -SqlPass ""{code:GetSqlPass}"""; Flags: waituntilterminated; StatusMsg: "Verificando/creando base de datos y aplicando actualización en SQL Server..."

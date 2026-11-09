@@ -7,7 +7,8 @@ const { generateTsqlFunctionsAndSps } = require('../deploy/gen_tsql_sps_and_func
 // SPs obligatorios de integración con Zeus ERP que DEBEN existir en SQL Server
 const MANDATORY_ZEUS_SPS = [
     'spFacturacionesCrear',
-    'spCotizacionesCrear'
+    'spCotizacionesCrear',
+    'spCotizacionEliminarZeus'
 ];
 
 function getSqlServerConfig(targetDbName) {

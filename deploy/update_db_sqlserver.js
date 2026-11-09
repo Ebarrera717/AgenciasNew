@@ -45,7 +45,7 @@ function resolveNamedInstanceTcpPort(rawHost, instanceName, user, password) {
     // 1. Intentar leer del registro de Windows si la instancia es local
     try {
         const psRegCmd = `$p = Get-ItemProperty "HKLM:\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL*.${instanceName}\\MSSQLServer\\SuperSocketNetLib\\Tcp\\IPAll" -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p) { if ($p.TcpPort) { Write-Output $p.TcpPort } elseif ($p.TcpDynamicPorts) { Write-Output $p.TcpDynamicPorts } }`;
-        const regOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psRegCmd], {
+        const regOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-Command', psRegCmd], {
             encoding: 'utf8',
             timeout: 5000,
             stdio: ['ignore', 'pipe', 'ignore']
@@ -79,7 +79,7 @@ function resolveNamedInstanceTcpPort(rawHost, instanceName, user, password) {
             $conn.Close();
             if ($foundPort) { Write-Output $foundPort }
         `;
-        const netOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psNetCmd], {
+        const netOut = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-Command', psNetCmd], {
             encoding: 'utf8',
             timeout: 8000,
             stdio: ['ignore', 'pipe', 'ignore']

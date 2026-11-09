@@ -57,7 +57,7 @@ Este documento contiene las directrices, estándares y reglas del proyecto para 
 - **Flujo Obligatorio al modificar Funciones SQL / SPs (PostgreSQL + SQL Server)**:
   1. **Compilación e Inyección Inmediata Local**: Ejecutar obligatoria e INMEDIATAMENTE en el mismo turno el desplegador e inyector de base de datos en los entornos locales de PostgreSQL (`node deploy/gen_schema_json.js`) y SQL Server activos. NUNCA responder al usuario ni terminar el turno tras tocar o corregir un `.sql` sin haber inyectado y verificado la compilación limpia en la base de datos local.
   2. Consultar al usuario en español si desea generar el instalador y actualizador automáticamente o si prefiere realizarlo manualmente (Skill [`installer-decision`](file:///f:/Proyectos/AgenciasNew/.agents/skills/installer-decision/SKILL.md)).
-  3. Si aprueba automático: Generar el empaquetado standalone (`powershell.exe -ExecutionPolicy Bypass -File deploy/Generar_Empaquetado.ps1`) y compilar con `GenerarSetup.bat` / `GenerarActualizador.bat`.
+  3. Si aprueba automático: Generar el empaquetado standalone (`powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File deploy/Generar_Empaquetado.ps1`) y compilar con `GenerarSetup.bat` / `GenerarActualizador.bat`.
   4. Si prefiere manual: Entregar instrucciones y scripts para compilación manual por parte del usuario.
 
 ### SQL Server (Base de Producción/Agencias)

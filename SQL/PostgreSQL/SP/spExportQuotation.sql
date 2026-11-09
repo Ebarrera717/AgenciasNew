@@ -56,7 +56,9 @@ BEGIN
     CREATE TEMP TABLE IF NOT EXISTS Cotizacion (
 		id INT GENERATED ALWAYS AS IDENTITY,
 		cd_sucursal VARCHAR(250),
+		ds_sucursal VARCHAR(250),
 		cd_implante VARCHAR(250),
+		ds_implante VARCHAR(250),
 		cd_consecutivo VARCHAR(250),
 		cd_usuario VARCHAR(250),
 		dt_fechacont TIMESTAMP ,
@@ -345,7 +347,7 @@ BEGIN
     -- 4. Poblar Tablas Temporales (POBLANDO TODAS LAS COLUMNAS CON NOMBRES EXPLÍCITOS)
     
     INSERT INTO Cotizacion (
-        cd_sucursal, cd_implante, cd_consecutivo, cd_usuario, dt_fechacont, dt_fecha, 
+        cd_sucursal, ds_sucursal, cd_implante, ds_implante, cd_consecutivo, cd_usuario, dt_fechacont, dt_fecha, 
         cd_usuarioAct, dt_fechaAct, cd_tercero_codigo, ds_tercero_nombre, cd_cliente_codigo, 
         ds_cliente_nombre, ds_cliente_dir, ds_cliente_ciudad, ds_cliente_tel, ds_cliente_dirdesp, 
         ds_cliente_email, ds_cliente_contacto, ds_cliente_contacto_email, cd_monedas_IATA, 
@@ -361,7 +363,9 @@ BEGIN
     )
     SELECT 
         COALESCE(b.code, '') as cd_sucursal, 
+        NULLIF(COALESCE(b.name, ''), '') as ds_sucursal, 
         COALESCE(i.code, '') as cd_implante, 
+        NULLIF(COALESCE(i.name, ''), '') as ds_implante, 
         COALESCE(
             CASE 
                 WHEN TRIM(COALESCE(q."internalNumber", '')) ~ '^[0-9]+$' THEN LPAD(TRIM(q."internalNumber"), 8, '0')
@@ -858,7 +862,7 @@ BEGIN
             xmlagg(
                 xmlelement(name "Cotizacion",
                     xmlforest(
-                        q.cd_sucursal, q.cd_implante, q.cd_consecutivo, q.cd_usuario,
+                        q.cd_sucursal, q.ds_sucursal, q.cd_implante, q.ds_implante, q.cd_consecutivo, q.cd_usuario,
                         q.dt_fechacont, q.dt_fecha, q.cd_usuarioAct, q.dt_fechaAct,
                         q.cd_tercero_codigo, q.ds_tercero_nombre, q.cd_cliente_codigo,
                         q.ds_cliente_nombre, q.ds_cliente_dir, q.ds_cliente_ciudad,

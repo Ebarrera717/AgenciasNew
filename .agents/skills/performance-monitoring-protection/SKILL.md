@@ -109,7 +109,7 @@ Todo reporte generado (`Diagnosticos/Korex_Rendimiento_*.html`) y cualquier paqu
   ```
 - **Wrapper PowerShell**:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File deploy/Korex_Performance_Engine.ps1 -Engine postgres -Mode recommend
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File deploy/Korex_Performance_Engine.ps1 -Engine postgres -Mode recommend
   ```
 - **Mantenimiento Controlado**:
   ```bash

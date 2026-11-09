@@ -11,7 +11,7 @@ echo OMITIENDO las validaciones y ejecucion de base de datos SQL Server.
 echo.
 
 echo [PASO 1/2] Compilando sitio Next.js y empaquetando archivos...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0deploy\Generar_Empaquetado.ps1"
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "%~dp0deploy\Generar_Empaquetado.ps1"
 if %errorlevel% neq 0 (
     echo.
     echo ================================================================

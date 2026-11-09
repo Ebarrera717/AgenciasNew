@@ -200,6 +200,7 @@ export async function POST(req: NextRequest) {
                     const currency = first.Moneda || 'COP';
                     const exchangeRate = parseFloat(first.Tasa_Cambio || '1');
                     const commissionPct = parseFloat(first.Comision_Global_Pct || '0');
+                    const observations = (first.Observaciones || first.Observacion || first.Observations || first.Notas || '').toString().trim() || null;
 
                     // Insert Quotation Header
                     const qRes = await new mssql.Request(transaction)
@@ -215,13 +216,14 @@ export async function POST(req: NextRequest) {
                         .input('chargesAndTaxes', mssql.Float, globalCargos)
                         .input('totalAmount', mssql.Float, 0)
                         .input('userId', mssql.Int, actingUserId)
+                        .input('observations', mssql.NVarChar, observations)
                         .query(`
                             INSERT INTO dbo.[Quotation] (
                                 internalNumber, clientId, currency, exchangeRate, branchId, implantId, sellerId,
-                                ticketPrinterId, commissionPercentage, chargesAndTaxes, totalAmount, userId
+                                ticketPrinterId, commissionPercentage, chargesAndTaxes, totalAmount, userId, observations
                             ) OUTPUT INSERTED.id VALUES (
                                 @internalNumber, @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId,
-                                @ticketPrinterId, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId
+                                @ticketPrinterId, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId, @observations
                             )
                         `);
 
@@ -454,8 +456,35 @@ export async function POST(req: NextRequest) {
                 createdConsecutives = createdIds.map(id => mapIdToConsec.get(id) || id.toString());
                 const createdConsecutiveStr = createdConsecutives.join(', ');
                 dbMessage = dbMessage.replace(/\[[^\]]+\]/, `[${createdConsecutiveStr}]`);
+
+                // Sincronizar observaciones por grupo en PostgreSQL
+                const distinctGroups: string[] = [];
+                const groupObsMap = new Map<string, string>();
+                for (const r of rows) {
+                    const gKey = (r.Grupo_Cotizacion || '1').toString();
+                    if (!groupObsMap.has(gKey)) {
+                        distinctGroups.push(gKey);
+                        const obs = (r.Observaciones || r.Observacion || r.Observations || r.Notas || '').toString().trim();
+                        groupObsMap.set(gKey, obs);
+                    }
+                }
+                for (let i = 0; i < createdIds.length; i++) {
+                    const cId = createdIds[i];
+                    const gKey = distinctGroups[i];
+                    const obs = gKey ? groupObsMap.get(gKey) : null;
+                    if (obs) {
+                        try {
+                            await executePostgresQuery(
+                                `UPDATE public."Quotation" SET "observations" = $1 WHERE id = $2`,
+                                [obs, cId]
+                            );
+                        } catch (err) {
+                            console.warn(`[IMPORT API] Could not update observations for Quotation #${cId}:`, err);
+                        }
+                    }
+                }
             } catch (e) {
-                console.warn('[IMPORT API] Could not fetch internalNumbers for created quotations:', e);
+                console.warn('[IMPORT API] Could not fetch internalNumbers or update observations for created quotations:', e);
             }
         }
 

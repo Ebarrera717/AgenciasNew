@@ -41,7 +41,7 @@ Si el usuario confirma que desea la generación automática:
    ```
 2. **Empaquetado Standalone Next.js**:
    ```powershell
-   powershell.exe -ExecutionPolicy Bypass -File deploy/Generar_Empaquetado.ps1
+   powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File deploy/Generar_Empaquetado.ps1
    ```
 3. **Compilación de Ejecutables con Inno Setup**:
    - Ejecutar `GenerarSetup.bat` o compilar directo:

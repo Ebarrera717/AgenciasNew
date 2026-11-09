@@ -239,7 +239,8 @@ export default function InvoicesListPage() {
             'Proveedor',
             'Monto Total',
             'Moneda',
-            'Estado'
+            'Estado',
+            'Observaciones'
         ];
 
         const rows = listToCopy.map(q => {
@@ -258,7 +259,8 @@ export default function InvoicesListPage() {
                 prov,
                 Number(q.totalAmount) || 0,
                 q.currency || 'COP',
-                q.state || 'NUEVO'
+                q.state || 'NUEVO',
+                q.observations || ''
             ];
         });
 
@@ -326,7 +328,8 @@ export default function InvoicesListPage() {
                     'Proveedor': prov,
                     'Monto Total': Number(q.totalAmount) || 0,
                     'Moneda': q.currency || 'COP',
-                    'Estado': q.state || 'NUEVO'
+                    'Estado': q.state || 'NUEVO',
+                    'Observaciones': q.observations || ''
                 };
             });
 

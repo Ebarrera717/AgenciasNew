@@ -33,21 +33,25 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
   AppDir: String;
-  Cmd: String;
 begin
   AppDir := ExpandConstant('{app}');
-  Cmd := '-ExecutionPolicy Bypass -Command "' +
-         'Stop-Service -Name Korex_SQLServer_Service -Force -ErrorAction SilentlyContinue; ' +
-         'Get-Process -Name korex_sqlserver -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; ' +
-         'Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ''*' + AppDir + '*'' } | Stop-Process -Force -ErrorAction SilentlyContinue; ' +
-         'Start-Sleep -Seconds 2; ' +
-         'if (Test-Path ''' + AppDir + '\.next'') { Remove-Item ''' + AppDir + '\.next'' -Recurse -Force -ErrorAction SilentlyContinue }; ' +
-         'if (Test-Path ''' + AppDir + '\public'') { Remove-Item ''' + AppDir + '\public'' -Recurse -Force -ErrorAction SilentlyContinue };' +
-         '"';
-  Exec('powershell.exe', Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // Detención limpia del servicio web existente
+  Exec('net.exe', 'stop Korex_SQLServer_Service', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(1500);
+
+  // Limpieza segura y nativa de caché previo a la actualización
+  if (AppDir <> '') and (AppDir <> 'C:\') and (AppDir <> 'C:\Windows') then
+  begin
+    if DirExists(AppDir + '\.next') then
+      DelTree(AppDir + '\.next', True, True, True);
+    if DirExists(AppDir + '\public') then
+      DelTree(AppDir + '\public', True, True, True);
+  end;
+
   Result := '';
 end;
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\Update_Korex_SQLServer.ps1"" -SkipDb"; Flags: waituntilterminated; StatusMsg: "Actualizando sitio web y reiniciando servicios..."
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -File ""{app}\Update_Korex_SQLServer.ps1"" -SkipDb"; Flags: waituntilterminated; StatusMsg: "Actualizando sitio web y reiniciando servicios..."
 Filename: "http://localhost:3000/"; Flags: shellexec runasoriginaluser postinstall; Description: "Abrir la plataforma AgenciasNew en mi Navegador"

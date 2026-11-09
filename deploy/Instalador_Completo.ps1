@@ -51,7 +51,7 @@ Write-Host "   [+] Complementos de IIS configurados exitosamente." -ForegroundCo
 Write-Host "`n1.5. Configurando red de PostgreSQL (0.0.0.0/0) y Firewall..." -ForegroundColor Yellow
 $RemoteScript = "$PSScriptRoot\Configure-PostgresRemote.ps1"
 if (Test-Path $RemoteScript) {
-    & powershell.exe -ExecutionPolicy Bypass -File "$RemoteScript" -Elevated
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$RemoteScript" -Elevated
 }
 
 # 2. Compilar Next.js en Modo Standalone
@@ -75,9 +75,15 @@ Copy-Item ".\deploy\web.config" -Destination "$StandalonePath\web.config" -Force
 
 # 4. Crear o Reiniciar el Servicio Oculto de Windows (node-windows)
 Write-Host "`n4. Instalando y arrancando servicio interno Windows (AgenciasNew_NextJS)..." -ForegroundColor Yellow
-if (Get-Service -Name "AgenciasNew_NextJS" -ErrorAction SilentlyContinue) {
-    Stop-Service -Name "AgenciasNew_NextJS" -Force -ErrorAction SilentlyContinue 
-    Start-Sleep -Seconds 2
+$oldSvc = Get-Service -Name "AgenciasNew_NextJS" -ErrorAction SilentlyContinue
+if ($oldSvc -and $oldSvc.Status -eq 'Running') {
+    Stop-Service -Name "AgenciasNew_NextJS" -NoWait -ErrorAction SilentlyContinue
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($sw.Elapsed.TotalSeconds -lt 10) {
+        Start-Sleep -Milliseconds 500
+        $oldSvc.Refresh()
+        if ($oldSvc.Status -eq 'Stopped') { break }
+    }
 }
 node .\deploy\install-service.js | Out-Null
 

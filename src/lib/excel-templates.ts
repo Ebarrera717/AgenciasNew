@@ -38,7 +38,8 @@ export function getQuotationTemplateData() {
             Servicios: 'Desayuno Buffet Incluido',
             Descripcion: 'Alojamiento con Desayuno',
             Fecha_Vencimiento_Proveedor: '2026-11-25',
-            Factura_Proveedor: 'FPROV-99881'
+            Factura_Proveedor: 'FPROV-99881',
+            Observaciones: 'Observaciones generales de la cotización'
         },
         {
             Grupo_Cotizacion: '1',
@@ -76,7 +77,8 @@ export function getQuotationTemplateData() {
             Servicios: 'Traslado Privado Aeropuerto-Hotel',
             Descripcion: 'Servicio de transfer',
             Fecha_Vencimiento_Proveedor: '',
-            Factura_Proveedor: ''
+            Factura_Proveedor: '',
+            Observaciones: 'Observaciones generales de la cotización'
         }
     ]
 }
@@ -129,7 +131,8 @@ export function getInvoiceTemplateData() {
             Serie: 'A',
             Consecutivo: '000123',
             Fecha_Vencimiento_Proveedor: '2026-11-25',
-            Factura_Proveedor: 'FPROV-99881'
+            Factura_Proveedor: 'FPROV-99881',
+            Observaciones: 'Observaciones generales de la factura grupo 1'
         },
         {
             Grupo_Factura: '2',
@@ -177,7 +180,8 @@ export function getInvoiceTemplateData() {
             Serie: 'A',
             Consecutivo: '000124',
             Fecha_Vencimiento_Proveedor: '2026-10-10',
-            Factura_Proveedor: 'AV-98124'
+            Factura_Proveedor: 'AV-98124',
+            Observaciones: 'Observaciones generales de la factura grupo 2'
         }
     ]
 }

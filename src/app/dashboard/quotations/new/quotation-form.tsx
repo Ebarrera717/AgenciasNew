@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Save, Trash2, Plus, ChevronDown, Calendar, Users, Globe, DollarSign, Briefcase, Hotel as HotelIcon, Tag, Tags, Percent, Calculator, ArrowRight, Loader2, FileDown, Paperclip, FileText, Download, X, Printer, CreditCard, Receipt, Plane, AlertCircle, Send, CheckCircle2, Archive, FileSpreadsheet, FileImage, User, Clock, History, Eye } from 'lucide-react'
+import { Save, Trash2, Plus, ChevronDown, Calendar, Users, Globe, DollarSign, Briefcase, Hotel as HotelIcon, Tag, Tags, Percent, Calculator, ArrowRight, Loader2, FileDown, Paperclip, FileText, Download, X, Printer, CreditCard, Receipt, Plane, AlertCircle, Send, CheckCircle2, Archive, FileSpreadsheet, FileImage, User, Clock, History, Eye, Undo2 } from 'lucide-react'
 import JSZip from 'jszip'
 import { format, differenceInDays } from 'date-fns'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -242,7 +242,43 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
     const [stateHistoryList, setStateHistoryList] = useState<any[]>([])
     const [selectedHistoryItemForDetail, setSelectedHistoryItemForDetail] = useState<any | null>(null)
     const [isHistoryDetailModalOpen, setIsHistoryDetailModalOpen] = useState(false)
+    const [deletingZeus, setDeletingZeus] = useState(false)
     const router = useRouter()
+
+    const handleDeleteFromZeus = async () => {
+        if (!quotationId) return;
+        const consecDisplay = formData.internalNumber || quotationId;
+        if (!confirm(`¿Estás seguro de eliminar la cotización #${consecDisplay} de Zeus ERP?\n\n• Solamente se eliminará si NO está facturada o liquidada en Zeus ERP.\n• Podrás probar cualquier cambio y enviarla de nuevo a Zeus ERP sin tener que anular todo el proceso.`)) {
+            return;
+        }
+
+        setDeletingZeus(true);
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const res = await fetch('/api/quotations/zeus-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    quotationId: parseInt(quotationId),
+                    consecutive: formData.internalNumber || quotationId,
+                    userId: user.id
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setFormData(prev => ({ ...prev, state: 'PENDIENTE' }));
+                alert(data.message || '✅ Cotización eliminada exitosamente de Zeus ERP. Su estado quedó en PENDIENTE para que puedas guardarla y re-exportarla.');
+            } else {
+                alert(`⚠️ ${data.message || 'Error al eliminar en Zeus ERP'}`);
+            }
+        } catch (err: any) {
+            console.error('Error al eliminar de Zeus:', err);
+            alert('Error de conexión al intentar eliminar en Zeus ERP.');
+        } finally {
+            setDeletingZeus(false);
+        }
+    };
 
     const activeCurrency = data?.currencies?.find((c: any) => c.code === formData.currency);
     const decimals = activeCurrency ? (activeCurrency.decimals ?? 2) : 2;
@@ -1271,6 +1307,18 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                         >
                             <Receipt className="w-5 h-5" />
                             Facturar
+                        </button>
+                    )}
+                    {quotationId && (
+                        <button
+                            type="button"
+                            onClick={handleDeleteFromZeus}
+                            disabled={deletingZeus || saving}
+                            className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-lg shadow-rose-600/20 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                            title="Eliminar esta cotización en Zeus ERP (solo si no está facturada) para probar cambios y enviarla de nuevo"
+                        >
+                            {deletingZeus ? <Loader2 className="animate-spin w-5 h-5" /> : <Undo2 className="w-5 h-5" />}
+                            Eliminar de Zeus
                         </button>
                     )}
                     <button

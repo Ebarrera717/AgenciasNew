@@ -185,7 +185,7 @@ export async function GET(req: Request) {
                     fechasViaje: '',
                     pasajeros: paxNames,
                     hotelesServicios: servicesText,
-                    observaciones: inv.state || '',
+                    observaciones: inv.observations || inv.state || '',
                     formaPago: paymentsText
                 };
 
@@ -333,7 +333,7 @@ export async function GET(req: Request) {
                 fechasViaje: '',
                 pasajeros: paxNames,
                 hotelesServicios: servicesText,
-                observaciones: inv.state || '',
+                observaciones: inv.observations || inv.state || '',
                 formaPago: paymentsText
             };
 

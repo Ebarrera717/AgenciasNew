@@ -25,7 +25,7 @@ set /p SQL_PASS="Clave SQL Server: "
 
 echo.
 echo Iniciando verificacion/creacion y actualizacion de la base [%SQL_DB%]...
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0deploy\Update_Korex_SQLServer_BD.ps1" -SqlHost "%SQL_HOST%" -SqlPort "%SQL_PORT%" -SqlDb "%SQL_DB%" -SqlUser "%SQL_USER%" -SqlPass "%SQL_PASS%"
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "%~dp0deploy\Update_Korex_SQLServer_BD.ps1" -SqlHost "%SQL_HOST%" -SqlPort "%SQL_PORT%" -SqlDb "%SQL_DB%" -SqlUser "%SQL_USER%" -SqlPass "%SQL_PASS%"
 if %errorlevel% neq 0 (
     echo.
     echo ================================================================

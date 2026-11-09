@@ -375,7 +375,7 @@ if ($svcIsRunning -and $backendPortActive) {
             $taskMgr = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
             if (Test-Path $taskMgr) {
                 Write-DiagLog "Reintentando arranque mediante Task Scheduler..." "WARN"
-                & powershell.exe -ExecutionPolicy Bypass -File "$taskMgr" -Action Start -Engine $Engine -TargetDir "$TargetDir" -Port $NextjsPort > $null 2>&1
+                & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgr" -Action Start -Engine $Engine -TargetDir "$TargetDir" -Port $NextjsPort > $null 2>&1
                 Start-Sleep -Seconds 3
                 $bConn3 = Get-NetTCPConnection -LocalPort $NextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($bConn3) { $repaired = $true; $backendPid = $bConn3.OwningProcess }

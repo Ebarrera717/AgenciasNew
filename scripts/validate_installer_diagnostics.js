@@ -140,7 +140,7 @@ runTest('TEST-DIAGNOSTIC-ENGINE', 'Existencia e integridad del motor Korex_Diagn
 // BLOQUE 4: EJECUCIÓN DEL MOTOR EN MODO DIAGNÓSTICO (POSTGRESQL Y SQL SERVER)
 // ----------------------------------------------------------------------------
 runTest('TEST-DIAGNOSTIC-PG', 'Ejecución del motor en modo Diagnostico para PostgreSQL', () => {
-  const cmd = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '${path.join(deployDir, 'Korex_Diagnostics_Engine.ps1')}' -Engine POSTGRESQL -Mode Diagnostico -TargetDir '${rootDir}' -GenerateZip"`;
+  const cmd = `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -Command "& '${path.join(deployDir, 'Korex_Diagnostics_Engine.ps1')}' -Engine POSTGRESQL -Mode Diagnostico -TargetDir '${rootDir}' -GenerateZip"`;
   try {
     execSync(cmd, { stdio: 'pipe' });
   } catch (err) {
@@ -156,7 +156,7 @@ runTest('TEST-DIAGNOSTIC-PG', 'Ejecución del motor en modo Diagnostico para Pos
 });
 
 runTest('TEST-DIAGNOSTIC-SQL', 'Ejecución del motor en modo Diagnostico para SQL Server', () => {
-  const cmd = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '${path.join(deployDir, 'Korex_Diagnostics_Engine.ps1')}' -Engine SQLSERVER -Mode Diagnostico -TargetDir '${rootDir}' -GenerateZip"`;
+  const cmd = `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -Command "& '${path.join(deployDir, 'Korex_Diagnostics_Engine.ps1')}' -Engine SQLSERVER -Mode Diagnostico -TargetDir '${rootDir}' -GenerateZip"`;
   try {
     execSync(cmd, { stdio: 'pipe' });
   } catch (err) {

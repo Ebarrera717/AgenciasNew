@@ -1,6 +1,251 @@
 
 
 -- ==========================================
+-- Procedimiento Zeus ERP: spCotizacionEliminarZeus.sql
+-- ==========================================
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+IF OBJECT_ID('dbo.spCotizacionEliminarZeus', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.spCotizacionEliminarZeus;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.spCotizacionEliminarZeus
+(
+    @cd_consecutivo VARCHAR(50) = NULL,
+    @id_cotizacion INT = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @res_id_cotizacion INT = NULL;
+    DECLARE @res_consecutivo VARCHAR(50) = NULL;
+    DECLARE @res_estado INT = NULL;
+    DECLARE @res_cliente VARCHAR(250) = NULL;
+
+    -- 1. Identificar la cotización en Zeus ERP por ID o por Consecutivo (con o sin padding de ceros)
+    SELECT TOP 1 
+        @res_id_cotizacion = id,
+        @res_consecutivo = LTRIM(RTRIM(cd_consecutivo)),
+        @res_estado = in_estado,
+        @res_cliente = ds_cliente_nombre
+    FROM dbo.Cotizacion WITH (NOLOCK)
+    WHERE (@id_cotizacion IS NOT NULL AND id = @id_cotizacion)
+       OR (@cd_consecutivo IS NOT NULL AND LTRIM(RTRIM(cd_consecutivo)) = LTRIM(RTRIM(@cd_consecutivo)))
+       OR (@cd_consecutivo IS NOT NULL AND LTRIM(RTRIM(cd_consecutivo)) = RIGHT('00000000' + LTRIM(RTRIM(@cd_consecutivo)), 8))
+       OR (@cd_consecutivo IS NOT NULL AND ISNUMERIC(@cd_consecutivo) = 1 AND TRY_CAST(cd_consecutivo AS INT) = TRY_CAST(@cd_consecutivo AS INT));
+
+    IF @res_id_cotizacion IS NULL
+    BEGIN
+        SELECT 
+            'La cotización ' + ISNULL(@cd_consecutivo, CAST(@id_cotizacion AS VARCHAR)) + ' no existe en la base de datos de Zeus ERP.' AS Respuesta,
+            1 AS Estado,
+            0 AS Eliminado,
+            NULL AS IdZeusEliminado,
+            NULL AS ConsecutivoEliminado;
+        RETURN 1;
+    END
+
+    -- 2. VALIDAR SI ESTÁ FACTURADA O LIQUIDADA EN ZEUS ERP
+    -- 2.1 Por estado en cabecera Cotizacion (in_estado = 2 'Parcialmente Liquidada' o 3 'Liquidada')
+    IF @res_estado IN (2, 3)
+    BEGIN
+        SELECT 
+            '❌ No se puede eliminar: La cotización #' + @res_consecutivo + ' se encuentra ' + 
+            CASE @res_estado WHEN 2 THEN 'Parcialmente Liquidada' WHEN 3 THEN 'Liquidada/Facturada' ELSE 'Facturada' END + 
+            ' en Zeus ERP.' AS Respuesta,
+            1 AS Estado,
+            0 AS Eliminado,
+            @res_id_cotizacion AS IdZeusEliminado,
+            @res_consecutivo AS ConsecutivoEliminado;
+        RETURN 1;
+    END
+
+    -- 2.2 Por referencia de factura o remisión en CotizacionServicios
+    IF EXISTS (
+        SELECT 1 FROM dbo.CotizacionServicios WITH (NOLOCK)
+        WHERE id_Cotizacion = @res_id_cotizacion 
+          AND (
+            (id_fac_factura IS NOT NULL AND id_fac_factura > 0)
+            OR (id_fac_remision IS NOT NULL AND id_fac_remision > 0)
+            OR (id_fac_facturaComision IS NOT NULL AND id_fac_facturaComision > 0)
+          )
+    )
+    BEGIN
+        SELECT 
+            '❌ No se puede eliminar: La cotización #' + @res_consecutivo + ' ya cuenta con servicios asociados a facturas o remisiones en Zeus ERP.' AS Respuesta,
+            1 AS Estado,
+            0 AS Eliminado,
+            @res_id_cotizacion AS IdZeusEliminado,
+            @res_consecutivo AS ConsecutivoEliminado;
+        RETURN 1;
+    END
+
+    -- 2.3 Por referencia en Fac_Servicios (ítems facturados en Zeus ERP)
+    IF EXISTS (
+        SELECT 1 FROM dbo.Fac_Servicios fs WITH (NOLOCK)
+        INNER JOIN dbo.CotizacionServicios cs WITH (NOLOCK) ON fs.id_CotizacionServicios = cs.id
+        WHERE cs.id_Cotizacion = @res_id_cotizacion
+    )
+    BEGIN
+        SELECT 
+            '❌ No se puede eliminar: Existen servicios facturados en Zeus ERP vinculados a esta cotización.' AS Respuesta,
+            1 AS Estado,
+            0 AS Eliminado,
+            @res_id_cotizacion AS IdZeusEliminado,
+            @res_consecutivo AS ConsecutivoEliminado;
+        RETURN 1;
+    END
+
+    -- 2.4 Por comisiones liquidadas de facturas
+    IF OBJECT_ID('dbo.ComisionesFacturas') IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.ComisionesFacturas WITH (NOLOCK) WHERE id_cotizacion = @res_id_cotizacion)
+       OR (OBJECT_ID('dbo.ComisionesFacturasDetalle') IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.ComisionesFacturasDetalle WITH (NOLOCK) WHERE id_cotizacion = @res_id_cotizacion))
+    BEGIN
+        SELECT 
+            '❌ No se puede eliminar: La cotización #' + @res_consecutivo + ' tiene registros de comisiones de facturas en Zeus ERP.' AS Respuesta,
+            1 AS Estado,
+            0 AS Eliminado,
+            @res_id_cotizacion AS IdZeusEliminado,
+            @res_consecutivo AS ConsecutivoEliminado;
+        RETURN 1;
+    END
+
+    -- 3. ELIMINACIÓN SEGURA EN TRANSACCIÓN ATÓMICA
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Tabla temporal para almacenar los IDs de los servicios de esta cotización
+        DECLARE @tblServicios TABLE (id INT PRIMARY KEY);
+        INSERT INTO @tblServicios (id)
+        SELECT id FROM dbo.CotizacionServicios WHERE id_Cotizacion = @res_id_cotizacion;
+
+        -- A. Eliminar tablas hijas de CotizacionServicios
+        IF OBJECT_ID('dbo.CotizacionServicios_PaxAdicional') IS NOT NULL
+            DELETE FROM dbo.CotizacionServicios_PaxAdicional WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios) OR id_Cotizacion = @res_id_cotizacion;
+
+        -- Eliminar CotizacionImpuestos antes de eliminar CotizacionCargos
+        IF OBJECT_ID('dbo.CotizacionImpuestos') IS NOT NULL
+            DELETE FROM dbo.CotizacionImpuestos 
+            WHERE id_CotizacionCargos IN (
+                SELECT id FROM dbo.CotizacionCargos WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios)
+            );
+
+        IF OBJECT_ID('dbo.CotizacionCargos') IS NOT NULL
+            DELETE FROM dbo.CotizacionCargos WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios);
+
+        IF OBJECT_ID('dbo.CotizacionServiciosFormasPago') IS NOT NULL
+            DELETE FROM dbo.CotizacionServiciosFormasPago WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios);
+
+        IF OBJECT_ID('dbo.Fac_Servicios_TiposFacturacionHoteles') IS NOT NULL
+            DELETE FROM dbo.Fac_Servicios_TiposFacturacionHoteles WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios);
+
+        IF OBJECT_ID('dbo.CotizacionServicios_TipoProv') IS NOT NULL
+            DELETE FROM dbo.CotizacionServicios_TipoProv WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios);
+
+        IF OBJECT_ID('dbo.CotizacionServicios_VoucherAdicional') IS NOT NULL
+            DELETE FROM dbo.CotizacionServicios_VoucherAdicional WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios) OR id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.CotizacionServicios_TiquetesAdicionales') IS NOT NULL
+            DELETE FROM dbo.CotizacionServicios_TiquetesAdicionales WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios) OR id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Fac_Servicios_CargoTipoPlan') IS NOT NULL
+            DELETE FROM dbo.Fac_Servicios_CargoTipoPlan WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios);
+
+        IF OBJECT_ID('dbo.Servicios_ProveedoresAdicionales') IS NOT NULL
+            DELETE FROM dbo.Servicios_ProveedoresAdicionales WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios);
+
+        IF OBJECT_ID('dbo.CotizacionesPagosComision') IS NOT NULL
+            DELETE FROM dbo.CotizacionesPagosComision WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios) OR id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Fac_ServiciosImagen') IS NOT NULL
+            DELETE FROM dbo.Fac_ServiciosImagen WHERE id_CotizacionServicios IN (SELECT id FROM @tblServicios);
+
+        IF OBJECT_ID('dbo.VariableDatosMaestro') IS NOT NULL
+            DELETE FROM dbo.VariableDatosMaestro 
+            WHERE CodigoMaestro IN (SELECT cd_Consecutivo_VariablesAdicionales FROM dbo.CotizacionServicios WHERE id_Cotizacion = @res_id_cotizacion AND cd_Consecutivo_VariablesAdicionales IS NOT NULL);
+
+        -- B. Eliminar tablas hijas directas de Cotizacion
+        IF OBJECT_ID('dbo.EmailTiempoRespuestaGuiaCotizaciones') IS NOT NULL
+            DELETE FROM dbo.EmailTiempoRespuestaGuiaCotizaciones WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Cotizacion_SeguimientoCliente') IS NOT NULL
+            DELETE FROM dbo.Cotizacion_SeguimientoCliente WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Cotizacion_Solicitud') IS NOT NULL
+            DELETE FROM dbo.Cotizacion_Solicitud WHERE Id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.CotizacionOrdenesPago') IS NOT NULL
+            DELETE FROM dbo.CotizacionOrdenesPago WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Cotizacion_Seguimiento') IS NOT NULL
+            DELETE FROM dbo.Cotizacion_Seguimiento WHERE id_cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Cotizacion_GrConcepto') IS NOT NULL
+            DELETE FROM dbo.Cotizacion_GrConcepto WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.CotizacionFormatosAdicionales') IS NOT NULL
+            DELETE FROM dbo.CotizacionFormatosAdicionales WHERE id_cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.CotizacionFormatosAdicionalesItineracio') IS NOT NULL
+            DELETE FROM dbo.CotizacionFormatosAdicionalesItineracio WHERE id_cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Fac_DepartItems') IS NOT NULL
+            DELETE FROM dbo.Fac_DepartItems WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Fac_ReferidosItems') IS NOT NULL
+            DELETE FROM dbo.Fac_ReferidosItems WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Cotizacion_radicacion') IS NOT NULL
+            DELETE FROM dbo.Cotizacion_radicacion WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.CotizacionCambioAutoEtapas') IS NOT NULL
+            DELETE FROM dbo.CotizacionCambioAutoEtapas WHERE id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.JobEmail_Log') IS NOT NULL
+            DELETE FROM dbo.JobEmail_Log WHERE Id_Cotizacion = @res_id_cotizacion;
+
+        IF OBJECT_ID('dbo.Cotizacion_Opciones') IS NOT NULL
+            DELETE FROM dbo.Cotizacion_Opciones WHERE id_cotizacion = @res_id_cotizacion;
+
+        -- C. Eliminar servicios de cotización
+        DELETE FROM dbo.CotizacionServicios WHERE id_Cotizacion = @res_id_cotizacion;
+
+        -- D. Eliminar cabecera de cotización
+        DELETE FROM dbo.Cotizacion WHERE id = @res_id_cotizacion;
+
+        COMMIT TRANSACTION;
+
+        SELECT 
+            '✅ Cotización #' + @res_consecutivo + ' (ID Zeus: #' + CAST(@res_id_cotizacion AS VARCHAR) + ') eliminada exitosamente de Zeus ERP.' AS Respuesta,
+            0 AS Estado,
+            1 AS Eliminado,
+            @res_id_cotizacion AS IdZeusEliminado,
+            @res_consecutivo AS ConsecutivoEliminado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        DECLARE @errMsg VARCHAR(MAX) = ERROR_MESSAGE();
+        SELECT 
+            '❌ Error al eliminar cotización en Zeus ERP: ' + @errMsg AS Respuesta,
+            1 AS Estado,
+            0 AS Eliminado,
+            @res_id_cotizacion AS IdZeusEliminado,
+            @res_consecutivo AS ConsecutivoEliminado;
+        RETURN 1;
+    END CATCH
+END;
+GO
+
+
+GO
+
+
+-- ==========================================
 -- Procedimiento Zeus ERP: spCotizacionesCrear.sql
 -- ==========================================
 
@@ -24,7 +269,7 @@ IF OBJECT_ID('dbo.spCotizacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spCotizacionesCrear;
 GO
 
-CREATE PROCEDURE dbo.spCotizacionesCrear
+CREATE OR ALTER PROCEDURE dbo.spCotizacionesCrear
 (
     @xml VARCHAR(MAX)
 )
@@ -362,9 +607,12 @@ BEGIN
 			RETURN 1;
         END
 
-        -- Extraer los principales códigos maestros del XML para validarlos
+        -- Extraer los principales códigos maestros del XML para validarlos y resolverlos
         DECLARE @val_cd_cliente_codigo VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_cliente_codigo)[1]', 'VARCHAR(25)');
         DECLARE @val_cd_sucursal VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_sucursal)[1]', 'VARCHAR(25)');
+        DECLARE @val_ds_sucursal VARCHAR(100) = @xmlData.value('(Cotizaciones/Cotizacion/ds_sucursal)[1]', 'VARCHAR(100)');
+        DECLARE @val_cd_implante VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_implante)[1]', 'VARCHAR(25)');
+        DECLARE @val_ds_implante VARCHAR(100) = @xmlData.value('(Cotizaciones/Cotizacion/ds_implante)[1]', 'VARCHAR(100)');
         DECLARE @val_cd_vendedor VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_vendedor)[1]', 'VARCHAR(25)');
         DECLARE @val_cd_tiqueteador VARCHAR(25) = @xmlData.value('(Cotizaciones/Cotizacion/cd_tiqueteador)[1]', 'VARCHAR(25)');
 
@@ -393,20 +641,134 @@ BEGIN
             END
         END
 
-        -- 2. Validar Sucursal
-        IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
+        -- 2. Resolver Sucursal de forma dinámica y tolerante (Zeus ERP dbo.Sucursales / Korex dbo.Branch)
+        DECLARE @val_id_sucursal INT = NULL;
+        IF OBJECT_ID('dbo.Sucursales') IS NOT NULL
         BEGIN
-            IF OBJECT_ID('dbo.[Branch]') IS NOT NULL
+            IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
             BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM dbo.[Branch] WHERE code = @val_cd_sucursal OR CAST(id AS VARCHAR(25)) = @val_cd_sucursal
-                )
-                BEGIN
-                    SELECT 'sucursal ' + @val_cd_sucursal + ' no existe' AS 'Respuesta', 1 AS 'Estado';
-                    RETURN 1;
-                END
+                -- 2.1 Por cd_codigo exacto
+                SELECT TOP 1 @val_id_sucursal = id 
+                FROM dbo.Sucursales 
+                WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@val_cd_sucursal));
+
+                -- 2.2 Por cd_alterno
+                IF @val_id_sucursal IS NULL
+                    SELECT TOP 1 @val_id_sucursal = id 
+                    FROM dbo.Sucursales 
+                    WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@val_cd_sucursal));
+
+                -- 2.3 Por ID numérico directo
+                IF @val_id_sucursal IS NULL AND TRY_CAST(@val_cd_sucursal AS INT) IS NOT NULL
+                    SELECT TOP 1 @val_id_sucursal = id 
+                    FROM dbo.Sucursales 
+                    WHERE id = TRY_CAST(@val_cd_sucursal AS INT);
+
+                -- 2.4 Por coincidencia de texto en ds_nombre usando el código
+                IF @val_id_sucursal IS NULL
+                    SELECT TOP 1 @val_id_sucursal = id 
+                    FROM dbo.Sucursales 
+                    WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_cd_sucursal)) + '%';
+            END
+
+            -- 2.5 Por ds_sucursal (nombre descriptivo enviado desde Korex)
+            IF @val_id_sucursal IS NULL AND @val_ds_sucursal IS NOT NULL AND @val_ds_sucursal <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_sucursal = id 
+                FROM dbo.Sucursales 
+                WHERE LTRIM(RTRIM(ds_nombre)) = LTRIM(RTRIM(@val_ds_sucursal))
+                   OR LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_ds_sucursal)) + '%';
+            END
+
+            -- 2.6 Fallback seguro a primera sucursal existente en Zeus ERP
+            IF @val_id_sucursal IS NULL
+                SELECT TOP 1 @val_id_sucursal = id FROM dbo.Sucursales ORDER BY id ASC;
+        END
+        ELSE IF OBJECT_ID('dbo.[Branch]') IS NOT NULL
+        BEGIN
+            IF @val_cd_sucursal IS NOT NULL AND @val_cd_sucursal <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_sucursal = id 
+                FROM dbo.[Branch] 
+                WHERE code = @val_cd_sucursal OR id = TRY_CAST(@val_cd_sucursal AS INT);
+            END
+            IF @val_id_sucursal IS NULL
+                SELECT TOP 1 @val_id_sucursal = id FROM dbo.[Branch] ORDER BY id ASC;
+        END
+
+        IF @val_id_sucursal IS NULL SET @val_id_sucursal = 1;
+
+        -- 2.b Resolver Implante de forma dinámica y tolerante (Zeus ERP dbo.Implantes / Korex dbo.Implant)
+        DECLARE @val_id_implante INT = NULL;
+        IF OBJECT_ID('dbo.Implantes') IS NOT NULL
+        BEGIN
+            IF @val_cd_implante IS NOT NULL AND @val_cd_implante <> ''
+            BEGIN
+                -- 2.b.1 Por cd_codigo dentro de la sucursal asignada
+                SELECT TOP 1 @val_id_implante = id 
+                FROM dbo.Implantes 
+                WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@val_cd_implante)) 
+                  AND id_sucursal = @val_id_sucursal;
+
+                -- 2.b.2 Por cd_alterno dentro de la sucursal asignada
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@val_cd_implante)) 
+                      AND id_sucursal = @val_id_sucursal;
+
+                -- 2.b.3 Por cd_codigo general
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@val_cd_implante));
+
+                -- 2.b.4 Por cd_alterno general
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@val_cd_implante));
+
+                -- 2.b.5 Por ID numérico
+                IF @val_id_implante IS NULL AND TRY_CAST(@val_cd_implante AS INT) IS NOT NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE id = TRY_CAST(@val_cd_implante AS INT);
+
+                -- 2.b.6 Por coincidencia en ds_nombre usando el código
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_cd_implante)) + '%';
+            END
+
+            -- 2.b.7 Por ds_implante (nombre descriptivo enviado desde Korex)
+            IF @val_id_implante IS NULL AND @val_ds_implante IS NOT NULL AND @val_ds_implante <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_implante = id 
+                FROM dbo.Implantes 
+                WHERE (LTRIM(RTRIM(ds_nombre)) = LTRIM(RTRIM(@val_ds_implante))
+                       OR LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_ds_implante)) + '%')
+                  AND id_sucursal = @val_id_sucursal;
+
+                IF @val_id_implante IS NULL
+                    SELECT TOP 1 @val_id_implante = id 
+                    FROM dbo.Implantes 
+                    WHERE LTRIM(RTRIM(ds_nombre)) = LTRIM(RTRIM(@val_ds_implante))
+                       OR LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@val_ds_implante)) + '%';
             END
         END
+        ELSE IF OBJECT_ID('dbo.[Implant]') IS NOT NULL
+        BEGIN
+            IF @val_cd_implante IS NOT NULL AND @val_cd_implante <> ''
+            BEGIN
+                SELECT TOP 1 @val_id_implante = id 
+                FROM dbo.[Implant] 
+                WHERE code = @val_cd_implante OR id = TRY_CAST(@val_cd_implante AS INT);
+            END
+        END
+
+        IF @val_id_implante IS NULL SET @val_id_implante = 0;
 
         -- 3. Validar / Resolver Vendedor
         IF OBJECT_ID('dbo.MAEVENDE') IS NOT NULL
@@ -558,8 +920,8 @@ BEGIN
 			bl_existe
 		)	
         SELECT 
-			id_sucursal = ISNULL(TRY_CAST(C.Cotizacion.value('cd_sucursal[1]','VARCHAR(25)') AS INT), 1),
-			id_implante = TRY_CAST(C.Cotizacion.value('cd_implante[1]','VARCHAR(25)') AS INT),
+			id_sucursal = ISNULL(@val_id_sucursal, 1),
+			id_implante = ISNULL(@val_id_implante, 0),
 			cd_consecutivo = CASE 
 				WHEN ISNUMERIC(RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')))) = 1 
 				     AND LEN(RTRIM(LTRIM(C.Cotizacion.value('cd_consecutivo[1]','VARCHAR(25)')))) < 8
@@ -1928,7 +2290,7 @@ IF OBJECT_ID('dbo.spFacturacionesCrear', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spFacturacionesCrear;
 GO
 
-CREATE PROCEDURE dbo.spFacturacionesCrear
+CREATE OR ALTER PROCEDURE dbo.spFacturacionesCrear
 (
     @xml VARCHAR(MAX)
 )
@@ -3519,16 +3881,45 @@ BEGIN
 					SELECT TOP 1 @cd_vendedor = IDVENDE FROM dbo.MAEVENDE WITH (NOLOCK) WHERE IDVENDE IS NOT NULL ORDER BY IDVENDE ASC;
 				END;
 
-				-- Resolve IDs for headers
-				IF ISNULL(@cd_sucursal,'')=''
+				-- Resolve IDs for headers (Sucursales e Implantes con búsqueda multi-criterio)
+				SET @id_sucursal = NULL;
+				IF ISNULL(@cd_sucursal,'') <> ''
 				BEGIN
-					SET @cd_sucursal='01'
-					SET @cd_implante=NULL
+					-- 1. Por cd_codigo exacto
+					SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_sucursal));
+					-- 2. Por cd_alterno
+					IF @id_sucursal IS NULL
+						SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@cd_sucursal));
+					-- 3. Por ID numérico
+					IF @id_sucursal IS NULL AND TRY_CAST(@cd_sucursal AS INT) IS NOT NULL
+						SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE id = TRY_CAST(@cd_sucursal AS INT);
+					-- 4. Por coincidencia en ds_nombre
+					IF @id_sucursal IS NULL
+						SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@cd_sucursal)) + '%';
 				END
-				SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) WHERE cd_codigo = @cd_sucursal;
 				IF @id_sucursal IS NULL SELECT TOP 1 @id_sucursal = id FROM dbo.Sucursales WITH (NOLOCK) ORDER BY id;
 
-				SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE cd_codigo = @cd_implante AND id_sucursal = @id_sucursal;
+				SET @id_implante = NULL;
+				IF ISNULL(@cd_implante,'') <> ''
+				BEGIN
+					-- 1. Por cd_codigo dentro de la sucursal
+					SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_implante)) AND id_sucursal = @id_sucursal;
+					-- 2. Por cd_alterno dentro de la sucursal
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@cd_implante)) AND id_sucursal = @id_sucursal;
+					-- 3. Por cd_codigo general
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_codigo)) = LTRIM(RTRIM(@cd_implante));
+					-- 4. Por cd_alterno general
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(cd_alterno)) = LTRIM(RTRIM(@cd_implante));
+					-- 5. Por ID numérico
+					IF @id_implante IS NULL AND TRY_CAST(@cd_implante AS INT) IS NOT NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE id = TRY_CAST(@cd_implante AS INT);
+					-- 6. Por coincidencia en ds_nombre
+					IF @id_implante IS NULL
+						SELECT TOP 1 @id_implante = id FROM dbo.Implantes WITH (NOLOCK) WHERE LTRIM(RTRIM(ds_nombre)) LIKE '%' + LTRIM(RTRIM(@cd_implante)) + '%';
+				END
 				SELECT TOP 1 @id_monedas_iata = id FROM dbo.Monedas_IATA WITH (NOLOCK) WHERE cd_codigo = @ds_moneda;
 				IF @id_monedas_iata IS NULL SELECT TOP 1 @id_monedas_iata = id FROM dbo.Monedas_IATA WITH (NOLOCK) ORDER BY id;
 
@@ -4511,12 +4902,31 @@ BEGIN
 					JOIN dbo.VariableDefinicion VD WITH (NOLOCK) ON VD.IDEN = CCV.Iden_Variable
 					WHERE RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
 					  AND CCV.bl_Exige = 1
-					  AND CCV.IDEN_Maestro IN (35, 37)
+					  AND (
+						  -- Maestro 35: Tiquetes -> Solo validar si la factura contiene tiquetes (Aire / in_tipoitem = 1)
+						  (CCV.IDEN_Maestro = 35 AND EXISTS (
+							  SELECT 1 FROM #TmpFacturaItems TI 
+							  WHERE TI.id_factura = @id_facturacion 
+							    AND (TI.tipo_item = 'Aire' OR TI.in_tipoitem = 1)
+						  ))
+						  OR
+						  -- Maestro 37: Servicios -> Solo validar si la factura contiene servicios (tipo_item <> 'Aire')
+						  (CCV.IDEN_Maestro = 37 AND EXISTS (
+							  SELECT 1 FROM #TmpFacturaItems TI 
+							  WHERE TI.id_factura = @id_facturacion 
+							    AND (TI.tipo_item IN ('SRV', 'Hotel', 'Auto', 'TAO') OR (TI.tipo_item <> 'Aire' AND ISNULL(TI.in_tipoitem, 0) <> 1))
+						  ))
+					  )
 					  AND NOT EXISTS (
 						  SELECT 1 FROM #VariablesAdicionales VA
 						  WHERE VA.id_facturacion = @id_facturacion
 						    AND RTRIM(LTRIM(VA.ds_VariableAdicional)) = RTRIM(LTRIM(VD.Nombre))
 						    AND LTRIM(RTRIM(ISNULL(VA.ds_valor, ''))) <> ''
+						    AND (
+							    (CCV.IDEN_Maestro = 35 AND (VA.ds_maestro IN ('Tiquetes', 'FacturacionTiquetes') OR VA.in_tipoitem = 1 OR ISNULL(VA.ds_maestro, '') = ''))
+							    OR
+							    (CCV.IDEN_Maestro = 37 AND (VA.ds_maestro IN ('FacturacionServicios', 'Servicios') OR VA.in_tipoitem <> 1 OR ISNULL(VA.ds_maestro, '') = ''))
+						    )
 					  )
 					  AND ISNULL(LTRIM(RTRIM(VD.DefaultVarchar)), '') = '';
 				END;
@@ -4652,7 +5062,7 @@ BEGIN
 					CROSS JOIN dbo.Cliente_ConfiguracionVariables CCV
 					JOIN dbo.VariableDefinicion VD ON VD.IDEN = CCV.Iden_Variable
 					WHERE FI.id_factura = @id_facturacion 
-					  AND FI.tipo_item IN ('SRV', 'Hotel', 'Auto')
+					  AND (FI.tipo_item IN ('SRV', 'Hotel', 'Auto', 'TAO') OR (FI.tipo_item <> 'Aire' AND ISNULL(FI.in_tipoitem, 0) <> 1))
 					  AND CCV.IDEN_Maestro = 37
 					  AND RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
 					  AND CCV.bl_Exige = 1
@@ -4674,7 +5084,7 @@ BEGIN
 					CROSS JOIN dbo.Cliente_ConfiguracionVariables CCV
 					JOIN dbo.VariableDefinicion VD ON VD.IDEN = CCV.Iden_Variable
 					WHERE FI.id_factura = @id_facturacion 
-					  AND FI.tipo_item IN ('Aire')
+					  AND (FI.tipo_item = 'Aire' OR FI.in_tipoitem = 1)
 					  AND CCV.IDEN_Maestro = 35
 					  AND RTRIM(LTRIM(CCV.id_cliente)) = RTRIM(LTRIM(@cd_cliente))
 					  AND CCV.bl_Exige = 1

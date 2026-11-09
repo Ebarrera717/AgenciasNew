@@ -113,12 +113,18 @@ function Start-KorexStartupTask {
     param([string]$task, [string]$target, [int]$p)
     Write-Host "[TASK SCHEDULER] Iniciando tarea programada '$task'..." -ForegroundColor Cyan
 
-    # 1. Liberar procesos huérfanos previos en el puerto
+    # 1. Liberar procesos huérfanos previos en el puerto de forma ordenada
     try {
         $conn = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($conn) {
-            Write-Host "[TASK SCHEDULER] Deteniendo proceso previo ocupando puerto $p (PID: $($conn.OwningProcess))..." -ForegroundColor Yellow
-            Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+            Write-Host "[TASK SCHEDULER] Solicitando cierre ordenado de proceso en puerto $p (PID: $($conn.OwningProcess))..." -ForegroundColor Yellow
+            $oldProc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+            if ($oldProc) {
+                try { $oldProc.CloseMainWindow() | Out-Null } catch {}
+                if (-not $oldProc.WaitForExit(3000)) {
+                    try { Stop-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue } catch {}
+                }
+            }
             Start-Sleep -Seconds 1
         }
     } catch {}
@@ -192,10 +198,15 @@ function Stop-KorexStartupTask {
         }
     } catch {}
 
-    # Matar cualquier proceso node en el directorio
+    # Solicitar cierre ordenado de cualquier proceso node en el directorio
     Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object {
         try { $_.Path -like "*$target*" } catch { $false }
-    } | Stop-Process -Force -ErrorAction SilentlyContinue
+    } | ForEach-Object {
+        try { $_.CloseMainWindow() | Out-Null } catch {}
+        if (-not $_.WaitForExit(3000)) {
+            try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {}
+        }
+    }
     Start-Sleep -Seconds 1
 }
 

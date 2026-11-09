@@ -40,6 +40,7 @@ export async function GET() {
                     providerName: r.providerName,
                     checkInDate: r.checkInDate,
                     checkOutDate: r.checkOutDate,
+                    observations: r.observations || '',
                     products: [
                         {
                             passengerName: r.paxName,
@@ -68,6 +69,7 @@ export async function GET() {
                 isExcelImport: isExcel,
                 zeusInvoiceNumber: zeusNum,
                 client: item.client || { name: item.clientName || 'Consumidor Final', document: '' },
+                observations: item.observations || '',
                 products: item.products || []
             };
         });

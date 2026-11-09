@@ -288,6 +288,6 @@ En el **Servidor Web**, puede verificar o reiniciar el proceso desde PowerShell 
   ```
 - **Si opera bajo Tarea Programada (Task Scheduler):**
   ```powershell
-  powershell -ExecutionPolicy Bypass -File "C:\inetpub\Korex\deploy\task_scheduler_manager.ps1" -Action Status -Engine SQLSERVER -Port 3001
-  powershell -ExecutionPolicy Bypass -File "C:\inetpub\Korex\deploy\task_scheduler_manager.ps1" -Action Restart -Engine SQLSERVER -Port 3001
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File "C:\inetpub\Korex\deploy\task_scheduler_manager.ps1" -Action Status -Engine SQLSERVER -Port 3001
+  powershell -NoProfile -ExecutionPolicy RemoteSigned -File "C:\inetpub\Korex\deploy\task_scheduler_manager.ps1" -Action Restart -Engine SQLSERVER -Port 3001
   ```

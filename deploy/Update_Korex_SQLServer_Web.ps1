@@ -161,14 +161,48 @@ if (Test-Path $WebConfigPath) {
 # =============================================================================
 Write-Log "Mecanismo de ejecucion activo en Servidor Web: $activeMechanism"
 
-Stop-Service -Name "Korex_SQLServer_Service" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "Korex_NextJS" -Force -ErrorAction SilentlyContinue
-Stop-Service -Name "korex_nextjs.exe" -Force -ErrorAction SilentlyContinue
-Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*$TargetDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+# Detener instancias previas ordenadamente (Graceful Shutdown para prevenir pérdida de datos)
+function Stop-KorexServiceGraceful($name, $timeoutSec = 10) {
+    $svc = Get-Service -Name $name -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -eq 'Running') {
+        Write-Log "Solicitando detencion limpia y ordenada de servicio $name..."
+        try {
+            Stop-Service -Name $name -NoWait -ErrorAction SilentlyContinue
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($sw.Elapsed.TotalSeconds -lt $timeoutSec) {
+                Start-Sleep -Milliseconds 500
+                $svc.Refresh()
+                if ($svc.Status -eq 'Stopped') {
+                    Write-Log "Servicio $name detenido ordenadamente."
+                    return $true
+                }
+            }
+            Write-Log "Tiempo de espera superado ($timeoutSec s) al detener servicio $name." "WARN"
+        } catch {
+            Write-Log "Aviso al detener servicio $name: $_" "WARN"
+        }
+    }
+    return $false
+}
+
+Stop-KorexServiceGraceful "Korex_SQLServer_Service"
+Stop-KorexServiceGraceful "Korex_NextJS"
+Stop-KorexServiceGraceful "korex_nextjs.exe"
+
+# Cierre ordenado de procesos Node.js de la aplicación con tiempo de gracia
+Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object {
+    try { $_.Path -like "*$TargetDir*" } catch { $false }
+} | ForEach-Object {
+    Write-Log "Solicitando cierre ordenado de proceso Node.js (PID: $($_.Id)) en $TargetDir..."
+    try { $_.CloseMainWindow() | Out-Null } catch {}
+    if (-not $_.WaitForExit(3000)) {
+        try { Stop-Process -Id $_.Id -ErrorAction SilentlyContinue } catch {}
+    }
+}
 
 $taskMgrScript = Join-Path $TargetDir "deploy\task_scheduler_manager.ps1"
 if (Test-Path $taskMgrScript) {
-    & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Stop -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort > $null 2>&1
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Stop -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort > $null 2>&1
 }
 
 Start-Sleep -Seconds 2
@@ -178,9 +212,9 @@ $startedOk = $false
 if ($activeMechanism -eq "TASK_SCHEDULER") {
     Write-Log "Actualizando y reiniciando via Windows Task Scheduler (Korex SQLServer - Startup)..."
     if (Test-Path $taskMgrScript) {
-        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
         Start-Sleep -Seconds 2
-        & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+        & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
         Start-Sleep -Seconds 3
 
         $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -221,9 +255,9 @@ if ($activeMechanism -eq "TASK_SCHEDULER") {
     if (-not $startedOk) {
         Write-Log "Aviso: Servicio Windows Web fallo al reiniciar. Activando fallback a Task Scheduler..." "WARN"
         if (Test-Path $taskMgrScript) {
-            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+            & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Register -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
             Start-Sleep -Seconds 2
-            & powershell.exe -ExecutionPolicy Bypass -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
+            & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$taskMgrScript" -Action Start -Engine SQLSERVER -TargetDir "$TargetDir" -Port $OldNextjsPort >> $LogFile 2>&1
             Start-Sleep -Seconds 3
             $chk = Get-NetTCPConnection -LocalPort $OldNextjsPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($chk) {
@@ -276,7 +310,7 @@ if (Test-Path $AppCmd) {
 # =============================================================================
 $DiagScript = Join-Path $TargetDir "deploy\Korex_Diagnostics_Engine.ps1"
 if (Test-Path $DiagScript) {
-    & powershell.exe -ExecutionPolicy Bypass -File "$DiagScript" `
+    & powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "$DiagScript" `
         -Engine "SQLSERVER" `
         -Mode "Reparacion" `
         -TargetDir "$TargetDir" `

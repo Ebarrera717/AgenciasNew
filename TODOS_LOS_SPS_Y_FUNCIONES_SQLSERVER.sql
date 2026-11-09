@@ -14,6 +14,11 @@ BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'observations') ALTER TABLE dbo.[Quotation] ADD [observations] NVARCHAR(MAX) NULL;
 END;
 GO
+IF OBJECT_ID('dbo.Invoices', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Invoices') AND name = 'observations') ALTER TABLE dbo.[Invoices] ADD [observations] NVARCHAR(MAX) NULL;
+END;
+GO
 IF OBJECT_ID('dbo.ImpRet', 'U') IS NOT NULL
 BEGIN
     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.ImpRet') AND name = 'in_tipo') ALTER TABLE dbo.ImpRet ADD in_tipo CHAR(1) NULL DEFAULT 'I';
@@ -3914,8 +3919,8 @@ BEGIN
             '33' AS [cd_serie],
             '' AS [cd_consecutivo],
             1 AS [cd_usuario],
-            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-            SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+            SUBSTRING(ISNULL(b.code, 'OFP'), 1, 25) AS [cd_sucursal],
+            SUBSTRING(ISNULL(imp.code, ''), 1, 25) AS [cd_implante],
             CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_fechacont],
             CONVERT(VARCHAR(19), ISNULL(e.date, GETDATE()), 120) AS [dt_vence],
             SUBSTRING(ISNULL(c.document, ''), 1, 15) AS [cd_tercero_codigo],
@@ -3935,7 +3940,7 @@ BEGIN
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
             CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [am_tcambiousd],
             1 AS [id_tipoventa],
-            '' AS [ds_Observacion],
+            ISNULL(e.observations, '') AS [ds_Observacion],
             CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [TotalFactura],
             CAST(ISNULL(e.totalAmount, 0) AS DECIMAL(18,2)) AS [ValorFactura],
             -- Items
@@ -4041,8 +4046,8 @@ BEGIN
                     0 AS [in_cc_cuotas2],
                     ISNULL(e.currency, 'COP') AS [cd_monedas_iata],
                     CAST(ISNULL(e.exchangeRate, 1.0) AS DECIMAL(18,4)) AS [Tcambio],
-                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 5) AS [cd_sucursal],
-                    SUBSTRING(ISNULL(imp.code, ''), 1, 5) AS [cd_implante],
+                    SUBSTRING(ISNULL(b.code, 'OFP'), 1, 25) AS [cd_sucursal],
+                    SUBSTRING(ISNULL(imp.code, ''), 1, 25) AS [cd_implante],
                     0 AS [bl_ahorro],
                     'ACT' AS [cd_TipoTiqueteGDS],
                     '' AS [cd_TiposDocumento],
@@ -4435,7 +4440,7 @@ IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spInvoicesListar;
 GO
 
-CREATE PROCEDURE dbo.spInvoicesListar
+CREATE OR ALTER PROCEDURE dbo.spInvoicesListar
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -4471,6 +4476,7 @@ BEGIN
         i.[fuente],
         i.[serie],
         i.[consecutivo],
+        i.[observations],
         (
             SELECT TOP 1 ipp.[name]
             FROM dbo.[InvoicesProduct] ip

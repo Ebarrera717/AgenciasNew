@@ -23,6 +23,7 @@ BEGIN
             'internalNumber', i."internalNumber",
             'date', i.date,
             'dueDate', i."dueDate",
+            'observations', COALESCE(i.observations, ''),
             'state', COALESCE(i.state, 'NUEVO'),
             'isExcelImport', COALESCE(i."isExcelImport", false),
             'zeusInvoiceNumber', i."zeusInvoiceNumber",

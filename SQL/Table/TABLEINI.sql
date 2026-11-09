@@ -635,7 +635,8 @@ BEGIN
         "chargesAndTaxes" double precision NOT NULL,
         "totalAmount" double precision NOT NULL,
         "userId" integer,
-        state character varying(25) DEFAULT 'NUEVO'::character varying
+        state character varying(25) DEFAULT 'NUEVO'::character varying,
+        "observations" text
     );
     CREATE TABLE IF NOT EXISTS public."InvoicesProduct" (
         id integer NOT NULL,

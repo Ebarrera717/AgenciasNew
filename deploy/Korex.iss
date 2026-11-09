@@ -36,20 +36,23 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
   AppDir: String;
-  Cmd: String;
 begin
   AppDir := ExpandConstant('{app}');
-  // Detener el servicio, matar procesos remanentes de node en el directorio destino, y borrar cache vieja para evitar bloqueos de archivos
-  Cmd := '-ExecutionPolicy Bypass -Command "' +
-         'Stop-Service -Name Korex_NextJS -Force -ErrorAction SilentlyContinue; ' +
-         'Get-Process -Name korex_nextjs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; ' +
-         'sc.exe delete Korex_NextJS | Out-Null; ' +
-         'Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ''*' + AppDir + '*'' } | Stop-Process -Force -ErrorAction SilentlyContinue; ' +
-         'Start-Sleep -Seconds 2; ' +
-         'if (Test-Path ''' + AppDir + '\.next'') { Remove-Item ''' + AppDir + '\.next'' -Recurse -Force -ErrorAction SilentlyContinue }; ' +
-         'if (Test-Path ''' + AppDir + '\public'') { Remove-Item ''' + AppDir + '\public'' -Recurse -Force -ErrorAction SilentlyContinue };' +
-         '"';
-  Exec('powershell.exe', Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  
+  // Detención limpia y ordenada del servicio previo sin matar procesos a ciegas
+  Exec('net.exe', 'stop Korex_NextJS', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('sc.exe', 'delete Korex_NextJS', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(1500);
+
+  // Limpieza segura y nativa de carpetas de caché previo a la instalación (sin invocar scripts de borrado)
+  if (AppDir <> '') and (AppDir <> 'C:\') and (AppDir <> 'C:\Windows') then
+  begin
+    if DirExists(AppDir + '\.next') then
+      DelTree(AppDir + '\.next', True, True, True);
+    if DirExists(AppDir + '\public') then
+      DelTree(AppDir + '\public', True, True, True);
+  end;
+
   Result := '';
 end;
 
@@ -93,7 +96,7 @@ begin
     end;
 
     // Verificar la conexión TCP a PostgreSQL usando PowerShell de fondo
-    Cmd := '-ExecutionPolicy Bypass -Command "' +
+    Cmd := '-NoProfile -ExecutionPolicy RemoteSigned -Command "' +
            '$tc = New-Object System.Net.Sockets.TcpClient; ' +
            'try { ' +
            '  $tc.Connect(''' + Host + ''', ' + Port + '); ' +
@@ -170,5 +173,5 @@ begin
 end;
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\Setup_Korex_Silent.ps1"" -PgHost ""{code:GetPgHost}"" -PgPort ""{code:GetPgPort}"" -PgDb ""{code:GetPgDb}"" -PgUser ""{code:GetPgUser}"" -PgPass ""{code:GetPgPass}"""; Flags: waituntilterminated runhidden; StatusMsg: "Configurando Node.js, Windows Services y Enrutamiento IIS... (Por favor espere)"
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File ""{app}\Setup_Korex_Silent.ps1"" -PgHost ""{code:GetPgHost}"" -PgPort ""{code:GetPgPort}"" -PgDb ""{code:GetPgDb}"" -PgUser ""{code:GetPgUser}"" -PgPass ""{code:GetPgPass}"""; Flags: waituntilterminated runhidden; StatusMsg: "Configurando Node.js, Windows Services y Enrutamiento IIS... (Por favor espere)"
 Filename: "http://localhost:3000/"; Flags: shellexec runasoriginaluser postinstall; Description: "Abrir la plataforma Korex en mi Navegador"

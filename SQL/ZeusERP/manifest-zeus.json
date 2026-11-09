@@ -1,15 +1,23 @@
 {
   "releaseVersion": "0.1.0",
-  "build": "20261105.01",
+  "build": "20261109.01",
   "target": "ZeusAgencias_23",
-  "generatedAt": "2026-11-05T19:11:25.334Z",
-  "totalObjects": 2,
+  "generatedAt": "2026-11-09T21:14:36.518Z",
+  "totalObjects": 3,
   "objects": [
+    {
+      "objectType": "PROCEDURE",
+      "objectName": "dbo.spCotizacionEliminarZeus",
+      "sourceFile": "SQL/ZeusERP/spCotizacionEliminarZeus.sql",
+      "hash": "3bdfb8b3ad3688ecf5abb12e19933e3078134cad5fb41e08b557096da13c4b0e",
+      "isMandatory": true,
+      "target": "ZEUS_ERP"
+    },
     {
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionesCrear",
       "sourceFile": "SQL/ZeusERP/spCotizacionesCrear.sql",
-      "hash": "e7b08b9c806c927378d84ffdfe07eb0ec5517e422f772789784baa05514c0f77",
+      "hash": "6be0e0aaa568af6d40c0db6feda9b0e3ba9d599f8f30b9ab2cacd83b0f55678b",
       "isMandatory": true,
       "target": "ZEUS_ERP"
     },
@@ -17,7 +25,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spFacturacionesCrear",
       "sourceFile": "SQL/ZeusERP/spFacturacionesCrear.sql",
-      "hash": "6bd42515eaf48b3b060132a6ea9a8364311ff4d9b2cf9c2b307c5556a06e8468",
+      "hash": "12cbd33520871783d5e704f950b0ac4509e3556580259115b6a0b0e2ef55ea41",
       "isMandatory": true,
       "target": "ZEUS_ERP"
     }
