@@ -41,7 +41,7 @@ BEGIN
             costoTotal, valorBase, utilidad, comisionTotalPercentage,
             comisionFreelancePercentage, comisionFreelanceValue,
             comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren,
+            destination, startDate, endDate, passenger, passengerFirstName, passengerLastName, paxAdults, paxChildren,
             reservationCode, copyFieldsToProducts, manualDescription, observations
         )
         SELECT
@@ -52,7 +52,7 @@ BEGIN
             costoTotal, valorBase, utilidad, comisionTotalPercentage,
             comisionFreelancePercentage, comisionFreelanceValue,
             comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren,
+            destination, startDate, endDate, passenger, passengerFirstName, passengerLastName, paxAdults, paxChildren,
             reservationCode, copyFieldsToProducts, manualDescription, observations
         FROM dbo.[Quotation]
         WHERE id = @p_quotation_id;
@@ -103,7 +103,7 @@ BEGIN
                 checkInDate, checkOutDate, nights, paxAdults, paxChildren,
                 serviceType, destination, reservationCode, sellerCommission,
                 ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                service, servicios, descripcion, description, passenger,
+                service, servicios, descripcion, description, passenger, passengerFirstName, passengerLastName,
                 providerDueDate, providerInvoice
             )
             SELECT
@@ -111,7 +111,7 @@ BEGIN
                 checkInDate, checkOutDate, nights, paxAdults, paxChildren,
                 serviceType, destination, reservationCode, sellerCommission,
                 ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                service, servicios, descripcion, description, passenger,
+                service, servicios, descripcion, description, passenger, passengerFirstName, passengerLastName,
                 providerDueDate, providerInvoice
             FROM dbo.[QuotationProduct]
             WHERE id = @origQpId;
@@ -119,8 +119,8 @@ BEGIN
             SET @newQpId = SCOPE_IDENTITY();
 
             -- Duplicar pasajeros
-            INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, [name], document)
-            SELECT @newQpId, [name], document
+            INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, [name], firstName, lastName, document)
+            SELECT @newQpId, [name], firstName, lastName, document
             FROM dbo.[QuotationProductPassenger]
             WHERE quotationProductId = @origQpId;
 

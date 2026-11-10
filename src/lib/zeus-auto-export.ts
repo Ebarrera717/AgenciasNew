@@ -117,6 +117,16 @@ export async function autoExportQuotationToZeusERP(
             return { exported: true, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
         }
 
+        // 1.5 Aplicar Parametrización Dinámica de Descripción de Ítems y Observaciones para Zeus ERP
+        try {
+            const { getZeusTextConfigs } = await import('@/lib/zeus-text-service');
+            const { applyZeusTextFormattingToXml } = await import('@/lib/zeus-text-formatter');
+            const { itemDescriptionConfig, observationsConfig } = await getZeusTextConfigs();
+            xmlStr = applyZeusTextFormattingToXml(xmlStr, itemDescriptionConfig, observationsConfig);
+        } catch (fmtErr: any) {
+            console.warn('[ZEUS_AUTO_EXPORT] Advertencia al formatear textos Zeus (Cotización):', fmtErr.message);
+        }
+
         // 2. Inyección en Zeus ERP (spCotizacionesCrear)
         const targetDb = await getZeusERPDatabaseName();
         console.log(`[ZEUS_AUTO_EXPORT] Inyectando XML en Zeus ERP (BD: ${targetDb}) para Cotización(es) [${idsStr}]...`);
@@ -206,6 +216,16 @@ export async function autoExportInvoiceToZeusERP(
             console.warn(`[ZEUS_AUTO_EXPORT] No se pudo generar XML válido para factura(s) [${idsStr}]: ${xmlStr}`);
             await registerLog(safeUserId, 'INVOICE', 'AUTO_EXPORT_ERROR', `ID(s) ${idsStr}: Error en generación de XML: ${xmlStr}`, { xml: xmlStr });
             return { exported: true, success: false, message: `Error en generación de XML: ${xmlStr}`, xml: xmlStr };
+        }
+
+        // 1.5 Aplicar Parametrización Dinámica de Descripción de Ítems y Observaciones para Zeus ERP
+        try {
+            const { getZeusTextConfigs } = await import('@/lib/zeus-text-service');
+            const { applyZeusTextFormattingToXml } = await import('@/lib/zeus-text-formatter');
+            const { itemDescriptionConfig, observationsConfig } = await getZeusTextConfigs();
+            xmlStr = applyZeusTextFormattingToXml(xmlStr, itemDescriptionConfig, observationsConfig);
+        } catch (fmtErr: any) {
+            console.warn('[ZEUS_AUTO_EXPORT] Advertencia al formatear textos Zeus (Factura):', fmtErr.message);
         }
 
         // 2. Inyección en Zeus ERP (spFacturacionesCrear)

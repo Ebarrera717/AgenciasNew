@@ -58,6 +58,9 @@ DECLARE
     -- Variables para validación de variables obligatorias específicas del cliente
     v_client_mandatory_vars JSONB;
     v_client_var_id_text TEXT;
+    v_pax_first TEXT;
+    v_pax_last TEXT;
+    v_pax_full TEXT;
     v_req_var_id INT;
     v_req_var_name TEXT;
     v_item_json JSONB;
@@ -128,6 +131,9 @@ BEGIN
     END IF;
 
     v_branch_id := NULLIF(p_data->>'branchId', '')::INT;
+    IF v_branch_id IS NULL THEN
+        SELECT id INTO v_branch_id FROM public."Branch" ORDER BY id ASC LIMIT 1;
+    END IF;
     v_implant_id := NULLIF(p_data->>'implantId', '')::INT;
 
     -- Obtener decimales de la moneda
@@ -491,10 +497,23 @@ BEGIN
             ) RETURNING id INTO v_invoice_product_id;
 
             IF v_item.passengers IS NOT NULL THEN
-                FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
+                FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x("firstName" TEXT, "lastName" TEXT, name TEXT, document TEXT)
                 LOOP
-                    INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "name", "document")
-                    VALUES (v_invoice_product_id, v_pax.name, v_pax.document);
+                    v_pax_first := NULLIF(TRIM(v_pax."firstName"), '');
+                    v_pax_last := NULLIF(TRIM(v_pax."lastName"), '');
+                    IF v_pax_first IS NULL AND v_pax_last IS NULL AND NULLIF(TRIM(v_pax.name), '') IS NOT NULL THEN
+                        IF POSITION(' ' IN TRIM(v_pax.name)) = 0 THEN
+                            v_pax_first := TRIM(v_pax.name);
+                            v_pax_last := '';
+                        ELSE
+                            v_pax_first := SPLIT_PART(TRIM(v_pax.name), ' ', 1);
+                            v_pax_last := SUBSTRING(TRIM(v_pax.name) FROM POSITION(' ' IN TRIM(v_pax.name)) + 1);
+                        END IF;
+                    END IF;
+                    v_pax_full := COALESCE(NULLIF(TRIM(COALESCE(v_pax_first, '') || ' ' || COALESCE(v_pax_last, '')), ''), v_pax.name, '');
+
+                    INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "firstName", "lastName", "name", "document")
+                    VALUES (v_invoice_product_id, v_pax_first, v_pax_last, v_pax_full, COALESCE(v_pax.document, ''));
                 END LOOP;
             END IF;
 

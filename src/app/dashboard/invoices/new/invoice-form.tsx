@@ -39,7 +39,7 @@ interface InvoiceFormData {
         destination: string;
         serviceType: string;
         reservationCode: string;
-        passengers?: { name: string, document: string }[];
+        passengers?: { name: string, firstName?: string, lastName?: string, document: string }[];
         servicios?: string;
         descripcion?: string;
         ticketCode?: string;
@@ -507,7 +507,9 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                 paxChildren: bkItem.paxChildren || 0,
                 destination: bkItem.destination || '',
                 passengers: (bkItem.passengers || []).map((px: any) => ({
-                    name: px.name || '',
+                    name: px.name || `${px.firstName || ''} ${px.lastName || ''}`.trim(),
+                    firstName: px.firstName || '',
+                    lastName: px.lastName || '',
                     document: px.document || ''
                 })),
                 mainTaxId,
@@ -941,7 +943,12 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                     descripcion: p.descripcion || '',
                                     providerDueDate: p.providerDueDate ? new Date(p.providerDueDate).toISOString().split('T')[0] : '',
                                     providerInvoice: p.providerInvoice || '',
-                                    passengers: Array.isArray(p.passengers) ? p.passengers : [],
+                                    passengers: Array.isArray(p.passengers) ? p.passengers.map((px: any) => ({
+                                        name: px.name || `${px.firstName || ''} ${px.lastName || ''}`.trim(),
+                                        firstName: px.firstName || '',
+                                        lastName: px.lastName || '',
+                                        document: px.document || ''
+                                    })) : [],
                                     sellerCommission: p.sellerCommission || 0,
                                     ticketPrinterCommission: p.ticketPrinterCommission || 0,
                                     mainTaxId: p.mainTaxId,
@@ -1026,7 +1033,12 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                     reservationCode: p.reservationCode || '',
                                     providerDueDate: p.providerDueDate ? new Date(p.providerDueDate).toISOString().split('T')[0] : '',
                                     providerInvoice: p.providerInvoice || '',
-                                    passengers: Array.isArray(p.passengers) ? p.passengers : [],
+                                    passengers: Array.isArray(p.passengers) ? p.passengers.map((px: any) => ({
+                                        name: px.name || `${px.firstName || ''} ${px.lastName || ''}`.trim(),
+                                        firstName: px.firstName || '',
+                                        lastName: px.lastName || '',
+                                        document: px.document || ''
+                                    })) : [],
                                     sellerCommission: p.sellerCommission || 0,
                                     ticketPrinterCommission: p.ticketPrinterCommission || 0,
                                     mainTaxId,
@@ -1073,7 +1085,7 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                 providerId: '', prestadoraId: '', checkIn: '', checkOut: '',
                 paxAdults: 1, paxChildren: 0, destination: '', serviceType: '', reservationCode: '', 
                 providerDueDate: '', providerInvoice: '',
-                passengers: [{ name: '', document: '' }],
+                passengers: [{ name: '', firstName: '', lastName: '', document: '' }],
                 sellerCommission: 0, ticketPrinterCommission: 0,
                 appliedTaxes: [],
                 variables: [],
@@ -2163,26 +2175,43 @@ export default function InvoiceForm({ invoiceId, quotationId, initialData, onCan
                                                         Detalle de Pasajeros
                                                         <button type="button" onClick={() => {
                                                             const p = [...(item.passengers || [])];
-                                                            p.push({ name: '', document: '' });
+                                                            p.push({ name: '', firstName: '', lastName: '', document: '' });
                                                             updateItem(index, 'passengers', p);
                                                         }} className="text-blue-500 font-medium hover:underline lowercase text-xs flex items-center gap-1">+ agregar pasajero</button>
                                                     </p>
                                                     {(item.passengers || []).map((pax: any, pIdx: number) => (
-                                                        <div key={pIdx} className="flex gap-2">
-                                                            <input type="text" placeholder="Nombre" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.name} onChange={(e) => {
-                                                                const newPass = [...(item.passengers || [])];
-                                                                newPass[pIdx] = { ...pax, name: e.target.value };
-                                                                updateItem(index, 'passengers', newPass);
-                                                            }} />
-                                                            <input type="text" placeholder="Documento" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.document} onChange={(e) => {
-                                                                const newPass = [...(item.passengers || [])];
-                                                                newPass[pIdx] = { ...pax, document: e.target.value };
-                                                                updateItem(index, 'passengers', newPass);
-                                                            }} />
-                                                            <button type="button" onClick={() => {
-                                                                const newPass = (item.passengers || []).filter((_: any, idx: number) => idx !== pIdx);
-                                                                updateItem(index, 'passengers', newPass);
-                                                            }} className="text-red-400 p-2 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                                                        <div key={pIdx} className="grid grid-cols-12 gap-2 items-center">
+                                                            <div className="col-span-4">
+                                                                <input type="text" placeholder="Nombres" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.firstName ?? (pax.name ? pax.name.split(' ')[0] : '')} onChange={(e) => {
+                                                                    const newPass = [...(item.passengers || [])];
+                                                                    const first = e.target.value;
+                                                                    const last = newPass[pIdx]?.lastName || '';
+                                                                    newPass[pIdx] = { ...pax, firstName: first, lastName: last, name: `${first} ${last}`.trim() };
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} />
+                                                            </div>
+                                                            <div className="col-span-4">
+                                                                <input type="text" placeholder="Apellidos" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.lastName ?? (pax.name && pax.name.includes(' ') ? pax.name.substring(pax.name.indexOf(' ') + 1) : '')} onChange={(e) => {
+                                                                    const newPass = [...(item.passengers || [])];
+                                                                    const last = e.target.value;
+                                                                    const first = newPass[pIdx]?.firstName || '';
+                                                                    newPass[pIdx] = { ...pax, firstName: first, lastName: last, name: `${first} ${last}`.trim() };
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} />
+                                                            </div>
+                                                            <div className="col-span-3">
+                                                                <input type="text" placeholder="Documento" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.document} onChange={(e) => {
+                                                                    const newPass = [...(item.passengers || [])];
+                                                                    newPass[pIdx] = { ...pax, document: e.target.value };
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} />
+                                                            </div>
+                                                            <div className="col-span-1 flex justify-center">
+                                                                <button type="button" onClick={() => {
+                                                                    const newPass = (item.passengers || []).filter((_: any, idx: number) => idx !== pIdx);
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} className="text-red-400 p-2 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>

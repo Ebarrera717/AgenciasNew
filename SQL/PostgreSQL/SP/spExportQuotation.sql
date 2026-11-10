@@ -491,16 +491,22 @@ BEGIN
         COALESCE(qp.destination, '') as ds_destino, 
         COALESCE(NULLIF(TRIM(qp.servicios), ''), NULLIF(TRIM(qp.descripcion), ''), NULLIF(TRIM(pr.description), ''), '') as ds_servicio, 
         COALESCE(NULLIF(TRIM(qp.descripcion), ''), NULLIF(TRIM(pr.description), ''), '') as ds_descrip, 
-		CASE 
-	        WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
-	        WHEN TRIM(qpp.name) NOT LIKE '% %' THEN TRIM(qpp.name)
-	        ELSE COALESCE(arr[1], '')
-	    END AS ds_paxname,
-	    CASE 
-	        WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
-	        WHEN TRIM(qpp.name) NOT LIKE '% %' THEN ''
-	        ELSE COALESCE(arr[2], '')
-	    END AS ds_paxape,
+		COALESCE(
+	        NULLIF(TRIM(qpp.firstName), ''),
+	        CASE 
+	            WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
+	            WHEN TRIM(qpp.name) NOT LIKE '% %' THEN TRIM(qpp.name)
+	            ELSE COALESCE(arr[1], '')
+	        END
+	    ) AS ds_paxname,
+	    COALESCE(
+	        NULLIF(TRIM(qpp.lastName), ''),
+	        CASE 
+	            WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
+	            WHEN TRIM(qpp.name) NOT LIKE '% %' THEN ''
+	            ELSE COALESCE(arr[2], '')
+	        END
+	    ) AS ds_paxape,
         CASE 
 	        WHEN TRIM(qpp.name) LIKE '% %' THEN COALESCE(arr[3], '')
 	        ELSE ''
@@ -626,6 +632,8 @@ BEGIN
 	LEFT JOIN LATERAL ( 
         SELECT 
             COALESCE(pp.id, 999999) as id,
+            COALESCE(NULLIF(TRIM(pp."firstName"), ''), NULLIF(TRIM(qp."passengerFirstName"), ''), NULLIF(TRIM(qt."passengerFirstName"), '')) as firstName,
+            COALESCE(NULLIF(TRIM(pp."lastName"), ''), NULLIF(TRIM(qp."passengerLastName"), ''), NULLIF(TRIM(qt."passengerLastName"), '')) as lastName,
             COALESCE(pp.name, qp.passenger, '') as name,
             COALESCE(pp.document, '') as document,
             regexp_split_to_array(TRIM(COALESCE(pp.name, qp.passenger, '')), '\s+') AS arr
@@ -660,16 +668,22 @@ BEGIN
 	SELECT 
 	    cs.cd_Cotizacion, 
 	    cs.cd_Consecutivo_VARiablesAdicionales AS cd_CotizacionServicios, 
-	    CASE 
-	        WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
-	        WHEN TRIM(p.name) NOT LIKE '% %' THEN ''
-	        ELSE COALESCE(arr[2], '')
-	    END AS ds_paxape,
-	    CASE 
-	        WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
-	        WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name)
-	        ELSE COALESCE(arr[1], '')
-	    END AS ds_paxname,
+	    COALESCE(
+	        NULLIF(TRIM(p."lastName"), ''),
+	        CASE 
+	            WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
+	            WHEN TRIM(p.name) NOT LIKE '% %' THEN ''
+	            ELSE COALESCE(arr[2], '')
+	        END
+	    ) AS ds_paxape,
+	    COALESCE(
+	        NULLIF(TRIM(p."firstName"), ''),
+	        CASE 
+	            WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
+	            WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name)
+	            ELSE COALESCE(arr[1], '')
+	        END
+	    ) AS ds_paxname,
 	    CASE 
 	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[3], '')
 	        ELSE ''

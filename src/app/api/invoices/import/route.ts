@@ -4,6 +4,7 @@ import { executeSQLServerProcedure, isSQLServerMode, getZeusERPDatabaseName } fr
 import { executePostgresQuery } from '@/lib/postgres'
 import { generateTraceCode, recordTraceEvent } from '@/lib/traceability'
 import { getNextTransactionConsecutive } from '@/lib/consecutives'
+import { parseExcelPassengers, buildExcelPassengersString } from '@/app/api/quotations/import/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -689,18 +690,15 @@ export async function POST(req: NextRequest) {
                         }
 
                         // Inserción de Pasajeros
-                        const paxStr = (it.Pasajeros || '').toString().trim();
-                        if (paxStr) {
-                            const paxItems = paxStr.split('|');
-                            for (const paxItem of paxItems) {
-                                if (!paxItem.trim()) continue;
-                                const parts = paxItem.split(':');
-                                await new mssql.Request(transaction)
-                                    .input('invoiceProductId', mssql.Int, invoiceProductId)
-                                    .input('name', mssql.VarChar, parts[0]?.trim() || '')
-                                    .input('document', mssql.VarChar, parts[1]?.trim() || '')
-                                    .query(`INSERT INTO dbo.[InvoicesProductPasenger] (invoiceProductId, name, document) VALUES (@invoiceProductId, @name, @document)`);
-                            }
+                        const paxList = parseExcelPassengers(it);
+                        for (const p of paxList) {
+                            await new mssql.Request(transaction)
+                                .input('invoiceProductId', mssql.Int, invoiceProductId)
+                                .input('name', mssql.VarChar, p.name)
+                                .input('firstName', mssql.VarChar, p.firstName)
+                                .input('lastName', mssql.VarChar, p.lastName)
+                                .input('document', mssql.VarChar, p.document)
+                                .query(`INSERT INTO dbo.[InvoicesProductPasenger] (invoiceProductId, name, firstName, lastName, document) VALUES (@invoiceProductId, @name, @firstName, @lastName, @document)`);
                         }
 
                         // Inserción de Variables Adicionales
@@ -855,7 +853,7 @@ export async function POST(req: NextRequest) {
                 getExcelPrestadoraCode(row),
                 impuestosStr,
                 getExcelVariableString(row),
-                getRowValue(row, 'Pasajeros', 'Pasajero', 'Pax') || '',
+                buildExcelPassengersString(row),
                 extractNumericValue(getRowValue(row, 'Precio_Unitario', 'Precio Unitario', 'Precio', 'Valor_Unitario', 'Valor', 'Price', 'Unit_Price', 'Tarifa') || ''),
                 extractNumericValue(getRowValue(row, 'Cantidad', 'Quantity', 'Qty') || ''),
                 checkInClean,

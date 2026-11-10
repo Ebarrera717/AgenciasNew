@@ -249,6 +249,8 @@ BEGIN
         [destination] NVARCHAR(255) NULL,
         [startDate] DATETIME2 NULL,
         [endDate] DATETIME2 NULL,
+        [passengerFirstName] NVARCHAR(150) NULL,
+        [passengerLastName] NVARCHAR(150) NULL,
         [passenger] NVARCHAR(255) NULL,
         [paxAdults] INT NULL,
         [paxChildren] INT NULL,
@@ -260,6 +262,12 @@ BEGIN
 END;
 IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'observations')
     ALTER TABLE dbo.[Quotation] ADD [observations] NVARCHAR(MAX) NULL;
+
+IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'passengerFirstName')
+    ALTER TABLE dbo.[Quotation] ADD [passengerFirstName] NVARCHAR(150) NULL;
+
+IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'passengerLastName')
+    ALTER TABLE dbo.[Quotation] ADD [passengerLastName] NVARCHAR(150) NULL;
 
 -- 14. Currency
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Currency' AND schema_id = SCHEMA_ID('dbo'))
@@ -371,11 +379,19 @@ BEGIN
         [description] NVARCHAR(MAX) NULL,
         [servicios] NVARCHAR(MAX) NULL,
         [descripcion] NVARCHAR(MAX) NULL,
+        [passengerFirstName] NVARCHAR(150) NULL,
+        [passengerLastName] NVARCHAR(150) NULL,
         [passenger] NVARCHAR(255) NULL,
         [providerDueDate] DATETIME2 NULL,
         [providerInvoice] NVARCHAR(100) NULL
     );
 END;
+
+IF OBJECT_ID('dbo.QuotationProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'passengerFirstName')
+    ALTER TABLE dbo.[QuotationProduct] ADD [passengerFirstName] NVARCHAR(150) NULL;
+
+IF OBJECT_ID('dbo.QuotationProduct') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProduct') AND name = 'passengerLastName')
+    ALTER TABLE dbo.[QuotationProduct] ADD [passengerLastName] NVARCHAR(150) NULL;
 
 -- 19a. Combo
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Combo' AND schema_id = SCHEMA_ID('dbo'))
@@ -398,10 +414,18 @@ BEGIN
     CREATE TABLE dbo.[QuotationProductPassenger] (
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_QuotationProductPassenger PRIMARY KEY,
         [quotationProductId] INT NOT NULL CONSTRAINT FK_QuotationProductPassenger_QuotationProduct REFERENCES dbo.[QuotationProduct]([id]) ON DELETE CASCADE,
+        [firstName] NVARCHAR(150) NULL,
+        [lastName] NVARCHAR(150) NULL,
         [name] NVARCHAR(255) NOT NULL,
         [document] NVARCHAR(50) NOT NULL
     );
 END;
+
+IF OBJECT_ID('dbo.QuotationProductPassenger') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductPassenger') AND name = 'firstName')
+    ALTER TABLE dbo.[QuotationProductPassenger] ADD [firstName] NVARCHAR(150) NULL;
+
+IF OBJECT_ID('dbo.QuotationProductPassenger') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.QuotationProductPassenger') AND name = 'lastName')
+    ALTER TABLE dbo.[QuotationProductPassenger] ADD [lastName] NVARCHAR(150) NULL;
 
 -- 19c. QuotationProductTax
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'QuotationProductTax' AND schema_id = SCHEMA_ID('dbo'))
@@ -603,10 +627,18 @@ BEGIN
     CREATE TABLE dbo.[InvoicesProductPasenger] (
         [id] INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InvoicesProductPasenger PRIMARY KEY,
         [invoiceProductId] INT NOT NULL,
+        [firstName] NVARCHAR(150) NULL,
+        [lastName] NVARCHAR(150) NULL,
         [name] NVARCHAR(255) NOT NULL,
         [document] NVARCHAR(255) NOT NULL
     );
 END;
+
+IF OBJECT_ID('dbo.InvoicesProductPasenger') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPasenger') AND name = 'firstName')
+    ALTER TABLE dbo.[InvoicesProductPasenger] ADD [firstName] NVARCHAR(150) NULL;
+
+IF OBJECT_ID('dbo.InvoicesProductPasenger') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicesProductPasenger') AND name = 'lastName')
+    ALTER TABLE dbo.[InvoicesProductPasenger] ADD [lastName] NVARCHAR(150) NULL;
 
 -- 20d. InvoicesProductVariable
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InvoicesProductVariable' AND schema_id = SCHEMA_ID('dbo'))
@@ -2724,6 +2756,79 @@ BEGIN
        OR internalNumber LIKE 'QUO-%' 
        OR internalNumber LIKE 'TEMP_%'
        OR internalNumber = '';
+END;
+
+-- Migración inteligente de pasajeros históricos en SQL Server
+IF OBJECT_ID('dbo.Quotation', 'U') IS NOT NULL AND COL_LENGTH('dbo.Quotation', 'passengerFirstName') IS NOT NULL
+BEGIN
+    EXEC('UPDATE dbo.[Quotation]
+    SET [passengerFirstName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([passenger]))) = 0 THEN LTRIM(RTRIM([passenger]))
+            ELSE SUBSTRING(LTRIM(RTRIM([passenger])), 1, CHARINDEX('' '', LTRIM(RTRIM([passenger]))) - 1)
+        END,
+        [passengerLastName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([passenger]))) = 0 THEN ''''
+            ELSE LTRIM(SUBSTRING(LTRIM(RTRIM([passenger])), CHARINDEX('' '', LTRIM(RTRIM([passenger]))) + 1, LEN([passenger])))
+        END
+    WHERE ([passengerFirstName] IS NULL OR [passengerLastName] IS NULL)
+      AND [passenger] IS NOT NULL AND LTRIM(RTRIM([passenger])) <> '''';');
+END;
+
+IF OBJECT_ID('dbo.QuotationProduct', 'U') IS NOT NULL AND COL_LENGTH('dbo.QuotationProduct', 'passengerFirstName') IS NOT NULL
+BEGIN
+    EXEC('UPDATE dbo.[QuotationProduct]
+    SET [passengerFirstName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([passenger]))) = 0 THEN LTRIM(RTRIM([passenger]))
+            ELSE SUBSTRING(LTRIM(RTRIM([passenger])), 1, CHARINDEX('' '', LTRIM(RTRIM([passenger]))) - 1)
+        END,
+        [passengerLastName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([passenger]))) = 0 THEN ''''
+            ELSE LTRIM(SUBSTRING(LTRIM(RTRIM([passenger])), CHARINDEX('' '', LTRIM(RTRIM([passenger]))) + 1, LEN([passenger])))
+        END
+    WHERE ([passengerFirstName] IS NULL OR [passengerLastName] IS NULL)
+      AND [passenger] IS NOT NULL AND LTRIM(RTRIM([passenger])) <> '''';');
+END;
+
+IF OBJECT_ID('dbo.QuotationProductPassenger', 'U') IS NOT NULL AND COL_LENGTH('dbo.QuotationProductPassenger', 'firstName') IS NOT NULL
+BEGIN
+    EXEC('UPDATE dbo.[QuotationProductPassenger]
+    SET [firstName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([name]))) = 0 THEN LTRIM(RTRIM([name]))
+            ELSE SUBSTRING(LTRIM(RTRIM([name])), 1, CHARINDEX('' '', LTRIM(RTRIM([name]))) - 1)
+        END,
+        [lastName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([name]))) = 0 THEN ''''
+            ELSE LTRIM(SUBSTRING(LTRIM(RTRIM([name])), CHARINDEX('' '', LTRIM(RTRIM([name]))) + 1, LEN([name])))
+        END
+    WHERE ([firstName] IS NULL OR [lastName] IS NULL)
+      AND [name] IS NOT NULL AND LTRIM(RTRIM([name])) <> '''';');
+END;
+
+IF OBJECT_ID('dbo.InvoicesProductPasenger', 'U') IS NOT NULL AND COL_LENGTH('dbo.InvoicesProductPasenger', 'firstName') IS NOT NULL
+BEGIN
+    EXEC('UPDATE dbo.[InvoicesProductPasenger]
+    SET [firstName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([name]))) = 0 THEN LTRIM(RTRIM([name]))
+            ELSE SUBSTRING(LTRIM(RTRIM([name])), 1, CHARINDEX('' '', LTRIM(RTRIM([name]))) - 1)
+        END,
+        [lastName] = CASE 
+            WHEN CHARINDEX('' '', LTRIM(RTRIM([name]))) = 0 THEN ''''
+            ELSE LTRIM(SUBSTRING(LTRIM(RTRIM([name])), CHARINDEX('' '', LTRIM(RTRIM([name]))) + 1, LEN([name])))
+        END
+    WHERE ([firstName] IS NULL OR [lastName] IS NULL)
+      AND [name] IS NOT NULL AND LTRIM(RTRIM([name])) <> '''';');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = 'ZeusItemDescriptionConfig')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) 
+    VALUES ('ZeusItemDescriptionConfig', 'Parametrización Descripción Ítems Zeus ERP', '{"separator":" - ","fields":[{"id":"descripcion_manual","name":"Descripción Manual","enabled":true,"order":1,"label":"Servicio"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":true,"order":2,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":true,"order":3,"label":"Hasta"},{"id":"proveedor","name":"Proveedor","enabled":true,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"nacionalidad","name":"Nacionalidad","enabled":true,"order":6,"label":"Nacionalidad"},{"id":"numero_cotizacion","name":"Número de cotización","enabled":false,"order":7,"label":"Cotización"},{"id":"pasajero","name":"Nombre del pasajero","enabled":false,"order":8,"label":"Pasajero"},{"id":"destino","name":"Destino","enabled":false,"order":9,"label":"Destino"},{"id":"reservacion","name":"Código de Reserva","enabled":false,"order":10,"label":"Reserva"}]}');
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = 'ZeusObservationsConfig')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) 
+    VALUES ('ZeusObservationsConfig', 'Parametrización Observaciones Zeus ERP', '{"separator":" - ","fields":[{"id":"numero_cotizacion","name":"Número de cotización","enabled":true,"order":1,"label":"Cotización"},{"id":"numero_factura","name":"Número de factura","enabled":false,"order":2,"label":"Factura"},{"id":"pasajero","name":"Nombre del pasajero","enabled":true,"order":3,"label":"Pasajero"},{"id":"proveedor","name":"Proveedor","enabled":false,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":false,"order":6,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":false,"order":7,"label":"Hasta"},{"id":"descripcion_adicional","name":"Descripción adicional","enabled":false,"order":8,"label":"Servicios"}]}');
 END;
 
 PRINT 'Tablas de la base de datos SQL Server estructuradas exitosamente.';

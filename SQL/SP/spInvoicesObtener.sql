@@ -162,6 +162,8 @@ BEGIN
     SELECT 
         ipp.[id],
         ipp.[invoiceProductId],
+        ipp.[firstName],
+        ipp.[lastName],
         ipp.[name],
         ipp.[document]
     FROM dbo.[InvoicesProductPasenger] ipp

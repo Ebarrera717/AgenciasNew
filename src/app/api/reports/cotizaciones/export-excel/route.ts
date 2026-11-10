@@ -160,6 +160,10 @@ const FIELD_KEYWORDS: Record<string, string[]> = {
     fechasViaje: ['fechas de viaje', 'fechas viaje', 'fecha viaje', 'fechasviaje'],
     hotelesServicios: ['hoteles o servicios', 'hoteles/servicios', 'servicios', 'hoteles'],
     pasajeros: ['pasajeros', 'pasajero', 'nombre pasajero'],
+    pasajerosNombres: ['pasajeros nombres', 'nombres pasajeros', 'nombres'],
+    pasajerosApellidos: ['pasajeros apellidos', 'apellidos pasajeros', 'apellidos'],
+    pasajeroCabeceraNombres: ['pasajero nombres', 'titular nombres'],
+    pasajeroCabeceraApellidos: ['pasajero apellidos', 'titular apellidos'],
     totalAdultos: ['total adultos', 'adultos', 'totaladultos'],
     totalNinos: ['total ninos', 'ninos', 'totalninos'],
     observaciones: ['observaciones', 'notas'],
@@ -494,6 +498,10 @@ export async function GET(req: Request) {
                     fechaInicioCabecera: row.fechaInicioCabecera || '',
                     fechaFinCabecera: row.fechaFinCabecera || '',
                     pasajeroCabecera: row.pasajeroCabecera || '',
+                    pasajeroCabeceraNombres: row.pasajeroCabeceraNombres || '',
+                    pasajeroCabeceraApellidos: row.pasajeroCabeceraApellidos || '',
+                    pasajerosNombres: row.pasajerosNombres || '',
+                    pasajerosApellidos: row.pasajerosApellidos || '',
                     paxAdultosCabecera: row.paxAdultosCabecera || 0,
                     paxNinosCabecera: row.paxNinosCabecera || 0,
                     reservacionCabecera: row.reservacionCabecera || '',
@@ -783,6 +791,10 @@ export async function GET(req: Request) {
             setVal((config as any).fechaInicioCabecera, q.fechaInicioCabecera ? new Date(q.fechaInicioCabecera) : '');
             setVal((config as any).fechaFinCabecera, q.fechaFinCabecera ? new Date(q.fechaFinCabecera) : '');
             setVal((config as any).pasajeroCabecera, q.pasajeroCabecera || '');
+            setVal((config as any).pasajeroCabeceraNombres, q.pasajeroCabeceraNombres || '');
+            setVal((config as any).pasajeroCabeceraApellidos, q.pasajeroCabeceraApellidos || '');
+            setVal((config as any).pasajerosNombres, q.pasajerosNombres || '');
+            setVal((config as any).pasajerosApellidos, q.pasajerosApellidos || '');
             setVal((config as any).paxAdultosCabecera, q.paxAdultosCabecera || 0);
             setVal((config as any).paxNinosCabecera, q.paxNinosCabecera || 0);
             setVal((config as any).reservacionCabecera, q.reservacionCabecera || '');
@@ -1094,6 +1106,11 @@ export async function GET(req: Request) {
                     fechasViaje: q.fechasViaje || '',
                     hotelesServicios: q.hotelesServicios || '',
                     pasajeros: q.pasajeros || 'Mismo titular',
+                    pasajerosNombres: q.pasajerosNombres || '',
+                    pasajerosApellidos: q.pasajerosApellidos || '',
+                    pasajeroCabecera: q.pasajeroCabecera || '',
+                    pasajeroCabeceraNombres: q.pasajeroCabeceraNombres || '',
+                    pasajeroCabeceraApellidos: q.pasajeroCabeceraApellidos || '',
                     totalAdultos: String(q.totalAdultos),
                     totalNinos: String(q.totalNinos),
                     baseComisionable: formatCurrency(q.baseComisionable),

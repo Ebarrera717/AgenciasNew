@@ -209,7 +209,19 @@ async function exportSchema() {
         }
         
         const schemaFile = path.join(sqlDir, 'schema_reference.json');
-        fs.writeFileSync(schemaFile, JSON.stringify(schema, null, 2), 'utf8');
+        let written = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                fs.writeFileSync(schemaFile, JSON.stringify(schema, null, 2), 'utf8');
+                written = true;
+                break;
+            } catch (wErr) {
+                if (attempt === 3) throw wErr;
+                const waitMs = 500 * attempt;
+                const start = Date.now();
+                while (Date.now() - start < waitMs) {}
+            }
+        }
         console.log(`[Schema Generator] EXITO: Archivo descriptor guardado en: ${schemaFile} (${fs.statSync(schemaFile).size} bytes)`);
 
         await client.end();

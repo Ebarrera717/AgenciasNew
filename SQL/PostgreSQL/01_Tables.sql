@@ -919,6 +919,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'TransactionConsecutive' AND column_name = 'padding') THEN
         ALTER TABLE public."TransactionConsecutive" ADD COLUMN "padding" integer DEFAULT 4;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'TransactionConsecutive' AND column_name = 'updatedAt') THEN
+        ALTER TABLE public."TransactionConsecutive" ADD COLUMN "updatedAt" timestamp without time zone DEFAULT now();
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Branch' AND column_name = 'id') THEN
         ALTER TABLE public."Branch" ADD COLUMN "id" integer NOT NULL;
     END IF;
@@ -2100,6 +2103,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'name') THEN
         ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "name" character varying(255) NOT NULL;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'firstName') THEN
+        ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "firstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'lastName') THEN
+        ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "lastName" character varying(150);
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'document') THEN
         ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "document" character varying(255) NOT NULL;
     END IF;
@@ -2307,6 +2316,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passenger') THEN
         ALTER TABLE public."Quotation" ADD COLUMN "passenger" character varying(255);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passengerFirstName') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN "passengerFirstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passengerLastName') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN "passengerLastName" character varying(150);
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'paxAdults') THEN
         ALTER TABLE public."Quotation" ADD COLUMN "paxAdults" integer;
     END IF;
@@ -2498,6 +2513,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'passenger') THEN
         ALTER TABLE public."QuotationProduct" ADD COLUMN "passenger" character varying(255);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'passengerFirstName') THEN
+        ALTER TABLE public."QuotationProduct" ADD COLUMN "passengerFirstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'passengerLastName') THEN
+        ALTER TABLE public."QuotationProduct" ADD COLUMN "passengerLastName" character varying(150);
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'id') THEN
         ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "id" integer NOT NULL;
     END IF;
@@ -2506,6 +2527,12 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'name') THEN
         ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "name" text NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'firstName') THEN
+        ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "firstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'lastName') THEN
+        ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "lastName" character varying(150);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'document') THEN
         ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "document" text NOT NULL;
@@ -3611,6 +3638,15 @@ DELETE FROM public."SystemParameter" WHERE code IN ('EnviarFacturasAutoSQLserver
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1') ON CONFLICT (code) DO NOTHING;
 
+-- Parametrización dinámica de información enviada a Zeus (Descripción de Ítems y Observaciones)
+INSERT INTO public."SystemParameter" ("code", "name", "value") 
+VALUES ('ZeusItemDescriptionConfig', 'Parametrización Descripción Ítems Zeus ERP', '{"separator":" - ","fields":[{"id":"descripcion_manual","name":"Descripción Manual","enabled":true,"order":1,"label":"Servicio"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":true,"order":2,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":true,"order":3,"label":"Hasta"},{"id":"proveedor","name":"Proveedor","enabled":true,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"nacionalidad","name":"Nacionalidad","enabled":true,"order":6,"label":"Nacionalidad"},{"id":"numero_cotizacion","name":"Número de cotización","enabled":false,"order":7,"label":"Cotización"},{"id":"pasajero","name":"Nombre del pasajero","enabled":false,"order":8,"label":"Pasajero"},{"id":"destino","name":"Destino","enabled":false,"order":9,"label":"Destino"},{"id":"reservacion","name":"Código de Reserva","enabled":false,"order":10,"label":"Reserva"}]}') 
+ON CONFLICT ("code") DO NOTHING;
+
+INSERT INTO public."SystemParameter" ("code", "name", "value") 
+VALUES ('ZeusObservationsConfig', 'Parametrización Observaciones Zeus ERP', '{"separator":" - ","fields":[{"id":"numero_cotizacion","name":"Número de cotización","enabled":true,"order":1,"label":"Cotización"},{"id":"numero_factura","name":"Número de factura","enabled":false,"order":2,"label":"Factura"},{"id":"pasajero","name":"Nombre del pasajero","enabled":true,"order":3,"label":"Pasajero"},{"id":"proveedor","name":"Proveedor","enabled":false,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":false,"order":6,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":false,"order":7,"label":"Hasta"},{"id":"descripcion_adicional","name":"Descripción adicional","enabled":false,"order":8,"label":"Servicios"}]}') 
+ON CONFLICT ("code") DO NOTHING;
+
 
 -- Sincronización universal de secuencias autoincrementales en llaves primarias ('id') para prevenir colisiones 23505
 DO $$
@@ -3652,3 +3688,60 @@ BEGIN
         END;
     END LOOP;
 END $$;
+
+-- Migración inteligente y no destructiva de registros históricos de Pasajeros (Nombres y Apellidos)
+DO $$
+BEGIN
+    -- Quotation:
+    UPDATE public."Quotation"
+    SET "passengerFirstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN TRIM(passenger)
+            ELSE SPLIT_PART(TRIM(passenger), ' ', 1)
+        END,
+        "passengerLastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(passenger) FROM POSITION(' ' IN TRIM(passenger)) + 1)
+        END
+    WHERE ("passengerFirstName" IS NULL OR "passengerLastName" IS NULL)
+      AND passenger IS NOT NULL AND TRIM(passenger) <> '';
+
+    -- QuotationProduct:
+    UPDATE public."QuotationProduct"
+    SET "passengerFirstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN TRIM(passenger)
+            ELSE SPLIT_PART(TRIM(passenger), ' ', 1)
+        END,
+        "passengerLastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(passenger) FROM POSITION(' ' IN TRIM(passenger)) + 1)
+        END
+    WHERE ("passengerFirstName" IS NULL OR "passengerLastName" IS NULL)
+      AND passenger IS NOT NULL AND TRIM(passenger) <> '';
+
+    -- QuotationProductPassenger:
+    UPDATE public."QuotationProductPassenger"
+    SET "firstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN TRIM(name)
+            ELSE SPLIT_PART(TRIM(name), ' ', 1)
+        END,
+        "lastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(name) FROM POSITION(' ' IN TRIM(name)) + 1)
+        END
+    WHERE ("firstName" IS NULL OR "lastName" IS NULL)
+      AND name IS NOT NULL AND TRIM(name) <> '';
+
+    -- InvoicesProductPasenger:
+    UPDATE public."InvoicesProductPasenger"
+    SET "firstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN TRIM(name)
+            ELSE SPLIT_PART(TRIM(name), ' ', 1)
+        END,
+        "lastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(name) FROM POSITION(' ' IN TRIM(name)) + 1)
+        END
+    WHERE ("firstName" IS NULL OR "lastName" IS NULL)
+      AND name IS NOT NULL AND TRIM(name) <> '';
+END $$;
+

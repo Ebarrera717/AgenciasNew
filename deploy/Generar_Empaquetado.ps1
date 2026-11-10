@@ -52,6 +52,8 @@ if (Test-Path $ReleaseDir) {
         }
     }
     Get-ChildItem $ReleaseDir -Exclude "node_modules", ".next", "public" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    # Sanitizar explícitamente cualquier archivo .env* del paquete de release para seguridad
+    Get-ChildItem $ReleaseDir -Filter ".env*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 } else {
     New-Item -ItemType Directory -Path $ReleaseDir | Out-Null
 }

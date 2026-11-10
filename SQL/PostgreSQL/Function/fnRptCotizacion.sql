@@ -48,6 +48,8 @@ CREATE OR REPLACE FUNCTION public."fnRptCotizacion"(
 
         -- Resúmenes de cabecera
         "pasajeros" text,
+        "pasajerosNombres" text,
+        "pasajerosApellidos" text,
         "totalAdultos" integer,
         "totalNinos" integer,
         "baseComisionable" double precision,
@@ -60,6 +62,8 @@ CREATE OR REPLACE FUNCTION public."fnRptCotizacion"(
         "fechaInicioCabecera" timestamp without time zone,
         "fechaFinCabecera" timestamp without time zone,
         "pasajeroCabecera" text,
+        "pasajeroCabeceraNombres" text,
+        "pasajeroCabeceraApellidos" text,
         "paxAdultosCabecera" integer,
         "paxNinosCabecera" integer,
         "reservacionCabecera" text,
@@ -186,6 +190,16 @@ BEGIN
             FROM "QuotationProductPassenger" p
             WHERE p."quotationProductId" = qp.id
         )::text AS "pasajeros",
+        (
+            SELECT string_agg(COALESCE(NULLIF(TRIM(p."firstName"), ''), p.name), ', ')
+            FROM "QuotationProductPassenger" p
+            WHERE p."quotationProductId" = qp.id
+        )::text AS "pasajerosNombres",
+        (
+            SELECT string_agg(COALESCE(NULLIF(TRIM(p."lastName"), ''), ''), ', ')
+            FROM "QuotationProductPassenger" p
+            WHERE p."quotationProductId" = qp.id
+        )::text AS "pasajerosApellidos",
         COALESCE(qp."paxAdults", 0)::integer AS "totalAdultos",
         COALESCE(qp."paxChildren", 0)::integer AS "totalNinos",
         COALESCE(q."baseCommissionable", 0)::double precision AS "baseComisionable",
@@ -198,6 +212,8 @@ BEGIN
         q."startDate" AS "fechaInicioCabecera",
         q."endDate" AS "fechaFinCabecera",
         COALESCE(q.passenger, '')::text AS "pasajeroCabecera",
+        COALESCE(q."passengerFirstName", '')::text AS "pasajeroCabeceraNombres",
+        COALESCE(q."passengerLastName", '')::text AS "pasajeroCabeceraApellidos",
         COALESCE(q."paxAdults", 0)::integer AS "paxAdultosCabecera",
         COALESCE(q."paxChildren", 0)::integer AS "paxNinosCabecera",
         COALESCE(q."reservationCode", '')::text AS "reservacionCabecera",

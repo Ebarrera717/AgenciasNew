@@ -43,6 +43,7 @@ import { QuotationFormatsTab } from '@/components/QuotationFormatsTab'
 import RoleManagerTab from '@/components/RoleManagerTab'
 import LicenseStatusCard from '@/components/LicenseStatusCard'
 import { AdministrativeFeeTab } from '@/components/AdministrativeFeeTab'
+import ZeusExportConfigTab from '@/components/ZeusExportConfigTab'
 import ErrorDiagnosticModal, { DiagnosticErrorData } from '@/components/ErrorDiagnosticModal'
 import { isSuperAdminRole } from '@/lib/permissions'
 
@@ -328,8 +329,8 @@ export default function SettingsPage() {
     const [masterList, setMasterList] = useState<any[]>([])
     const [dynamicMasterOptions, setDynamicMasterOptions] = useState<any[]>([])
 
-    // Sub-pestaña para la categorización de Parámetros del Sistema (SQL Server, Tarifa Admin, Licencia, General)
-    const [paramSubTab, setParamSubTab] = useState<'sql' | 'tarifa_admin' | 'licencia' | 'general' | 'todos'>('sql')
+    // Sub-pestaña para la categorización de Parámetros del Sistema (SQL Server, Exportación Zeus, Tarifa Admin, Licencia, General)
+    const [paramSubTab, setParamSubTab] = useState<'sql' | 'zeus_textos' | 'tarifa_admin' | 'licencia' | 'general' | 'todos'>('sql')
 
     const getParamCategory = (item: any): 'sql' | 'tarifa_admin' | 'licencia' | 'general' => {
         const code = (item?.code || '').toUpperCase();
@@ -1467,7 +1468,7 @@ export default function SettingsPage() {
                         accept=".xlsx, .xls, .csv"
                         onChange={handleBulkUpload}
                     />
-                    {activeTab !== 'logs' && (
+                    {activeTab !== 'logs' && !(activeTab === 'parametros' && paramSubTab === 'zeus_textos') && (
                         <>
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
@@ -1566,15 +1567,18 @@ export default function SettingsPage() {
                     <div className="flex flex-wrap items-center gap-2 p-1.5 bg-zinc-100 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/50">
                         {[
                             { id: 'sql', label: 'SQL Server', icon: Server, color: 'text-blue-500' },
+                            { id: 'zeus_textos', label: 'Exportación Zeus (Campos y Textos)', icon: SlidersHorizontal, color: 'text-indigo-500' },
                             { id: 'tarifa_admin', label: 'Tarifa Administrativa', icon: DollarSign, color: 'text-emerald-500' },
                             { id: 'licencia', label: 'Licencia', icon: Key, color: 'text-amber-500' },
                             { id: 'general', label: 'General', icon: Settings, color: 'text-zinc-500' },
                             { id: 'todos', label: 'Todos los Parámetros', icon: Database, color: 'text-purple-500' },
                         ].map((subTab) => {
-                            const count = (parameters || []).filter(item => {
-                                if (subTab.id === 'todos') return true;
-                                return getParamCategory(item) === subTab.id;
-                            }).length;
+                            const count = subTab.id === 'zeus_textos'
+                                ? 2
+                                : (parameters || []).filter(item => {
+                                    if (subTab.id === 'todos') return true;
+                                    return getParamCategory(item) === subTab.id;
+                                }).length;
                             const Icon = subTab.icon;
                             const isSelected = paramSubTab === subTab.id;
                             return (
@@ -1605,7 +1609,8 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                <div className="flex flex-wrap items-center gap-3">
+                {!(activeTab === 'parametros' && paramSubTab === 'zeus_textos') && (
+                    <div className="flex flex-wrap items-center gap-3">
                     <div className="relative flex-1 min-w-[260px]">
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
                         <input
@@ -1634,6 +1639,7 @@ export default function SettingsPage() {
                         </select>
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Content Area */}
@@ -1946,7 +1952,10 @@ export default function SettingsPage() {
                     <div className="p-8">
                         <AdministrativeFeeTab />
                     </div>
-
+                ) : activeTab === 'parametros' && paramSubTab === 'zeus_textos' ? (
+                    <div className="p-8">
+                        <ZeusExportConfigTab />
+                    </div>
                 ) : loading ? (
                     <div className="flex items-center justify-center h-full p-20">
                         <Loader2 className="animate-spin w-12 h-12 text-blue-600" />

@@ -1,371 +1,587 @@
-IF OBJECT_ID('dbo.spCotizacionCrear', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.spCotizacionCrear;
-GO
-
-CREATE PROCEDURE dbo.spCotizacionCrear
-    @p_data NVARCHAR(MAX),
-    @p_acting_user_id INT = 1,
-    @p_quotation_id INT = NULL OUTPUT,
-    @p_mensaje_resultado NVARCHAR(MAX) = NULL OUTPUT
-AS
+DO $$
+DECLARE
+    r RECORD;
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
 
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.[Quotation])
-        BEGIN
-            DBCC CHECKIDENT ('dbo.[Quotation]', RESEED, 0);
-        END
+CREATE OR REPLACE PROCEDURE public."spCotizacionCrear"(
+    IN p_data jsonb, 
+    IN p_acting_user_id integer, 
+    INOUT p_quotation_id integer DEFAULT 0, 
+    INOUT p_mensaje_resultado text DEFAULT ''
+)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_internal_number TEXT;
+    v_quotation_id INT;
+    v_item RECORD;
+    v_tax RECORD;
+    v_pax RECORD;
+    v_var RECORD;
+    v_pmt RECORD;
+    v_combo RECORD;
+    v_manual RECORD;
+    v_quotation_product_id INT;
+    -- Variables para validación de campos obligatorios dinámicos
+    v_val_item JSONB;
+    v_val_prod_id INT;
+    v_mandatory_fields JSONB;
+    v_field_key TEXT;
+    v_model TEXT;
+    v_field_name TEXT;
+    v_prod_desc TEXT;
+    v_has_passengers BOOLEAN;
+    v_has_empty_pax_name BOOLEAN;
+    v_has_payments BOOLEAN;
+    v_json_field_name TEXT;
+    -- Variables para validación de variables obligatorias específicas del cliente
+    v_client_id INT;
+    v_client_mandatory_vars JSONB;
+    v_client_var_id_text TEXT;
+    v_req_var_id INT;
+    v_req_var_name TEXT;
+    v_item_json JSONB;
+    v_item_prod_id INT;
+    v_item_prod_desc TEXT;
+    v_has_var BOOLEAN;
+    -- Variables para cálculos financieros
+    v_mostrar_totalizacion BOOLEAN;
+    v_comision_utilidad DOUBLE PRECISION;
+    v_comision_freelance DOUBLE PRECISION;
+    v_comision_propia DOUBLE PRECISION;
+    v_costo_total DOUBLE PRECISION;
+    v_valor_base DOUBLE PRECISION;
+    v_decimals INT;
+    v_acting_user_id INT := NULL;
+    v_tp_user_id INT := NULL;
+    v_permitir_sin_productos TEXT := '1';
+    -- Variables para nombres y apellidos separados de pasajeros
+    v_pax_first_name TEXT;
+    v_pax_last_name TEXT;
+    v_pax_full_name TEXT;
+    v_item_pax_first TEXT;
+    v_item_pax_last TEXT;
+    v_item_pax_full TEXT;
+    v_sub_pax_first TEXT;
+    v_sub_pax_last TEXT;
+    v_sub_pax_full TEXT;
+BEGIN
+    -- Resolución segura y determinista del usuario creador (Elaborado por)
+    IF NULLIF(p_data->>'userId', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = NULLIF(p_data->>'userId', '')::INT LIMIT 1;
+    END IF;
 
-        DECLARE @clientId INT = JSON_VALUE(@p_data, '$.clientId');
-        DECLARE @currency NVARCHAR(10) = ISNULL(JSON_VALUE(@p_data, '$.currency'), 'COP');
-        DECLARE @exchangeRate FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.exchangeRate') AS FLOAT), 1);
-        DECLARE @branchId INT = JSON_VALUE(@p_data, '$.branchId');
-        DECLARE @implantId INT = JSON_VALUE(@p_data, '$.implantId');
-        DECLARE @sellerId INT = JSON_VALUE(@p_data, '$.sellerId');
-        DECLARE @ticketPrinterId INT = JSON_VALUE(@p_data, '$.ticketPrinterId');
-        DECLARE @totalAmount FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.totalAmount') AS FLOAT), 0);
-        DECLARE @baseCommissionable FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.baseCommissionable') AS FLOAT), 0);
-        DECLARE @chargesAndTaxes FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.chargesAndTaxes') AS FLOAT), 0);
-        DECLARE @commissionPercentage FLOAT = ISNULL(CAST(JSON_VALUE(@p_data, '$.commissionPercentage') AS FLOAT), 0);
-        DECLARE @destination NVARCHAR(250) = JSON_VALUE(@p_data, '$.destination');
-        DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
-        DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
-        DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
-        DECLARE @paxAdults INT = JSON_VALUE(@p_data, '$.paxAdults');
-        DECLARE @paxChildren INT = JSON_VALUE(@p_data, '$.paxChildren');
-        DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
-        DECLARE @manualDescription NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.manualDescription');
-        DECLARE @observations NVARCHAR(MAX) = JSON_VALUE(@p_data, '$.observations');
+    IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE LOWER(TRIM(email)) = LOWER(TRIM(p_data->>'userEmail')) LIMIT 1;
+    END IF;
 
-        DECLARE @actingUserId INT = TRY_CAST(JSON_VALUE(@p_data, '$.userId') AS INT);
-        IF @actingUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[User] WHERE id = @actingUserId)
-            SET @actingUserId = NULL;
+    IF v_acting_user_id IS NULL AND p_acting_user_id IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id LIMIT 1;
+    END IF;
 
-        IF @actingUserId IS NULL AND NULLIF(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userEmail'))), '') IS NOT NULL
-        BEGIN
-            SELECT TOP 1 @actingUserId = [id]
-            FROM dbo.[User]
-            WHERE LOWER(LTRIM(RTRIM([email]))) = LOWER(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userEmail'))))
-            ORDER BY [id] ASC;
-        END;
+    -- Si no vino usuario explícito en p_data (o cayó en el fallback 1 por sesión no enviada) y el Tiqueteador seleccionado corresponde a un Usuario del sistema, asignar ese Usuario creador
+    IF (v_acting_user_id IS NULL OR (v_acting_user_id = 1 AND NULLIF(p_data->>'userId', '') IS NULL AND NULLIF(p_data->>'userEmail', '') IS NULL))
+       AND (NULLIF(p_data->>'ticketPrinterId', '') IS NOT NULL OR NULLIF(p_data->>'ticketPrinterCode', '') IS NOT NULL) THEN
+        SELECT u.id INTO v_tp_user_id
+        FROM public."TicketPrinter" tp
+        JOIN public."User" u ON (
+            u."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE tp.id = NULLIF(p_data->>'ticketPrinterId', '')::INT
+           OR (tp.code IS NOT NULL AND UPPER(tp.code) = UPPER(p_data->>'ticketPrinterCode'))
+        ORDER BY u.id ASC
+        LIMIT 1;
 
-        IF @actingUserId IS NULL AND @p_acting_user_id IS NOT NULL
-        BEGIN
-            SELECT TOP 1 @actingUserId = [id] FROM dbo.[User] WHERE id = @p_acting_user_id;
-        END;
+        IF v_tp_user_id IS NOT NULL THEN
+            v_acting_user_id := v_tp_user_id;
+        END IF;
+    END IF;
 
-        IF @clientId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Client] WHERE id = @clientId)
-            SET @clientId = NULL;
-        IF @branchId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Branch] WHERE id = @branchId)
-            SET @branchId = NULL;
-        IF @sellerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Seller] WHERE id = @sellerId)
-            SET @sellerId = NULL;
-        IF @implantId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Implant] WHERE id = @implantId)
-            SET @implantId = NULL;
-        IF @ticketPrinterId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[TicketPrinter] WHERE id = @ticketPrinterId)
-            SET @ticketPrinterId = NULL;
+    IF v_acting_user_id IS NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" ORDER BY id ASC LIMIT 1;
+    END IF;
 
-        -- Si no vino usuario explícito en @p_data (o cayó en el fallback 1) y el Tiqueteador seleccionado corresponde a un Usuario del sistema, asignar ese Usuario creador
-        IF (@actingUserId IS NULL OR (@actingUserId = 1 AND NULLIF(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userId'))), '') IS NULL AND NULLIF(LTRIM(RTRIM(JSON_VALUE(@p_data, '$.userEmail'))), '') IS NULL))
-           AND @ticketPrinterId IS NOT NULL
-        BEGIN
-            DECLARE @tpUserId INT = NULL;
-            SELECT TOP 1 @tpUserId = u.[id]
-            FROM dbo.[TicketPrinter] tp
-            JOIN dbo.[User] u ON (
-                u.[ticketPrinterId] = tp.[id]
-                OR (NULLIF(LTRIM(RTRIM(tp.[email])), '') IS NOT NULL AND LOWER(LTRIM(RTRIM(u.[email]))) = LOWER(LTRIM(RTRIM(tp.[email]))))
-                OR (NULLIF(LTRIM(RTRIM(tp.[name])), '') IS NOT NULL AND UPPER(LTRIM(RTRIM(u.[name]))) = UPPER(LTRIM(RTRIM(tp.[name]))))
-            )
-            WHERE tp.[id] = @ticketPrinterId
-            ORDER BY u.[id] ASC;
+    -- Validaciones
+    IF NULLIF(p_data->>'clientId', '') IS NULL THEN
+        p_mensaje_resultado := 'ERROR: El campo Cliente es obligatorio.';
+        RETURN;
+    END IF;
 
-            IF @tpUserId IS NOT NULL
-                SET @actingUserId = @tpUserId;
-        END;
+    -- Parámetro del Sistema para permitir o no cotizaciones sin productos
+    SELECT COALESCE(value, '1') INTO v_permitir_sin_productos
+    FROM public."SystemParameter"
+    WHERE code IN ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'PermitirCotizacionSinProductos')
+    LIMIT 1;
 
-        DECLARE @internalNum NVARCHAR(100) = NULL;
-        EXEC dbo.spObtenerSiguienteConsecutivo N'QUOTATION', @branchId, @implantId, @internalNum OUTPUT;
+    IF v_permitir_sin_productos IS NULL THEN
+        v_permitir_sin_productos := '1';
+    END IF;
 
-        -- Parámetro del Sistema para permitir o no cotizaciones sin productos
-        DECLARE @permitirSinProductos NVARCHAR(50) = (
-            SELECT TOP 1 [value]
-            FROM dbo.[SystemParameter]
-            WHERE code IN ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'PermitirCotizacionSinProductos')
-        );
-        IF @permitirSinProductos IS NULL SET @permitirSinProductos = '1';
+    IF p_data->'items' IS NULL OR jsonb_array_length(COALESCE(p_data->'items', '[]'::jsonb)) = 0 THEN
+        IF v_permitir_sin_productos NOT IN ('1', 'true', 'TRUE', 't', 'SI', 'si') THEN
+            p_mensaje_resultado := 'ERROR: La cotización debe tener al menos un producto.';
+            RETURN;
+        END IF;
+    ELSE
+        IF EXISTS (
+            SELECT 1 FROM jsonb_to_recordset(p_data->'items') AS x("productId" INT, "mainTaxId" TEXT)
+            WHERE "productId" IS NULL OR NULLIF("mainTaxId", '') IS NULL
+        ) THEN
+            p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto y un Cargo Principal seleccionado.';
+            RETURN;
+        END IF;
+    END IF;
 
-        IF JSON_QUERY(@p_data, '$.items') IS NULL OR NOT EXISTS (SELECT 1 FROM OPENJSON(@p_data, '$.items'))
-        BEGIN
-            IF @permitirSinProductos NOT IN ('1', 'true', 'TRUE', 't', 'SI', 'si')
-            BEGIN
-                SET @p_mensaje_resultado = N'ERROR: La cotización debe tener al menos un producto.';
-                RETURN;
-            END
-        END
+    -- Validación de campos obligatorios dinámicos por producto
+    IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 THEN
+        FOR v_val_item IN SELECT jsonb_array_elements(p_data->'items')
+        LOOP
+            v_val_prod_id := (v_val_item->>'productId')::INT;
+            
+            SELECT "mandatoryFields", "description" 
+            INTO v_mandatory_fields, v_prod_desc 
+            FROM public."Product" 
+            WHERE id = v_val_prod_id;
 
-        -- Validación de variables adicionales obligatorias del cliente para cotizaciones
-        IF @clientId IS NOT NULL
-        BEGIN
-            DECLARE @clientMandatoryVarsJson NVARCHAR(MAX) = (SELECT mandatoryVariables FROM dbo.[Client] WHERE id = @clientId);
-            IF @clientMandatoryVarsJson IS NOT NULL AND ISJSON(@clientMandatoryVarsJson) = 1
-            BEGIN
-                DECLARE @reqVarList TABLE (varId INT);
-                IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotation') IS NOT NULL
-                BEGIN
-                    INSERT INTO @reqVarList (varId)
-                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotation') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
-                END
-                ELSE IF JSON_QUERY(@clientMandatoryVarsJson, '$.quotations') IS NOT NULL
-                BEGIN
-                    INSERT INTO @reqVarList (varId)
-                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson, '$.quotations') WHERE TRY_CAST([value] AS INT) IS NOT NULL;
-                END
-                ELSE IF JSON_VALUE(@clientMandatoryVarsJson, '$[0]') IS NOT NULL
-                BEGIN
-                    INSERT INTO @reqVarList (varId)
-                    SELECT TRY_CAST([value] AS INT) FROM OPENJSON(@clientMandatoryVarsJson) WHERE TRY_CAST([value] AS INT) IS NOT NULL;
-                END
+            v_prod_desc := COALESCE(v_prod_desc, 'Producto #' || v_val_prod_id);
 
-                IF EXISTS (SELECT 1 FROM @reqVarList)
-                BEGIN
-                    DECLARE @reqVarId INT;
-                    DECLARE req_var_cur CURSOR LOCAL FAST_FORWARD FOR
-                    SELECT varId FROM @reqVarList;
+            IF v_mandatory_fields IS NOT NULL AND jsonb_typeof(v_mandatory_fields) = 'array' THEN
+                FOR v_field_key IN SELECT jsonb_array_elements_text(v_mandatory_fields)
+                LOOP
+                    v_model := split_part(v_field_key, '.', 1);
+                    v_field_name := split_part(v_field_key, '.', 2);
 
-                    OPEN req_var_cur;
-                    FETCH NEXT FROM req_var_cur INTO @reqVarId;
-
-                    WHILE @@FETCH_STATUS = 0
-                    BEGIN
-                        DECLARE @reqVarName NVARCHAR(250) = (SELECT [name] FROM dbo.[MasterVariable] WHERE id = @reqVarId);
-                        SET @reqVarName = ISNULL(@reqVarName, CONCAT(N'Variable #', @reqVarId));
-
-                        IF EXISTS (
-                            SELECT 1
-                            FROM OPENJSON(@p_data, '$.items') AS itm
-                            OUTER APPLY (
-                                SELECT COUNT(1) AS cnt
-                                FROM OPENJSON(itm.[value], '$.variables') AS v
-                                WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
-                                  AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
-                            ) vars
-                            WHERE ISNULL(vars.cnt, 0) = 0
-                        )
-                        BEGIN
-                            DECLARE @missingProdDesc NVARCHAR(250) = (
-                                SELECT TOP 1 ISNULL(p.[description], CONCAT(N'Producto #', ISNULL(TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS NVARCHAR(50)), '1')))
-                                FROM OPENJSON(@p_data, '$.items') AS itm
-                                LEFT JOIN dbo.[Product] p ON p.id = TRY_CAST(JSON_VALUE(itm.[value], '$.productId') AS INT)
-                                OUTER APPLY (
-                                    SELECT COUNT(1) AS cnt
-                                    FROM OPENJSON(itm.[value], '$.variables') AS v
-                                    WHERE TRY_CAST(JSON_VALUE(v.[value], '$.masterVariableId') AS INT) = @reqVarId
-                                      AND NULLIF(LTRIM(RTRIM(JSON_VALUE(v.[value], '$.value'))), '') IS NOT NULL
-                                ) vars
-                                WHERE ISNULL(vars.cnt, 0) = 0
-                            );
-
-                            SET @p_mensaje_resultado = CONCAT(N'ERROR: El cliente requiere completar la variable adicional "', @reqVarName, N'" en el producto "', ISNULL(@missingProdDesc, N'Producto'), N'".');
-                            CLOSE req_var_cur;
-                            DEALLOCATE req_var_cur;
+                    IF v_model = 'Quotation' THEN
+                        IF NULLIF(p_data->>v_field_name, '') IS NULL THEN
+                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo general "' || v_field_name || '".';
                             RETURN;
-                        END
+                        END IF;
+                    ELSIF v_model = 'QuotationProduct' THEN
+                        v_json_field_name := v_field_name;
+                        IF v_field_name = 'checkInDate' THEN
+                            v_json_field_name := 'checkIn';
+                        ELSIF v_field_name = 'checkOutDate' THEN
+                            v_json_field_name := 'checkOut';
+                        ELSIF v_field_name = 'description' THEN
+                            v_json_field_name := 'descripcion';
+                        ELSIF v_field_name = 'service' THEN
+                            IF NULLIF(v_val_item->>'service', '') IS NULL AND v_val_item->>'servicios' IS NOT NULL THEN
+                                v_json_field_name := 'servicios';
+                            END IF;
+                        END IF;
 
-                        FETCH NEXT FROM req_var_cur INTO @reqVarId;
-                    END
+                        IF v_field_name = 'passengers' THEN
+                            v_has_passengers := FALSE;
+                            v_has_empty_pax_name := FALSE;
+                            
+                            IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
+                                SELECT EXISTS (
+                                    SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p("firstName" TEXT, "lastName" TEXT, name TEXT)
+                                    WHERE (p."firstName" IS NULL OR trim(p."firstName") = '') AND (p.name IS NULL OR trim(p.name) = '')
+                                ) INTO v_has_empty_pax_name;
+                            END IF;
 
-                    CLOSE req_var_cur;
-                    DEALLOCATE req_var_cur;
-                END
-            END
-        END
+                            IF NOT v_has_passengers OR v_has_empty_pax_name THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pasajero con su nombre.';
+                                RETURN;
+                            END IF;
+                        ELSIF v_field_name = 'payments' THEN
+                            v_has_payments := FALSE;
+                            IF v_val_item->'payments' IS NOT NULL AND jsonb_typeof(v_val_item->'payments') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'payments') > 0, FALSE) INTO v_has_payments;
+                            END IF;
 
-        BEGIN TRANSACTION;
+                            IF NOT v_has_payments THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pago.';
+                                RETURN;
+                            END IF;
+                        ELSE
+                            IF NULLIF(v_val_item->>v_json_field_name, '') IS NULL THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo "' || v_field_name || '".';
+                                RETURN;
+                            END IF;
+                        END IF;
+                    END IF;
+                END LOOP;
+            END IF;
+        END LOOP;
+    END IF;
 
-        INSERT INTO dbo.[Quotation] (
-            internalNumber, [date], clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
-            baseCommissionable, chargesAndTaxes, totalAmount, commissionPercentage, userId, state, stateDescription, stateUpdatedAt,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren, reservationCode, manualDescription, observations
-        ) VALUES (
-            ISNULL(@internalNum, N'TEMP'), GETDATE(), @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId, @ticketPrinterId,
-            @baseCommissionable, @chargesAndTaxes, @totalAmount, @commissionPercentage, @actingUserId, N'NUEVO', N'Creación de cotización', GETDATE(),
-            @destination, @startDate, @endDate, @passenger, @paxAdults, @paxChildren, @reservationCode, @manualDescription, @observations
-        );
+    -- Validación de variables obligatorias específicas del cliente para cotizaciones
+    v_client_id := NULLIF(p_data->>'clientId', '')::INT;
+    IF v_client_id IS NOT NULL THEN
+        SELECT "mandatoryVariables" INTO v_client_mandatory_vars
+        FROM public."Client"
+        WHERE id = v_client_id;
 
-        SET @p_quotation_id = SCOPE_IDENTITY();
+        -- Normalizar variables obligatorias para cotización (soporta formato objeto {"quotation": [...], "invoice": [...]} y legado array [...])
+        IF v_client_mandatory_vars IS NOT NULL THEN
+            IF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars->'quotation' IS NOT NULL AND jsonb_typeof(v_client_mandatory_vars->'quotation') = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars->'quotation';
+            ELSIF jsonb_typeof(v_client_mandatory_vars) = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars;
+            ELSE
+                v_client_mandatory_vars := '[]'::jsonb;
+            END IF;
+        ELSE
+            v_client_mandatory_vars := '[]'::jsonb;
+        END IF;
 
-        IF @internalNum IS NULL OR @internalNum = N'TEMP'
+        IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 AND jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
+            FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars)
+            LOOP
+                v_req_var_id := v_client_var_id_text::INT;
+                
+                SELECT "name" INTO v_req_var_name FROM public."MasterVariable" WHERE id = v_req_var_id;
+                v_req_var_name := COALESCE(v_req_var_name, 'Variable #' || v_req_var_id);
+
+                FOR v_item_json IN SELECT jsonb_array_elements(p_data->'items')
+                LOOP
+                    v_item_prod_id := (v_item_json->>'productId')::INT;
+                    SELECT "description" INTO v_item_prod_desc FROM public."Product" WHERE id = v_item_prod_id;
+                    v_item_prod_desc := COALESCE(v_item_prod_desc, 'Producto #' || v_item_prod_id);
+
+                    SELECT EXISTS (
+                        SELECT 1 FROM jsonb_to_recordset(v_item_json->'variables') AS v("masterVariableId" INT, value TEXT)
+                        WHERE v."masterVariableId" = v_req_var_id AND NULLIF(trim(v.value), '') IS NOT NULL
+                    ) INTO v_has_var;
+
+                    IF NOT v_has_var THEN
+                        p_mensaje_resultado := 'ERROR: El cliente requiere completar la variable adicional "' || v_req_var_name || '" en el producto "' || v_item_prod_desc || '".';
+                        RETURN;
+                    END IF;
+                END LOOP;
+            END LOOP;
+        END IF;
+    END IF;
+
+    -- Obtener decimales de la moneda
+    v_decimals := COALESCE(public.fn_obtener_decimales_moneda(p_data->>'currency'), 2);
+
+    v_internal_number := NULLIF(p_data->>'consecutivo', '');
+
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    END IF;
+
+    -- Resolución inteligente de nombres y apellidos del pasajero principal
+    v_pax_first_name := NULLIF(TRIM(p_data->>'passengerFirstName'), '');
+    v_pax_last_name := NULLIF(TRIM(p_data->>'passengerLastName'), '');
+    IF v_pax_first_name IS NULL AND v_pax_last_name IS NULL AND NULLIF(TRIM(p_data->>'passenger'), '') IS NOT NULL THEN
+        IF POSITION(' ' IN TRIM(p_data->>'passenger')) = 0 THEN
+            v_pax_first_name := TRIM(p_data->>'passenger');
+            v_pax_last_name := '';
+        ELSE
+            v_pax_first_name := SPLIT_PART(TRIM(p_data->>'passenger'), ' ', 1);
+            v_pax_last_name := SUBSTRING(TRIM(p_data->>'passenger') FROM POSITION(' ' IN TRIM(p_data->>'passenger')) + 1);
+        END IF;
+    END IF;
+    v_pax_full_name := NULLIF(TRIM(COALESCE(v_pax_first_name, '') || ' ' || COALESCE(v_pax_last_name, '')), '');
+
+    INSERT INTO public."Quotation" (
+        "internalNumber", "date", "clientId", "currency", "exchangeRate", 
+        "branchId", "implantId", "sellerId", "ticketPrinterId", 
+        "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
+        "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
+        "destination", "startDate", "endDate", 
+        "passengerFirstName", "passengerLastName", "passenger", 
+        "paxAdults", "paxChildren",
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
+    ) VALUES (
+        COALESCE(v_internal_number, 'TEMP_' || gen_random_uuid()::text), CURRENT_TIMESTAMP,
+        (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
+        COALESCE(p_data->>'currency', 'COP'), COALESCE(NULLIF(p_data->>'exchangeRate', '')::FLOAT, 1.0),
+        COALESCE(
+            (SELECT id FROM public."Branch" WHERE id = NULLIF(p_data->>'branchId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'branchCode')) LIMIT 1),
+            (SELECT id FROM public."Branch" ORDER BY id ASC LIMIT 1)
+        ),
+        (SELECT id FROM public."Implant" WHERE id = NULLIF(p_data->>'implantId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'implantCode')) LIMIT 1),
+        (SELECT id FROM public."Seller" WHERE id = NULLIF(p_data->>'sellerId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'sellerCode')) LIMIT 1),
+        (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
+        0, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::FLOAT, 0), COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0),
+        COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0), v_acting_user_id, 'NUEVO', 'Creación de cotización', CURRENT_TIMESTAMP,
+        p_data->>'destination', 
+        CASE WHEN p_data->>'startDate' IS NOT NULL AND p_data->>'startDate' <> '' THEN (p_data->>'startDate')::TIMESTAMP ELSE NULL END,
+        CASE WHEN p_data->>'endDate' IS NOT NULL AND p_data->>'endDate' <> '' THEN (p_data->>'endDate')::TIMESTAMP ELSE NULL END,
+        v_pax_first_name,
+        v_pax_last_name,
+        v_pax_full_name,
+        NULLIF(p_data->>'paxAdults', '')::INT,
+        NULLIF(p_data->>'paxChildren', '')::INT,
+        p_data->>'reservationCode',
+        COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
+        p_data->>'manualDescription',
+        p_data->>'observations'
+    ) RETURNING id INTO v_quotation_id;
+
+    IF v_internal_number IS NULL OR v_internal_number = '' THEN
+        v_internal_number := v_quotation_id::text;
+        UPDATE public."Quotation"
+        SET "internalNumber" = v_internal_number
+        WHERE id = v_quotation_id;
+    END IF;
+
+    -- Insertar historial de estado inicial
+    INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId", "metadata")
+    VALUES (v_quotation_id, 'NUEVO', 'Creación de cotización', CURRENT_TIMESTAMP, v_acting_user_id, p_data);
+
+    FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
+    LOOP
+        DECLARE
+            v_combo_real_id INT := COALESCE(v_combo."comboId", v_combo.id);
+            v_cupos_disponibles INT;
+            v_combo_name TEXT;
         BEGIN
-            UPDATE dbo.[Quotation]
-            SET internalNumber = CAST(@p_quotation_id AS NVARCHAR(50))
-            WHERE id = @p_quotation_id;
-        END
+            SELECT "cupos", "name" INTO v_cupos_disponibles, v_combo_name
+            FROM public."Combo" WHERE id = v_combo_real_id;
 
-        INSERT INTO dbo.[QuotationStateHistory] (quotationId, state, [description], createdAt, userId)
-        VALUES (@p_quotation_id, N'NUEVO', N'Creación de cotización', GETDATE(), @actingUserId);
+            IF v_cupos_disponibles IS NOT NULL AND v_cupos_disponibles <= 0 THEN
+                p_mensaje_resultado := 'ERROR: El combo "' || COALESCE(v_combo_name, v_combo_real_id::TEXT) || '" no tiene cupos disponibles.';
+                RETURN;
+            END IF;
 
-        IF JSON_QUERY(@p_data, '$.items') IS NOT NULL
-        BEGIN
-            DECLARE @item_val NVARCHAR(MAX);
-            DECLARE item_cur CURSOR LOCAL FAST_FORWARD FOR
-            SELECT [value] FROM OPENJSON(@p_data, '$.items');
+            INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
+            VALUES (v_quotation_id, v_combo_real_id);
 
-            OPEN item_cur;
-            FETCH NEXT FROM item_cur INTO @item_val;
+            -- Descontar 1 cupo
+            UPDATE public."Combo" SET "cupos" = "cupos" - 1 WHERE id = v_combo_real_id;
+        END;
+    END LOOP;
 
-            WHILE @@FETCH_STATUS = 0
-            BEGIN
-                DECLARE @productId INT = TRY_CAST(JSON_VALUE(@item_val, '$.productId') AS INT);
-                DECLARE @quantity INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.quantity') AS INT), 1);
-                DECLARE @price FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.price') AS FLOAT), 0);
-                DECLARE @cost FLOAT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.cost') AS FLOAT), 0);
-                DECLARE @providerId INT = TRY_CAST(JSON_VALUE(@item_val, '$.providerId') AS INT);
-                DECLARE @prestadoraId INT = TRY_CAST(JSON_VALUE(@item_val, '$.prestadoraId') AS INT);
-                DECLARE @checkInDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkIn') AS DATETIME2);
-                DECLARE @checkOutDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.checkOut') AS DATETIME2);
-                DECLARE @nights INT = TRY_CAST(JSON_VALUE(@item_val, '$.nights') AS INT);
-                DECLARE @paxAdultsItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxAdults') AS INT);
-                DECLARE @paxChildrenItem INT = TRY_CAST(JSON_VALUE(@item_val, '$.paxChildren') AS INT);
-                DECLARE @serviceType NVARCHAR(250) = JSON_VALUE(@item_val, '$.serviceType');
-                DECLARE @destinationItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.destination');
-                DECLARE @reservationCodeItem NVARCHAR(100) = JSON_VALUE(@item_val, '$.reservationCode');
-                DECLARE @sellerCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.sellerCommission') AS FLOAT);
-                DECLARE @ticketPrinterCommission FLOAT = TRY_CAST(JSON_VALUE(@item_val, '$.ticketPrinterCommission') AS FLOAT);
-                DECLARE @comboId INT = TRY_CAST(JSON_VALUE(@item_val, '$.comboId') AS INT);
-                DECLARE @mainTaxId INT = TRY_CAST(JSON_VALUE(@item_val, '$.mainTaxId') AS INT);
-                DECLARE @inNationality INT = ISNULL(TRY_CAST(JSON_VALUE(@item_val, '$.inNationality') AS INT), 1);
-                DECLARE @service NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.service');
-                DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.servicios');
-                DECLARE @descripcion NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.descripcion');
-                DECLARE @passengerItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.passenger');
-                DECLARE @providerDueDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.providerDueDate') AS DATETIME2);
-                DECLARE @providerInvoice NVARCHAR(100) = JSON_VALUE(@item_val, '$.providerInvoice');
-
-                IF @providerId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Provider] WHERE id = @providerId) SET @providerId = NULL;
-                IF @prestadoraId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.[Prestadora] WHERE id = @prestadoraId) SET @prestadoraId = NULL;
-
-                DECLARE @qp_id INT;
-                INSERT INTO dbo.[QuotationProduct] (
-                    quotationId, productId, quantity, price, cost, providerId, prestadoraId,
-                    checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
-                    reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                    service, servicios, descripcion, passenger, providerDueDate, providerInvoice
-                ) VALUES (
-                    @p_quotation_id, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
-                    @checkInDate, @checkOutDate, @nights, @paxAdultsItem, @paxChildrenItem, @serviceType, @destinationItem,
-                    @reservationCodeItem, @sellerCommission, @ticketPrinterCommission, @comboId, @mainTaxId, @inNationality,
-                    @service, @servicios, @descripcion, @passengerItem, @providerDueDate, @providerInvoice
-                );
-                SET @qp_id = SCOPE_IDENTITY();
-
-                -- Insert Applied Taxes (QuotationProductTax)
-                IF JSON_QUERY(@item_val, '$.appliedTaxes') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductTax] (quotationProductId, chargeAndTaxId, explicitAmount, valueSnapshot, valueTypeSnapshot, isMain)
-                    SELECT
-                        @qp_id,
-                        TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT),
-                        ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.explicitAmount') AS FLOAT), ISNULL(TRY_CAST(JSON_VALUE(tax.value, '$.amount') AS FLOAT), 0)),
-                        TRY_CAST(JSON_VALUE(tax.value, '$.valueSnapshot') AS FLOAT),
-                        JSON_VALUE(tax.value, '$.valueTypeSnapshot'),
-                        CASE WHEN TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) = @mainTaxId OR JSON_VALUE(tax.value, '$.isMain') = 'true' THEN 1 ELSE 0 END
-                    FROM OPENJSON(@item_val, '$.appliedTaxes') AS tax
-                    WHERE TRY_CAST(JSON_VALUE(tax.value, '$.chargeAndTaxId') AS INT) IS NOT NULL;
-                END
-
-                -- Insert Passengers (QuotationProductPassenger)
-                IF JSON_QUERY(@item_val, '$.passengers') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
-                    SELECT
-                        @qp_id,
-                        JSON_VALUE(pax.value, '$.name'),
-                        JSON_VALUE(pax.value, '$.document')
-                    FROM OPENJSON(@item_val, '$.passengers') AS pax
-                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
-                END
-
-                -- Insert Variables (QuotationProductVariable)
-                IF JSON_QUERY(@item_val, '$.variables') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductVariable] (quotationProductId, masterVariableId, value)
-                    SELECT
-                        @qp_id,
-                        TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT),
-                        JSON_VALUE(v.value, '$.value')
-                    FROM OPENJSON(@item_val, '$.variables') AS v
-                    WHERE TRY_CAST(JSON_VALUE(v.value, '$.masterVariableId') AS INT) IS NOT NULL;
-                END
-
-                -- Insert Payments (QuotationProductPayment)
-                IF JSON_QUERY(@item_val, '$.payments') IS NOT NULL
-                BEGIN
-                    INSERT INTO dbo.[QuotationProductPayment] (
-                        quotationProductId, amount, paymentMethod, date, reference, creditCardId, cardNumber, authorizationCode, voucher, expirationDate
-                    )
-                    SELECT
-                        @qp_id,
-                        ISNULL(TRY_CAST(JSON_VALUE(pmt.value, '$.amount') AS FLOAT), 0),
-                        JSON_VALUE(pmt.value, '$.paymentMethod'),
-                        TRY_CAST(JSON_VALUE(pmt.value, '$.date') AS DATETIME2),
-                        JSON_VALUE(pmt.value, '$.reference'),
-                        TRY_CAST(JSON_VALUE(pmt.value, '$.creditCardId') AS INT),
-                        JSON_VALUE(pmt.value, '$.cardNumber'),
-                        JSON_VALUE(pmt.value, '$.authorizationCode'),
-                        JSON_VALUE(pmt.value, '$.voucher'),
-                        JSON_VALUE(pmt.value, '$.expirationDate')
-                    FROM OPENJSON(@item_val, '$.payments') AS pmt;
-                END
-
-                FETCH NEXT FROM item_cur INTO @item_val;
-            END
-
-            CLOSE item_cur;
-            DEALLOCATE item_cur;
-        END
-
-        -- Recalculate totalAmount if 0 or missing
-        DECLARE @calcTotal FLOAT = (
-            SELECT SUM(ISNULL(qpt.explicitAmount, 0))
-            FROM dbo.[QuotationProductTax] qpt
-            JOIN dbo.[QuotationProduct] qp ON qpt.quotationProductId = qp.id
-            WHERE qp.quotationId = @p_quotation_id
-        );
-        IF @calcTotal IS NULL OR @calcTotal = 0
-        BEGIN
-            SET @calcTotal = (
-                SELECT SUM(ISNULL(qp.price, 0) * ISNULL(qp.quantity, 1))
-                FROM dbo.[QuotationProduct] qp
-                WHERE qp.quotationId = @p_quotation_id
+    IF p_data->'manualServices' IS NOT NULL AND jsonb_typeof(p_data->'manualServices') = 'array' THEN
+        FOR v_manual IN SELECT * FROM jsonb_to_recordset(p_data->'manualServices') AS x(
+            "providerName" TEXT, "serviceName" TEXT, "cost" FLOAT, "salePrice" FLOAT, "utility" FLOAT
+        )
+        LOOP
+            INSERT INTO public."QuotationManualService" (
+                "quotationId", "providerName", "serviceName", "cost", "salePrice", "utility"
+            ) VALUES (
+                v_quotation_id, 
+                v_manual."providerName", 
+                v_manual."serviceName", 
+                COALESCE(v_manual."cost", 0), 
+                COALESCE(v_manual."salePrice", 0), 
+                COALESCE(v_manual."utility", COALESCE(v_manual."salePrice", 0) - COALESCE(v_manual."cost", 0))
             );
-        END
+        END LOOP;
+    END IF;
 
-        IF @calcTotal IS NOT NULL AND @calcTotal > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @calcTotal,
-                baseCommissionable = ISNULL(NULLIF(@baseCommissionable, 0), @calcTotal),
-                chargesAndTaxes = ISNULL(NULLIF(@chargesAndTaxes, 0), @calcTotal)
-            WHERE id = @p_quotation_id;
-        END
-        ELSE IF @totalAmount > 0
-        BEGIN
-            UPDATE dbo.[Quotation]
-            SET totalAmount = @totalAmount
-            WHERE id = @p_quotation_id;
-        END
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(COALESCE(p_data->'items', '[]'::jsonb)) AS x(
+                      "productId" INT, "productCode" TEXT, quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
+                      "providerCode" TEXT, "prestadoraCode" TEXT,
+                      "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,
+                      "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
+                      "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
+                      "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "payments" JSONB, "inNationality" INT,
+                      "service" TEXT, "servicios" TEXT, "descripcion" TEXT, 
+                      "passengerFirstName" TEXT, "passengerLastName" TEXT, "passenger" TEXT,
+                      "providerDueDate" TEXT, "providerInvoice" TEXT
+                  )
+    LOOP
+        v_item_pax_first := NULLIF(TRIM(v_item."passengerFirstName"), '');
+        v_item_pax_last := NULLIF(TRIM(v_item."passengerLastName"), '');
+        IF v_item_pax_first IS NULL AND v_item_pax_last IS NULL AND NULLIF(TRIM(v_item."passenger"), '') IS NOT NULL THEN
+            IF POSITION(' ' IN TRIM(v_item."passenger")) = 0 THEN
+                v_item_pax_first := TRIM(v_item."passenger");
+                v_item_pax_last := '';
+            ELSE
+                v_item_pax_first := SPLIT_PART(TRIM(v_item."passenger"), ' ', 1);
+                v_item_pax_last := SUBSTRING(TRIM(v_item."passenger") FROM POSITION(' ' IN TRIM(v_item."passenger")) + 1);
+            END IF;
+        END IF;
 
-        COMMIT TRANSACTION;
+        IF COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE) AND v_item_pax_first IS NULL AND v_item_pax_last IS NULL THEN
+            v_item_pax_first := v_pax_first_name;
+            v_item_pax_last := v_pax_last_name;
+        END IF;
 
-        SET @p_mensaje_resultado = N'SUCCESS: Cotización creada correctamente con ID ' + CAST(@p_quotation_id AS NVARCHAR(20));
-        SELECT @p_quotation_id AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SET @p_mensaje_resultado = N'ERROR: ' + ERROR_MESSAGE();
-        SELECT 0 AS p_quotation_id, @p_mensaje_resultado AS p_mensaje_resultado;
-    END CATCH
+        v_item_pax_full := NULLIF(TRIM(COALESCE(v_item_pax_first, '') || ' ' || COALESCE(v_item_pax_last, '')), '');
+
+        INSERT INTO public."QuotationProduct" (
+            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
+            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
+            "serviceType", "destination", "reservationCode", "sellerCommission", 
+            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
+            "service", "servicios", "descripcion", 
+            "passengerFirstName", "passengerLastName", "passenger",
+            "providerDueDate", "providerInvoice"
+        ) VALUES (
+            v_quotation_id,
+            COALESCE(
+                (SELECT id FROM public."Product" WHERE id = v_item."productId" OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."productCode")) LIMIT 1),
+                (SELECT id FROM public."Product" ORDER BY id ASC LIMIT 1)
+            ),
+            v_item.quantity, 
+            ROUND(v_item.price::numeric, v_decimals)::double precision, 
+            ROUND(v_item.cost::numeric, v_decimals)::double precision, 
+            (SELECT id FROM public."Provider" WHERE id = NULLIF(v_item."providerId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."providerCode")) LIMIT 1),
+            (SELECT id FROM public."Prestadora" WHERE id = NULLIF(v_item."prestadoraId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."prestadoraCode")) LIMIT 1),
+            CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
+            CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
+            v_item.nights, v_item."paxAdults", v_item."paxChildren",
+            v_item."serviceType", v_item."destination", v_item."reservationCode", 
+            ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
+            ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
+            NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
+            COALESCE(v_item."service", v_item."servicios"), COALESCE(v_item."servicios", v_item."service"), v_item."descripcion",
+            v_item_pax_first,
+            v_item_pax_last,
+            v_item_pax_full,
+            CASE WHEN v_item."providerDueDate" IS NOT NULL AND v_item."providerDueDate" <> '' THEN v_item."providerDueDate"::TIMESTAMP ELSE NULL END,
+            v_item."providerInvoice"
+        ) RETURNING id INTO v_quotation_product_id;
+
+        IF v_item.passengers IS NOT NULL THEN
+            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x("firstName" TEXT, "lastName" TEXT, name TEXT, document TEXT)
+            LOOP
+                v_sub_pax_first := NULLIF(TRIM(v_pax."firstName"), '');
+                v_sub_pax_last := NULLIF(TRIM(v_pax."lastName"), '');
+                IF v_sub_pax_first IS NULL AND v_sub_pax_last IS NULL AND NULLIF(TRIM(v_pax.name), '') IS NOT NULL THEN
+                    IF POSITION(' ' IN TRIM(v_pax.name)) = 0 THEN
+                        v_sub_pax_first := TRIM(v_pax.name);
+                        v_sub_pax_last := '';
+                    ELSE
+                        v_sub_pax_first := SPLIT_PART(TRIM(v_pax.name), ' ', 1);
+                        v_sub_pax_last := SUBSTRING(TRIM(v_pax.name) FROM POSITION(' ' IN TRIM(v_pax.name)) + 1);
+                    END IF;
+                END IF;
+                v_sub_pax_full := COALESCE(NULLIF(TRIM(COALESCE(v_sub_pax_first, '') || ' ' || COALESCE(v_sub_pax_last, '')), ''), v_pax.name, '');
+
+                INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "firstName", "lastName", "name", "document")
+                VALUES (v_quotation_product_id, v_sub_pax_first, v_sub_pax_last, v_sub_pax_full, COALESCE(v_pax.document, ''));
+            END LOOP;
+        END IF;
+
+        IF v_item."appliedTaxes" IS NOT NULL THEN
+            FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS x("chargeAndTaxId" INT, "explicitAmount" FLOAT)
+            LOOP
+                INSERT INTO public."QuotationProductTax" (
+                    "quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
+                )
+                SELECT v_quotation_product_id, ct.id, ct.value, ct."valueType", 
+                       ROUND(v_tax."explicitAmount"::numeric, v_decimals)::double precision, 
+                       CASE WHEN NULLIF(v_item."mainTaxId", '')::INT = ct.id THEN TRUE ELSE FALSE END
+                FROM public."ChargeAndTax" ct
+                WHERE ct.id = v_tax."chargeAndTaxId";
+            END LOOP;
+        END IF;
+
+        IF v_item.variables IS NOT NULL THEN
+            FOR v_var IN SELECT * FROM jsonb_to_recordset(v_item.variables) AS x("masterVariableId" INT, value TEXT)
+            LOOP
+                INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
+                VALUES (v_quotation_product_id, v_var."masterVariableId", v_var.value);
+            END LOOP;
+        END IF;
+
+        IF v_item.payments IS NOT NULL THEN
+            FOR v_pmt IN SELECT * FROM jsonb_to_recordset(v_item.payments) AS x(
+                "amount" FLOAT, "paymentMethod" TEXT, "date" TEXT, "reference" TEXT,
+                "creditCardId" INT, "cardNumber" TEXT, "authorizationCode" TEXT, "voucher" TEXT, "expirationDate" TEXT
+            )
+            LOOP
+                INSERT INTO public."QuotationProductPayment" (
+                    "quotationProductId", "amount", "paymentMethod", "reference", "date",
+                    "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
+                ) VALUES (
+                    v_quotation_product_id, 
+                    ROUND(v_pmt."amount"::numeric, v_decimals)::double precision, 
+                    v_pmt."paymentMethod", v_pmt."reference",
+                    CASE WHEN v_pmt."date" IS NOT NULL AND v_pmt."date" <> '' THEN v_pmt."date"::TIMESTAMP ELSE CURRENT_TIMESTAMP END,
+                    v_pmt."creditCardId", v_pmt."cardNumber", v_pmt."authorizationCode", v_pmt."voucher", v_pmt."expirationDate"
+                );
+            END LOOP;
+        END IF;
+    END LOOP;
+
+    -- Calcular y actualizar el totalAmount y los nuevos campos financieros
+    SELECT 
+        COALESCE(SUM(qp.cost), 0.0), 
+        COALESCE(SUM(
+            qp.price * qp.quantity + COALESCE((
+                SELECT SUM(qpt2."explicitAmount")
+                FROM public."QuotationProductTax" qpt2
+                JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
+                LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
+                WHERE qpt2."quotationProductId" = qp.id
+                  AND COALESCE(qpt2."isMain", false) = false
+                  AND qpt2."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)
+                  AND ct2."targetTaxId" IS NOT NULL
+                  AND (
+                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
+                  )
+            ), 0.0)
+        ), 0.0)
+    INTO v_costo_total, v_valor_base
+    FROM public."QuotationProduct" qp
+    WHERE qp."quotationId" = v_quotation_id;
+
+    SELECT COALESCE(value = 'true', FALSE) INTO v_mostrar_totalizacion
+    FROM public."SystemParameter"
+    WHERE code = 'MOSTRAR_TOTALIZACION_COTIZACION';
+
+    v_comision_freelance := COALESCE(NULLIF(p_data->>'comisionFreelancePercentage', '')::DOUBLE PRECISION, 0.0);
+
+    IF v_mostrar_totalizacion THEN
+        v_comision_utilidad := ROUND(public.fn_calcular_porcentaje_comision(public.fn_calcular_utilidad(v_valor_base, v_costo_total), v_valor_base)::NUMERIC, 2)::DOUBLE PRECISION;
+        v_comision_propia := v_comision_utilidad - v_comision_freelance;
+    ELSE
+        v_comision_propia := public.fn_calcular_comision_resta(
+            COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
+            v_comision_freelance
+        );
+    END IF;
+
+    UPDATE public."Quotation"
+    SET 
+        "totalAmount" = COALESCE(
+            NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
+            ROUND((COALESCE("chargesAndTaxes", 0) + 
+                COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = v_quotation_id), 0.0) +
+                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = v_quotation_id AND COALESCE(qpt."isMain", false) = false AND qpt."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)), 0.0)
+            )::numeric, v_decimals)::double precision
+        ),
+        "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,
+        "valorBase" = ROUND(v_valor_base::numeric, v_decimals)::double precision,
+        "comisionTotalPercentage" = COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
+        "comisionFreelancePercentage" = v_comision_freelance,
+        "comisionPropiaPercentage" = v_comision_propia,
+        "commissionPercentage" = v_comision_propia,
+        "utilidad" = ROUND(public.fn_calcular_utilidad(v_valor_base, v_costo_total)::numeric, v_decimals)::double precision,
+        "comisionUtilidadPercentage" = public.fn_calcular_porcentaje_comision(
+            public.fn_calcular_utilidad(v_valor_base, v_costo_total),
+            v_valor_base
+        ),
+        "comisionFreelanceValue" = ROUND(public.fn_calcular_valor_comision(v_comision_freelance, v_valor_base)::numeric, v_decimals)::double precision,
+        "comisionPropiaValue" = ROUND(public.fn_calcular_valor_comision(v_comision_propia, v_valor_base)::numeric, v_decimals)::double precision
+    WHERE id = v_quotation_id;
+
+    p_quotation_id := v_quotation_id;
+    p_mensaje_resultado := 'SUCCESS: Cotización creada correctamente con ID ' || v_quotation_id;
+
+    -- Registrar en Auditoría
+    CALL public."spLogRegistrar"(
+        v_acting_user_id, 
+        'QUOTATION', 
+        'CREATE', 
+        'Se creó la cotización ' || v_internal_number || ' (ID: ' || v_quotation_id || ')', 
+        p_data, 
+        v_quotation_id -- Reutilizamos variable para el logId temporal
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END;
+$procedure$;

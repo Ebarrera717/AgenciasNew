@@ -214,6 +214,8 @@ model Quotation {
   destination                 String?                  @db.VarChar(255)
   startDate                   DateTime?                @db.Timestamp(6)
   endDate                     DateTime?                @db.Timestamp(6)
+  passengerFirstName          String?                  @db.VarChar(150)
+  passengerLastName           String?                  @db.VarChar(150)
   passenger                   String?                  @db.VarChar(255)
   paxAdults                   Int?
   paxChildren                 Int?
@@ -292,6 +294,8 @@ model QuotationProduct {
   description             String?
   servicios               String?
   descripcion             String?
+  passengerFirstName      String?                     @db.VarChar(150)
+  passengerLastName       String?                     @db.VarChar(150)
   passenger               String?                     @db.VarChar(255)
   providerDueDate         DateTime?                   @db.Timestamp(6)
   providerInvoice         String?                     @db.VarChar(100)
@@ -308,6 +312,8 @@ model QuotationProduct {
 model QuotationProductPassenger {
   id                 Int              @id @default(autoincrement())
   quotationProductId Int
+  firstName          String?          @db.VarChar(150)
+  lastName           String?          @db.VarChar(150)
   name               String
   document           String
   quotationProduct   QuotationProduct @relation(fields: [quotationProductId], references: [id], onDelete: Cascade)
@@ -546,10 +552,12 @@ model InvoicesProductTax {
 }
 
 model InvoicesProductPasenger {
-  id               Int    @id @default(autoincrement())
+  id               Int     @id @default(autoincrement())
   invoiceProductId Int
-  name             String @db.VarChar(255)
-  document         String @db.VarChar(255)
+  firstName        String? @db.VarChar(150)
+  lastName         String? @db.VarChar(150)
+  name             String  @db.VarChar(255)
+  document         String  @db.VarChar(255)
 }
 
 model InvoicesProductVariable {
@@ -1164,6 +1172,7 @@ model TransactionConsecutive {
   implantId       Int?
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime? @default(now()) @db.Timestamp(6)
   padding         Int?     @default(4)
   branch          Branch?  @relation(fields: [branchId], references: [id], onUpdate: NoAction)
   implant         Implant? @relation(fields: [implantId], references: [id], onUpdate: NoAction)

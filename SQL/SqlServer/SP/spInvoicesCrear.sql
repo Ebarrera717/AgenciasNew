@@ -173,9 +173,33 @@ BEGIN
                 -- Pasajeros del Item
                 IF JSON_QUERY(@itemJson, '$.passengers') IS NOT NULL
                 BEGIN
-                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [document])
-                    SELECT @newIpId, JSON_VALUE(pax.value, '$.name'), JSON_VALUE(pax.value, '$.document')
-                    FROM OPENJSON(@itemJson, '$.passengers') AS pax;
+                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [firstName], [lastName], [document])
+                    SELECT 
+                        @newIpId,
+                        LTRIM(RTRIM(COALESCE(
+                            NULLIF(CONCAT(ISNULL(JSON_VALUE(pax.value, '$.firstName'), N''), N' ', ISNULL(JSON_VALUE(pax.value, '$.lastName'), N'')), N' '),
+                            JSON_VALUE(pax.value, '$.name'),
+                            N''
+                        ))),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.firstName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), 1, CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) - 1)
+                            END
+                        ),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.lastName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN N''
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) + 1, LEN(JSON_VALUE(pax.value, '$.name')))
+                            END
+                        ),
+                        JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@itemJson, '$.passengers') AS pax
+                    WHERE (JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.firstName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.firstName')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.lastName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.lastName')) <> '');
                 END;
 
                 -- Variables del Item

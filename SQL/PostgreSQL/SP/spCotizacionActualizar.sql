@@ -61,6 +61,16 @@ DECLARE
     v_decimals INT;
     v_acting_user_id INT := NULL;
     v_permitir_sin_productos TEXT := '1';
+    -- Variables para nombres y apellidos separados de pasajeros
+    v_pax_first_name TEXT;
+    v_pax_last_name TEXT;
+    v_pax_full_name TEXT;
+    v_item_pax_first TEXT;
+    v_item_pax_last TEXT;
+    v_item_pax_full TEXT;
+    v_sub_pax_first TEXT;
+    v_sub_pax_last TEXT;
+    v_sub_pax_full TEXT;
 BEGIN
     -- Resolución segura de p_acting_user_id para evitar violación de Quotation_userId_fkey
     IF p_acting_user_id IS NOT NULL THEN
@@ -157,8 +167,8 @@ BEGIN
                             IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
                                 SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
                                 SELECT EXISTS (
-                                    SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p(name TEXT)
-                                    WHERE p.name IS NULL OR trim(p.name) = ''
+                                    SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p("firstName" TEXT, "lastName" TEXT, name TEXT)
+                                    WHERE (p."firstName" IS NULL OR trim(p."firstName") = '') AND (p.name IS NULL OR trim(p.name) = '')
                                 ) INTO v_has_empty_pax_name;
                             END IF;
 
@@ -239,6 +249,20 @@ BEGIN
     -- Obtener decimales de la moneda
     v_decimals := COALESCE(public.fn_obtener_decimales_moneda(p_data->>'currency'), 2);
 
+    -- Resolución inteligente de nombres y apellidos del pasajero principal
+    v_pax_first_name := NULLIF(TRIM(p_data->>'passengerFirstName'), '');
+    v_pax_last_name := NULLIF(TRIM(p_data->>'passengerLastName'), '');
+    IF v_pax_first_name IS NULL AND v_pax_last_name IS NULL AND NULLIF(TRIM(p_data->>'passenger'), '') IS NOT NULL THEN
+        IF POSITION(' ' IN TRIM(p_data->>'passenger')) = 0 THEN
+            v_pax_first_name := TRIM(p_data->>'passenger');
+            v_pax_last_name := '';
+        ELSE
+            v_pax_first_name := SPLIT_PART(TRIM(p_data->>'passenger'), ' ', 1);
+            v_pax_last_name := SUBSTRING(TRIM(p_data->>'passenger') FROM POSITION(' ' IN TRIM(p_data->>'passenger')) + 1);
+        END IF;
+    END IF;
+    v_pax_full_name := NULLIF(TRIM(COALESCE(v_pax_first_name, '') || ' ' || COALESCE(v_pax_last_name, '')), '');
+
     UPDATE public."Quotation" SET
         "clientId" = (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
         "currency" = p_data->>'currency',
@@ -257,7 +281,9 @@ BEGIN
         "destination" = p_data->>'destination',
         "startDate" = CASE WHEN p_data->>'startDate' IS NOT NULL AND p_data->>'startDate' <> '' THEN (p_data->>'startDate')::TIMESTAMP ELSE NULL END,
         "endDate" = CASE WHEN p_data->>'endDate' IS NOT NULL AND p_data->>'endDate' <> '' THEN (p_data->>'endDate')::TIMESTAMP ELSE NULL END,
-        "passenger" = p_data->>'passenger',
+        "passengerFirstName" = v_pax_first_name,
+        "passengerLastName" = v_pax_last_name,
+        "passenger" = v_pax_full_name,
         "paxAdults" = NULLIF(p_data->>'paxAdults', '')::INT,
         "paxChildren" = NULLIF(p_data->>'paxChildren', '')::INT,
         "reservationCode" = p_data->>'reservationCode',
@@ -345,16 +371,37 @@ BEGIN
                       "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
                       "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
                       "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "payments" JSONB, "inNationality" INT,
-                      "service" TEXT, "servicios" TEXT, "descripcion" TEXT, "passenger" TEXT,
+                      "service" TEXT, "servicios" TEXT, "descripcion" TEXT, 
+                      "passengerFirstName" TEXT, "passengerLastName" TEXT, "passenger" TEXT,
                       "providerDueDate" TEXT, "providerInvoice" TEXT
                   )
     LOOP
+        v_item_pax_first := NULLIF(TRIM(v_item."passengerFirstName"), '');
+        v_item_pax_last := NULLIF(TRIM(v_item."passengerLastName"), '');
+        IF v_item_pax_first IS NULL AND v_item_pax_last IS NULL AND NULLIF(TRIM(v_item."passenger"), '') IS NOT NULL THEN
+            IF POSITION(' ' IN TRIM(v_item."passenger")) = 0 THEN
+                v_item_pax_first := TRIM(v_item."passenger");
+                v_item_pax_last := '';
+            ELSE
+                v_item_pax_first := SPLIT_PART(TRIM(v_item."passenger"), ' ', 1);
+                v_item_pax_last := SUBSTRING(TRIM(v_item."passenger") FROM POSITION(' ' IN TRIM(v_item."passenger")) + 1);
+            END IF;
+        END IF;
+
+        IF COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE) AND v_item_pax_first IS NULL AND v_item_pax_last IS NULL THEN
+            v_item_pax_first := v_pax_first_name;
+            v_item_pax_last := v_pax_last_name;
+        END IF;
+
+        v_item_pax_full := NULLIF(TRIM(COALESCE(v_item_pax_first, '') || ' ' || COALESCE(v_item_pax_last, '')), '');
+
         INSERT INTO public."QuotationProduct" (
             "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
             "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
             "serviceType", "destination", "reservationCode", "sellerCommission", 
             "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger",
+            "service", "servicios", "descripcion", 
+            "passengerFirstName", "passengerLastName", "passenger",
             "providerDueDate", "providerInvoice"
         ) VALUES (
             p_id,
@@ -372,16 +419,31 @@ BEGIN
             ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
             NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
             COALESCE(v_item."service", v_item."servicios"), COALESCE(v_item."servicios", v_item."service"), v_item."descripcion",
-            v_item."passenger",
+            v_item_pax_first,
+            v_item_pax_last,
+            v_item_pax_full,
             CASE WHEN v_item."providerDueDate" IS NOT NULL AND v_item."providerDueDate" <> '' THEN v_item."providerDueDate"::TIMESTAMP ELSE NULL END,
             v_item."providerInvoice"
         ) RETURNING id INTO v_quotation_product_id;
 
         IF v_item.passengers IS NOT NULL THEN
-            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
+            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x("firstName" TEXT, "lastName" TEXT, name TEXT, document TEXT)
             LOOP
-                INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-                VALUES (v_quotation_product_id, v_pax.name, v_pax.document);
+                v_sub_pax_first := NULLIF(TRIM(v_pax."firstName"), '');
+                v_sub_pax_last := NULLIF(TRIM(v_pax."lastName"), '');
+                IF v_sub_pax_first IS NULL AND v_sub_pax_last IS NULL AND NULLIF(TRIM(v_pax.name), '') IS NOT NULL THEN
+                    IF POSITION(' ' IN TRIM(v_pax.name)) = 0 THEN
+                        v_sub_pax_first := TRIM(v_pax.name);
+                        v_sub_pax_last := '';
+                    ELSE
+                        v_sub_pax_first := SPLIT_PART(TRIM(v_pax.name), ' ', 1);
+                        v_sub_pax_last := SUBSTRING(TRIM(v_pax.name) FROM POSITION(' ' IN TRIM(v_pax.name)) + 1);
+                    END IF;
+                END IF;
+                v_sub_pax_full := COALESCE(NULLIF(TRIM(COALESCE(v_sub_pax_first, '') || ' ' || COALESCE(v_sub_pax_last, '')), ''), v_pax.name, '');
+
+                INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "firstName", "lastName", "name", "document")
+                VALUES (v_quotation_product_id, v_sub_pax_first, v_sub_pax_last, v_sub_pax_full, COALESCE(v_pax.document, ''));
             END LOOP;
         END IF;
 

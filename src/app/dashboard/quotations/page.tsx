@@ -570,7 +570,7 @@ export default function QuotationsListPage() {
                     traceCode: data.traceCode,
                     items: [{
                         cotDisplay: `#${consecDisplay}`,
-                        isError: false,
+                        statusType: 'success',
                         message: 'Eliminada en Zeus ERP',
                         idZeus: data.idZeusEliminado
                     }]

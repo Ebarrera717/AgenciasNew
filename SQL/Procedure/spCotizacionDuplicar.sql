@@ -65,7 +65,9 @@ BEGIN
         "costoTotal", "valorBase", "utilidad", "comisionTotalPercentage",
         "comisionFreelancePercentage", "comisionFreelanceValue",
         "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
-        "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
+        "destination", "startDate", "endDate", 
+        "passengerFirstName", "passengerLastName", "passenger", 
+        "paxAdults", "paxChildren",
         "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
     ) VALUES (
         v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
@@ -75,7 +77,9 @@ BEGIN
         v_orig_quotation."costoTotal", v_orig_quotation."valorBase", v_orig_quotation."utilidad", v_orig_quotation."comisionTotalPercentage",
         v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
         v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
-        v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
+        v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", 
+        v_orig_quotation."passengerFirstName", v_orig_quotation."passengerLastName", v_orig_quotation."passenger", 
+        v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
         v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription", v_orig_quotation."observations"
     ) RETURNING id INTO v_new_id;
 
@@ -112,20 +116,22 @@ BEGIN
             "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
             "serviceType", "destination", "reservationCode", "sellerCommission",
             "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger",
+            "service", "servicios", "descripcion", 
+            "passengerFirstName", "passengerLastName", "passenger",
             "providerDueDate", "providerInvoice"
         ) VALUES (
             v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
             v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
             v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
             v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger",
+            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", 
+            v_orig_qp."passengerFirstName", v_orig_qp."passengerLastName", v_orig_qp."passenger",
             v_orig_qp."providerDueDate", v_orig_qp."providerInvoice"
         ) RETURNING id INTO v_new_qp_id;
 
         -- Duplicar Pasajeros del producto
-        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-        SELECT v_new_qp_id, "name", "document"
+        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "firstName", "lastName", "name", "document")
+        SELECT v_new_qp_id, "firstName", "lastName", "name", "document"
         FROM public."QuotationProductPassenger"
         WHERE "quotationProductId" = v_orig_qp.id;
 

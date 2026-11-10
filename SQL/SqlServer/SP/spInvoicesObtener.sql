@@ -162,6 +162,8 @@ BEGIN
         ipp.[id],
         ipp.[invoiceProductId],
         ipp.[name],
+        ipp.[firstName],
+        ipp.[lastName],
         ipp.[document]
     FROM dbo.[InvoicesProductPasenger] ipp
     JOIN dbo.[InvoicesProduct] ip ON ipp.[invoiceProductId] = ip.[id]

@@ -26,7 +26,7 @@ function testReleaseManifest() {
     'dbo.spCotizacionActualizar',
     'dbo.spCotizacionListar',
     'dbo.spCotizacionHistorial',
-    'dbo.spFacturacionesCrear'
+    'dbo.spInvoicesCrear'
   ];
 
   const manifestMap = new Set(manifest.objects.map(o => o.objectName));

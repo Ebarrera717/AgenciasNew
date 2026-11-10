@@ -1,3 +1,7 @@
+-- ==========================================
+-- Procedimiento Standalone: spInvoicesListar.sql
+-- ==========================================
+
 -- 2.29. spInvoicesListar
 IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spInvoicesListar;
@@ -39,6 +43,18 @@ BEGIN
         i.[fuente],
         i.[serie],
         i.[consecutivo],
+        (
+            SELECT TOP 1 ipp.[firstName]
+            FROM dbo.[InvoicesProduct] ip
+            JOIN dbo.[InvoicesProductPasenger] ipp ON ipp.[invoiceProductId] = ip.[id]
+            WHERE ip.[invoiceId] = i.[id] AND ipp.[firstName] IS NOT NULL AND ipp.[firstName] <> ''
+        ) AS [paxFirstName],
+        (
+            SELECT TOP 1 ipp.[lastName]
+            FROM dbo.[InvoicesProduct] ip
+            JOIN dbo.[InvoicesProductPasenger] ipp ON ipp.[invoiceProductId] = ip.[id]
+            WHERE ip.[invoiceId] = i.[id] AND ipp.[lastName] IS NOT NULL AND ipp.[lastName] <> ''
+        ) AS [paxLastName],
         (
             SELECT TOP 1 ipp.[name]
             FROM dbo.[InvoicesProduct] ip

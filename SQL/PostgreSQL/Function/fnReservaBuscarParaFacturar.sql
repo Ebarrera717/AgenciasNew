@@ -67,7 +67,7 @@ BEGIN
                         'passengers', COALESCE((
                             SELECT jsonb_agg(
                                 jsonb_build_object(
-                                    'name', TRIM(COALESCE(bpp2.firstnm, '') || ' ' || COALESCE(bpp2.lastnm, '')),
+                                    'firstName', COALESCE(bpp2.firstnm, ''), 'lastName', COALESCE(bpp2.lastnm, ''), 'name', TRIM(COALESCE(bpp2.firstnm, '') || ' ' || COALESCE(bpp2.lastnm, '')),
                                     'document', COALESCE(bpp2.identification, '')
                                 )
                             )

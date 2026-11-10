@@ -114,6 +114,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'Error en generación de XML de facturación', traceCode }, { status: 500 })
         }
 
+        // 1.5 Aplicar Parametrización Dinámica de Descripción de Ítems y Observaciones para Zeus ERP
+        try {
+            const { getZeusTextConfigs } = await import('@/lib/zeus-text-service');
+            const { applyZeusTextFormattingToXml } = await import('@/lib/zeus-text-formatter');
+            const { itemDescriptionConfig, observationsConfig } = await getZeusTextConfigs();
+            xmlStr = applyZeusTextFormattingToXml(xmlStr, itemDescriptionConfig, observationsConfig);
+        } catch (fmtErr: any) {
+            console.warn('[EXPORT_API] Advertencia al aplicar parametrización de textos Zeus:', fmtErr.message);
+        }
+
         // 2. Integración Directa con SQL Server (spFacturacionesCrear -> Zeus ERP)
         let sqlServerMsg = 'Enviado exitosamente a SQL Server';
         let success = true;

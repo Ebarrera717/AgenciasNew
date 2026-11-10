@@ -220,11 +220,15 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { name: 'Productos y Servicios', type: 'Grilla de Ítems', description: 'Permite incorporar vuelos, hoteles, tours o servicios manuales.' },
                     { name: 'Fecha Vencimiento Proveedor', type: 'Fecha (Opcional)', description: 'Fecha límite de pago o vencimiento emitida por el proveedor del servicio.' },
                     { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura, recibo o soporte entregado por el proveedor.' },
-                    { name: 'Variables Adicionales', type: 'Campos Dinámicos', description: 'Variables adicionales requeridas. Muestra un distintivo "Obligatoria" si el cliente seleccionado la tiene configurada para cotización.' },
-                    { name: 'Pasajeros e Itinerarios', type: 'Detalle de Ítem', description: 'Especifica nombres, documentos, fechas de viaje y trayectos.' },
+                    { name: 'Nombres del Pasajero (Cabecera)', type: 'Texto', description: 'Nombres del pasajero registrados de forma independiente (ej. Juan Carlos) tanto en la cabecera como en la grilla de servicios.' },
+                    { name: 'Apellidos del Pasajero (Cabecera)', type: 'Texto', description: 'Apellidos del pasajero registrados de forma independiente (ej. De la Torre Pérez) para estructuración limpia sin ambigüedad en nombres compuestos.' },
+                    { name: 'Pasajeros e Itinerarios (Nombres, Apellidos y Documento)', type: 'Grilla Dinámica de Pasajeros', description: 'Especifica Nombres, Apellidos y Documento de identificación en columnas independientes para cada pasajero asociado al producto o servicio.' },
                     { name: 'Adjuntos y Documentos en Lote', type: 'Gestor Documental Multiactivo', description: 'Permite cargar múltiples archivos simultáneamente (Subir Lote), visualizarlos, descargarlos individualmente o empaquetados en lote comprimido (.ZIP) con un solo clic, y eliminarlos de forma masiva o selectiva.' }
                 ],
                 businessRules: [
+                    'Separación Estricta de Pasajeros: Korex gestiona nombres y apellidos en campos independientes (passengerFirstName y passengerLastName) tanto en la cabecera como en cada producto y en la grilla de pasajeros múltiples (firstName y lastName). Al exportar a Zeus ERP, los datos se mapean directamente a ds_paxname (Nombres) y ds_paxape (Apellidos) eliminando divisiones erróneas por espacios en nombres o apellidos compuestos.',
+                    'Compatibilidad Histórica de Pasajeros: Los registros anteriores con nombres concatenados se preservan y se descomponen inteligentemente al editar, manteniendo sincronizado el campo legado passenger para reportes y búsquedas globales sin alterar la información histórica.',
+                    'Plantillas de Impresión y Exportación: Las propuestas de cotización en PDF y Excel integran marcadores independientes ({{pasajeroCabeceraNombres}}, {{pasajeroCabeceraApellidos}}, {{pasajerosNombres}}, {{pasajerosApellidos}}), garantizando un formato profesional sin duplicaciones.',
                     'Si el parámetro del sistema "PERMITIR_COTIZACION_SIN_PRODUCTOS" está habilitado (valor "1"), es posible crear y guardar una cotización únicamente con el cliente y datos de cabecera sin necesidad de registrar productos de inmediato.',
                     'Permite pre-cargar y colocar adjuntos antes de guardar la cotización o de agregar productos; los archivos quedan preparados en cola ("Por guardar") y se suben y vinculan automáticamente al persistir la cotización.',
                     'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para cotizaciones, el sistema validará en el formulario y en base de datos que todos los productos registrados contengan un valor válido antes de permitir guardar.',
@@ -276,9 +280,12 @@ export const MANUAL_MODULES: ManualModule[] = [
                     { name: 'Factura Proveedor', type: 'Texto Alfanumérico', description: 'Número de factura o documento del proveedor asociado al producto, exportada a Zeus ERP en dbo.FacturaProveedor.' },
                     { name: 'Check-In / Check-Out', type: 'Fechas (Opcional)', description: 'Fechas de llegada y salida del servicio/hotel, exportadas a Zeus ERP en dbo.Fac_Servicios (dt_llegada, dt_salida).' },
                     { name: 'Servicios', type: 'Texto Multilínea', description: 'Descripción detallada de servicios incluidos o complementarios, exportada a Zeus ERP en dbo.Fac_Servicios (ds_servicio).' },
-                    { name: 'Variables Adicionales de Factura', type: 'Campos Dinámicos', description: 'Variables adicionales requeridas con distintivo "Obligatoria" si el cliente la exige para facturas.' }
+                    { name: 'Variables Adicionales de Factura', type: 'Campos Dinámicos', description: 'Variables adicionales requeridas con distintivo "Obligatoria" si el cliente la exige para facturas.' },
+                    { name: 'Pasajeros de la Factura (Nombres y Apellidos)', type: 'Grilla Dinámica', description: 'Registro y desglose de pasajeros con columnas independientes para Nombres, Apellidos y Documento de identidad.' }
                 ],
                 businessRules: [
+                    'Estructura de Pasajeros e Integración a Zeus ERP: Los pasajeros de las facturas se registran con Nombres (firstName) y Apellidos (lastName) de forma independiente. Al exportar a Zeus ERP, los nombres se envían a ds_paxname y los apellidos a ds_paxape de forma limpia, eliminando la necesidad de separaciones manuales o heurísticas por espacios.',
+                    'Compatibilidad de Facturas: Mantiene la compatibilidad hacia atrás con registros históricos y preserva el nombre completo en el campo name para búsquedas y consultas consolidadas.',
                     'Si el cliente seleccionado tiene configuradas variables adicionales obligatorias para facturas, el formulario web y el Stored Procedure bloquearán la emisión si algún ítem carece de dicha variable.',
                     'En importaciones de facturas desde Excel, el sistema valida que las variables obligatorias de factura vengan informadas en la columna de variables o en las columnas dinámicas correspondientes.',
                     'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor son persistidos en base de datos y se transmiten automáticamente a Zeus ERP insertando/actualizando la tabla dbo.FacturaProveedor vinculada a la factura creada.',
@@ -907,6 +914,29 @@ export const MANUAL_MODULES: ManualModule[] = [
                 steps: [
                     { number: 1, title: 'Acceder a Consecutivos', description: 'En el menú Ajustes del sistema, seleccione la pestaña "Consecutivos".' },
                     { number: 2, title: 'Configurar Tipo de Transacción', description: 'Haga clic en "+ Nuevo", ingrese el código de transacción, descripción, prefijo y consecutivo de inicio.' }
+                ]
+            },
+            {
+                code: 'MAE-29',
+                masterCode: 'ZeusTextConfiguration',
+                name: 'Parametrización Dinámica de Textos para Zeus ERP (Descripción y Observaciones)',
+                summary: 'Configuración dinámica del contenido enviado a Zeus ERP en la Descripción de Ítems (ds_descrip) y Observaciones (ds_observacion).',
+                concept: 'Permite a cada empresa seleccionar qué campos de Korex se incorporan al enviar cotizaciones y facturas a Zeus ERP, definiendo su orden de aparición, etiquetas personalizadas (ej. Desde, Hasta, Aerolínea), separadores (ej. " - ", " | ") y visualizando una vista previa en tiempo real. Conserva 100% las observaciones originales y omite automáticamente campos sin información.',
+                fields: [
+                    { name: 'Descripción de Ítems', type: 'Configuración Dinámica', description: 'Selección de campos (Descripción Manual, Fechas, Proveedor, Prestador, Nacionalidad, Pasajero, Destino, Reserva), etiquetas y orden.' },
+                    { name: 'Observaciones', type: 'Configuración Dinámica', description: 'Selección de datos complementarios a anexar a las observaciones existentes (Cotización, Factura, Pasajero, Proveedor, etc.).' },
+                    { name: 'Separadores', type: 'Texto / Presets', description: 'Separador entre fragmentos (ej: " - ", " | ", ", ").' },
+                    { name: 'Vista Previa en Vivo', type: 'Simulación en Tiempo Real', description: 'Muestra en pantalla el resultado exacto del texto que será recibido por Zeus ERP.' }
+                ],
+                businessRules: [
+                    'Los campos sin información se omiten limpiamente sin generar etiquetas vacías ni separadores duplicados.',
+                    'Las observaciones originales digitadas por el asesor siempre se conservan al inicio sin ser reemplazadas.',
+                    'Las longitudes máximas son validadas automáticamente para cumplir con los esquemas de Zeus ERP (ds_descrip y ds_observacion).'
+                ],
+                steps: [
+                    { number: 1, title: 'Acceder a Parámetros', description: 'En Configuración del Sistema, seleccione la pestaña "Parámetros" y luego la sub-pestaña "Exportación Zeus (Campos y Textos)".' },
+                    { number: 2, title: 'Personalizar Campos y Etiquetas', description: 'Active o desactive los switches, modifique las etiquetas en los campos de texto, cambie el orden con las flechas y ajuste el separador deseado.' },
+                    { number: 3, title: 'Verificar y Guardar', description: 'Revise la vista previa en vivo y haga clic en "Guardar Configuración".' }
                 ]
             }
         ]

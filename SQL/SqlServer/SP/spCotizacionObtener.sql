@@ -64,6 +64,8 @@ BEGIN
         q.[startDate],
         q.[endDate],
         q.[passenger],
+        q.[passengerFirstName],
+        q.[passengerLastName],
         q.[paxAdults],
         q.[paxChildren],
         q.[reservationCode],
@@ -129,6 +131,8 @@ BEGIN
                 qp.[servicios],
                 qp.[descripcion],
                 qp.[passenger],
+                qp.[passengerFirstName],
+                qp.[passengerLastName],
                 qp.[providerDueDate],
                 qp.[providerInvoice],
                 (
@@ -150,7 +154,7 @@ BEGIN
                     FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
                 ) AS [prestadoraJson],
                 (
-                    SELECT qpax.[id], qpax.[name], qpax.[document]
+                    SELECT qpax.[id], qpax.[name], qpax.[firstName], qpax.[lastName], qpax.[document]
                     FROM dbo.[QuotationProductPassenger] qpax
                     WHERE qpax.[quotationProductId] = qp.[id]
                     FOR JSON PATH

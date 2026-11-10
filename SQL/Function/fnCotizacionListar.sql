@@ -80,6 +80,9 @@ BEGIN
             ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'passengerFirstName', q."passengerFirstName",
+            'passengerLastName', q."passengerLastName",
+            'passenger', q.passenger,
             'user', CASE WHEN u.id IS NOT NULL THEN jsonb_build_object('id', u.id, 'name', u.name) ELSE NULL END,
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,
@@ -104,8 +107,11 @@ BEGIN
                             'checkOutDate', qp."checkOutDate",
                             'inNationality', COALESCE(qp."inNationality", 1),
                             'mainTaxId', qp."mainTaxId",
+                            'passengerFirstName', qp."passengerFirstName",
+                            'passengerLastName', qp."passengerLastName",
+                            'passenger', qp.passenger,
                             'passengers', COALESCE((
-                                SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'name', qpax.name, 'document', qpax.document))
+                                SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'firstName', qpax."firstName", 'lastName', qpax."lastName", 'name', qpax.name, 'document', qpax.document))
                                 FROM public."QuotationProductPassenger" qpax
                                 WHERE qpax."quotationProductId" = qp.id
                             ), '[]'::jsonb),

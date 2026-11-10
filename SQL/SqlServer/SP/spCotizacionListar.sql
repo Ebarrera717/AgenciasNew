@@ -29,6 +29,9 @@ BEGIN
         q.[stateUpdatedAt],
         q.[userId],
         u.[name] AS [userName],
+        q.[passenger],
+        q.[passengerFirstName],
+        q.[passengerLastName],
         (
             SELECT c.[id], c.[name], c.[document]
             FROM dbo.[Client] c
@@ -53,6 +56,9 @@ BEGIN
                 qp.[checkOutDate],
                 qp.[inNationality],
                 qp.[mainTaxId],
+                qp.[passenger],
+                qp.[passengerFirstName],
+                qp.[passengerLastName],
                 (
                     SELECT p.[id], p.[description]
                     FROM dbo.[Product] p
@@ -72,7 +78,7 @@ BEGIN
                     FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
                 ) AS [prestadoraJson],
                 (
-                    SELECT qpax.[id], qpax.[name], qpax.[document]
+                    SELECT qpax.[id], qpax.[name], qpax.[firstName], qpax.[lastName], qpax.[document]
                     FROM dbo.[QuotationProductPassenger] qpax
                     WHERE qpax.[quotationProductId] = qp.[id]
                     FOR JSON PATH

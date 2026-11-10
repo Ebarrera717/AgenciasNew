@@ -1348,6 +1348,8 @@ BEGIN
         ipp.[id],
         ipp.[invoiceProductId],
         ipp.[name],
+        ipp.[firstName],
+        ipp.[lastName],
         ipp.[document]
     FROM dbo.[InvoicesProductPasenger] ipp
     JOIN dbo.[InvoicesProduct] ip ON ipp.[invoiceProductId] = ip.[id]
@@ -1596,9 +1598,33 @@ BEGIN
                 -- Pasajeros del Item
                 IF JSON_QUERY(@itemJson, '$.passengers') IS NOT NULL
                 BEGIN
-                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [document])
-                    SELECT @newIpId, JSON_VALUE(pax.value, '$.name'), JSON_VALUE(pax.value, '$.document')
-                    FROM OPENJSON(@itemJson, '$.passengers') AS pax;
+                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [firstName], [lastName], [document])
+                    SELECT 
+                        @newIpId,
+                        LTRIM(RTRIM(COALESCE(
+                            NULLIF(CONCAT(ISNULL(JSON_VALUE(pax.value, '$.firstName'), N''), N' ', ISNULL(JSON_VALUE(pax.value, '$.lastName'), N'')), N' '),
+                            JSON_VALUE(pax.value, '$.name'),
+                            N''
+                        ))),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.firstName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), 1, CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) - 1)
+                            END
+                        ),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.lastName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN N''
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) + 1, LEN(JSON_VALUE(pax.value, '$.name')))
+                            END
+                        ),
+                        JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@itemJson, '$.passengers') AS pax
+                    WHERE (JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.firstName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.firstName')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.lastName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.lastName')) <> '');
                 END;
 
                 -- Variables del Item
@@ -1864,9 +1890,33 @@ BEGIN
                 -- Pasajeros del Item
                 IF JSON_QUERY(@itemJson, '$.passengers') IS NOT NULL
                 BEGIN
-                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [document])
-                    SELECT @newIpId, JSON_VALUE(pax.value, '$.name'), JSON_VALUE(pax.value, '$.document')
-                    FROM OPENJSON(@itemJson, '$.passengers') AS pax;
+                    INSERT INTO dbo.[InvoicesProductPasenger] ([invoiceProductId], [name], [firstName], [lastName], [document])
+                    SELECT 
+                        @newIpId,
+                        LTRIM(RTRIM(COALESCE(
+                            NULLIF(CONCAT(ISNULL(JSON_VALUE(pax.value, '$.firstName'), N''), N' ', ISNULL(JSON_VALUE(pax.value, '$.lastName'), N'')), N' '),
+                            JSON_VALUE(pax.value, '$.name'),
+                            N''
+                        ))),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.firstName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), 1, CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) - 1)
+                            END
+                        ),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.lastName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN N''
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) + 1, LEN(JSON_VALUE(pax.value, '$.name')))
+                            END
+                        ),
+                        JSON_VALUE(pax.value, '$.document')
+                    FROM OPENJSON(@itemJson, '$.passengers') AS pax
+                    WHERE (JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.firstName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.firstName')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.lastName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.lastName')) <> '');
                 END;
 
                 -- Variables del Item
@@ -2338,6 +2388,9 @@ BEGIN
         q.[stateUpdatedAt],
         q.[userId],
         u.[name] AS [userName],
+        q.[passenger],
+        q.[passengerFirstName],
+        q.[passengerLastName],
         (
             SELECT c.[id], c.[name], c.[document]
             FROM dbo.[Client] c
@@ -2362,6 +2415,9 @@ BEGIN
                 qp.[checkOutDate],
                 qp.[inNationality],
                 qp.[mainTaxId],
+                qp.[passenger],
+                qp.[passengerFirstName],
+                qp.[passengerLastName],
                 (
                     SELECT p.[id], p.[description]
                     FROM dbo.[Product] p
@@ -2381,7 +2437,7 @@ BEGIN
                     FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
                 ) AS [prestadoraJson],
                 (
-                    SELECT qpax.[id], qpax.[name], qpax.[document]
+                    SELECT qpax.[id], qpax.[name], qpax.[firstName], qpax.[lastName], qpax.[document]
                     FROM dbo.[QuotationProductPassenger] qpax
                     WHERE qpax.[quotationProductId] = qp.[id]
                     FOR JSON PATH
@@ -2579,6 +2635,8 @@ BEGIN
         q.[startDate],
         q.[endDate],
         q.[passenger],
+        q.[passengerFirstName],
+        q.[passengerLastName],
         q.[paxAdults],
         q.[paxChildren],
         q.[reservationCode],
@@ -2644,6 +2702,8 @@ BEGIN
                 qp.[servicios],
                 qp.[descripcion],
                 qp.[passenger],
+                qp.[passengerFirstName],
+                qp.[passengerLastName],
                 qp.[providerDueDate],
                 qp.[providerInvoice],
                 (
@@ -2665,7 +2725,7 @@ BEGIN
                     FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
                 ) AS [prestadoraJson],
                 (
-                    SELECT qpax.[id], qpax.[name], qpax.[document]
+                    SELECT qpax.[id], qpax.[name], qpax.[firstName], qpax.[lastName], qpax.[document]
                     FROM dbo.[QuotationProductPassenger] qpax
                     WHERE qpax.[quotationProductId] = qp.[id]
                     FOR JSON PATH
@@ -2755,6 +2815,21 @@ BEGIN
         DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
         DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
         DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
+        DECLARE @passengerFirstName NVARCHAR(150) = JSON_VALUE(@p_data, '$.passengerFirstName');
+        DECLARE @passengerLastName NVARCHAR(150) = JSON_VALUE(@p_data, '$.passengerLastName');
+
+        IF @passengerFirstName IS NULL AND @passengerLastName IS NULL AND NULLIF(LTRIM(RTRIM(@passenger)), '') IS NOT NULL
+        BEGIN
+            IF CHARINDEX(' ', LTRIM(RTRIM(@passenger))) = 0
+                SET @passengerFirstName = LTRIM(RTRIM(@passenger));
+            ELSE
+            BEGIN
+                SET @passengerFirstName = SUBSTRING(LTRIM(RTRIM(@passenger)), 1, CHARINDEX(' ', LTRIM(RTRIM(@passenger))) - 1);
+                SET @passengerLastName = SUBSTRING(LTRIM(RTRIM(@passenger)), CHARINDEX(' ', LTRIM(RTRIM(@passenger))) + 1, LEN(@passenger));
+            END
+        END;
+        IF @passenger IS NULL AND (@passengerFirstName IS NOT NULL OR @passengerLastName IS NOT NULL)
+            SET @passenger = LTRIM(RTRIM(CONCAT(ISNULL(@passengerFirstName, N''), N' ', ISNULL(@passengerLastName, N''))));
         DECLARE @paxAdults INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxAdults') AS INT);
         DECLARE @paxChildren INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxChildren') AS INT);
         DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
@@ -2893,11 +2968,11 @@ BEGIN
         INSERT INTO dbo.[Quotation] (
             internalNumber, [date], clientId, currency, exchangeRate, branchId, implantId, sellerId, ticketPrinterId,
             baseCommissionable, chargesAndTaxes, totalAmount, commissionPercentage, userId, state, stateDescription, stateUpdatedAt,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren, reservationCode, manualDescription, observations
+            destination, startDate, endDate, passenger, passengerFirstName, passengerLastName, paxAdults, paxChildren, reservationCode, manualDescription, observations
         ) VALUES (
             ISNULL(@internalNum, N'TEMP'), GETDATE(), @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId, @ticketPrinterId,
             @baseCommissionable, @chargesAndTaxes, @totalAmount, @commissionPercentage, @actingUserId, N'NUEVO', N'Creación de cotización', GETDATE(),
-            @destination, @startDate, @endDate, @passenger, @paxAdults, @paxChildren, @reservationCode, @manualDescription, @observations
+            @destination, @startDate, @endDate, @passenger, @passengerFirstName, @passengerLastName, @paxAdults, @paxChildren, @reservationCode, @manualDescription, @observations
         );
 
         SET @p_quotation_id = SCOPE_IDENTITY();
@@ -2946,6 +3021,21 @@ BEGIN
                 DECLARE @servicios NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.servicios');
                 DECLARE @descripcion NVARCHAR(MAX) = JSON_VALUE(@item_val, '$.descripcion');
                 DECLARE @passengerItem NVARCHAR(250) = JSON_VALUE(@item_val, '$.passenger');
+                DECLARE @passengerFirstNameItem NVARCHAR(150) = JSON_VALUE(@item_val, '$.passengerFirstName');
+                DECLARE @passengerLastNameItem NVARCHAR(150) = JSON_VALUE(@item_val, '$.passengerLastName');
+
+                IF @passengerFirstNameItem IS NULL AND @passengerLastNameItem IS NULL AND NULLIF(LTRIM(RTRIM(@passengerItem)), '') IS NOT NULL
+                BEGIN
+                    IF CHARINDEX(' ', LTRIM(RTRIM(@passengerItem))) = 0
+                        SET @passengerFirstNameItem = LTRIM(RTRIM(@passengerItem));
+                    ELSE
+                    BEGIN
+                        SET @passengerFirstNameItem = SUBSTRING(LTRIM(RTRIM(@passengerItem)), 1, CHARINDEX(' ', LTRIM(RTRIM(@passengerItem))) - 1);
+                        SET @passengerLastNameItem = SUBSTRING(LTRIM(RTRIM(@passengerItem)), CHARINDEX(' ', LTRIM(RTRIM(@passengerItem))) + 1, LEN(@passengerItem));
+                    END
+                END;
+                IF @passengerItem IS NULL AND (@passengerFirstNameItem IS NOT NULL OR @passengerLastNameItem IS NOT NULL)
+                    SET @passengerItem = LTRIM(RTRIM(CONCAT(ISNULL(@passengerFirstNameItem, N''), N' ', ISNULL(@passengerLastNameItem, N''))));
                 DECLARE @providerDueDate DATETIME2 = TRY_CAST(JSON_VALUE(@item_val, '$.providerDueDate') AS DATETIME2);
                 DECLARE @providerInvoice NVARCHAR(100) = JSON_VALUE(@item_val, '$.providerInvoice');
 
@@ -2957,12 +3047,12 @@ BEGIN
                     quotationId, productId, quantity, price, cost, providerId, prestadoraId,
                     checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
                     reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                    service, servicios, descripcion, description, passenger, providerDueDate, providerInvoice
+                    service, servicios, descripcion, description, passenger, passengerFirstName, passengerLastName, providerDueDate, providerInvoice
                 ) VALUES (
                     @p_quotation_id, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
                     @checkInDate, @checkOutDate, @nights, @paxAdultsItem, @paxChildrenItem, @serviceType, @destinationItem,
                     @reservationCodeItem, @sellerCommission, @ticketPrinterCommission, @comboId, @mainTaxId, @inNationality,
-                    @service, @servicios, @descripcion, @descripcion, @passengerItem, @providerDueDate, @providerInvoice
+                    @service, @servicios, @descripcion, @descripcion, @passengerItem, @passengerFirstNameItem, @passengerLastNameItem, @providerDueDate, @providerInvoice
                 );
                 SET @qp_id = SCOPE_IDENTITY();
 
@@ -2984,13 +3074,33 @@ BEGIN
                 -- Insert Passengers (QuotationProductPassenger)
                 IF JSON_QUERY(@item_val, '$.passengers') IS NOT NULL
                 BEGIN
-                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
+                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, firstName, lastName, document)
                     SELECT
                         @qp_id,
-                        JSON_VALUE(pax.value, '$.name'),
+                        LTRIM(RTRIM(COALESCE(
+                            NULLIF(CONCAT(ISNULL(JSON_VALUE(pax.value, '$.firstName'), N''), N' ', ISNULL(JSON_VALUE(pax.value, '$.lastName'), N'')), N' '),
+                            JSON_VALUE(pax.value, '$.name'),
+                            N''
+                        ))),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.firstName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), 1, CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) - 1)
+                            END
+                        ),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.lastName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN N''
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) + 1, LEN(JSON_VALUE(pax.value, '$.name')))
+                            END
+                        ),
                         JSON_VALUE(pax.value, '$.document')
                     FROM OPENJSON(@item_val, '$.passengers') AS pax
-                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
+                    WHERE (JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.firstName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.firstName')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.lastName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.lastName')) <> '');
                 END;
 
                 -- Insert Variables (QuotationProductVariable)
@@ -3145,6 +3255,21 @@ BEGIN
         DECLARE @startDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.startDate') AS DATETIME2);
         DECLARE @endDate DATETIME2 = TRY_CAST(JSON_VALUE(@p_data, '$.endDate') AS DATETIME2);
         DECLARE @passenger NVARCHAR(250) = JSON_VALUE(@p_data, '$.passenger');
+        DECLARE @passengerFirstName NVARCHAR(150) = JSON_VALUE(@p_data, '$.passengerFirstName');
+        DECLARE @passengerLastName NVARCHAR(150) = JSON_VALUE(@p_data, '$.passengerLastName');
+
+        IF @passengerFirstName IS NULL AND @passengerLastName IS NULL AND NULLIF(LTRIM(RTRIM(@passenger)), '') IS NOT NULL
+        BEGIN
+            IF CHARINDEX(' ', LTRIM(RTRIM(@passenger))) = 0
+                SET @passengerFirstName = LTRIM(RTRIM(@passenger));
+            ELSE
+            BEGIN
+                SET @passengerFirstName = SUBSTRING(LTRIM(RTRIM(@passenger)), 1, CHARINDEX(' ', LTRIM(RTRIM(@passenger))) - 1);
+                SET @passengerLastName = SUBSTRING(LTRIM(RTRIM(@passenger)), CHARINDEX(' ', LTRIM(RTRIM(@passenger))) + 1, LEN(@passenger));
+            END
+        END;
+        IF @passenger IS NULL AND (@passengerFirstName IS NOT NULL OR @passengerLastName IS NOT NULL)
+            SET @passenger = LTRIM(RTRIM(CONCAT(ISNULL(@passengerFirstName, N''), N' ', ISNULL(@passengerLastName, N''))));
         DECLARE @paxAdults INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxAdults') AS INT);
         DECLARE @paxChildren INT = TRY_CAST(JSON_VALUE(@p_data, '$.paxChildren') AS INT);
         DECLARE @reservationCode NVARCHAR(100) = JSON_VALUE(@p_data, '$.reservationCode');
@@ -3283,6 +3408,8 @@ BEGIN
             startDate = @startDate,
             endDate = @endDate,
             passenger = @passenger,
+            passengerFirstName = @passengerFirstName,
+            passengerLastName = @passengerLastName,
             paxAdults = @paxAdults,
             paxChildren = @paxChildren,
             reservationCode = @reservationCode,
@@ -3330,6 +3457,21 @@ BEGIN
                 DECLARE @serviciosUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.servicios');
                 DECLARE @descripcionUpd NVARCHAR(MAX) = JSON_VALUE(@item_val_upd, '$.descripcion');
                 DECLARE @passengerItemUpd NVARCHAR(250) = JSON_VALUE(@item_val_upd, '$.passenger');
+                DECLARE @passengerFirstNameItemUpd NVARCHAR(150) = JSON_VALUE(@item_val_upd, '$.passengerFirstName');
+                DECLARE @passengerLastNameItemUpd NVARCHAR(150) = JSON_VALUE(@item_val_upd, '$.passengerLastName');
+
+                IF @passengerFirstNameItemUpd IS NULL AND @passengerLastNameItemUpd IS NULL AND NULLIF(LTRIM(RTRIM(@passengerItemUpd)), '') IS NOT NULL
+                BEGIN
+                    IF CHARINDEX(' ', LTRIM(RTRIM(@passengerItemUpd))) = 0
+                        SET @passengerFirstNameItemUpd = LTRIM(RTRIM(@passengerItemUpd));
+                    ELSE
+                    BEGIN
+                        SET @passengerFirstNameItemUpd = SUBSTRING(LTRIM(RTRIM(@passengerItemUpd)), 1, CHARINDEX(' ', LTRIM(RTRIM(@passengerItemUpd))) - 1);
+                        SET @passengerLastNameItemUpd = SUBSTRING(LTRIM(RTRIM(@passengerItemUpd)), CHARINDEX(' ', LTRIM(RTRIM(@passengerItemUpd))) + 1, LEN(@passengerItemUpd));
+                    END
+                END;
+                IF @passengerItemUpd IS NULL AND (@passengerFirstNameItemUpd IS NOT NULL OR @passengerLastNameItemUpd IS NOT NULL)
+                    SET @passengerItemUpd = LTRIM(RTRIM(CONCAT(ISNULL(@passengerFirstNameItemUpd, N''), N' ', ISNULL(@passengerLastNameItemUpd, N''))));
                 DECLARE @providerDueDateUpd DATETIME2 = TRY_CAST(JSON_VALUE(@item_val_upd, '$.providerDueDate') AS DATETIME2);
                 DECLARE @providerInvoiceUpd NVARCHAR(100) = JSON_VALUE(@item_val_upd, '$.providerInvoice');
 
@@ -3341,12 +3483,12 @@ BEGIN
                     quotationId, productId, quantity, price, cost, providerId, prestadoraId,
                     checkInDate, checkOutDate, nights, paxAdults, paxChildren, serviceType, destination,
                     reservationCode, sellerCommission, ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                    service, servicios, descripcion, description, passenger, providerDueDate, providerInvoice
+                    service, servicios, descripcion, description, passenger, passengerFirstName, passengerLastName, providerDueDate, providerInvoice
                 ) VALUES (
                     @p_id, @productIdUpd, @quantityUpd, @priceUpd, @costUpd, @providerIdUpd, @prestadoraIdUpd,
                     @checkInDateUpd, @checkOutDateUpd, @nightsUpd, @paxAdultsItemUpd, @paxChildrenItemUpd, @serviceTypeUpd, @destinationItemUpd,
                     @reservationCodeItemUpd, @sellerCommissionUpd, @ticketPrinterCommissionUpd, @comboIdUpd, @mainTaxIdUpd, @inNationalityUpd,
-                    @serviceUpd, @serviciosUpd, @descripcionUpd, @descripcionUpd, @passengerItemUpd, @providerDueDateUpd, @providerInvoiceUpd
+                    @serviceUpd, @serviciosUpd, @descripcionUpd, @descripcionUpd, @passengerItemUpd, @passengerFirstNameItemUpd, @passengerLastNameItemUpd, @providerDueDateUpd, @providerInvoiceUpd
                 );
                 SET @qp_id_upd = SCOPE_IDENTITY();
 
@@ -3368,13 +3510,33 @@ BEGIN
                 -- Insert Passengers (QuotationProductPassenger)
                 IF JSON_QUERY(@item_val_upd, '$.passengers') IS NOT NULL
                 BEGIN
-                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, document)
+                    INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, firstName, lastName, document)
                     SELECT
                         @qp_id_upd,
-                        JSON_VALUE(pax.value, '$.name'),
+                        LTRIM(RTRIM(COALESCE(
+                            NULLIF(CONCAT(ISNULL(JSON_VALUE(pax.value, '$.firstName'), N''), N' ', ISNULL(JSON_VALUE(pax.value, '$.lastName'), N'')), N' '),
+                            JSON_VALUE(pax.value, '$.name'),
+                            N''
+                        ))),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.firstName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), 1, CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) - 1)
+                            END
+                        ),
+                        COALESCE(
+                            NULLIF(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.lastName'))), N''),
+                            CASE 
+                                WHEN CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) = 0 THEN N''
+                                ELSE SUBSTRING(LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name'))), CHARINDEX(' ', LTRIM(RTRIM(JSON_VALUE(pax.value, '$.name')))) + 1, LEN(JSON_VALUE(pax.value, '$.name')))
+                            END
+                        ),
                         JSON_VALUE(pax.value, '$.document')
                     FROM OPENJSON(@item_val_upd, '$.passengers') AS pax
-                    WHERE JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '';
+                    WHERE (JSON_VALUE(pax.value, '$.name') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.name')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.firstName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.firstName')) <> '')
+                       OR (JSON_VALUE(pax.value, '$.lastName') IS NOT NULL AND TRIM(JSON_VALUE(pax.value, '$.lastName')) <> '');
                 END;
 
                 -- Insert Variables (QuotationProductVariable)
@@ -3532,7 +3694,7 @@ BEGIN
             costoTotal, valorBase, utilidad, comisionTotalPercentage,
             comisionFreelancePercentage, comisionFreelanceValue,
             comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren,
+            destination, startDate, endDate, passenger, passengerFirstName, passengerLastName, paxAdults, paxChildren,
             reservationCode, copyFieldsToProducts, manualDescription, observations
         )
         SELECT
@@ -3543,7 +3705,7 @@ BEGIN
             costoTotal, valorBase, utilidad, comisionTotalPercentage,
             comisionFreelancePercentage, comisionFreelanceValue,
             comisionPropiaPercentage, comisionPropiaValue, comisionUtilidadPercentage,
-            destination, startDate, endDate, passenger, paxAdults, paxChildren,
+            destination, startDate, endDate, passenger, passengerFirstName, passengerLastName, paxAdults, paxChildren,
             reservationCode, copyFieldsToProducts, manualDescription, observations
         FROM dbo.[Quotation]
         WHERE id = @p_quotation_id;
@@ -3594,7 +3756,7 @@ BEGIN
                 checkInDate, checkOutDate, nights, paxAdults, paxChildren,
                 serviceType, destination, reservationCode, sellerCommission,
                 ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                service, servicios, descripcion, description, passenger,
+                service, servicios, descripcion, description, passenger, passengerFirstName, passengerLastName,
                 providerDueDate, providerInvoice
             )
             SELECT
@@ -3602,7 +3764,7 @@ BEGIN
                 checkInDate, checkOutDate, nights, paxAdults, paxChildren,
                 serviceType, destination, reservationCode, sellerCommission,
                 ticketPrinterCommission, comboId, mainTaxId, inNationality,
-                service, servicios, descripcion, description, passenger,
+                service, servicios, descripcion, description, passenger, passengerFirstName, passengerLastName,
                 providerDueDate, providerInvoice
             FROM dbo.[QuotationProduct]
             WHERE id = @origQpId;
@@ -3610,8 +3772,8 @@ BEGIN
             SET @newQpId = SCOPE_IDENTITY();
 
             -- Duplicar pasajeros
-            INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, [name], document)
-            SELECT @newQpId, [name], document
+            INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, [name], firstName, lastName, document)
+            SELECT @newQpId, [name], firstName, lastName, document
             FROM dbo.[QuotationProductPassenger]
             WHERE quotationProductId = @origQpId;
 
@@ -3985,18 +4147,24 @@ BEGIN
                     CAST(0 AS DECIMAL(18,2)) AS [am_vat],
                     CAST(0 AS DECIMAL(18,2)) AS [am_Comision],
                     -- Titular: primer pasajero con nombres y apellidos separados
-                    CASE 
-                        WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, 30)
-                        WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
-                            THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - 1)
-                        ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) - 1)
-                    END AS [ds_paxname],
-                    CASE 
-                        WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN ''
-                        WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
-                            THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1, 100)), 1, 30)
-                        ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) + 1, 100)), 1, 30)
-                    END AS [ds_paxape],
+                    COALESCE(
+                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.firstName)), 1, 30), ''),
+                        CASE 
+                            WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, 30)
+                            WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
+                                THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - 1)
+                            ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) - 1)
+                        END
+                    ) AS [ds_paxname],
+                    COALESCE(
+                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.lastName)), 1, 30), ''),
+                        CASE 
+                            WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN ''
+                            WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
+                                THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1, 100)), 1, 30)
+                            ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) + 1, 100)), 1, 30)
+                        END
+                    ) AS [ds_paxape],
                     'SR' AS [ds_paxprefix],
                     '' AS [cd_tourcode],
                     0 AS [NumTktConj],
@@ -4136,18 +4304,24 @@ BEGIN
                             e.id AS [id_factura],
                             ep.id AS [id_item],
                             3 AS [in_tipoitem],
-                            CASE 
-                                WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, 50)
-                                WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
-                                    THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - 1)
-                                ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) - 1)
-                            END AS [ds_paxname],
-                            CASE 
-                                WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN ''
-                                WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
-                                    THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1, 100)), 1, 50)
-                                ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) + 1, 100)), 1, 50)
-                            END AS [ds_paxape],
+                            COALESCE(
+                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.firstName)), 1, 50), ''),
+                                CASE 
+                                    WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, 50)
+                                    WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
+                                        THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - 1)
+                                    ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) - 1)
+                                END
+                            ) AS [ds_paxname],
+                            COALESCE(
+                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.lastName)), 1, 50), ''),
+                                CASE 
+                                    WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN ''
+                                    WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
+                                        THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1, 100)), 1, 50)
+                                    ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) + 1, 100)), 1, 50)
+                                END
+                            ) AS [ds_paxape],
                             'SR' AS [ds_paxprefix],
                             '' AS [ds_paxclasificacion],
                             '' AS [cd_voucherpax],
@@ -4440,7 +4614,7 @@ IF OBJECT_ID('dbo.spInvoicesListar', 'P') IS NOT NULL
     DROP PROCEDURE dbo.spInvoicesListar;
 GO
 
-CREATE OR ALTER PROCEDURE dbo.spInvoicesListar
+CREATE PROCEDURE dbo.spInvoicesListar
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -4476,7 +4650,18 @@ BEGIN
         i.[fuente],
         i.[serie],
         i.[consecutivo],
-        i.[observations],
+        (
+            SELECT TOP 1 ipp.[firstName]
+            FROM dbo.[InvoicesProduct] ip
+            JOIN dbo.[InvoicesProductPasenger] ipp ON ipp.[invoiceProductId] = ip.[id]
+            WHERE ip.[invoiceId] = i.[id] AND ipp.[firstName] IS NOT NULL AND ipp.[firstName] <> ''
+        ) AS [paxFirstName],
+        (
+            SELECT TOP 1 ipp.[lastName]
+            FROM dbo.[InvoicesProduct] ip
+            JOIN dbo.[InvoicesProductPasenger] ipp ON ipp.[invoiceProductId] = ip.[id]
+            WHERE ip.[invoiceId] = i.[id] AND ipp.[lastName] IS NOT NULL AND ipp.[lastName] <> ''
+        ) AS [paxLastName],
         (
             SELECT TOP 1 ipp.[name]
             FROM dbo.[InvoicesProduct] ip

@@ -1,15 +1,15 @@
 {
   "releaseVersion": "0.1.0",
-  "build": "20261109.01",
+  "build": "20261110.01",
   "engine": "SQLServer",
-  "generatedAt": "2026-11-09T21:14:36.518Z",
+  "generatedAt": "2026-11-10T22:47:25.720Z",
   "totalObjects": 188,
   "objects": [
     {
       "objectType": "TABLE",
       "objectName": "dbo.Role",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -17,7 +17,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TicketPrinter",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -25,7 +25,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Branch",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -33,7 +33,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Implant",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -41,7 +41,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.User",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -49,7 +49,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Seller",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -57,7 +57,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Client",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -65,7 +65,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ProviderType",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -73,7 +73,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Provider",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -81,7 +81,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Prestadora",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -89,7 +89,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TicketType",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -97,7 +97,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Product",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -105,7 +105,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Quotation",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -113,7 +113,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Currency",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -121,7 +121,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.SystemParameter",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -129,7 +129,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Menu",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -137,7 +137,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Master",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -145,7 +145,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.MasterVariable",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -153,7 +153,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ChargeAndTax",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -161,7 +161,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationProduct",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -169,7 +169,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Combo",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -177,7 +177,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationProductPassenger",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -185,7 +185,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationProductTax",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -193,7 +193,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationProductVariable",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -201,7 +201,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationProductPayment",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -209,7 +209,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationCombo",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -217,7 +217,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationManualService",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -225,7 +225,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationStateHistory",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -233,7 +233,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Invoices",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -241,7 +241,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InvoicesProduct",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -249,7 +249,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InvoicesProductTax",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -257,7 +257,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InvoicesProductPasenger",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -265,7 +265,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InvoicesProductVariable",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -273,7 +273,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InvoicesProductPayment",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -281,7 +281,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InvoicesProductItinerary",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -289,7 +289,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InvoicesProductCombo",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -297,7 +297,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Attachment",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -305,7 +305,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TraceabilitySession",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -313,7 +313,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TraceabilityLog",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -321,7 +321,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Countries",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -329,7 +329,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Cities",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -337,7 +337,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Airports",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -345,7 +345,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CreditCard",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -353,7 +353,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Resolution",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -361,7 +361,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.DocumentResolution",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -369,7 +369,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.SysConsecutivo",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -377,7 +377,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TransactionConsecutive",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -385,7 +385,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Equivalence",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -393,7 +393,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ExecutionProcedure",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -401,7 +401,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ExecutionPreset",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -409,7 +409,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Payment",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -417,7 +417,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.QuotationState",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -425,7 +425,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.PreQuotation",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -433,7 +433,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.PreQuotationStateHistory",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -441,7 +441,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ImpRet",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -449,7 +449,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CargosDesc",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -457,7 +457,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.parametros",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -465,7 +465,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Parametr",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -473,7 +473,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Monedas_IATA",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -481,7 +481,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Sucursales",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -489,7 +489,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Implantes",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -497,7 +497,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.FormasPago",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -505,7 +505,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TarjetasCredito",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -513,7 +513,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.tarjetascredito",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -521,7 +521,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TiposDocumento",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -529,7 +529,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Entidades",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -537,7 +537,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Tiqueteadores",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -545,7 +545,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TiposServicios",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -553,7 +553,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ConceptoFacturacion",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -561,7 +561,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.tiposServicio_asignados",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -569,7 +569,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TipoProveedores",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -577,7 +577,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TipoVenta",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -585,7 +585,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Hoteles",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -593,7 +593,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CLIENTES",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -601,7 +601,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.PROVEEDORES",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -609,7 +609,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.MAEVENDE",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -617,7 +617,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TERCEROS",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -625,7 +625,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Terceros",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -633,7 +633,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.FACTURAS",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -641,7 +641,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.FUENTES",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -649,7 +649,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Fac_Factura",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -657,7 +657,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.fac_factura",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -665,7 +665,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.resoluciones",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -673,7 +673,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.NotasAerolinea",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -681,7 +681,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CargosAsignados",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -689,7 +689,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CargosAsignados_ConceptoFac",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -697,7 +697,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CargosAsignados_Configuracion_ImpCategoriaFiscal",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -705,7 +705,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Categorias",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -713,7 +713,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Cierres",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -721,7 +721,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Cliente_ConfiguracionVariables",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -729,7 +729,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Cliente_FP_AirPlus",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -737,7 +737,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Clientes_Descuentos",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -745,7 +745,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ColaImpresion_Documentos",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -753,7 +753,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ConfiguracioFacturaTarjetasPropias_NumerosTC",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -761,7 +761,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ConfiguracionClientesConceptos",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -769,7 +769,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ConfiguracionConceptosAutoClientes",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -777,7 +777,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ConfiguracionConceptosAutoClientes_Conceptos",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -785,7 +785,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ConfiguracionTransacciones_Adicionales",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -793,7 +793,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ConfiguracionVariables",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -801,7 +801,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Configuracion_ImpCategoriaFiscal",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -809,7 +809,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Configuracion_remisiones",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -817,7 +817,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Cotizacion",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -825,7 +825,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CotizacionCargos",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -833,7 +833,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CotizacionImpuestos",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -841,7 +841,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CotizacionServicios",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -849,7 +849,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CotizacionServiciosFormasPago",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -857,7 +857,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CotizacionServicios_PaxAdicional",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -865,7 +865,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.CotizacionServicios_TipoProv",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -873,7 +873,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Cotizacion_facturas",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -881,7 +881,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.EquivalencesInterfaces",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -889,7 +889,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Etapas",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -897,7 +897,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Fac_RecibosCaja",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -905,7 +905,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Fac_Servicios",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -913,7 +913,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Fac_Servicios_TiposFacturacionHoteles",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -921,7 +921,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Fac_Tao",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -929,7 +929,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.fac_TAO",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -937,7 +937,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.GREmpresarial",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -945,7 +945,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ImpAsignados",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -953,7 +953,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ImpAsignados_ConceptoFac",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -961,7 +961,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ImpAsignados_Configuracion_ImpCategoriaFiscal",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -969,7 +969,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Impuestos_bu",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -977,7 +977,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Interfaces",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -985,7 +985,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.InterfaceExtractParam",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -993,7 +993,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ReservaGDS_Detalles",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1001,7 +1001,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ReservaGDS_Servicios",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1009,7 +1009,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ReservaGDS_VariableAdicional",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1017,7 +1017,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.ReservasGDS",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1025,7 +1025,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Segmento",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1033,7 +1033,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.TiposFacturacionHoteles",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1041,7 +1041,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Tiquetes",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1049,7 +1049,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Usuario",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1057,7 +1057,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.VariableDatosMaestro",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1065,7 +1065,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.VariableDefinicion",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1073,7 +1073,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.VariableDefinicionMaestro",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1081,7 +1081,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Korex_UpdateHistory",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1089,7 +1089,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Korex_UpdateObjects",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1097,7 +1097,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Korex_UpdateErrors",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1105,7 +1105,7 @@
       "objectType": "TABLE",
       "objectName": "dbo.Korex_Installation",
       "sourceFile": "SQL/SqlServer/01_Tables.sql",
-      "hash": "8ebb7d0dbf908d9c5f2418b2cda6e882fff8c08e838f7ddd18193fb251bcee78",
+      "hash": "7ac21d2674c6782f22ef0e5688c382cd2a8f81999ddb0122980e943b54c2b2ba",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1113,7 +1113,7 @@
       "objectType": "FUNCTION",
       "objectName": "dbo.fnQuitarEspeciales",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1121,7 +1121,7 @@
       "objectType": "FUNCTION",
       "objectName": "dbo.fnObtenerSiguienteConsecutivo",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1129,7 +1129,7 @@
       "objectType": "FUNCTION",
       "objectName": "dbo.fnInterfaceExtractParamValue",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1137,7 +1137,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spObtenerSiguienteConsecutivo",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1145,7 +1145,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spMonedaListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1153,7 +1153,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spMonedaCrear",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1161,7 +1161,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spClienteListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1169,7 +1169,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spBranchListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1177,7 +1177,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spImplantListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1185,7 +1185,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spSellerListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1193,7 +1193,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spProviderTypeListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1201,7 +1201,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spProviderListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1209,7 +1209,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spPrestadoraListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1217,7 +1217,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spTicketTypeListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1225,7 +1225,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spTicketPrinterListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1233,7 +1233,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spProductListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1241,7 +1241,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spChargeAndTaxListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1249,7 +1249,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spRoleListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1257,7 +1257,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spUserListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1265,7 +1265,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spParameterListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1273,7 +1273,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spMenuListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1281,7 +1281,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spMasterListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1289,7 +1289,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spTraceabilityLog",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1297,7 +1297,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spTraceabilityList",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1305,7 +1305,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spTraceabilityGetDetails",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1313,7 +1313,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spTraceabilityClean",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1321,7 +1321,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spInvoicesObtener",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1329,7 +1329,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spInvoicesCrear",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1337,7 +1337,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spInvoicesActualizar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1345,7 +1345,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spInvoicesEliminar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1353,7 +1353,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spInvoicesListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1361,7 +1361,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spPreCotizacionListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1369,7 +1369,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spPreCotizacionCrear",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1377,7 +1377,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spPreCotizacionConvertir",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1385,7 +1385,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spPreCotizacionEliminar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1393,7 +1393,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionListar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1401,7 +1401,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionHistorial",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1409,7 +1409,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionObtener",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1417,7 +1417,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionCrear",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1425,7 +1425,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionActualizar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1433,7 +1433,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionDuplicar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1441,7 +1441,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionEliminar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1449,7 +1449,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionActualizarEstadoManual",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1457,7 +1457,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spCotizacionActualizarEstado",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1465,7 +1465,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spExportInvoices",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1473,7 +1473,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spLimpiarMovimientosProduccion",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1481,7 +1481,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spMaestroImportar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1489,7 +1489,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spQuotationStateActualizar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1497,7 +1497,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spQuotationStateCrear",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     },
@@ -1505,7 +1505,7 @@
       "objectType": "PROCEDURE",
       "objectName": "dbo.spQuotationStateEliminar",
       "sourceFile": "SQL/SqlServer/03_Functions_And_SPs.sql",
-      "hash": "57762c8af4490b2fa21d453008490e106693c7f65c258b1dce531db371f0d6df",
+      "hash": "0f416e60f546fc0b5e9dd4c8e9c3b194025becf69e78f58da6f83dd4a43493ec",
       "isMandatory": true,
       "engine": "SQLServer"
     }

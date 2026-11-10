@@ -50,7 +50,7 @@ BEGIN
                             'provider', CASE WHEN prov.id IS NOT NULL THEN jsonb_build_object('id', prov.id, 'name', prov.name) ELSE NULL END,
                             'prestadora', CASE WHEN h.id IS NOT NULL THEN jsonb_build_object('id', h.id, 'name', h.name) ELSE NULL END,
                             'passengers', COALESCE((
-                                SELECT jsonb_agg(jsonb_build_object('id', pax.id, 'name', pax.name, 'document', pax.document))
+                                SELECT jsonb_agg(jsonb_build_object('id', pax.id, 'firstName', pax."firstName", 'lastName', pax."lastName", 'name', pax.name, 'document', pax.document))
                                 FROM public."InvoicesProductPasenger" pax
                                 WHERE pax."invoiceProductId" = ip.id
                             ), '[]'::jsonb)

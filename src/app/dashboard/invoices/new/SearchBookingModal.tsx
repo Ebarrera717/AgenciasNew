@@ -322,7 +322,7 @@ export default function SearchBookingModal({ isOpen, onClose, onSelectBooking }:
                                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
                                         {ticketRows.map(({ id, booking: bk, item }) => {
                                             const isSelected = selectedTicketIds.includes(id)
-                                            const paxList = (item.passengers || []).map((p: any) => p.name).filter(Boolean)
+                                            const paxList = (item.passengers || []).map((p: any) => p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim()).filter(Boolean)
                                             const ticketVal = calculateItemPrice(item)
                                             const ticketCode = item.code || item.ticketCode || 'VUE'
                                             const airline = item.prestadoracode || bk.prestadoracode || ''

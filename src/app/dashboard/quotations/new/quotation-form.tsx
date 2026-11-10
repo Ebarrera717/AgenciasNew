@@ -33,6 +33,8 @@ interface QuotationFormData {
     startDate?: string;
     endDate?: string;
     passenger?: string;
+    passengerFirstName?: string;
+    passengerLastName?: string;
     paxAdults?: number;
     paxChildren?: number;
     reservationCode?: string;
@@ -58,9 +60,11 @@ interface QuotationFormData {
         servicios?: string;
         descripcion?: string;
         passenger?: string;
+        passengerFirstName?: string;
+        passengerLastName?: string;
         providerDueDate?: string;
         providerInvoice?: string;
-        passengers: { name: string, document: string }[];
+        passengers: { name: string, firstName?: string, lastName?: string, document: string }[];
         sellerCommission: number;
         ticketPrinterCommission: number;
         mainTaxId?: number;
@@ -188,6 +192,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
         startDate: '',
         endDate: '',
         passenger: '',
+        passengerFirstName: '',
+        passengerLastName: '',
         paxAdults: 1,
         paxChildren: 0,
         reservationCode: '',
@@ -927,6 +933,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                             startDate: qData.startDate ? new Date(qData.startDate).toISOString().split('T')[0] : '',
                             endDate: qData.endDate ? new Date(qData.endDate).toISOString().split('T')[0] : '',
                             passenger: qData.passenger || '',
+                            passengerFirstName: qData.passengerFirstName || '',
+                            passengerLastName: qData.passengerLastName || '',
                             paxAdults: qData.paxAdults ?? 1,
                             paxChildren: qData.paxChildren ?? 0,
                             reservationCode: qData.reservationCode || '',
@@ -981,9 +989,16 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                     servicios: p.servicios || p.service || '',
                                     descripcion: p.descripcion || '',
                                     passenger: p.passenger || '',
+                                    passengerFirstName: p.passengerFirstName || '',
+                                    passengerLastName: p.passengerLastName || '',
                                     providerDueDate: p.providerDueDate ? new Date(p.providerDueDate).toISOString().split('T')[0] : '',
                                     providerInvoice: p.providerInvoice || '',
-                                    passengers: Array.isArray(p.passengers) ? p.passengers : [],
+                                    passengers: Array.isArray(p.passengers) ? p.passengers.map((px: any) => ({
+                                        name: px.name || `${px.firstName || ''} ${px.lastName || ''}`.trim(),
+                                        firstName: px.firstName || '',
+                                        lastName: px.lastName || '',
+                                        document: px.document || ''
+                                    })) : [],
                                     payments: Array.isArray(p.payments) ? p.payments : [],
                                     sellerCommission: p.sellerCommission || 0,
                                     ticketPrinterCommission: p.ticketPrinterCommission || 0,
@@ -1020,6 +1035,11 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
     const updateHeaderField = (field: keyof QuotationFormData, value: any) => {
         setFormData(prev => {
             const nextState = { ...prev, [field]: value };
+            if (field === 'passengerFirstName') {
+                nextState.passenger = `${value || ''} ${nextState.passengerLastName || ''}`.trim();
+            } else if (field === 'passengerLastName') {
+                nextState.passenger = `${nextState.passengerFirstName || ''} ${value || ''}`.trim();
+            }
             const copyFields = nextState.copyFieldsToProducts !== false;
             
             if (copyFields) {
@@ -1028,6 +1048,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                     startDate: 'checkIn',
                     endDate: 'checkOut',
                     passenger: 'passenger',
+                    passengerFirstName: 'passengerFirstName',
+                    passengerLastName: 'passengerLastName',
                     paxAdults: 'paxAdults',
                     paxChildren: 'paxChildren',
                     reservationCode: 'reservationCode',
@@ -1036,10 +1058,28 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 
                 if (mapHeaderToProduct[field]) {
                     const prodField = mapHeaderToProduct[field];
-                    nextState.items = nextState.items.map(item => ({
-                        ...item,
-                        [prodField]: value
-                    }));
+                    nextState.items = nextState.items.map(item => {
+                        const updated = {
+                            ...item,
+                            [prodField]: value
+                        };
+                        if (field === 'passengerFirstName' || field === 'passengerLastName' || field === 'passenger') {
+                            updated.passenger = nextState.passenger;
+                            updated.passengerFirstName = nextState.passengerFirstName;
+                            updated.passengerLastName = nextState.passengerLastName;
+                            if (updated.passengers && updated.passengers.length > 0) {
+                                const newP = [...updated.passengers];
+                                newP[0] = {
+                                    ...newP[0],
+                                    firstName: nextState.passengerFirstName || '',
+                                    lastName: nextState.passengerLastName || '',
+                                    name: nextState.passenger || ''
+                                };
+                                updated.passengers = newP;
+                            }
+                        }
+                        return updated;
+                    });
                 } else if (field === 'copyFieldsToProducts' && value === true) {
                     nextState.items = nextState.items.map(item => ({
                         ...item,
@@ -1047,6 +1087,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                         checkIn: nextState.startDate || item.checkIn,
                         checkOut: nextState.endDate || item.checkOut,
                         passenger: nextState.passenger || item.passenger,
+                        passengerFirstName: nextState.passengerFirstName || item.passengerFirstName,
+                        passengerLastName: nextState.passengerLastName || item.passengerLastName,
                         paxAdults: nextState.paxAdults !== undefined ? nextState.paxAdults : item.paxAdults,
                         paxChildren: nextState.paxChildren !== undefined ? nextState.paxChildren : item.paxChildren,
                         reservationCode: nextState.reservationCode || item.reservationCode,
@@ -1074,9 +1116,16 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 reservationCode: copyFields && formData.reservationCode ? formData.reservationCode : '', 
                 descripcion: copyFields && formData.manualDescription ? formData.manualDescription : '', 
                 passenger: copyFields && formData.passenger ? formData.passenger : '',
+                passengerFirstName: copyFields && formData.passengerFirstName ? formData.passengerFirstName : '',
+                passengerLastName: copyFields && formData.passengerLastName ? formData.passengerLastName : '',
                 providerDueDate: '',
                 providerInvoice: '',
-                passengers: [{ name: '', document: '' }],
+                passengers: [{
+                    name: copyFields && formData.passenger ? formData.passenger : '',
+                    firstName: copyFields && formData.passengerFirstName ? formData.passengerFirstName : '',
+                    lastName: copyFields && formData.passengerLastName ? formData.passengerLastName : '',
+                    document: ''
+                }],
                 sellerCommission: 0, ticketPrinterCommission: 0,
                 appliedTaxes: [],
                 variables: [],
@@ -1127,6 +1176,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 reservationCode: (copyFields && formData.reservationCode) ? formData.reservationCode : '',
                 descripcion: copyFields && formData.manualDescription ? formData.manualDescription : '',
                 passenger: (copyFields && formData.passenger) ? formData.passenger : '',
+                passengerFirstName: (copyFields && formData.passengerFirstName) ? formData.passengerFirstName : '',
+                passengerLastName: (copyFields && formData.passengerLastName) ? formData.passengerLastName : '',
                 providerDueDate: '',
                 providerInvoice: '',
                 passengers: [],
@@ -1599,14 +1650,24 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                 onChange={(e) => updateHeaderField('endDate', e.target.value)}
                                             />
                                         </div>
-                                        <div className="space-y-2 md:col-span-2">
-                                            <label className="text-sm font-semibold text-zinc-500">Pasajero Principal</label>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold text-zinc-500">Nombres del Pasajero</label>
                                             <input 
                                                 type="text"
                                                 className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                value={formData.passenger || ''}
-                                                onChange={(e) => updateHeaderField('passenger', e.target.value)}
-                                                placeholder="Nombre del pasajero principal"
+                                                value={formData.passengerFirstName || ''}
+                                                onChange={(e) => updateHeaderField('passengerFirstName', e.target.value)}
+                                                placeholder="Nombres..."
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold text-zinc-500">Apellidos del Pasajero</label>
+                                            <input 
+                                                type="text"
+                                                className="w-full h-12 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                value={formData.passengerLastName || ''}
+                                                onChange={(e) => updateHeaderField('passengerLastName', e.target.value)}
+                                                placeholder="Apellidos..."
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -2024,10 +2085,22 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                     <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Reservación</label>
                                                     <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.reservationCode} onChange={(e) => updateItem(index, 'reservationCode', e.target.value)} />
                                                 </div>
-                                                <div className="space-y-1 md:col-span-2">
-                                                     <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Pasajero</label>
-                                                     <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.passenger || ''} onChange={(e) => updateItem(index, 'passenger', e.target.value)} placeholder="Pasajero del producto..." />
-                                                 </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Nombres Pasajero</label>
+                                                    <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.passengerFirstName || ''} onChange={(e) => {
+                                                        const first = e.target.value;
+                                                        updateItem(index, 'passengerFirstName', first);
+                                                        updateItem(index, 'passenger', `${first} ${item.passengerLastName || ''}`.trim());
+                                                    }} placeholder="Nombres..." />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Apellidos Pasajero</label>
+                                                    <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.passengerLastName || ''} onChange={(e) => {
+                                                        const last = e.target.value;
+                                                        updateItem(index, 'passengerLastName', last);
+                                                        updateItem(index, 'passenger', `${item.passengerFirstName || ''} ${last}`.trim());
+                                                    }} placeholder="Apellidos..." />
+                                                </div>
                                                  <div className="space-y-1 md:col-span-2">
                                                      <label className="text-[10px] uppercase font-bold text-blue-500 h-7 flex items-end leading-tight pb-0.5">Servicio</label>
                                                      <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-blue-200 dark:border-blue-800 outline-none text-xs" value={item.servicios || item.service || ''} onChange={(e) => { updateItem(index, 'servicios', e.target.value); updateItem(index, 'service', e.target.value); }} placeholder="Servicio (ej. Desayuno incluido, Traslado VIP)..." />
@@ -2075,26 +2148,43 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                         Detalle de Pasajeros
                                                         <button type="button" onClick={() => {
                                                             const p = [...(item.passengers || [])];
-                                                            p.push({ name: '', document: '' });
+                                                            p.push({ name: '', firstName: '', lastName: '', document: '' });
                                                             updateItem(index, 'passengers', p);
                                                         }} className="text-blue-500 font-medium hover:underline lowercase text-xs flex items-center gap-1">+ agregar pasajero</button>
                                                     </p>
                                                     {(item.passengers || []).map((pax: any, pIdx: number) => (
-                                                        <div key={pIdx} className="flex gap-2">
-                                                            <input type="text" placeholder="Nombre" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.name} onChange={(e) => {
-                                                                const newPass = [...item.passengers];
-                                                                newPass[pIdx] = { ...pax, name: e.target.value };
-                                                                updateItem(index, 'passengers', newPass);
-                                                            }} />
-                                                            <input type="text" placeholder="Documento" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.document} onChange={(e) => {
-                                                                const newPass = [...item.passengers];
-                                                                newPass[pIdx] = { ...pax, document: e.target.value };
-                                                                updateItem(index, 'passengers', newPass);
-                                                            }} />
-                                                            <button type="button" onClick={() => {
-                                                                const newPass = item.passengers.filter((_: any, idx: number) => idx !== pIdx);
-                                                                updateItem(index, 'passengers', newPass);
-                                                            }} className="text-red-400 p-2 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                                                        <div key={pIdx} className="grid grid-cols-12 gap-2 items-center">
+                                                            <div className="col-span-4">
+                                                                <input type="text" placeholder="Nombres" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.firstName ?? (pax.name ? pax.name.split(' ')[0] : '')} onChange={(e) => {
+                                                                    const newPass = [...item.passengers];
+                                                                    const first = e.target.value;
+                                                                    const last = newPass[pIdx]?.lastName || '';
+                                                                    newPass[pIdx] = { ...pax, firstName: first, lastName: last, name: `${first} ${last}`.trim() };
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} />
+                                                            </div>
+                                                            <div className="col-span-4">
+                                                                <input type="text" placeholder="Apellidos" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.lastName ?? (pax.name && pax.name.includes(' ') ? pax.name.substring(pax.name.indexOf(' ') + 1) : '')} onChange={(e) => {
+                                                                    const newPass = [...item.passengers];
+                                                                    const last = e.target.value;
+                                                                    const first = newPass[pIdx]?.firstName || '';
+                                                                    newPass[pIdx] = { ...pax, firstName: first, lastName: last, name: `${first} ${last}`.trim() };
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} />
+                                                            </div>
+                                                            <div className="col-span-3">
+                                                                <input type="text" placeholder="Documento" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={pax.document} onChange={(e) => {
+                                                                    const newPass = [...item.passengers];
+                                                                    newPass[pIdx] = { ...pax, document: e.target.value };
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} />
+                                                            </div>
+                                                            <div className="col-span-1 flex justify-center">
+                                                                <button type="button" onClick={() => {
+                                                                    const newPass = item.passengers.filter((_: any, idx: number) => idx !== pIdx);
+                                                                    updateItem(index, 'passengers', newPass);
+                                                                }} className="text-red-400 p-2 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button>
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>

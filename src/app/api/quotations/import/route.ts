@@ -43,6 +43,74 @@ function getExcelPrestadoraCode(row: any): string {
     return '';
 }
 
+export function parseExcelPassengers(row: any): { name: string; firstName: string; lastName: string; document: string }[] {
+    if (!row || typeof row !== 'object') return [];
+    const directFirstName = (row.Pasajero_Nombres || row.Pasajero_Nombre || row.passengerFirstName || row['Pasajero Nombres'] || '').toString().trim();
+    const directLastName = (row.Pasajero_Apellidos || row.Pasajero_Apellido || row.passengerLastName || row['Pasajero Apellidos'] || '').toString().trim();
+    const directDoc = (row.Pasajero_Documento || row.passengerDocument || row['Pasajero Documento'] || '').toString().trim();
+
+    const paxStr = (row.Pasajeros || row.Pasajero || row.Pax || '').toString().trim();
+    const result: { name: string; firstName: string; lastName: string; document: string }[] = [];
+
+    if (paxStr) {
+        const items = paxStr.split('|');
+        for (const it of items) {
+            const itemTrim = it.trim();
+            if (!itemTrim) continue;
+            const parts = itemTrim.split(':').map((p: string) => p.trim());
+            let fn = '';
+            let ln = '';
+            let doc = '';
+            let full = '';
+
+            if (parts.length >= 3) {
+                fn = parts[0];
+                ln = parts[1];
+                doc = parts[2] || '';
+                full = `${fn} ${ln}`.trim();
+            } else if (parts.length === 2) {
+                full = parts[0];
+                doc = parts[1];
+                const spc = full.indexOf(' ');
+                if (spc > 0) {
+                    fn = full.substring(0, spc).trim();
+                    ln = full.substring(spc + 1).trim();
+                } else {
+                    fn = full;
+                    ln = '';
+                }
+            } else {
+                full = parts[0];
+                const spc = full.indexOf(' ');
+                if (spc > 0) {
+                    fn = full.substring(0, spc).trim();
+                    ln = full.substring(spc + 1).trim();
+                } else {
+                    fn = full;
+                    ln = '';
+                }
+            }
+            result.push({ name: full, firstName: fn, lastName: ln, document: doc });
+        }
+    }
+
+    if (result.length === 0 && (directFirstName || directLastName)) {
+        const full = `${directFirstName} ${directLastName}`.trim();
+        result.push({ name: full, firstName: directFirstName, lastName: directLastName, document: directDoc });
+    } else if (result.length > 0 && directFirstName && directLastName && !result[0].firstName && !result[0].lastName) {
+        result[0].firstName = directFirstName;
+        result[0].lastName = directLastName;
+    }
+
+    return result;
+}
+
+export function buildExcelPassengersString(row: any): string {
+    const parsed = parseExcelPassengers(row);
+    if (parsed.length === 0) return '';
+    return parsed.map(p => `${p.firstName}:${p.lastName}:${p.document}`).join('|');
+}
+
 export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const traceCode = generateTraceCode();
@@ -202,6 +270,11 @@ export async function POST(req: NextRequest) {
                     const commissionPct = parseFloat(first.Comision_Global_Pct || '0');
                     const observations = (first.Observaciones || first.Observacion || first.Observations || first.Notas || '').toString().trim() || null;
 
+                    const firstPaxList = parseExcelPassengers(first);
+                    const headerPaxFirstName = firstPaxList[0]?.firstName || null;
+                    const headerPaxLastName = firstPaxList[0]?.lastName || null;
+                    const headerPax = firstPaxList[0]?.name || null;
+
                     // Insert Quotation Header
                     const qRes = await new mssql.Request(transaction)
                         .input('internalNumber', mssql.VarChar, internalNum || 'TEMP')
@@ -217,13 +290,18 @@ export async function POST(req: NextRequest) {
                         .input('totalAmount', mssql.Float, 0)
                         .input('userId', mssql.Int, actingUserId)
                         .input('observations', mssql.NVarChar, observations)
+                        .input('passenger', mssql.NVarChar, headerPax)
+                        .input('passengerFirstName', mssql.NVarChar, headerPaxFirstName)
+                        .input('passengerLastName', mssql.NVarChar, headerPaxLastName)
                         .query(`
                             INSERT INTO dbo.[Quotation] (
                                 internalNumber, clientId, currency, exchangeRate, branchId, implantId, sellerId,
-                                ticketPrinterId, commissionPercentage, chargesAndTaxes, totalAmount, userId, observations
+                                ticketPrinterId, commissionPercentage, chargesAndTaxes, totalAmount, userId, observations,
+                                passenger, passengerFirstName, passengerLastName
                             ) OUTPUT INSERTED.id VALUES (
                                 @internalNumber, @clientId, @currency, @exchangeRate, @branchId, @implantId, @sellerId,
-                                @ticketPrinterId, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId, @observations
+                                @ticketPrinterId, @commissionPercentage, @chargesAndTaxes, @totalAmount, @userId, @observations,
+                                @passenger, @passengerFirstName, @passengerLastName
                             )
                         `);
 
@@ -280,7 +358,12 @@ export async function POST(req: NextRequest) {
                             nights = parseInt(it.Noches || '1', 10);
                         }
 
-                        await new mssql.Request(transaction)
+                        const itPaxList = parseExcelPassengers(it);
+                        const itPaxFirstName = itPaxList[0]?.firstName || headerPaxFirstName;
+                        const itPaxLastName = itPaxList[0]?.lastName || headerPaxLastName;
+                        const itPax = itPaxList[0]?.name || headerPax;
+
+                        const qpRes = await new mssql.Request(transaction)
                             .input('quotationId', mssql.Int, quotationId)
                             .input('productId', mssql.Int, productId)
                             .input('quantity', mssql.Int, quantity)
@@ -301,7 +384,9 @@ export async function POST(req: NextRequest) {
                             .input('inNationality', mssql.Int, inNationality)
                             .input('servicios', mssql.VarChar, it.Servicios || null)
                             .input('descripcion', mssql.VarChar, it.Descripcion || null)
-                            .input('passenger', mssql.VarChar, it.Pasajeros || null)
+                            .input('passenger', mssql.NVarChar, itPax)
+                            .input('passengerFirstName', mssql.NVarChar, itPaxFirstName)
+                            .input('passengerLastName', mssql.NVarChar, itPaxLastName)
                             .input('providerDueDate', mssql.VarChar, normalizeDateString(it.Fecha_Vencimiento_Proveedor || it.Fecha_Vencimiento || it.Vencimiento_Proveedor || it.providerDueDate || '') || null)
                             .input('providerInvoice', mssql.VarChar, (it.Factura_Proveedor || it.Factura || it.Factura_Prov || it.providerInvoice || '').toString().trim() || null)
                             .query(`
@@ -309,14 +394,25 @@ export async function POST(req: NextRequest) {
                                     quotationId, productId, quantity, price, cost, providerId, prestadoraId,
                                     checkInDate, checkOutDate, nights, paxAdults, paxChildren,
                                     serviceType, destination, reservationCode, sellerCommission, ticketPrinterCommission,
-                                    inNationality, servicios, descripcion, passenger, providerDueDate, providerInvoice
-                                ) VALUES (
+                                    inNationality, servicios, descripcion, passenger, passengerFirstName, passengerLastName, providerDueDate, providerInvoice
+                                ) OUTPUT INSERTED.id VALUES (
                                     @quotationId, @productId, @quantity, @price, @cost, @providerId, @prestadoraId,
                                     TRY_CAST(@checkInDate AS DATETIME2), TRY_CAST(@checkOutDate AS DATETIME2), @nights, @paxAdults, @paxChildren,
                                     @serviceType, @destination, @reservationCode, @sellerCommission, @ticketPrinterCommission,
-                                    @inNationality, @servicios, @descripcion, @passenger, TRY_CAST(@providerDueDate AS DATETIME2), @providerInvoice
+                                    @inNationality, @servicios, @descripcion, @passenger, @passengerFirstName, @passengerLastName, TRY_CAST(@providerDueDate AS DATETIME2), @providerInvoice
                                 )
                             `);
+
+                        const qpId = qpRes.recordset[0].id;
+                        for (const p of itPaxList) {
+                            await new mssql.Request(transaction)
+                                .input('quotationProductId', mssql.Int, qpId)
+                                .input('name', mssql.VarChar, p.name)
+                                .input('firstName', mssql.VarChar, p.firstName)
+                                .input('lastName', mssql.VarChar, p.lastName)
+                                .input('document', mssql.VarChar, p.document)
+                                .query(`INSERT INTO dbo.[QuotationProductPassenger] (quotationProductId, name, firstName, lastName, document) VALUES (@quotationProductId, @name, @firstName, @lastName, @document)`);
+                        }
 
                         quotationTotalSum += (itemPrice * quantity);
                     }
@@ -401,7 +497,7 @@ export async function POST(req: NextRequest) {
                 getExcelPrestadoraCode(row),
                 row.Impuestos_Nombres_Y_Valores || '',
                 row.Variables_Codigos_Y_Valores || '',
-                row.Pasajeros || '',
+                buildExcelPassengersString(row),
                 row.Precio_Unitario || '',
                 row.Cantidad || '',
                 row.CheckIn || '',

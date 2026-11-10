@@ -159,6 +159,8 @@ export async function GET(req: Request) {
 
                 const servicesText = invProducts.map(p => p.servicios || p.descripcion || '').filter(Boolean).join(' | ');
                 const paxNames = invProducts.flatMap(p => (p.passengers || []).map((px: any) => px.name)).filter(Boolean).join(', ');
+                const paxFirstNames = invProducts.flatMap(p => (p.passengers || []).map((px: any) => px.firstName || px.name)).filter(Boolean).join(', ');
+                const paxLastNames = invProducts.flatMap(p => (p.passengers || []).map((px: any) => px.lastName || '')).filter(Boolean).join(', ');
                 const paymentsText = invProducts.flatMap(p => (p.payments || []).map((py: any) => `${py.paymentMethod || 'Pago'}: $${py.amount}`)).join(', ');
 
                 const fieldValues: Record<string, any> = {
@@ -184,6 +186,8 @@ export async function GET(req: Request) {
                     totalAmount: inv.totalAmount,
                     fechasViaje: '',
                     pasajeros: paxNames,
+                    pasajerosNombres: paxFirstNames,
+                    pasajerosApellidos: paxLastNames,
                     hotelesServicios: servicesText,
                     observaciones: inv.observations || inv.state || '',
                     formaPago: paymentsText
@@ -308,6 +312,8 @@ export async function GET(req: Request) {
 
             const servicesText = invProducts.map(p => p.servicios || p.descripcion || '').filter(Boolean).join(' | ');
             const paxNames = invProducts.flatMap(p => (p.passengers || []).map((px: any) => px.name)).filter(Boolean).join(', ');
+            const paxFirstNames = invProducts.flatMap(p => (p.passengers || []).map((px: any) => px.firstName || px.name)).filter(Boolean).join(', ');
+            const paxLastNames = invProducts.flatMap(p => (p.passengers || []).map((px: any) => px.lastName || '')).filter(Boolean).join(', ');
             const paymentsText = invProducts.flatMap(p => (p.payments || []).map((py: any) => `${py.paymentMethod || 'Pago'}: $${py.amount}`)).join(', ');
 
             const fieldValues: Record<string, any> = {
@@ -332,6 +338,8 @@ export async function GET(req: Request) {
                 totalAmount: inv.totalAmount,
                 fechasViaje: '',
                 pasajeros: paxNames,
+                pasajerosNombres: paxFirstNames,
+                pasajerosApellidos: paxLastNames,
                 hotelesServicios: servicesText,
                 observaciones: inv.observations || inv.state || '',
                 formaPago: paymentsText
