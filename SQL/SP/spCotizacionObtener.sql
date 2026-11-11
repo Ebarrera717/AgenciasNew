@@ -194,13 +194,30 @@ BEGIN
             WHERE ms.[quotationId] = q.[id]
             FOR JSON PATH
         ) AS [manualServicesJson],
-        (
-            SELECT sh.[id], sh.[quotationId], sh.[state], sh.[description], sh.[userId], u.[name] AS [userName], sh.[createdAt]
-            FROM dbo.[QuotationStateHistory] sh
-            LEFT JOIN dbo.[User] u ON sh.[userId] = u.[id]
-            WHERE sh.[quotationId] = q.[id]
-            ORDER BY sh.[id] ASC
-            FOR JSON PATH
+        COALESCE(
+            (
+                SELECT sh.[id], sh.[quotationId], sh.[state], sh.[description], sh.[userId], COALESCE(u.[name], 'Sistema') AS [userName], sh.[createdAt], sh.[metadata]
+                FROM dbo.[QuotationStateHistory] sh
+                LEFT JOIN dbo.[User] u ON sh.[userId] = u.[id]
+                WHERE sh.[quotationId] = q.[id]
+                ORDER BY sh.[createdAt] DESC, sh.[id] DESC
+                FOR JSON PATH
+            ),
+            (
+                SELECT 
+                    q.[id] AS [id],
+                    q.[id] AS [quotationId],
+                    COALESCE(q.[state], 'NUEVO') AS [state],
+                    COALESCE(q.[stateDescription], 'Creación de cotización') AS [description],
+                    q.[userId],
+                    COALESCE(u2.[name], 'Sistema') AS [userName],
+                    COALESCE(q.[stateUpdatedAt], q.[date], GETDATE()) AS [createdAt],
+                    NULL AS [metadata]
+                FROM dbo.[Quotation] q2
+                LEFT JOIN dbo.[User] u2 ON q2.[userId] = u2.[id]
+                WHERE q2.[id] = q.[id]
+                FOR JSON PATH
+            )
         ) AS [stateHistoryJson]
     FROM dbo.[Quotation] q
     WHERE q.[id] = @targetId;

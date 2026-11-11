@@ -176,4 +176,23 @@ Validando que las 11 capas (PostgreSQL local, Json Schema, T-SQL Scripts y Suite
 6. **Cadena de Validación Desarrollo → Release → Producción**:
    Exige manifest de release, comprobación en base limpia, prueba desde versión previa, validación con datos reales y Smoke Test post-actualización. Se prohíbe asumir que *"funciona en desarrollo = funciona en producción"*.
 
+---
+
+## 7. Principio Universal de Integridad AST de Scripts de Despliegue, Paridad de Contratos JSON/SQL y Ejecución Verificada (Prevención de Fallos Silenciosos)
+
+### A. Validación Sintáctica AST Obligatoria de Scripts PowerShell (`.ps1`) en Pre-Compilación
+Ningún paquete o instalador puede generarse si algún archivo `.ps1` del repositorio contiene errores de parseo (por ejemplo, interpolación ambigua `$variable:` sin llaves `${variable}:` dentro de cadenas con dos puntos, bloques sin cerrar o caracteres inválidos).
+- **Mecanismo Bloqueante**: `deploy/validate_schema_before_package.js` (invocado automáticamente por `deploy/gen_schema_json.js` y `deploy/Generar_Empaquetado.ps1`) ejecuta `[System.Management.Automation.Language.Parser]::ParseFile` sobre el 100% de los scripts `.ps1` de la raíz y `deploy/`. Si un solo archivo reporta un error AST, la compilación se aborta inmediatamente con `EXIT CODE 1`.
+
+### B. Paridad de Contrato de Columnas en Funciones/SPs de Consulta y Fallback (`fnCotizacion` / `spCotizacionObtener`)
+Cuando la arquitectura utiliza rutas híbridas (consulta ORM principal + función SQL de respaldo o consulta directa por SP/Función), **la función SQL DEBE proyectar el 100% de los atributos de negocio, financieros, operativos y relacionales que consume el formulario o API**, evitando que un fallback o cambio de motor degrade silenciosamente los campos en la interfaz de usuario.
+- **Mecanismo Bloqueante**:
+  1. En `deploy/validate_schema_before_package.js` (**PASO 1**), cualquier error de compilación SQL en `SQL/Function`, `SQL/SP` o `SQL/Procedure` es un **error fatal bloqueante (`process.exit(1)`)**, nunca una advertencia ignorada.
+  2. En `deploy/validate_schema_before_package.js` (**PASO 3.2**) y en el post-check de `deploy/db_installer.js`, se audita tanto el archivo fuente como la definición viva en `pg_proc` (`pg_get_functiondef`) para verificar la presencia de todos los atributos críticos del contrato JSON (comisiones, costos, utilidad, fechas, destino, nombres/apellidos de pasajero y relaciones maestras).
+  3. En PostgreSQL, cuando una función construye objetos JSON con más de 50 claves (`> 100` argumentos), **DEBE dividirse obligatoriamente concatenando múltiples llamadas `jsonb_build_object(...) || jsonb_build_object(...)`** para no exceder jamás el límite nativo de 100 argumentos por función en PostgreSQL (`error 54023`).
+
+### C. Sincronización Forzada Pre-Empaquetado y Verificación de `ResultCode` en Inno Setup
+1. `deploy/Generar_Empaquetado.ps1` ejecuta siempre en su **PASO 0** `node deploy/gen_schema_json.js`, garantizando que `RELEASE_KOREX\SQL\schema_reference.json` y `Actualizador.SQL` nunca viajen desactualizados aunque el empaquetador se ejecute de forma independiente.
+2. `deploy/Korex_Update.iss` ejecuta `Update_Korex.ps1` dentro de `CurStepChanged(ssPostInstall)` evaluando estrictamente `ResultCode`. Si el script PowerShell o `db_installer.js` devuelve un código distinto de `0`, el instalador despliega un diálogo `MsgBox` crítico en pantalla detallando el fallo y la ruta de `install_log.txt`, impidiendo cierres silenciosos con actualizaciones incompletas.
+
 

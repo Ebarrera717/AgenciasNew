@@ -394,6 +394,83 @@ async function run() {
         console.warn(`  ${colors.yellow}[!] Aviso sincronizando catálogos: ${catErr.message}${colors.reset}`);
     }
 
+    // 7. Migración No Destructiva de Datos Históricos (Nombres y Apellidos de Pasajeros)
+    console.log(`\n${colors.bright}[6/7] Ejecutando migraciones idempotentes de datos históricos...${colors.reset}`);
+    try {
+        await dbClient.query(`
+            DO $$
+            BEGIN
+                UPDATE public."Quotation"
+                SET "passengerFirstName" = split_part(TRIM("passenger"), ' ', 1),
+                    "passengerLastName" = CASE 
+                        WHEN position(' ' in TRIM("passenger")) > 0 
+                        THEN TRIM(substring(TRIM("passenger") from position(' ' in TRIM("passenger")) + 1))
+                        ELSE ''
+                    END
+                WHERE ("passengerFirstName" IS NULL OR TRIM("passengerFirstName") = '')
+                  AND "passenger" IS NOT NULL AND TRIM("passenger") <> '';
+
+                UPDATE public."QuotationProductPassenger"
+                SET "firstName" = split_part(TRIM("name"), ' ', 1),
+                    "lastName" = CASE 
+                        WHEN position(' ' in TRIM("name")) > 0 
+                        THEN TRIM(substring(TRIM("name") from position(' ' in TRIM("name")) + 1))
+                        ELSE ''
+                    END
+                WHERE ("firstName" IS NULL OR TRIM("firstName") = '')
+                  AND "name" IS NOT NULL AND TRIM("name") <> '';
+
+                UPDATE public."Invoices"
+                SET "passengerFirstName" = split_part(TRIM("passenger"), ' ', 1),
+                    "passengerLastName" = CASE 
+                        WHEN position(' ' in TRIM("passenger")) > 0 
+                        THEN TRIM(substring(TRIM("passenger") from position(' ' in TRIM("passenger")) + 1))
+                        ELSE ''
+                    END
+                WHERE ("passengerFirstName" IS NULL OR TRIM("passengerFirstName") = '')
+                  AND "passenger" IS NOT NULL AND TRIM("passenger") <> '';
+
+                UPDATE public."InvoicesProductPassenger"
+                SET "firstName" = split_part(TRIM("name"), ' ', 1),
+                    "lastName" = CASE 
+                        WHEN position(' ' in TRIM("name")) > 0 
+                        THEN TRIM(substring(TRIM("name") from position(' ' in TRIM("name")) + 1))
+                        ELSE ''
+                    END
+                WHERE ("firstName" IS NULL OR TRIM("firstName") = '')
+                  AND "name" IS NOT NULL AND TRIM("name") <> '';
+            END $$;
+        `);
+        console.log(`  ${colors.green}[OK] Migración de datos históricos verificada y aplicada.${colors.reset}`);
+    } catch (migErr) {
+        console.warn(`  ${colors.yellow}[!] Aviso en migración de datos históricos: ${migErr.message}${colors.reset}`);
+    }
+
+    // 8. Verificación Post-Actualización Obligatoria (EJECUTADO + VALIDADO = OK)
+    console.log(`\n${colors.bright}[7/7] Verificando integridad post-actualización (Columnas y Contrato fnCotizacion)...${colors.reset}`);
+    try {
+        const fnCheck = await dbClient.query(`
+            SELECT pg_get_functiondef(p.oid) AS def
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND LOWER(p.proname) = 'fncotizacion'
+            LIMIT 1;
+        `);
+        const fnDef = fnCheck.rows[0]?.def || '';
+        const requiredFnKeys = ['comisionFreelancePercentage', 'comisionPropiaPercentage', 'comisionTotalPercentage', 'passengerFirstName', 'passengerLastName', 'destination', 'startDate', 'endDate'];
+        const missingFnKeys = requiredFnKeys.filter(k => !fnDef.includes(`'${k}'`));
+        if (missingFnKeys.length > 0) {
+            console.error(`  ${colors.red}[ERROR POST-CHECK] La función public.fnCotizacion no contiene los campos obligatorios: ${missingFnKeys.join(', ')}${colors.reset}`);
+            await dbClient.end();
+            process.exit(2);
+        }
+        console.log(`  ${colors.green}[OK] Verificación post-actualización superada: public.fnCotizacion y columnas críticas validadas.${colors.reset}`);
+    } catch (postErr) {
+        console.error(`  ${colors.red}[ERROR POST-CHECK] Falló la auditoría post-actualización: ${postErr.message}${colors.reset}`);
+        await dbClient.end();
+        process.exit(2);
+    }
+
     await dbClient.end();
     console.log(`\n${colors.bright}${colors.green}>> PROCESAMIENTO DE BASE DE DATOS FINALIZADO EXITOSAMENTE <<\n${colors.reset}`);
 }

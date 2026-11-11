@@ -53,63 +53,124 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
             return NextResponse.json(parsedQuotation);
         }
 
-        const quotation = await prisma.quotation.findUnique({
-            where: { id },
-            include: {
-                client: true,
-                seller: true,
-                branch: true,
-                implant: true,
-                ticketPrinter: true,
-                manualServices: true,
-                products: {
-                    include: {
-                        appliedTaxes: true,
-                        passengers: true,
-                        variables: true,
-                        payments: true,
-                        product: true,
-                        provider: true,
-                        prestadora: true
+        // Modo PostgreSQL: Ejecutar fnCotizacion directamente (prioridad Base de Datos según Regla Primordial)
+        try {
+            const results: any[] = await prisma.$queryRawUnsafe(
+                `SELECT public.fnCotizacion($1::INT) as data`,
+                id
+            );
+            const quotationData = results[0]?.data;
+            if (quotationData && quotationData.id) {
+                let stateHistory: any[] = Array.isArray(quotationData.stateHistory) ? quotationData.stateHistory : [];
+                if (stateHistory.length === 0) {
+                    try {
+                        const shRes: any[] = await prisma.$queryRawUnsafe(
+                            `SELECT * FROM public.fn_obtener_historial_estados($1::INT)`,
+                            id
+                        );
+                        if (Array.isArray(shRes) && shRes.length > 0) {
+                            stateHistory = shRes;
+                        }
+                    } catch (shErr: any) {
+                        console.warn('Warning fetching stateHistory via fn_obtener_historial_estados:', shErr.message);
                     }
-                },
-                combos: {
-                    include: {
-                        combo: {
-                            include: {
-                                products: {
-                                    include: {
-                                        product: true,
-                                        appliedTaxes: {
-                                            include: { chargeAndTax: true }
+                }
+
+                if (stateHistory.length === 0) {
+                    stateHistory = [{
+                        id: quotationData.id,
+                        quotationId: quotationData.id,
+                        state: quotationData.state || 'NUEVO',
+                        description: quotationData.stateDescription || 'Creación de cotización',
+                        userId: quotationData.userId || null,
+                        userName: quotationData.userName || 'Sistema',
+                        createdAt: quotationData.stateUpdatedAt || quotationData.date || new Date().toISOString(),
+                        metadata: null
+                    }];
+                }
+
+                quotationData.stateHistory = stateHistory;
+                return NextResponse.json(quotationData);
+            }
+        } catch (fnErr: any) {
+            console.warn('Warning: fnCotizacion error in GET /api/quotations/[id], attempting prisma fallback:', fnErr.message);
+        }
+
+        // Fallback a Prisma ORM en caso de que fnCotizacion no devuelva resultado
+        try {
+            const quotation = await prisma.quotation.findUnique({
+                where: { id },
+                include: {
+                    client: true,
+                    seller: true,
+                    branch: true,
+                    implant: true,
+                    ticketPrinter: true,
+                    manualServices: true,
+                    products: {
+                        include: {
+                            appliedTaxes: true,
+                            passengers: true,
+                            variables: true,
+                            payments: true,
+                            product: true,
+                            provider: true,
+                            prestadora: true
+                        }
+                    },
+                    combos: {
+                        include: {
+                            combo: {
+                                include: {
+                                    products: {
+                                        include: {
+                                            product: true,
+                                            appliedTaxes: {
+                                                include: { chargeAndTax: true }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                } as any
+            });
+
+            if (quotation) {
+                let stateHistory: any[] = [];
+                try {
+                    stateHistory = await prisma.$queryRawUnsafe(
+                        `SELECT * FROM public.fn_obtener_historial_estados($1::INT)`,
+                        id
+                    );
+                } catch (shErr: any) {
+                    console.warn('Warning: Could not fetch stateHistory for quotation ' + id + ':', shErr.message);
                 }
-            } as any
-        })
 
-        if (!quotation) {
-            return NextResponse.json({ message: 'Cotización no encontrada' }, { status: 404 })
+                if (!stateHistory || stateHistory.length === 0) {
+                    stateHistory = [{
+                        id: quotation.id,
+                        quotationId: quotation.id,
+                        state: quotation.state || 'NUEVO',
+                        description: quotation.stateDescription || 'Creación de cotización',
+                        userId: quotation.userId || null,
+                        userName: 'Sistema',
+                        createdAt: quotation.stateUpdatedAt || quotation.date || new Date().toISOString(),
+                        metadata: null
+                    }];
+                }
+
+                return NextResponse.json({
+                    ...quotation,
+                    stateHistory
+                });
+            }
+        } catch (prismaErr: any) {
+            console.error('Error in prisma fallback for quotation ' + id + ':', prismaErr.message);
         }
 
-        let stateHistory: any[] = [];
-        try {
-            stateHistory = await prisma.$queryRawUnsafe(
-                `SELECT * FROM public.fn_obtener_historial_estados($1::INT)`,
-                id
-            );
-        } catch (shErr: any) {
-            console.warn('Warning: Could not fetch stateHistory for quotation ' + id + ':', shErr.message);
-        }
-
-        return NextResponse.json({
-            ...quotation,
-            stateHistory
-        })
+        return NextResponse.json({ message: 'Cotización no encontrada' }, { status: 404 });
     } catch (error: any) {
         console.error('Error fetching quotation:', error)
         return NextResponse.json({ message: 'Error interno del servidor', error: error.message }, { status: 500 })

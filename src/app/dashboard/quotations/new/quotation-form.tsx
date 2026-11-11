@@ -907,7 +907,32 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                     if (qRes.ok) {
                         const qData = await qRes.json()
                         setOriginalState(qData.state || 'Nuevo')
-                        setStateHistoryList(qData.stateHistory || [])
+                        let histList = Array.isArray(qData.stateHistory) ? qData.stateHistory : []
+                        if (histList.length === 0) {
+                            try {
+                                const hRes = await fetch(`/api/quotations/${quotationId}/state`)
+                                if (hRes.ok) {
+                                    const hData = await hRes.json()
+                                    if (Array.isArray(hData)) histList = hData
+                                    else if (Array.isArray(hData?.history)) histList = hData.history
+                                }
+                            } catch (e) {
+                                // Ignore
+                            }
+                        }
+                        if (histList.length === 0 && qData.id) {
+                            histList = [{
+                                id: qData.id,
+                                quotationId: qData.id,
+                                state: qData.state || 'NUEVO',
+                                description: qData.stateDescription || 'Creación de cotización',
+                                userId: qData.userId || null,
+                                userName: qData.user?.name || qData.userName || 'Sistema',
+                                createdAt: qData.stateUpdatedAt || qData.date || new Date().toISOString(),
+                                metadata: null
+                            }]
+                        }
+                        setStateHistoryList(histList)
                         setData((prev: any) => ({
                             ...prev,
                             clients: qData.client ? [...(prev?.clients || []).filter((c: any) => String(c.id) !== String(qData.client.id)), qData.client] : prev?.clients,
@@ -933,8 +958,8 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                             startDate: qData.startDate ? new Date(qData.startDate).toISOString().split('T')[0] : '',
                             endDate: qData.endDate ? new Date(qData.endDate).toISOString().split('T')[0] : '',
                             passenger: qData.passenger || '',
-                            passengerFirstName: qData.passengerFirstName || '',
-                            passengerLastName: qData.passengerLastName || '',
+                            passengerFirstName: qData.passengerFirstName || (qData.passenger ? String(qData.passenger).trim().split(/\s+/)[0] : ''),
+                            passengerLastName: qData.passengerLastName || (qData.passenger && String(qData.passenger).trim().includes(' ') ? String(qData.passenger).trim().split(/\s+/).slice(1).join(' ') : ''),
                             paxAdults: qData.paxAdults ?? 1,
                             paxChildren: qData.paxChildren ?? 0,
                             reservationCode: qData.reservationCode || '',
@@ -989,16 +1014,19 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                     servicios: p.servicios || p.service || '',
                                     descripcion: p.descripcion || '',
                                     passenger: p.passenger || '',
-                                    passengerFirstName: p.passengerFirstName || '',
-                                    passengerLastName: p.passengerLastName || '',
+                                    passengerFirstName: p.passengerFirstName || (p.passenger ? String(p.passenger).trim().split(/\s+/)[0] : ''),
+                                    passengerLastName: p.passengerLastName || (p.passenger && String(p.passenger).trim().includes(' ') ? String(p.passenger).trim().split(/\s+/).slice(1).join(' ') : ''),
                                     providerDueDate: p.providerDueDate ? new Date(p.providerDueDate).toISOString().split('T')[0] : '',
                                     providerInvoice: p.providerInvoice || '',
-                                    passengers: Array.isArray(p.passengers) ? p.passengers.map((px: any) => ({
-                                        name: px.name || `${px.firstName || ''} ${px.lastName || ''}`.trim(),
-                                        firstName: px.firstName || '',
-                                        lastName: px.lastName || '',
-                                        document: px.document || ''
-                                    })) : [],
+                                    passengers: Array.isArray(p.passengers) ? p.passengers.map((px: any) => {
+                                        const fullName = px.name || `${px.firstName || ''} ${px.lastName || ''}`.trim();
+                                        return {
+                                            name: fullName,
+                                            firstName: px.firstName || (fullName ? String(fullName).trim().split(/\s+/)[0] : ''),
+                                            lastName: px.lastName || (fullName && String(fullName).trim().includes(' ') ? String(fullName).trim().split(/\s+/).slice(1).join(' ') : ''),
+                                            document: px.document || ''
+                                        };
+                                    }) : [],
                                     payments: Array.isArray(p.payments) ? p.payments : [],
                                     sellerCommission: p.sellerCommission || 0,
                                     ticketPrinterCommission: p.ticketPrinterCommission || 0,

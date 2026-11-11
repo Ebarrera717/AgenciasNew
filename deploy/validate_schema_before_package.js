@@ -19,6 +19,41 @@ async function validateAndPrepareSchema(customConnStr) {
     console.warn("  [WARN] No se pudo compilar SQL/PostgreSQL:", pgGenErr.message);
   }
 
+  // 0.2 BARRERA AST POWERSHELL: Validar sintaxis de todos los scripts .ps1 de despliegue e instalación
+  console.log("\n[PASO 0.2/4] Auditando sintaxis AST de scripts PowerShell (.ps1) de instalación y actualización...");
+  try {
+    const { execFileSync } = require('child_process');
+    const psDirs = [rootDir, path.join(rootDir, 'deploy')];
+    const psFiles = [];
+    for (const d of psDirs) {
+      if (!fs.existsSync(d)) continue;
+      for (const f of fs.readdirSync(d)) {
+        if (f.toLowerCase().endsWith('.ps1')) {
+          psFiles.push(path.join(d, f));
+        }
+      }
+    }
+    let psErrors = 0;
+    for (const psFile of psFiles) {
+      const psCmd = `$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile('${psFile.replace(/'/g, "''")}', [ref]$null, [ref]$errors); if ($errors.Count -gt 0) { foreach ($e in $errors) { Write-Output "LINE $($e.Extent.StartLineNumber): $($e.Message) [$($e.Extent.Text)]" }; exit 1 }`;
+      try {
+        execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCmd], { encoding: 'utf8', stdio: 'pipe' });
+      } catch (psErr) {
+        console.error(`  [ERROR CRITICO AST POWERSHELL] Sintaxis inválida en ${path.relative(rootDir, psFile)}:`);
+        console.error(`    ${(psErr.stdout || psErr.message || '').trim()}`);
+        psErrors++;
+      }
+    }
+    if (psErrors > 0) {
+      console.error(`\n[FATAL] Se detectaron ${psErrors} script(s) PowerShell (.ps1) con errores de sintaxis AST.`);
+      console.error("  Empaquetado y compilación ABORTADOS para impedir fallos silenciosos en el instalador/actualizador.\n");
+      process.exit(1);
+    }
+    console.log(`  [OK] ${psFiles.length} scripts PowerShell (.ps1) validados con 0 errores de sintaxis AST.`);
+  } catch (astRunnerErr) {
+    console.warn(`  [WARN] No se pudo invocar el parser AST de PowerShell: ${astRunnerErr.message}`);
+  }
+
   // 1. Desplegar todos los archivos SQL locales a la BD PostgreSQL local
   console.log("\n[PASO 1/4] Desplegando funciones y SPs a PostgreSQL local...");
   let connectionString = customConnStr || process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL;
@@ -142,10 +177,18 @@ async function validateAndPrepareSchema(customConnStr) {
         pgSyncCache[pgDbKey][relKey] = fileHash;
         pgExecutedFiles++;
       } catch (err) {
-        console.warn(`  [WARN] Error compilando ${folder}/${file}: ${err.message}`);
+        if (folder === 'SQL/Function' || folder === 'SQL/SP' || folder === 'SQL/Procedure') {
+          console.error(`  [ERROR FATAL SQL] Falló la compilación de ${folder}/${file}: ${err.message}`);
+          process.exit(1);
+        } else {
+          console.warn(`  [WARN] Error compilando ${folder}/${file}: ${err.message}`);
+        }
       }
     }
   }
+  try {
+    fs.writeFileSync(pgCachePath, JSON.stringify(pgSyncCache, null, 2), 'utf8');
+  } catch {}
   console.log(`  [OK] Despliegue en PostgreSQL local completado (${pgExecutedFiles} ejecutados, ${pgCachedFiles} en caché sin cambios).`);
 
   // 2. Verificar integridad de tablas referenciadas en Alter_New_Columns.sql
@@ -565,6 +608,66 @@ async function validateAndPrepareSchema(customConnStr) {
     }
   }
   console.log("  [OK] Funciones de consulta validadas con LEFT JOIN obligatorio.");
+
+  // 3.2 AUDITORÍA DE CONTRATO DE PROYECCIÓN EN FUNCIONES DE CONSULTA DE DETALLE (fnCotizacion / spCotizacionObtener)
+  console.log("\n[PASO 3.2/4] Auditando paridad de campos del contrato JSON en fnCotizacion...");
+  const requiredQuotationFields = [
+    'comisionTotalPercentage',
+    'comisionFreelancePercentage',
+    'comisionFreelanceValue',
+    'comisionPropiaPercentage',
+    'comisionPropiaValue',
+    'comisionUtilidadPercentage',
+    'commissionPercentage',
+    'costoTotal',
+    'valorBase',
+    'utilidad',
+    'destination',
+    'startDate',
+    'endDate',
+    'passengerFirstName',
+    'passengerLastName',
+    'passenger',
+    'reservationCode',
+    'manualDescription',
+    'observations',
+    'seller',
+    'branch',
+    'implant',
+    'ticketPrinter',
+    'client',
+    'products',
+    'combos',
+    'manualServices'
+  ];
+  const fnCotizacionPath = path.join(funcFolder, 'fnCotizacion.sql');
+  if (fs.existsSync(fnCotizacionPath)) {
+    const fnCotSource = fs.readFileSync(fnCotizacionPath, 'utf8');
+    const missingInSource = requiredQuotationFields.filter(field => !fnCotSource.includes(`'${field}'`));
+    if (missingInSource.length > 0) {
+      console.error(`  [ERROR CRITICO CONTRATO SQL] SQL/Function/fnCotizacion.sql omite campos obligatorios del modelo Quotation: ${missingInSource.join(', ')}`);
+      process.exit(1);
+    }
+  }
+  const liveFnCotRes = await client.query(`
+    SELECT pg_get_functiondef(p.oid) AS def
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND LOWER(p.proname) = 'fncotizacion'
+    LIMIT 1;
+  `);
+  if (liveFnCotRes.rows.length === 0) {
+    console.error("  [ERROR CRITICO CONTRATO SQL] La función public.fnCotizacion no existe en PostgreSQL local.");
+    process.exit(1);
+  } else {
+    const liveDef = liveFnCotRes.rows[0].def || '';
+    const missingInLive = requiredQuotationFields.filter(field => !liveDef.includes(`'${field}'`));
+    if (missingInLive.length > 0) {
+      console.error(`  [ERROR CRITICO CONTRATO SQL] La función compilada public.fnCotizacion en BD omite campos obligatorios: ${missingInLive.join(', ')}`);
+      process.exit(1);
+    }
+  }
+  console.log(`  [OK] Contrato de proyección de fnCotizacion validado (${requiredQuotationFields.length} campos críticos presentes en disco y BD).`);
 
   // 3.5 AUDITORÍA AUTOMÁTICA DE FIRMAS Y PARÁMETROS EN API ROUTES VS STORED PROCEDURES / FUNCIONES
   console.log("\n[PASO 3.5/4] Auditando firmas y parámetros en API Routes vs Stored Procedures y Funciones...");

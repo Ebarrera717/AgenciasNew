@@ -149,7 +149,7 @@ function Stop-KorexServiceGraceful($name, $timeoutSec = 10) {
             }
             Write-Log "Tiempo de espera superado ($timeoutSec s) al detener servicio $name." "WARN"
         } catch {
-            Write-Log "Aviso al detener servicio $name: $_" "WARN"
+            Write-Log "Aviso al detener servicio ${name}: $_" "WARN"
         }
     }
     return $false

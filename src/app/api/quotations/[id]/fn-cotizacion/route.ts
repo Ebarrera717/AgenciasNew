@@ -49,12 +49,42 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
                     stateHistory: parseJson(row.stateHistoryJson) || []
                 };
             }
-        } else {
             const results: any[] = await prisma.$queryRawUnsafe(
                 `SELECT public.fnCotizacion($1::INT) as data`,
                 id
             );
             quotationData = results[0]?.data;
+            if (quotationData && quotationData.id) {
+                let stateHistory: any[] = Array.isArray(quotationData.stateHistory) ? quotationData.stateHistory : [];
+                if (stateHistory.length === 0) {
+                    try {
+                        const shRes: any[] = await prisma.$queryRawUnsafe(
+                            `SELECT * FROM public.fn_obtener_historial_estados($1::INT)`,
+                            id
+                        );
+                        if (Array.isArray(shRes) && shRes.length > 0) {
+                            stateHistory = shRes;
+                        }
+                    } catch (shErr: any) {
+                        console.warn('Warning fetching stateHistory in fn-cotizacion route:', shErr.message);
+                    }
+                }
+
+                if (stateHistory.length === 0) {
+                    stateHistory = [{
+                        id: quotationData.id,
+                        quotationId: quotationData.id,
+                        state: quotationData.state || 'NUEVO',
+                        description: quotationData.stateDescription || 'Creación de cotización',
+                        userId: quotationData.userId || null,
+                        userName: quotationData.userName || 'Sistema',
+                        createdAt: quotationData.stateUpdatedAt || quotationData.date || new Date().toISOString(),
+                        metadata: null
+                    }];
+                }
+
+                quotationData.stateHistory = stateHistory;
+            }
         }
 
         if (!quotationData) {

@@ -9,8 +9,16 @@ Write-Host "======================================================" -ForegroundC
 $RootDir = Split-Path -Parent $PSScriptRoot
 $ReleaseDir = "$RootDir\RELEASE_KOREX"
 
-# 1. Compilar modo Produccion
+# 0. Sincronizar y Auditar Esquema SQL + Sintaxis AST PowerShell antes de empaquetar
 Set-Location $RootDir
+Write-Host "`n[0/5] Sincronizando descriptor de base de datos y auditando contratos SQL / AST PowerShell..." -ForegroundColor Yellow
+node "$RootDir\deploy\gen_schema_json.js"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR CRITICO] Fallo la validacion pre-empaquetado de esquema o sintaxis AST PowerShell. Empaquetado abortado." -ForegroundColor Red
+    exit 1
+}
+
+# 1. Compilar modo Produccion
 if ($SkipBuild) {
     Write-Host "`n[1/5] OMITIENDO COMPILACION NEXT.JS (Modo Rapido - Solo base de datos/scripts)..." -ForegroundColor Yellow
 } else {

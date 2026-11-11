@@ -5524,28 +5524,97 @@ BEGIN
             'state', q.state,
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'costoTotal', COALESCE(q."costoTotal", 0),
+            'valorBase', COALESCE(q."valorBase", 0),
+            'utilidad', COALESCE(q.utilidad, 0),
+            'comisionTotalPercentage', COALESCE(q."comisionTotalPercentage", q."commissionPercentage", 0),
+            'comisionFreelancePercentage', COALESCE(q."comisionFreelancePercentage", 0),
+            'comisionFreelanceValue', COALESCE(q."comisionFreelanceValue", 0),
+            'comisionPropiaPercentage', COALESCE(q."comisionPropiaPercentage", q."commissionPercentage", 0),
+            'comisionPropiaValue', COALESCE(q."comisionPropiaValue", 0),
+            'comisionUtilidadPercentage', COALESCE(q."comisionUtilidadPercentage", 0),
             'destination', q.destination,
             'startDate', q."startDate",
             'endDate', q."endDate",
-            'passengerFirstName', q."passengerFirstName",
-            'passengerLastName', q."passengerLastName",
+            'passengerFirstName', COALESCE(NULLIF(TRIM(q."passengerFirstName"), ''), CASE WHEN q.passenger IS NOT NULL AND TRIM(q.passenger) <> '' THEN SPLIT_PART(TRIM(q.passenger), ' ', 1) ELSE '' END),
+            'passengerLastName', COALESCE(NULLIF(TRIM(q."passengerLastName"), ''), CASE WHEN q.passenger IS NOT NULL AND POSITION(' ' IN TRIM(q.passenger)) > 0 THEN SUBSTRING(TRIM(q.passenger) FROM POSITION(' ' IN TRIM(q.passenger)) + 1) ELSE '' END),
             'passenger', q.passenger,
             'paxAdults', q."paxAdults",
             'paxChildren', q."paxChildren",
             'reservationCode', q."reservationCode",
+            'copyFieldsToProducts', COALESCE(q."copyFieldsToProducts", true),
             'manualDescription', q."manualDescription",
-            'observations', q."observations",
+            'observations', q."observations"
+        ) || jsonb_build_object(
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,
                 'name', c.name,
                 'document', c.document
             ) ELSE jsonb_build_object('id', null, 'name', 'Cliente desconocido', 'document', '') END,
+            'seller', CASE WHEN s.id IS NOT NULL THEN jsonb_build_object('id', s.id, 'name', s.name) ELSE NULL END,
+            'branch', CASE WHEN b.id IS NOT NULL THEN jsonb_build_object('id', b.id, 'name', b.name) ELSE NULL END,
+            'implant', CASE WHEN imp.id IS NOT NULL THEN jsonb_build_object('id', imp.id, 'name', imp.name) ELSE NULL END,
+            'ticketPrinter', CASE WHEN tp.id IS NOT NULL THEN jsonb_build_object('id', tp.id, 'name', tp.name) ELSE NULL END,
+            'user', CASE WHEN qu.id IS NOT NULL THEN jsonb_build_object('id', qu.id, 'name', qu.name) ELSE NULL END,
+            'userName', COALESCE(qu.name, 'Sistema'),
             'combos', COALESCE((
                 SELECT jsonb_agg(jsonb_build_object('id', qc."comboId", 'comboId', qc."comboId", 'name', cb.name))
                 FROM public."QuotationCombo" qc
                 JOIN public."Combo" cb ON qc."comboId" = cb.id
                 WHERE qc."quotationId" = q.id
             ), '[]'::jsonb),
+            'manualServices', COALESCE((
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'id', ms.id,
+                        'serviceName', ms."serviceName",
+                        'name', ms."serviceName",
+                        'salePrice', ms."salePrice",
+                        'amount', ms."salePrice",
+                        'cost', ms.cost,
+                        'utility', ms.utility,
+                        'providerName', ms."providerName"
+                    )
+                )
+                FROM public."QuotationManualService" ms
+                WHERE ms."quotationId" = q.id
+            ), '[]'::jsonb),
+            'stateHistory', COALESCE(
+                (
+                    SELECT jsonb_agg(
+                        jsonb_build_object(
+                            'id', qsh.id,
+                            'quotationId', qsh."quotationId",
+                            'state', qsh.state,
+                            'description', qsh.description,
+                            'userId', qsh."userId",
+                            'userName', COALESCE(u.name, 'Sistema'),
+                            'createdAt', qsh."createdAt",
+                            'metadata', qsh.metadata
+                        ) ORDER BY qsh."createdAt" DESC, qsh.id DESC
+                    )
+                    FROM public."QuotationStateHistory" qsh
+                    LEFT JOIN public."User" u ON qsh."userId" = u.id
+                    WHERE qsh."quotationId" = q.id
+                ),
+                jsonb_build_array(
+                    jsonb_build_object(
+                        'id', q.id,
+                        'quotationId', q.id,
+                        'state', COALESCE(q.state, 'NUEVO'),
+                        'description', COALESCE(q."stateDescription", 'Creación de cotización'),
+                        'userId', q."userId",
+                        'userName', COALESCE(qu.name, 'Sistema'),
+                        'createdAt', COALESCE(q."stateUpdatedAt", q.date, NOW()),
+                        'metadata', jsonb_build_object(
+                            'initialState', COALESCE(q.state, 'NUEVO'),
+                            'totalAmount', q."totalAmount",
+                            'destination', q.destination,
+                            'passenger', q.passenger
+                        )
+                    )
+                )
+            ),
             'products', COALESCE(
                 (
                     SELECT jsonb_agg(
@@ -5630,6 +5699,11 @@ BEGIN
     INTO v_result
     FROM public."Quotation" q
     LEFT JOIN public."Client" c ON q."clientId" = c.id
+    LEFT JOIN public."Seller" s ON q."sellerId" = s.id
+    LEFT JOIN public."Branch" b ON q."branchId" = b.id
+    LEFT JOIN public."Implant" imp ON q."implantId" = imp.id
+    LEFT JOIN public."TicketPrinter" tp ON q."ticketPrinterId" = tp.id
+    LEFT JOIN public."User" qu ON q."userId" = qu.id
     WHERE q.id = p_quotation_id;
 
     RETURN v_result;
@@ -8380,19 +8454,39 @@ RETURNS TABLE (
     metadata JSONB
 ) AS $$
 BEGIN
-    RETURN QUERY
-    SELECT 
-        qsh.id,
-        qsh.state,
-        qsh.description,
-        qsh."createdAt",
-        qsh."userId",
-        COALESCE(u.name, 'Sistema'::TEXT) AS "userName",
-        qsh.metadata
-    FROM public."QuotationStateHistory" qsh
-    LEFT JOIN public."User" u ON qsh."userId" = u.id
-    WHERE qsh."quotationId" = p_quotation_id
-    ORDER BY qsh."createdAt" DESC, qsh.id DESC;
+    IF EXISTS (SELECT 1 FROM public."QuotationStateHistory" WHERE "quotationId" = p_quotation_id) THEN
+        RETURN QUERY
+        SELECT 
+            qsh.id,
+            qsh.state,
+            qsh.description,
+            qsh."createdAt",
+            qsh."userId",
+            COALESCE(u.name, 'Sistema'::TEXT) AS "userName",
+            qsh.metadata
+        FROM public."QuotationStateHistory" qsh
+        LEFT JOIN public."User" u ON qsh."userId" = u.id
+        WHERE qsh."quotationId" = p_quotation_id
+        ORDER BY qsh."createdAt" DESC, qsh.id DESC;
+    ELSE
+        RETURN QUERY
+        SELECT 
+            COALESCE(q.id, 1) AS id,
+            COALESCE(q.state, 'NUEVO')::VARCHAR(25) AS state,
+            COALESCE(q."stateDescription", 'Creación de cotización')::TEXT AS description,
+            COALESCE(q."stateUpdatedAt", q.date, NOW())::TIMESTAMP AS "createdAt",
+            q."userId",
+            COALESCE(u.name, 'Sistema'::TEXT) AS "userName",
+            jsonb_build_object(
+                'initialState', COALESCE(q.state, 'NUEVO'),
+                'totalAmount', q."totalAmount",
+                'destination', q.destination,
+                'passenger', q.passenger
+            ) AS metadata
+        FROM public."Quotation" q
+        LEFT JOIN public."User" u ON q."userId" = u.id
+        WHERE q.id = p_quotation_id;
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
 

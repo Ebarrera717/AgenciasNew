@@ -271,8 +271,9 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  DbUrl: String;
+  DbUrl, PsParams: String;
   Host, Port, DbName, User, Pass: String;
+  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -288,9 +289,16 @@ begin
     SaveStringToFile(ExpandConstant('{app}\.env'), 'NEXTAUTH_SECRET="KorexProductionSecretKey2024_Security"' + #13#10, True);
     SaveStringToFile(ExpandConstant('{app}\.env'), 'NEXTAUTH_URL="http://localhost:3000"' + #13#10, True);
     SaveStringToFile(ExpandConstant('{app}\.env'), 'PORT="3001"' + #13#10, True);
+
+    WizardForm.StatusLabel.Caption := 'Aplicando actualización de base de datos y servicios... (Por favor espere)';
+    PsParams := '-NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File "' + ExpandConstant('{app}\Update_Korex.ps1') + '" -PgHost "' + Host + '" -PgPort "' + Port + '" -PgDb "' + DbName + '" -PgUser "' + User + '" -PgPass "' + Pass + '"';
+    if not Exec('powershell.exe', PsParams, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or (ResultCode <> 0) then
+    begin
+      MsgBox('ADVERTENCIA CRÍTICA: El script de actualización (Update_Korex.ps1 / db_installer.js) finalizó con código de error ' + IntToStr(ResultCode) + '.' + #13#10#13#10 +
+             'Revise el archivo de registro en: ' + ExpandConstant('{app}\install_log.txt'), mbCriticalError, MB_OK);
+    end;
   end;
 end;
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File ""{app}\Update_Korex.ps1"" -PgHost ""{code:GetPgHost}"" -PgPort ""{code:GetPgPort}"" -PgDb ""{code:GetPgDb}"" -PgUser ""{code:GetPgUser}"" -PgPass ""{code:GetPgPass}"""; Flags: waituntilterminated runhidden; StatusMsg: "Aplicando actualización de archivos y base de datos... (Por favor espere)"
 Filename: "http://localhost:3000/"; Flags: shellexec runasoriginaluser postinstall; Description: "Abrir la plataforma Korex actualizada en mi Navegador"
