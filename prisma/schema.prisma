@@ -223,6 +223,8 @@ model Quotation {
   copyFieldsToProducts        Boolean?                 @default(true)
   manualDescription           String?
   observations                String?
+  zeusInvoiceNumber           String?                  @db.VarChar(50)
+  zeusInvoiceDate             DateTime?                @db.Timestamp(6)
   attachments                 Attachment[]
   preQuotations               PreQuotation[]           @relation("PreQuotationConverted")
   branch                      Branch                   @relation(fields: [branchId], references: [id])

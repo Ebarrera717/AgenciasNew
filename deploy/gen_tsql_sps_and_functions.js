@@ -2438,6 +2438,8 @@ BEGIN
         q.[passenger],
         q.[passengerFirstName],
         q.[passengerLastName],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         (
             SELECT c.[id], c.[name], c.[document]
             FROM dbo.[Client] c
@@ -2593,6 +2595,8 @@ BEGIN
         q.[endDate],
         q.[passenger],
         q.[reservationCode],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         (
             SELECT TOP 1 qs.[color]
             FROM dbo.[QuotationState] qs
@@ -2690,6 +2694,8 @@ BEGIN
         q.[copyFieldsToProducts],
         q.[manualDescription],
         q.[observations],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         ISNULL(q.[state], N'Nuevo') AS [state],
         q.[stateDescription],
         q.[stateUpdatedAt],

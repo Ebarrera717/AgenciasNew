@@ -72,6 +72,8 @@ BEGIN
         q.[copyFieldsToProducts],
         q.[manualDescription],
         q.[observations],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         ISNULL(q.[state], N'Nuevo') AS [state],
         q.[stateDescription],
         q.[stateUpdatedAt],

@@ -32,6 +32,8 @@ BEGIN
         q.[passenger],
         q.[passengerFirstName],
         q.[passengerLastName],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         (
             SELECT c.[id], c.[name], c.[document]
             FROM dbo.[Client] c

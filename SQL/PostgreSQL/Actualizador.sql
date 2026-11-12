@@ -3636,6 +3636,11 @@ BEGIN
         ALTER TABLE public."QuotationProduct" ALTER COLUMN "price" DROP NOT NULL;
         ALTER TABLE public."QuotationProduct" ALTER COLUMN "price" SET DEFAULT 0;
     END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN IF NOT EXISTS "zeusInvoiceNumber" character varying(50);
+        ALTER TABLE public."Quotation" ADD COLUMN IF NOT EXISTS "zeusInvoiceDate" timestamp without time zone;
+    END IF;
 END $$;
 
 

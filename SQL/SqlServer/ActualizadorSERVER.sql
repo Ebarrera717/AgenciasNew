@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-11-12T22:06:24.747Z
+-- Fecha de Generación: 2026-11-12T22:38:24.143Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -271,7 +271,9 @@ BEGIN
         [reservationCode] NVARCHAR(255) NULL,
         [copyFieldsToProducts] BIT NULL CONSTRAINT DF_Quotation_CopyFields DEFAULT 1,
         [manualDescription] NVARCHAR(MAX) NULL,
-        [observations] NVARCHAR(MAX) NULL
+        [observations] NVARCHAR(MAX) NULL,
+        [zeusInvoiceNumber] NVARCHAR(50) NULL,
+        [zeusInvoiceDate] DATETIME2 NULL
     );
 END;
 IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'observations')
@@ -282,6 +284,13 @@ IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.colu
 
 IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'passengerLastName')
     ALTER TABLE dbo.[Quotation] ADD [passengerLastName] NVARCHAR(150) NULL;
+
+IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'zeusInvoiceNumber')
+    ALTER TABLE dbo.[Quotation] ADD [zeusInvoiceNumber] NVARCHAR(50) NULL;
+
+IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'zeusInvoiceDate')
+    ALTER TABLE dbo.[Quotation] ADD [zeusInvoiceDate] DATETIME2 NULL;
+
 
 -- 14. Currency
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Currency' AND schema_id = SCHEMA_ID('dbo'))
@@ -6471,6 +6480,8 @@ BEGIN
         q.[passenger],
         q.[passengerFirstName],
         q.[passengerLastName],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         (
             SELECT c.[id], c.[name], c.[document]
             FROM dbo.[Client] c
@@ -6626,6 +6637,8 @@ BEGIN
         q.[endDate],
         q.[passenger],
         q.[reservationCode],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         (
             SELECT TOP 1 qs.[color]
             FROM dbo.[QuotationState] qs
@@ -6723,6 +6736,8 @@ BEGIN
         q.[copyFieldsToProducts],
         q.[manualDescription],
         q.[observations],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         ISNULL(q.[state], N'Nuevo') AS [state],
         q.[stateDescription],
         q.[stateUpdatedAt],

@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { isSQLServerMode, executeSQLServerProcedure } from '@/lib/sqlserver'
+import { triggerZeusInvoiceSyncInBackground } from '@/lib/zeus-invoice-sync'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
     console.log('[QUOTATIONS_HISTORY_DEBUG] Entering GET /api/quotations/history');
+    // Sincronización en segundo plano con Zeus ERP (no bloqueante, 0 ms de impacto en la respuesta)
+    try {
+        triggerZeusInvoiceSyncInBackground();
+    } catch (syncErr) {
+        console.warn('[QUOTATIONS_HISTORY] Error disparando sync de Zeus en background:', syncErr);
+    }
+
     try {
         const { searchParams } = new URL(request.url)
         const referencia = searchParams.get('referencia') || null

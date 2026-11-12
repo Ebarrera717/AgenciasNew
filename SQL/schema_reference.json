@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generatedAt": "2026-11-12T22:06:16.087Z",
+    "generatedAt": "2026-11-12T22:31:37.552Z",
     "databaseName": "Korex_colaereo"
   },
   "tables": {
@@ -4634,6 +4634,18 @@
         "passengerLastName": {
           "dataType": "character varying",
           "maxLength": 150,
+          "isNullable": "YES",
+          "columnDefault": null
+        },
+        "zeusInvoiceNumber": {
+          "dataType": "character varying",
+          "maxLength": 50,
+          "isNullable": "YES",
+          "columnDefault": null
+        },
+        "zeusInvoiceDate": {
+          "dataType": "timestamp without time zone",
+          "maxLength": null,
           "isNullable": "YES",
           "columnDefault": null
         }

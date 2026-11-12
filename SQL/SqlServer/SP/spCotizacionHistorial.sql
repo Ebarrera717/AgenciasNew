@@ -71,6 +71,8 @@ BEGIN
         q.[endDate],
         q.[passenger],
         q.[reservationCode],
+        q.[zeusInvoiceNumber],
+        q.[zeusInvoiceDate],
         (
             SELECT TOP 1 qs.[color]
             FROM dbo.[QuotationState] qs

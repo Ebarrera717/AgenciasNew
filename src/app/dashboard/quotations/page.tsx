@@ -315,7 +315,7 @@ export default function QuotationsListPage() {
             return
         }
 
-        const headers = ['ID', 'No. Interno', 'Fecha', 'Reserva / Localizador', 'Cliente', 'Pasajero / Titular', 'Elaborado por', 'Proveedor', 'Noches', 'Monto Total', 'Moneda', 'Estado']
+        const headers = ['ID', 'No. Interno', 'Fecha', 'Reserva / Localizador', 'Cliente', 'Pasajero / Titular', 'Elaborado por', 'Proveedor', 'Noches', 'Monto Total', 'Moneda', 'Estado', 'Factura Zeus']
         
         const rows = listToCopy.map(q => [
             q.id,
@@ -329,7 +329,8 @@ export default function QuotationsListPage() {
             q.nights || 1,
             q.totalAmount,
             q.currency || 'USD',
-            q.state || 'NUEVO'
+            q.state || 'NUEVO',
+            q.zeusInvoiceNumber || ''
         ])
 
         const tsvContent = [
@@ -1068,12 +1069,23 @@ export default function QuotationsListPage() {
                                                 }
 
                                                 return (
-                                                    <span
-                                                        style={inlineStyle}
-                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block ${badgeClass}`}
-                                                    >
-                                                        {rawState}
-                                                    </span>
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        <span
+                                                            style={inlineStyle}
+                                                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block ${badgeClass}`}
+                                                        >
+                                                            {rawState}
+                                                        </span>
+                                                        {q.zeusInvoiceNumber && (
+                                                            <span
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/90 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/60 shadow-xs"
+                                                                title={`Factura Zeus ERP: ${q.zeusInvoiceNumber}${q.zeusInvoiceDate ? ' - ' + format(new Date(q.zeusInvoiceDate), 'dd/MM/yyyy') : ''}`}
+                                                            >
+                                                                <Receipt className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                                                <span className="font-mono">Fac: {q.zeusInvoiceNumber}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 );
                                             })()}
                                         </td>

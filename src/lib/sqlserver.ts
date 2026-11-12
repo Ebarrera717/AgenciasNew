@@ -127,7 +127,7 @@ export async function getZeusSQLServerConfig(): Promise<{
         throw new Error('❌ Error de Configuración: El parámetro "UsuarioSQLServer" (Usuario de Zeus ERP) no está configurado en los Parámetros del Sistema.');
     }
 
-    if (encriptar && clave) {
+    if ((encriptar || clave.startsWith('ENC(')) && clave) {
         clave = decryptPassword(clave);
     }
 

@@ -257,7 +257,9 @@ BEGIN
         [reservationCode] NVARCHAR(255) NULL,
         [copyFieldsToProducts] BIT NULL CONSTRAINT DF_Quotation_CopyFields DEFAULT 1,
         [manualDescription] NVARCHAR(MAX) NULL,
-        [observations] NVARCHAR(MAX) NULL
+        [observations] NVARCHAR(MAX) NULL,
+        [zeusInvoiceNumber] NVARCHAR(50) NULL,
+        [zeusInvoiceDate] DATETIME2 NULL
     );
 END;
 IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'observations')
@@ -268,6 +270,13 @@ IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.colu
 
 IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'passengerLastName')
     ALTER TABLE dbo.[Quotation] ADD [passengerLastName] NVARCHAR(150) NULL;
+
+IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'zeusInvoiceNumber')
+    ALTER TABLE dbo.[Quotation] ADD [zeusInvoiceNumber] NVARCHAR(50) NULL;
+
+IF OBJECT_ID('dbo.Quotation') IS NOT NULL AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Quotation') AND name = 'zeusInvoiceDate')
+    ALTER TABLE dbo.[Quotation] ADD [zeusInvoiceDate] DATETIME2 NULL;
+
 
 -- 14. Currency
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Currency' AND schema_id = SCHEMA_ID('dbo'))
