@@ -2414,7 +2414,7 @@ BEGIN
 							SET @SrvHtlSqlStmt = @SrvHtlSqlStmt + CHAR(13) + CHAR(10) + 
 								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
 								' VALUES (@NewSrvId, NULL, ' + CAST(ISNULL(@th_id_tiposfacturacionhoteles, 5) AS VARCHAR) + ', ' +
-								CAST(ISNULL(@th_in_cantidad, 1) AS VARCHAR) + ', ' +
+								CAST(CASE WHEN ISNULL(@th_id_tiposfacturacionhoteles, 5) = 5 THEN ISNULL(NULLIF(@th_in_cantidad, 0), @calc_noches) ELSE ISNULL(@th_in_cantidad, 1) END AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_valor, 0) AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_contado, 0) AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_credito, 0) AS VARCHAR) + ', NULL, ' +
@@ -2518,8 +2518,8 @@ BEGIN
 							@dt_VenceFac = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_fechavencimientoproveedor, ISNULL(@gen_dt_fechaexped, GETDATE())), 120) + '''', 'NULL') + ',
 							@Id_AcomodacionSrv = NULL,
 							@Id_TipoPlanSrv = NULL,
-							@in_habitaciones = NULL,
-							@in_habitacionesSrv = NULL,
+							@in_habitaciones = 1,
+							@in_habitacionesSrv = 1,
 							@SqlStmt = ''' + REPLACE(@SrvSqlStmt, '''', '''''') + ''',
 							@cd_Consecutivo_variablesadicionales = ' + ISNULL('''' + @gen_cd_Consecutivo_variablesadicionales + '''', 'NULL') + ',
 							@cd_confirmacion = NULL,

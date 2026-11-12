@@ -4514,7 +4514,7 @@ BEGIN
                             3 AS [in_tipoitem],
                             'NCH' AS [cd_tiposfacturacionhoteles],
                             'Noches' AS [ds_tiposfacturacionhoteles],
-                            ISNULL(ep.quantity, 1) AS [in_cantidad],
+                            COALESCE(NULLIF(ep.nights, 0), CASE WHEN DATEDIFF(day, ISNULL(ep.checkInDate, GETDATE()), ISNULL(ep.checkOutDate, ISNULL(ep.checkInDate, GETDATE()))) > 0 THEN DATEDIFF(day, ISNULL(ep.checkInDate, GETDATE()), ISNULL(ep.checkOutDate, ISNULL(ep.checkInDate, GETDATE()))) ELSE 1 END) AS [in_cantidad],
                             CAST(ISNULL(ep.price, 0) AS DECIMAL(18,2)) AS [am_valor],
                             CASE 
                                 WHEN NOT EXISTS (

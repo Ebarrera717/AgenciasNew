@@ -1258,18 +1258,20 @@ BEGIN
 			id_acomodacion=NULL ,
 			in_dias=COALESCE(
 				NULLIF(C.CotizacionServicios.value('in_dias[1]','INT'), 0),
-				NULLIF(DATEDIFF(day, 
-					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
-					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
-				), 0),
+				NULLIF(C.CotizacionServicios.value('in_noches[1]','INT'), 0),
+				NULLIF(ABS(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'))
+				)), 0),
 				1
 			),
 			in_noches=COALESCE(
 				NULLIF(C.CotizacionServicios.value('in_noches[1]','INT'), 0),
-				NULLIF(DATEDIFF(day, 
-					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
-					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
-				), 0),
+				NULLIF(C.CotizacionServicios.value('in_dias[1]','INT'), 0),
+				NULLIF(ABS(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'))
+				)), 0),
 				1
 			),
 			ds_records =SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(100)'))), ''), ''), 1, 25) ,
@@ -1277,19 +1279,21 @@ BEGIN
 			in_diasSrv=COALESCE(
 				NULLIF(C.CotizacionServicios.value('in_diassrv[1]','INT'), 0),
 				NULLIF(C.CotizacionServicios.value('in_dias[1]','INT'), 0),
-				NULLIF(DATEDIFF(day, 
-					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
-					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
-				), 0),
+				NULLIF(C.CotizacionServicios.value('in_noches[1]','INT'), 0),
+				NULLIF(ABS(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'))
+				)), 0),
 				1
 			),
 			in_nochesSrv=COALESCE(
 				NULLIF(C.CotizacionServicios.value('in_nochessrv[1]','INT'), 0),
 				NULLIF(C.CotizacionServicios.value('in_noches[1]','INT'), 0),
-				NULLIF(DATEDIFF(day, 
-					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
-					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
-				), 0),
+				NULLIF(C.CotizacionServicios.value('in_dias[1]','INT'), 0),
+				NULLIF(ABS(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'))
+				)), 0),
 				1
 			),
 			Id_Especialista=NULL ,
@@ -1298,8 +1302,8 @@ BEGIN
 			ds_motivo_descuento='' ,
 			id_cargosdesc_descuento=NULL,
 			in_NumeroOpcion=0 ,
-			dt_FechaSalidaSrv=COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), GETDATE()) ,
-			dt_FechaLlegadaSrv=COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), GETDATE()) ,
+			dt_FechaSalidaSrv=COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), GETDATE()) ,
+			dt_FechaLlegadaSrv=COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), GETDATE()) ,
 			cd_localizador=SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(100)'))), ''), ''), 1, 25) ,
 			cd_voucherpax=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_voucherpax[1]','VARCHAR(50)'),''), 1, 25) ,
 			am_basecomisionableprov=0 ,
@@ -1308,8 +1312,8 @@ BEGIN
 			dt_VenceFac=GETDATE() ,
 			id_AcomodacionSrv=NULL ,
 			id_TipoPlanSrv=NULL ,
-			in_habitaciones=0 ,
-			in_habitacionesSrv=0 ,
+			in_habitaciones=COALESCE(NULLIF(C.CotizacionServicios.value('in_habitaciones[1]','INT'), 0), 1) ,
+			in_habitacionesSrv=COALESCE(NULLIF(C.CotizacionServicios.value('in_habitacionessrv[1]','INT'), 0), NULLIF(C.CotizacionServicios.value('in_habitaciones[1]','INT'), 0), 1) ,
 			cd_Consecutivo_VariablesAdicionales=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_consecutivo_variablesadicionales[1]','VARCHAR(50)'),''), 1, 8) ,
 			cd_confirmacion=SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_confirmacion[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(100)'))), ''), ''), 1, 25),
 			ds_confirmadopor=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_confirmadopor[1]','VARCHAR(500)'),''), 1, 250),
@@ -1764,8 +1768,12 @@ BEGIN
 		    EX.dt_salida = COALESCE(N.dt_salida, EX.dt_salida),
 		    EX.dt_FechaSalidaSrv = COALESCE(N.dt_FechaSalidaSrv, EX.dt_FechaSalidaSrv),
 		    EX.dt_FechaLlegadaSrv = COALESCE(N.dt_FechaLlegadaSrv, EX.dt_FechaLlegadaSrv),
-		    EX.in_noches = COALESCE(N.in_noches, EX.in_noches),
-		    EX.in_dias = COALESCE(N.in_dias, EX.in_dias)
+		    EX.in_noches = COALESCE(NULLIF(N.in_noches, 0), NULLIF(EX.in_noches, 0), 1),
+		    EX.in_nochesSrv = COALESCE(NULLIF(N.in_nochesSrv, 0), NULLIF(N.in_noches, 0), NULLIF(EX.in_nochesSrv, 0), NULLIF(EX.in_noches, 0), 1),
+		    EX.in_dias = COALESCE(NULLIF(N.in_dias, 0), NULLIF(N.in_noches, 0), NULLIF(EX.in_dias, 0), 1),
+		    EX.in_diasSrv = COALESCE(NULLIF(N.in_diasSrv, 0), NULLIF(N.in_dias, 0), NULLIF(EX.in_diasSrv, 0), 1),
+		    EX.in_habitaciones = COALESCE(NULLIF(N.in_habitaciones, 0), NULLIF(EX.in_habitaciones, 0), 1),
+		    EX.in_habitacionesSrv = COALESCE(NULLIF(N.in_habitacionesSrv, 0), NULLIF(EX.in_habitacionesSrv, 0), 1)
 		FROM CTE_EX EX
 		LEFT JOIN CTE_NEW N ON EX.id_Cotizacion = N.id_Cotizacion AND EX.rn = N.rn
 		LEFT JOIN CTE_NEW N1 ON EX.id_Cotizacion = N1.id_Cotizacion AND N1.rn = 1
@@ -2131,10 +2139,19 @@ BEGIN
 				  V.ValorVarchar
 		
 		UPDATE TF
-		SET TF.id_CotizacionServicios=CS.id_CotizacionServicios
+		SET TF.id_CotizacionServicios=CS.id_CotizacionServicios,
+		    TF.in_cantidad = CASE WHEN TF.Id_TiposFacturacionHoteles = 5 THEN COALESCE(NULLIF(CS.in_noches, 0), NULLIF(CS.in_nochesSrv, 0), NULLIF(TF.in_cantidad, 0), 1) ELSE TF.in_cantidad END
 		FROM @Fac_Servicios_TiposFacturacionHoteles TF
 		INNER JOIN @CotizacionServicios CS ON CS.cd_Consecutivo_VariablesAdicionales = TF.cd_CotizacionServicios
-		INNER JOIN @Cotizacion C ON C.cd_consecutivo = CS.cd_Cotizacion AND C.bl_existe=0
+		INNER JOIN @Cotizacion C ON C.cd_consecutivo = CS.cd_Cotizacion AND C.bl_existe=0;
+
+		-- Si la cotización ya existía en Zeus, actualizar in_cantidad en dbo.Fac_Servicios_TiposFacturacionHoteles
+		UPDATE FTH
+		SET FTH.in_cantidad = COALESCE(NULLIF(CS.in_noches, 0), NULLIF(CS.in_nochesSrv, 0), 1)
+		FROM dbo.Fac_Servicios_TiposFacturacionHoteles FTH
+		INNER JOIN dbo.CotizacionServicios CS ON CS.id = FTH.id_CotizacionServicios
+		INNER JOIN @Cotizacion C ON C.id_Cotizacion = CS.id_Cotizacion AND C.bl_existe = 1
+		WHERE FTH.Id_TiposFacturacionHoteles = 5;
 
 		INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles(
 			id_Fac_Servicios,
@@ -4738,7 +4755,7 @@ BEGIN
 							SET @SrvHtlSqlStmt = @SrvHtlSqlStmt + CHAR(13) + CHAR(10) + 
 								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
 								' VALUES (@NewSrvId, NULL, ' + CAST(ISNULL(@th_id_tiposfacturacionhoteles, 5) AS VARCHAR) + ', ' +
-								CAST(ISNULL(@th_in_cantidad, 1) AS VARCHAR) + ', ' +
+								CAST(CASE WHEN ISNULL(@th_id_tiposfacturacionhoteles, 5) = 5 THEN ISNULL(NULLIF(@th_in_cantidad, 0), @calc_noches) ELSE ISNULL(@th_in_cantidad, 1) END AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_valor, 0) AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_contado, 0) AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_credito, 0) AS VARCHAR) + ', NULL, ' +
@@ -4842,8 +4859,8 @@ BEGIN
 							@dt_VenceFac = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_fechavencimientoproveedor, ISNULL(@gen_dt_fechaexped, GETDATE())), 120) + '''', 'NULL') + ',
 							@Id_AcomodacionSrv = NULL,
 							@Id_TipoPlanSrv = NULL,
-							@in_habitaciones = NULL,
-							@in_habitacionesSrv = NULL,
+							@in_habitaciones = 1,
+							@in_habitacionesSrv = 1,
 							@SqlStmt = ''' + REPLACE(@SrvSqlStmt, '''', '''''') + ''',
 							@cd_Consecutivo_variablesadicionales = ' + ISNULL('''' + @gen_cd_Consecutivo_variablesadicionales + '''', 'NULL') + ',
 							@cd_confirmacion = NULL,

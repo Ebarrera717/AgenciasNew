@@ -1003,7 +1003,7 @@ BEGIN
         3 AS in_tipoitem,
         'NCH' AS cd_TiposFacturacionHoteles,
         'Noches' AS ds_TiposFacturacionHoteles,
-        COALESCE(ep.quantity, 1) AS in_cantidad,
+        COALESCE(NULLIF(ep.nights, 0), GREATEST(ABS(DATE(COALESCE(ep."checkOutDate", ep."checkInDate", CURRENT_DATE)) - DATE(COALESCE(ep."checkInDate", CURRENT_DATE))), 1)) AS in_cantidad,
         COALESCE(ep.price, 0) AS am_valor,
         CASE 
             WHEN NOT EXISTS (
