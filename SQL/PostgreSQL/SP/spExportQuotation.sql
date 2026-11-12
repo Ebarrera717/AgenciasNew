@@ -491,24 +491,24 @@ BEGIN
         COALESCE(qp.destination, '') as ds_destino, 
         COALESCE(NULLIF(TRIM(qp.servicios), ''), NULLIF(TRIM(qp.descripcion), ''), NULLIF(TRIM(pr.description), ''), '') as ds_servicio, 
         COALESCE(NULLIF(TRIM(qp.descripcion), ''), NULLIF(TRIM(pr.description), ''), '') as ds_descrip, 
-		COALESCE(
+		SUBSTRING(COALESCE(
 	        NULLIF(TRIM(qpp.firstName), ''),
 	        CASE 
 	            WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
 	            WHEN TRIM(qpp.name) NOT LIKE '% %' THEN TRIM(qpp.name)
 	            ELSE COALESCE(arr[1], '')
 	        END
-	    ) AS ds_paxname,
-	    COALESCE(
+	    ), 1, 20) AS ds_paxname,
+	    SUBSTRING(COALESCE(
 	        NULLIF(TRIM(qpp.lastName), ''),
 	        CASE 
 	            WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
 	            WHEN TRIM(qpp.name) NOT LIKE '% %' THEN ''
 	            ELSE COALESCE(arr[2], '')
 	        END
-	    ) AS ds_paxape,
+	    ), 1, 20) AS ds_paxape,
         CASE 
-	        WHEN TRIM(qpp.name) LIKE '% %' THEN COALESCE(arr[3], '')
+	        WHEN TRIM(qpp.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)
 	        ELSE ''
 	    END as cd_paxtype, 
         COALESCE(qp."inNationality", 1) as in_nacionalidad, 
@@ -559,12 +559,12 @@ BEGIN
 	    END  as ds_paxClasificacion, 
         '' as cd_tipoplan, 
         '' as cd_acomodacion, 
-        0 as in_dias,
-        COALESCE(qp.nights, 0) as in_noches, 
+        COALESCE(NULLIF(qp.nights, 0), GREATEST((DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_dias,
+        COALESCE(NULLIF(qp.nights, 0), GREATEST((DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_noches, 
         SUBSTRING(public."fnQuitarEspeciales"(COALESCE(NULLIF(TRIM(qp."reservationCode"), ''), NULLIF(TRIM(qt."reservationCode"), ''), '')), 1, 25) as ds_records, 
         '' as cd_GrConcepto, 
-        0 as in_diasSrv, 
-        0 as in_nochesSrv, 
+        COALESCE(NULLIF(qp.nights, 0), GREATEST((DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_diasSrv, 
+        COALESCE(NULLIF(qp.nights, 0), GREATEST((DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_nochesSrv, 
         '' as cd_Especialista,
         0 as am_porcentaje_descuento, 
         0 as am_valor_descuento, 
@@ -668,35 +668,35 @@ BEGIN
 	SELECT 
 	    cs.cd_Cotizacion, 
 	    cs.cd_Consecutivo_VARiablesAdicionales AS cd_CotizacionServicios, 
-	    COALESCE(
+	    SUBSTRING(COALESCE(
 	        NULLIF(TRIM(p."lastName"), ''),
 	        CASE 
 	            WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
 	            WHEN TRIM(p.name) NOT LIKE '% %' THEN ''
 	            ELSE COALESCE(arr[2], '')
 	        END
-	    ) AS ds_paxape,
-	    COALESCE(
+	    ), 1, 30) AS ds_paxape,
+	    SUBSTRING(COALESCE(
 	        NULLIF(TRIM(p."firstName"), ''),
 	        CASE 
 	            WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
 	            WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name)
 	            ELSE COALESCE(arr[1], '')
 	        END
-	    ) AS ds_paxname,
+	    ), 1, 30) AS ds_paxname,
 	    CASE 
-	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[3], '')
+	        WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)
 	        ELSE ''
 	    END AS ds_paxprefix,
 	    CASE 
-	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[4], '')
+	        WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[4], ''), 1, 7)
 	        ELSE ''
 	    END AS ds_paxClasificacion,
 	    CASE 
-	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[5], '')
+	        WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[5], ''), 1, 25)
 	        ELSE ''
 	    END AS cd_voucherpax,
-	    p.document AS cd_paxidentificacion, 
+	    SUBSTRING(COALESCE(p.document, ''), 1, 25) AS cd_paxidentificacion, 
 	    0 AS in_edad, 
 	    '' AS cd_tiquete
 		FROM (

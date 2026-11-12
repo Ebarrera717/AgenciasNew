@@ -390,7 +390,7 @@ BEGIN
 			ds_clilastname VARCHAR(60) COLLATE DATABASE_DEFAULT,
 			ds_clilastname2 VARCHAR(60) COLLATE DATABASE_DEFAULT,
 			cd_clipais VARCHAR(25) COLLATE DATABASE_DEFAULT,
-			ds_clitel VARCHAR(25) COLLATE DATABASE_DEFAULT,
+			ds_clitel VARCHAR(100) COLLATE DATABASE_DEFAULT,
 			cd_TipoTransaccion VARCHAR(1) COLLATE DATABASE_DEFAULT,
 			Fecha_Salida SMALLDATETIME,
 			Fecha_Llegada SMALLDATETIME,
@@ -428,8 +428,8 @@ BEGIN
 			cd_agcur VARCHAR(10) COLLATE DATABASE_DEFAULT,
 			am_agtarifa MONEY,
 			ds_dir1 VARCHAR(250) COLLATE DATABASE_DEFAULT,
-			ds_tel VARCHAR(25) COLLATE DATABASE_DEFAULT,
-			ds_fax VARCHAR(25) COLLATE DATABASE_DEFAULT,
+			ds_tel VARCHAR(100) COLLATE DATABASE_DEFAULT,
+			ds_fax VARCHAR(100) COLLATE DATABASE_DEFAULT,
 			cd_centrocosto VARCHAR(50) COLLATE DATABASE_DEFAULT,
 			NumTktConj INT,
 			Respuesta VARCHAR(1) COLLATE DATABASE_DEFAULT,
@@ -439,8 +439,8 @@ BEGIN
 			ds_archivo VARCHAR(250) COLLATE DATABASE_DEFAULT,
 			ds_Observaciones VARCHAR(8000) COLLATE DATABASE_DEFAULT,
 			ds_ClienteEmail VARCHAR(100) COLLATE DATABASE_DEFAULT,
-			cd_sucursal CHAR(5) COLLATE DATABASE_DEFAULT,
-			cd_implante CHAR(5) COLLATE DATABASE_DEFAULT,
+			cd_sucursal VARCHAR(25) COLLATE DATABASE_DEFAULT,
+			cd_implante VARCHAR(25) COLLATE DATABASE_DEFAULT,
 			bl_ClienteActualizar BIT,
 			bl_NotificacionMPD BIT,
 			cd_FormaPagoTAO VARCHAR(3) COLLATE DATABASE_DEFAULT,
@@ -1023,17 +1023,17 @@ BEGIN
 			in_tipoitem = NULL,
 			iden_gds = NULL,
 			ds_fecha = ISNULL(F.Facturacion.value('dt_fechacont[1]','SMALLDATETIME'),'19000101'),
-			cd_tiqueteador = ISNULL(F.Facturacion.value('cd_tiqueteador[1]','VARCHAR(25)'),''),
-			cd_vendedor = ISNULL(F.Facturacion.value('cd_vendedor[1]','VARCHAR(25)'),''),
-			cd_cliente = ISNULL(F.Facturacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),''),
+			cd_tiqueteador = SUBSTRING(ISNULL(F.Facturacion.value('cd_tiqueteador[1]','VARCHAR(25)'),''), 1, 6),
+			cd_vendedor = SUBSTRING(ISNULL(F.Facturacion.value('cd_vendedor[1]','VARCHAR(25)'),''), 1, 3),
+			cd_cliente = SUBSTRING(ISNULL(F.Facturacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),''), 1, 25),
 			am_highfare = 0,
 			am_lowfare = 0,
 			am_fare = 0,
 			ds_reasoncode = '',
-			ds_cliname = ISNULL(F.Facturacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),''),
-			ds_clidir = ISNULL(F.Facturacion.value('ds_cliente_dir[1]','VARCHAR(250)'),''),
-			ds_clicity = ISNULL(F.Facturacion.value('ds_cliente_ciudad[1]','VARCHAR(50)'),''),
-			ds_cliid = ISNULL(F.Facturacion.value('cd_cliente_codigo[1]','VARCHAR(10)'),''),
+			ds_cliname = SUBSTRING(ISNULL(F.Facturacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),''), 1, 250),
+			ds_clidir = SUBSTRING(ISNULL(F.Facturacion.value('ds_cliente_dir[1]','VARCHAR(250)'),''), 1, 250),
+			ds_clicity = SUBSTRING(ISNULL(F.Facturacion.value('ds_cliente_ciudad[1]','VARCHAR(50)'),''), 1, 40),
+			ds_cliid = SUBSTRING(ISNULL(F.Facturacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),''), 1, 25),
 			ds_itinerario = '',
 			ds_clases = '',
 			in_nacionalidad = 0,
@@ -1045,7 +1045,7 @@ BEGIN
 			ds_tkt_number = '',
 			ds_tkt_prefix = '',
 			ds_aero_code = '',
-			ds_moneda = ISNULL(F.Facturacion.value('cd_monedas_iata[1]','VARCHAR(25)'),'COP'),
+			ds_moneda = SUBSTRING(ISNULL(F.Facturacion.value('cd_monedas_iata[1]','VARCHAR(25)'),'COP'), 1, 3),
 			am_tarifa = 0,
 			am_iva = 0,
 			am_tua = 0,
@@ -1076,7 +1076,7 @@ BEGIN
 			ds_clilastname = '',
 			ds_clilastname2 = '',
 			cd_clipais = '',
-			ds_clitel = ISNULL(F.Facturacion.value('ds_cliente_tel[1]','VARCHAR(61)'),''),
+			ds_clitel = SUBSTRING(ISNULL(F.Facturacion.value('ds_cliente_tel[1]','VARCHAR(200)'),''), 1, 100),
 			cd_TipoTransaccion = '',
 			Fecha_Salida = GETDATE(),
 			Fecha_Llegada = GETDATE(),
@@ -1090,43 +1090,43 @@ BEGIN
 			in_cars = 0,
 			cd_carcode = '',
 			cd_conf_car = '',
-			cd_citysalida=ISNULL(F.Facturacion.value('cd_citysalida[1]','VARCHAR(61)'),''),
+			cd_citysalida=SUBSTRING(ISNULL(F.Facturacion.value('cd_citysalida[1]','VARCHAR(100)'),''), 1, 25),
 			dt_retorno=F.Facturacion.value('dt_retorno[1]','SMALLDATETIME'),
-			cd_cartype=ISNULL(F.Facturacion.value('cd_cartype[1]','VARCHAR(61)'),''),
-			cd_currency=ISNULL(F.Facturacion.value('cd_currency[1]','VARCHAR(3)'),'COP'),
+			cd_cartype=SUBSTRING(ISNULL(F.Facturacion.value('cd_cartype[1]','VARCHAR(100)'),''), 1, 25),
+			cd_currency=SUBSTRING(ISNULL(F.Facturacion.value('cd_currency[1]','VARCHAR(25)'),'COP'), 1, 10),
 			am_tarifacar=ISNULL(F.Facturacion.value('am_tarifacar[1]','MONEY'),0),
-			cd_bookingsource=ISNULL(F.Facturacion.value('cd_bookingsource[1]','VARCHAR(61)'),''),
-			cd_ratecode=ISNULL(F.Facturacion.value('cd_ratecode[1]','VARCHAR(61)'),''),
+			cd_bookingsource=SUBSTRING(ISNULL(F.Facturacion.value('cd_bookingsource[1]','VARCHAR(100)'),''), 1, 25),
+			cd_ratecode=SUBSTRING(ISNULL(F.Facturacion.value('cd_ratecode[1]','VARCHAR(100)'),''), 1, 25),
 			id_htl=NULL,
 			dt_checkin=F.Facturacion.value('dt_checkin[1]','SMALLDATETIME'),
 			in_guests=ISNULL(F.Facturacion.value('in_guests[1]','INT'),0),
-			cd_confirmation=ISNULL(F.Facturacion.value('cd_confirmation[1]','VARCHAR(61)'),''),
-			cd_city=ISNULL(F.Facturacion.value('cd_city[1]','VARCHAR(61)'),''),
-			cd_htlchain=ISNULL(F.Facturacion.value('cd_htlchain[1]','VARCHAR(61)'),''),
+			cd_confirmation=SUBSTRING(ISNULL(F.Facturacion.value('cd_confirmation[1]','VARCHAR(100)'),''), 1, 25),
+			cd_city=SUBSTRING(ISNULL(F.Facturacion.value('cd_city[1]','VARCHAR(100)'),''), 1, 25),
+			cd_htlchain=SUBSTRING(ISNULL(F.Facturacion.value('cd_htlchain[1]','VARCHAR(100)'),''), 1, 25),
 			dt_checkout=F.Facturacion.value('dt_checkout[1]','SMALLDATETIME'),
 			in_noches=ISNULL(F.Facturacion.value('in_noches[1]','INT'),0),
-			ds_htlname=ISNULL(F.Facturacion.value('ds_htlname[1]','VARCHAR(61)'),''),
+			ds_htlname=SUBSTRING(ISNULL(F.Facturacion.value('ds_htlname[1]','VARCHAR(500)'),''), 1, 250),
 			in_habs=ISNULL(F.Facturacion.value('in_habs[1]','INT'),0),
-			cd_bed=ISNULL(F.Facturacion.value('cd_bed[1]','VARCHAR(61)'),''),
-			cd_ratecode_htl=ISNULL(F.Facturacion.value('cd_ratecode_htl[1]','VARCHAR(61)'),''),
-			cd_htlcur=ISNULL(F.Facturacion.value('cd_htlcur[1]','VARCHAR(61)'),''),
+			cd_bed=SUBSTRING(ISNULL(F.Facturacion.value('cd_bed[1]','VARCHAR(100)'),''), 1, 25),
+			cd_ratecode_htl=SUBSTRING(ISNULL(F.Facturacion.value('cd_ratecode_htl[1]','VARCHAR(100)'),''), 1, 25),
+			cd_htlcur=SUBSTRING(ISNULL(F.Facturacion.value('cd_htlcur[1]','VARCHAR(100)'),''), 1, 10),
 			am_htltarifa=ISNULL(F.Facturacion.value('am_htltarifa[1]','MONEY'),0),
-			cd_agcur=ISNULL(F.Facturacion.value('cd_agcur[1]','VARCHAR(61)'),''),
+			cd_agcur=SUBSTRING(ISNULL(F.Facturacion.value('cd_agcur[1]','VARCHAR(100)'),''), 1, 10),
 			am_agtarifa=ISNULL(F.Facturacion.value('am_agtarifa[1]','MONEY'),0),
-			ds_dir1=ISNULL(F.Facturacion.value('ds_dir1[1]','VARCHAR(61)'),''),
-			ds_tel=ISNULL(F.Facturacion.value('ds_tel[1]','VARCHAR(61)'),''),
-			ds_fax=ISNULL(F.Facturacion.value('ds_fax[1]','VARCHAR(61)'),''),
-			cd_centrocosto=ISNULL(F.Facturacion.value('cd_centrocosto[1]','VARCHAR(61)'),''),
-			NumTktConj=ISNULL(F.Facturacion.value('NumTktConj[1]','VARCHAR(61)'),''),
+			ds_dir1=SUBSTRING(ISNULL(F.Facturacion.value('ds_dir1[1]','VARCHAR(500)'),''), 1, 250),
+			ds_tel=SUBSTRING(ISNULL(F.Facturacion.value('ds_tel[1]','VARCHAR(200)'),''), 1, 100),
+			ds_fax=SUBSTRING(ISNULL(F.Facturacion.value('ds_fax[1]','VARCHAR(200)'),''), 1, 100),
+			cd_centrocosto=SUBSTRING(ISNULL(F.Facturacion.value('cd_centrocosto[1]','VARCHAR(100)'),''), 1, 50),
+			NumTktConj=TRY_CAST(F.Facturacion.value('NumTktConj[1]','VARCHAR(61)') AS INT),
 			Respuesta=NULL,
 			ds_solicita = '',
 			cd_pax_CC = '',
 			ds_lapsoviaje = '',
-			ds_archivo = ISNULL(F.Facturacion.value('ds_archivo[1]','VARCHAR(61)'),''),
+			ds_archivo = SUBSTRING(ISNULL(F.Facturacion.value('ds_archivo[1]','VARCHAR(500)'),''), 1, 250),
 			ds_Observaciones = ISNULL(F.Facturacion.value('ds_Observacion[1]','VARCHAR(8000)'),''),
-			ds_ClienteEmail = ISNULL(F.Facturacion.value('ds_cliente_email[1]','VARCHAR(61)'),''),
-			cd_sucursal = ISNULL(F.Facturacion.value('cd_sucursal[1]','VARCHAR(25)'),'OFP'),
-			cd_implante = ISNULL(F.Facturacion.value('cd_implante[1]','VARCHAR(25)'),''), 
+			ds_ClienteEmail = SUBSTRING(ISNULL(F.Facturacion.value('ds_cliente_email[1]','VARCHAR(200)'),''), 1, 100),
+			cd_sucursal = SUBSTRING(ISNULL(F.Facturacion.value('cd_sucursal[1]','VARCHAR(50)'),'OFP'), 1, 25),
+			cd_implante = SUBSTRING(ISNULL(F.Facturacion.value('cd_implante[1]','VARCHAR(50)'),''), 1, 25), 
 			bl_ClienteActualizar = 0,
 			bl_NotificacionMPD = 0,
 			cd_FormaPagoTAO = '',
@@ -1230,46 +1230,46 @@ BEGIN
 			cd_fuente=FF.cd_fuente,
 			cd_serie=FF.cd_serie,
 			cd_consecutivo=FF.cd_consecutivo,
-			cd_tiquete = ISNULL(F.Item.value('cd_tiquete[1]','VARCHAR(50)'),''),
-			ds_descrip = ISNULL(F.Item.value('ds_descrip[1]','VARCHAR(500)'),''),
+			cd_tiquete = SUBSTRING(ISNULL(F.Item.value('cd_tiquete[1]','VARCHAR(50)'),''), 1, 11),
+			ds_descrip = SUBSTRING(ISNULL(F.Item.value('ds_descrip[1]','VARCHAR(500)'),''), 1, 4000),
 			in_nacionalidad = ISNULL(F.Item.value('in_nacionalidad[1]','INT'),0),
-			cd_cencosto = ISNULL(F.Item.value('cd_cencosto[1]','VARCHAR(50)'),''),
-			cd_auxiliar = ISNULL(F.Item.value('cd_auxiliar[1]','VARCHAR(50)'),''),
-			cd_item = ISNULL(F.Item.value('cd_item[1]','VARCHAR(50)'),''),
+			cd_cencosto = SUBSTRING(ISNULL(F.Item.value('cd_cencosto[1]','VARCHAR(50)'),''), 1, 16),
+			cd_auxiliar = SUBSTRING(ISNULL(F.Item.value('cd_auxiliar[1]','VARCHAR(50)'),''), 1, 16),
+			cd_item = SUBSTRING(ISNULL(F.Item.value('cd_item[1]','VARCHAR(50)'),''), 1, 16),
 			am_tarifa = ISNULL(F.Item.value('am_tarifa[1]','MONEY'),0),
 			am_iva = ISNULL(F.Item.value('am_iva[1]','MONEY'),0),
 			am_tua = ISNULL(F.Item.value('am_tua[1]','MONEY'),0),
 			am_comb = ISNULL(F.Item.value('am_comb[1]','MONEY'),0),
 			am_vat = ISNULL(F.Item.value('am_vat[1]','MONEY'),0),
 			am_Comision = ISNULL(F.Item.value('am_comision[1]','MONEY'),0),
-			ds_paxname = ISNULL(F.Item.value('ds_paxname[1]','VARCHAR(30)'),''),
-			ds_paxape = ISNULL(F.Item.value('ds_paxape[1]','VARCHAR(30)'),''),
-			ds_paxprefix = ISNULL(F.Item.value('ds_paxprefix[1]','VARCHAR(3)'),''),
-			cd_tourcode = ISNULL(F.Item.value('cd_tourcode[1]','VARCHAR(25)'),''),
+			ds_paxname = SUBSTRING(ISNULL(F.Item.value('ds_paxname[1]','VARCHAR(100)'),''), 1, 20),
+			ds_paxape = SUBSTRING(ISNULL(F.Item.value('ds_paxape[1]','VARCHAR(100)'),''), 1, 20),
+			ds_paxprefix = SUBSTRING(ISNULL(F.Item.value('ds_paxprefix[1]','VARCHAR(10)'),''), 1, 3),
+			cd_tourcode = SUBSTRING(ISNULL(F.Item.value('cd_tourcode[1]','VARCHAR(50)'),''), 1, 25),
 			NumTktConj = F.Item.value('NumTktConj[1]','INT'),
-			cd_TipoTiquete = F.Item.value('cd_tipotiquete[1]','VARCHAR(3)'),
+			cd_TipoTiquete = SUBSTRING(ISNULL(F.Item.value('cd_tipotiquete[1]','VARCHAR(10)'),''), 1, 3),
 			id_air = F.Item.value('id_air[1]','INT'),
-			ds_itinerario = ISNULL(F.Item.value('ds_itinerario[1]','VARCHAR(250)'),''),
-			ds_itinerarioaerolinea = ISNULL(F.Item.value('ds_itinerarioaerolinea[1]','VARCHAR(128)'),''),
-			ds_clases = ISNULL(F.Item.value('ds_clases[1]','VARCHAR(61)'),''),
+			ds_itinerario = SUBSTRING(ISNULL(F.Item.value('ds_itinerario[1]','VARCHAR(250)'),''), 1, 63),
+			ds_itinerarioaerolinea = SUBSTRING(ISNULL(F.Item.value('ds_itinerarioaerolinea[1]','VARCHAR(250)'),''), 1, 63),
+			ds_clases = SUBSTRING(ISNULL(F.Item.value('ds_clases[1]','VARCHAR(100)'),''), 1, 29),
 			ds_Observaciones = ISNULL(F.Item.value('ds_observaciones[1]','VARCHAR(8000)'),''),
 			am_highfare = ISNULL(F.Item.value('am_highfare[1]','MONEY'),0),
 			am_lowfare = ISNULL(F.Item.value('am_lowfare[1]','MONEY'),0),
-			ds_solicita = ISNULL(F.Item.value('ds_solicita[1]','VARCHAR(200)'),''),
-			ds_lapsoviaje = ISNULL(F.Item.value('ds_lapsoviaje[1]','VARCHAR(50)'),''),
-			cd_tktrevisado = ISNULL(F.Item.value('cd_tktrevisado[1]','VARCHAR(14)'),''),
-			cd_PasaportePax = ISNULL(F.Item.value('cd_pasaportepax[1]','VARCHAR(25)'),''),
-			cd_pax_CC = ISNULL(F.Item.value('cd_pax_cc[1]','VARCHAR(20)'),''),
+			ds_solicita = SUBSTRING(ISNULL(F.Item.value('ds_solicita[1]','VARCHAR(200)'),''), 1, 200),
+			ds_lapsoviaje = SUBSTRING(ISNULL(F.Item.value('ds_lapsoviaje[1]','VARCHAR(50)'),''), 1, 50),
+			cd_tktrevisado = SUBSTRING(ISNULL(F.Item.value('cd_tktrevisado[1]','VARCHAR(50)'),''), 1, 14),
+			cd_PasaportePax = SUBSTRING(ISNULL(F.Item.value('cd_pasaportepax[1]','VARCHAR(50)'),''), 1, 25),
+			cd_pax_CC = SUBSTRING(ISNULL(F.Item.value('cd_pax_cc[1]','VARCHAR(50)'),''), 1, 20),
 			am_PorFacParcial = ISNULL(F.Item.value('am_porfacparcial[1]','MONEY'),100),
 			in_cantpax = ISNULL(F.Item.value('in_cantpax[1]','INT'),0),
 			Id_Precompra = F.Item.value('id_precompra[1]','INT'),
-			cd_FormaPagoTAO = ISNULL(F.Item.value('cd_formapagotao[1]','VARCHAR(3)'),''),
-			cd_TarjetaCreditoTAO = ISNULL(F.Item.value('cd_tarjetacreditotao[1]','VARCHAR(4)'),''),
-			cd_NumeroTarjetaTAO = ISNULL(F.Item.value('cd_numerotarjetatao[1]','VARCHAR(25)'),''),
-			cd_VencimientoTarjetaTAO = ISNULL(F.Item.value('cd_vencimientotarjetatao[1]','VARCHAR(6)'),''),
-			cd_NumeroPolizaTAO = ISNULL(F.Item.value('cd_numeropolizatao[1]','VARCHAR(50)'),''),
-			cd_AnexoPolizaTAO = ISNULL(F.Item.value('cd_anexopolizatao[1]','VARCHAR(50)'),''),
-			ds_AutorizacionTarjetaTAO = ISNULL(F.Item.value('ds_autorizaciontarjetatao[1]','VARCHAR(25)'),''),
+			cd_FormaPagoTAO = SUBSTRING(ISNULL(F.Item.value('cd_formapagotao[1]','VARCHAR(10)'),''), 1, 3),
+			cd_TarjetaCreditoTAO = SUBSTRING(ISNULL(F.Item.value('cd_tarjetacreditotao[1]','VARCHAR(10)'),''), 1, 4),
+			cd_NumeroTarjetaTAO = SUBSTRING(ISNULL(F.Item.value('cd_numerotarjetatao[1]','VARCHAR(50)'),''), 1, 25),
+			cd_VencimientoTarjetaTAO = SUBSTRING(ISNULL(F.Item.value('cd_vencimientotarjetatao[1]','VARCHAR(10)'),''), 1, 6),
+			cd_NumeroPolizaTAO = SUBSTRING(ISNULL(F.Item.value('cd_numeropolizatao[1]','VARCHAR(50)'),''), 1, 50),
+			cd_AnexoPolizaTAO = SUBSTRING(ISNULL(F.Item.value('cd_anexopolizatao[1]','VARCHAR(50)'),''), 1, 50),
+			ds_AutorizacionTarjetaTAO = SUBSTRING(ISNULL(F.Item.value('ds_autorizaciontarjetatao[1]','VARCHAR(50)'),''), 1, 25),
 			in_cuotasTarjetaTAO = ISNULL(F.Item.value('in_cuotasTarjetatao[1]','INT'),0),
 			id_FormasPago = FP.id,
 			id_TarjetasCredito = TC.id,
@@ -1296,13 +1296,13 @@ BEGIN
 			id_TiposDocumento = TD.id,
 			id_entdist = ED.id,
 			id_entvend = EV.id,
-			cd_destino = ISNULL(F.Item.value('cd_destino[1]','VARCHAR(3)'),''),
+			cd_destino = SUBSTRING(ISNULL(F.Item.value('cd_destino[1]','VARCHAR(10)'),''), 1, 3),
 			dt_fechaexped = F.Item.value('dt_fechaexped[1]','SMALLDATETIME'),
 			id_tiqueteadores = TQ.id,
 			id_gds = F.Item.value('id_gds[1]','INT'),
 			iden_gds = F.Item.value('iden_gds[1]','INT'),
 			am_comisionPNR = ISNULL(F.Item.value('am_comisionpnr[1]','MONEY'),0),
-			ds_records = ISNULL(F.Item.value('ds_records[1]','VARCHAR(62)'),''),
+			ds_records = SUBSTRING(ISNULL(F.Item.value('ds_records[1]','VARCHAR(100)'),''), 1, 25),
 			bl_NoCalcComision = ISNULL(F.Item.value('bl_nocalccomision[1]','BIT'),0),
 			bl_NoCalcIvaComision = ISNULL(F.Item.value('bl_nocalcivacomision[1]','BIT'),0),
 			am_basecomisionable = ISNULL(F.Item.value('am_basecomisionable[1]','MONEY'),0),
@@ -1325,22 +1325,22 @@ BEGIN
 					)
 				)
 			),
-			cd_proveedores = ISNULL(F.Item.value('cd_proveedores[1]','VARCHAR(25)'),''),
-			ds_servicio = ISNULL(F.Item.value('ds_servicio[1]','VARCHAR(250)'), ISNULL(F.Item.value('servicios[1]','VARCHAR(250)'), '')),
+			cd_proveedores = SUBSTRING(ISNULL(F.Item.value('cd_proveedores[1]','VARCHAR(50)'),''), 1, 25),
+			ds_servicio = SUBSTRING(ISNULL(F.Item.value('ds_servicio[1]','VARCHAR(500)'), ISNULL(F.Item.value('servicios[1]','VARCHAR(500)'), '')), 1, 250),
 			am_valorprov = ISNULL(F.Item.value('am_valorprov[1]','MONEY'),0),
 			id_monedaprov = F.Item.value('id_monedaprov[1]','INT'),
-			dt_llegada = ISNULL(F.Item.value('dt_llegada[1]','SMALLDATETIME'), F.Item.value('fecha_llegada[1]','SMALLDATETIME')),
-			dt_salida = ISNULL(F.Item.value('dt_salida[1]','SMALLDATETIME'), F.Item.value('fecha_salida[1]','SMALLDATETIME')),
+			dt_llegada = COALESCE(F.Item.value('dt_fechasalidasrv[1]','SMALLDATETIME'), F.Item.value('dt_llegada[1]','SMALLDATETIME'), F.Item.value('fecha_llegada[1]','SMALLDATETIME'), F.Item.value('checkin[1]','SMALLDATETIME')),
+			dt_salida = COALESCE(F.Item.value('dt_fechallegadasrv[1]','SMALLDATETIME'), F.Item.value('dt_salida[1]','SMALLDATETIME'), F.Item.value('fecha_salida[1]','SMALLDATETIME'), F.Item.value('checkout[1]','SMALLDATETIME')),
 			am_pordescuento = ISNULL(F.Item.value('am_pordescuento[1]','NUMERIC(8,4)'),0),
-			Fecha_Salida = ISNULL(F.Item.value('fecha_salida[1]','SMALLDATETIME'), F.Item.value('dt_salida[1]','SMALLDATETIME')),
-			Fecha_Llegada = ISNULL(F.Item.value('fecha_llegada[1]','SMALLDATETIME'), F.Item.value('dt_llegada[1]','SMALLDATETIME')),
-			cd_facturaproveedor = ISNULL(F.Item.value('cd_facturaproveedor[1]','VARCHAR(25)'), ISNULL(F.Item.value('Factura_Proveedor[1]','VARCHAR(25)'), ISNULL(F.Item.value('FacturaProveedor[1]','VARCHAR(25)'), ''))),
+			Fecha_Salida = COALESCE(F.Item.value('fecha_salida[1]','SMALLDATETIME'), F.Item.value('dt_fechasalidasrv[1]','SMALLDATETIME'), F.Item.value('dt_salida[1]','SMALLDATETIME'), F.Item.value('checkin[1]','SMALLDATETIME')),
+			Fecha_Llegada = COALESCE(F.Item.value('fecha_llegada[1]','SMALLDATETIME'), F.Item.value('dt_fechallegadasrv[1]','SMALLDATETIME'), F.Item.value('dt_llegada[1]','SMALLDATETIME'), F.Item.value('checkout[1]','SMALLDATETIME')),
+			cd_facturaproveedor = SUBSTRING(ISNULL(F.Item.value('cd_facturaproveedor[1]','VARCHAR(50)'), ISNULL(F.Item.value('Factura_Proveedor[1]','VARCHAR(50)'), ISNULL(F.Item.value('FacturaProveedor[1]','VARCHAR(50)'), ''))), 1, 15),
 			dt_fechavencimientoproveedor = ISNULL(F.Item.value('dt_fechavencimientoproveedor[1]','SMALLDATETIME'), ISNULL(F.Item.value('Fecha_Vencimiento_Proveedor[1]','SMALLDATETIME'), F.Item.value('FechaVencimientoProveedor[1]','SMALLDATETIME'))),
 			am_basedescuento = ISNULL(F.Item.value('am_basedescuento[1]','MONEY'),0),
-			cd_Consecutivo_depende = ISNULL(F.Item.value('cd_consecutivo_depende[1]','VARCHAR(50)'),''),
-			cd_Consecutivo_variablesadicionales = ISNULL(F.Item.value('cd_consecutivo_variablesadicionales[1]','VARCHAR(50)'),''),
+			cd_Consecutivo_depende = SUBSTRING(ISNULL(F.Item.value('cd_consecutivo_depende[1]','VARCHAR(50)'),''), 1, 12),
+			cd_Consecutivo_variablesadicionales = SUBSTRING(ISNULL(F.Item.value('cd_consecutivo_variablesadicionales[1]','VARCHAR(50)'),''), 1, 8),
 			am_valor_total = ISNULL(F.Item.value('am_valor_total[1]','MONEY'),0), 
-			ds_proveedores = ISNULL(F.Item.value('ds_proveedores[1]','VARCHAR(25)'),''),
+			ds_proveedores = SUBSTRING(ISNULL(F.Item.value('ds_proveedores[1]','VARCHAR(250)'),''), 1, 25),
 			id_tipoproveedor = ISNULL(TP.id,1),
 			cd_tipoproveedor = ISNULL(F.Item.value('cd_tipoproveedor[1]','VARCHAR(25)'),'HTL'),
 			ds_tipoproveedor = ISNULL(F.Item.value('ds_tipoproveedor[1]','VARCHAR(50)'),'Hotel'),
@@ -1376,14 +1376,14 @@ BEGIN
 			id_facturacion=ISNULL(P.Pax.value('id_factura[1]', 'INT'),0),
 			id_item=ISNULL(P.Pax.value('id_item[1]', 'INT'),0),
 			in_tipoitem=ISNULL(P.Pax.value('in_tipoitem[1]', 'INT'),0),
-			ds_paxape=ISNULL(P.Pax.value('ds_paxape[1]', 'VARCHAR(50)'),''),
-			ds_paxname=ISNULL(P.Pax.value('ds_paxname[1]', 'VARCHAR(50)'),''),
-			ds_paxprefix=ISNULL(P.Pax.value('ds_paxprefix[1]', 'VARCHAR(10)'),''),
-			ds_paxclasificacion=ISNULL(P.Pax.value('ds_paxclasificacion[1]', 'VARCHAR(10)'),''),
-			cd_voucherpax=ISNULL(P.Pax.value('cd_voucherpax[1]', 'VARCHAR(50)'),''),
-			cd_paxidentificacion=ISNULL(P.Pax.value('cd_paxidentificacion[1]', 'VARCHAR(50)'),''),
+			ds_paxape=SUBSTRING(ISNULL(P.Pax.value('ds_paxape[1]', 'VARCHAR(100)'),''), 1, 30),
+			ds_paxname=SUBSTRING(ISNULL(P.Pax.value('ds_paxname[1]', 'VARCHAR(100)'),''), 1, 30),
+			ds_paxprefix=SUBSTRING(ISNULL(P.Pax.value('ds_paxprefix[1]', 'VARCHAR(10)'),''), 1, 3),
+			ds_paxclasificacion=SUBSTRING(ISNULL(P.Pax.value('ds_paxclasificacion[1]', 'VARCHAR(10)'),''), 1, 7),
+			cd_voucherpax=SUBSTRING(ISNULL(P.Pax.value('cd_voucherpax[1]', 'VARCHAR(50)'),''), 1, 25),
+			cd_paxidentificacion=SUBSTRING(ISNULL(P.Pax.value('cd_paxidentificacion[1]', 'VARCHAR(50)'),''), 1, 25),
 			in_edad=ISNULL(P.Pax.value('in_edad[1]', 'INT'),0),
-			cd_tiquete=ISNULL(P.Pax.value('cd_tiquete[1]', 'VARCHAR(50)'),'')
+			cd_tiquete=SUBSTRING(ISNULL(P.Pax.value('cd_tiquete[1]', 'VARCHAR(50)'),''), 1, 11)
 		FROM @xmlData.nodes('/Facturaciones/Facturacion/Item/Pasajeros') P(Pax);
 
 		DELETE FROM #Itinerarios;
@@ -1852,6 +1852,11 @@ BEGIN
 						CLOSE curItemFPs;
 						DEALLOCATE curItemFPs;
 
+						-- Asegurar orden cronológico de fechas en itinerarios (dt_salida = salida vuelo <= dt_llegada = llegada vuelo)
+						UPDATE #Itinerarios
+						SET dt_salida = dt_llegada, dt_llegada = dt_salida
+						WHERE id_item = @gen_id_item AND dt_salida > dt_llegada;
+
 						-- Build Itinerarios SQL (inline query, no temp table needed)
 						SET @TktItinSqlStmt = '';
 						SELECT 
@@ -1879,6 +1884,16 @@ BEGIN
 						WHERE id_item = @gen_id_item
 						ORDER BY in_orden;
 
+						-- Resolver fechas de tiquete garantizando dt_fechasalida (salida vuelo) <= dt_fechallegada (retorno/llegada)
+						DECLARE @tkt_fechasalida SMALLDATETIME = ISNULL(@gen_Fecha_Salida, @gen_dt_llegada);
+						DECLARE @tkt_fechallegada SMALLDATETIME = ISNULL(@gen_Fecha_Llegada, @gen_dt_salida);
+						IF @tkt_fechasalida IS NOT NULL AND @tkt_fechallegada IS NOT NULL AND @tkt_fechallegada < @tkt_fechasalida
+						BEGIN
+							DECLARE @tmp_tkt_dt SMALLDATETIME = @tkt_fechasalida;
+							SET @tkt_fechasalida = @tkt_fechallegada;
+							SET @tkt_fechallegada = @tmp_tkt_dt;
+						END;
+
 						SET @SqlStmt = @SqlStmt + CHAR(13) + CHAR(10) + '
 						DECLARE @NewTktId_' + CAST(@ItemIndex AS VARCHAR) + ' INT;
 						EXECUTE dbo.spza_Tiquete_Vender
@@ -1892,16 +1907,16 @@ BEGIN
 							@id_fac_remision = @NewRmId,
 							@cd_tktrevisado = ' + ISNULL('''' + @gen_cd_tktrevisado + '''', 'NULL') + ',
 							@id_pax = NULL,
-							@ds_paxname = ''' + ISNULL(@gen_ds_paxname,'') + ''',
-							@ds_paxape = ''' + ISNULL(@gen_ds_paxape,'') + ''',
-							@ds_paxprefix = ''' + ISNULL(@gen_ds_paxprefix, '') + ''',
-							@cd_paxcedula = ''' + ISNULL(@gen_cd_pax_CC, '') + ''',
-							@ds_itinerario = ''' + ISNULL(LEFT(@gen_ds_itinerario, 63),'') + ''',
-							@ds_itinerarioaerolinea = ''' + LEFT(ISNULL(@gen_ds_itinerarioaerolinea, ''), 63) + ''',
-							@ds_clases = ''' + ISNULL(@gen_ds_clases, '') + ''',
-							@dt_fechasalida = ' + ISNULL('''' + CONVERT(VARCHAR, @gen_Fecha_Salida, 120) + '''', 'NULL') + ',
-							@dt_fechallegada = ' + ISNULL('''' + CONVERT(VARCHAR, @gen_Fecha_Llegada, 120) + '''', 'NULL') + ',
-							@cd_destino = ''' + ISNULL(@gen_cd_destino, '') + ''',
+							@ds_paxname = ''' + SUBSTRING(ISNULL(@gen_ds_paxname,''), 1, 30) + ''',
+							@ds_paxape = ''' + SUBSTRING(ISNULL(@gen_ds_paxape,''), 1, 30) + ''',
+							@ds_paxprefix = ''' + SUBSTRING(ISNULL(@gen_ds_paxprefix, ''), 1, 3) + ''',
+							@cd_paxcedula = ''' + SUBSTRING(ISNULL(@gen_cd_pax_CC, ''), 1, 20) + ''',
+							@ds_itinerario = ''' + SUBSTRING(ISNULL(@gen_ds_itinerario, ''), 1, 63) + ''',
+							@ds_itinerarioaerolinea = ''' + SUBSTRING(ISNULL(@gen_ds_itinerarioaerolinea, ''), 1, 63) + ''',
+							@ds_clases = ''' + SUBSTRING(ISNULL(@gen_ds_clases, ''), 1, 29) + ''',
+							@dt_fechasalida = ' + ISNULL('''' + CONVERT(VARCHAR, @tkt_fechasalida, 120) + '''', 'NULL') + ',
+							@dt_fechallegada = ' + ISNULL('''' + CONVERT(VARCHAR, @tkt_fechallegada, 120) + '''', 'NULL') + ',
+							@cd_destino = ''' + SUBSTRING(ISNULL(@gen_cd_destino, ''), 1, 3) + ''',
 							@dt_fechaexped = ''' + ISNULL(CONVERT(VARCHAR, @gen_dt_fechaexped, 120),'19000101') + ''',
 							@id_usuario = 1,
 							@id_tiqueteadores = ' + ISNULL(CAST(@gen_id_tiqueteadores AS VARCHAR),'NULL') + ',
@@ -1914,7 +1929,7 @@ BEGIN
 							@am_tua = ' + ISNULL(CAST(@gen_am_tua AS VARCHAR),'0') + ',
 							@am_comb = ' + ISNULL(CAST(@gen_am_comb AS VARCHAR),'0') + ',
 							@am_vat = ' + ISNULL(CAST(@gen_am_vat AS VARCHAR),'0') + ',
-							@cd_ah = ''' + ISNULL(@gen_cd_tourcode, '') + ''',
+							@cd_ah = ''' + SUBSTRING(ISNULL(@gen_cd_tourcode, ''), 1, 3) + ''',
 							@am_desah = 0,
 							@id_gds = ' + ISNULL(CAST(@gen_id_gds AS VARCHAR),'NULL') + ',
 							@iden_gds = ' + ISNULL(CAST(@gen_iden_gds AS VARCHAR),'NULL') + ',
@@ -1923,7 +1938,7 @@ BEGIN
 							@bl_NoCalcIvaComision = 0,
 							@am_comisionPNR = ' + ISNULL(CAST(@gen_am_Comision AS VARCHAR),'0') + ',
 							@am_basecomisionable = ' + ISNULL(CAST(@gen_am_tarifa AS VARCHAR),'0') + ',
-							@ds_records = ''' + ISNULL(@gen_ds_records,'') + ''',
+							@ds_records = ''' + SUBSTRING(ISNULL(@gen_ds_records,''), 1, 15) + ''',
 							@id_hotel = NULL,
 							@id_precompra = ' + ISNULL(CAST(@gen_Id_Precompra AS VARCHAR), 'NULL') + ',
 							@id_TipoTiquete = NULL,
@@ -2357,26 +2372,30 @@ BEGIN
 						BEGIN
 							SET @SrvPaxSqlStmt = @SrvPaxSqlStmt + CHAR(13) + CHAR(10) + 
 								' EXECUTE dbo.spza_ServicioPaxAdicional_insertar @FacId = @NewFacId, @RemId = @NewRemId, @id_Fac_Servicios = @NewSrvId, @ds_paxname = ''' + 
-								REPLACE(@ad_paxname, '''', '''''') + ''', @ds_paxape = ''' + REPLACE(@ad_paxape, '''', '''''') + 
-								''', @in_edad = NULL, @ds_paxprefix= ''' + @ad_paxprefix + ''', @ds_paxClasificacion = NULL, @cd_voucherpax=NULL, @cd_tiquete=NULL;';
+								SUBSTRING(REPLACE(@ad_paxname, '''', ''''''), 1, 30) + ''', @ds_paxape = ''' + SUBSTRING(REPLACE(@ad_paxape, '''', ''''''), 1, 30) + 
+								''', @in_edad = NULL, @ds_paxprefix= ''' + SUBSTRING(@ad_paxprefix, 1, 3) + ''', @ds_paxClasificacion = NULL, @cd_voucherpax=NULL, @cd_tiquete=NULL;';
 							FETCH NEXT FROM curExtraPax INTO @ad_paxname, @ad_paxape, @ad_paxprefix, @ad_voucher, @ad_ident;
 						END;
 						CLOSE curExtraPax;
 						DEALLOCATE curExtraPax;
 
-						-- Validar inconsistencia de rango de fechas (Fecha Final / Check-Out anterior a Fecha Inicial / Check-In)
-						DECLARE @val_f_salida SMALLDATETIME = ISNULL(@gen_dt_salida, @gen_Fecha_Salida);
-						DECLARE @val_f_llegada SMALLDATETIME = ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada);
+						-- Determinar con precisión Check-In (fecha inicial) y Check-Out (fecha final)
+						-- En el XML de AgenciasNew / Korex:
+						-- dt_llegada / fecha_llegada representa la Fecha Inicial (Check In)
+						-- dt_salida / fecha_salida representa la Fecha Final (Check Out)
+						DECLARE @srv_checkin SMALLDATETIME = COALESCE(@gen_dt_llegada, @gen_Fecha_Llegada, @gen_Fecha_Salida, @gen_dt_salida);
+						DECLARE @srv_checkout SMALLDATETIME = COALESCE(@gen_dt_salida, @gen_Fecha_Salida, @gen_Fecha_Llegada, @gen_dt_llegada);
 
-						IF @val_f_salida IS NOT NULL AND @val_f_llegada IS NOT NULL AND @val_f_salida < @val_f_llegada
+						-- Safeguard absoluto: Si vienen invertidas (checkout < checkin), normalizarlas
+						IF @srv_checkin IS NOT NULL AND @srv_checkout IS NOT NULL AND @srv_checkout < @srv_checkin
 						BEGIN
-							DECLARE @err_date_msg NVARCHAR(4000) = '❌ Factura ' + ISNULL(@cd_consecutivo, '') + ': Inconsistencia de fechas en el producto "' + ISNULL(@gen_ds_descrip, 'Ítem') + '". La Fecha Final / Check-Out (' + CONVERT(VARCHAR, @val_f_salida, 111) + ') no puede ser anterior a la Fecha Inicial / Check-In (' + CONVERT(VARCHAR, @val_f_llegada, 111) + '). Por favor edite la factura y corrija las fechas.';
-							RAISERROR(@err_date_msg, 16, 1);
-							RETURN;
+							DECLARE @tmp_srv_dt SMALLDATETIME = @srv_checkin;
+							SET @srv_checkin = @srv_checkout;
+							SET @srv_checkout = @tmp_srv_dt;
 						END;
 
 						-- Calcular noches y dias
-						DECLARE @calc_noches INT = DATEDIFF(day, @val_f_llegada, @val_f_salida);
+						DECLARE @calc_noches INT = DATEDIFF(day, @srv_checkin, @srv_checkout);
 						IF @calc_noches IS NULL OR @calc_noches <= 0 SET @calc_noches = 1;
 						DECLARE @calc_dias INT = @calc_noches;
 
@@ -2451,15 +2470,20 @@ BEGIN
 							@am_valorprov = ' + CAST(ISNULL(@gen_am_tarifa,0) AS VARCHAR) + ',
 							@id_monedaprov = ' + ISNULL(CAST(@id_monedas_iata AS VARCHAR), 'NULL') + ',
 							@ds_InfoAdicional = NULL,
-							@ds_paxname = ''' + ISNULL(@gen_ds_paxname, '') + ''',
-							@ds_paxape = ''' + ISNULL(@gen_ds_paxape, '') + ''',
-							@cd_paxtype = ''' + ISNULL(@gen_ds_paxprefix, '') + ''',
+							@ds_paxname = ''' + SUBSTRING(ISNULL(@gen_ds_paxname, ''), 1, 20) + ''',
+							@ds_paxape = ''' + SUBSTRING(ISNULL(@gen_ds_paxape, ''), 1, 20) + ''',
+							@cd_paxtype = ''' + SUBSTRING(ISNULL(@gen_ds_paxprefix, ''), 1, 3) + ''',
 							@in_edad = NULL,
 							@cd_voucher = NULL,
 							@in_cantpax = 1,
-							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
-							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
-							@ds_destino = ''' + ISNULL(@gen_cd_destino, '') + ''',
+							-- En Zeus ERP (dbo.Fac_Servicios):
+							-- dt_salida = Check In (Fecha Inicial)
+							-- dt_llegada = Check Out (Fecha Final)
+							-- dt_FechaSalidaSrv = Salida del servicio (Fecha Inicial)
+							-- dt_FechaLlegadaSrv = Llegada del servicio (Fecha Final)
+							@dt_llegada = ' + ISNULL('''' + CONVERT(VARCHAR, @srv_checkout, 120) + '''', 'NULL') + ',
+							@dt_salida = ' + ISNULL('''' + CONVERT(VARCHAR, @srv_checkin, 120) + '''', 'NULL') + ',
+							@ds_destino = ''' + SUBSTRING(ISNULL(@gen_cd_destino, ''), 1, 30) + ''',
 							@id_gds = '+ CAST(ISNULL(@gen_id_gds,1) AS VARCHAR) + ',
 							@am_basecomisionable = ' + CAST(ISNULL(@gen_am_basecomisionable,0) AS VARCHAR) + ',
 							@am_porcomision = 0,
@@ -2469,7 +2493,7 @@ BEGIN
 							@in_dias = ' + CAST(@calc_dias AS VARCHAR) + ',
 							@in_noches = ' + CAST(@calc_noches AS VARCHAR) + ',
 							@bl_notdomicilionacional=0,
-							@CodigoReserva =''' + ISNULL(@gen_ds_records,'') + ''',
+							@CodigoReserva =''' + SUBSTRING(ISNULL(@gen_ds_records,''), 1, 25) + ''',
 							@AnticiposSqlStmt = NULL,
 							@PaxAdicionalSqlStmt = ''' + REPLACE(ISNULL(@SrvPaxSqlStmt,''), '''', '''''') + ''', 
 							@VoucherAdicionalSqlStmt = NULL,
@@ -2484,8 +2508,8 @@ BEGIN
 							@am_valor_descuento = 0,
 							@ds_motivo_descuento = NULL,
 							@Id_CargosDesc_Descuento = NULL,
-							@dt_FechaSalidaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_llegada, @gen_Fecha_Llegada), 120) + '''', 'NULL') + ',
-							@dt_FechaLlegadaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, ISNULL(@gen_dt_salida, @gen_Fecha_Salida), 120) + '''', 'NULL') + ',
+							@dt_FechaSalidaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, @srv_checkin, 120) + '''', 'NULL') + ',
+							@dt_FechaLlegadaSrv = ' + ISNULL('''' + CONVERT(VARCHAR, @srv_checkout, 120) + '''', 'NULL') + ',
 							@cd_localizador = NULL,
 							@cd_VoucherPax = NULL,
 							@am_basecomisionableprov = ' + CAST(ISNULL(@gen_am_basecomisionable,0) AS VARCHAR) + ',
@@ -2819,19 +2843,19 @@ BEGIN
 							'@id_implante = ' + ISNULL(CAST(@id_implante AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@dt_fechacont = ' + ISNULL('''' + CONVERT(VARCHAR, @FechaCont, 120) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@dt_vence = ' + ISNULL('''' + CONVERT(VARCHAR, @FechaCont, 120) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_tercero_codigo = ' + ISNULL('''' + REPLACE(@cd_tercero_real, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_tercero_nombre = ' + ISNULL('''' + REPLACE(@ds_cliname, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_cliente_codigo = ' + ISNULL('''' + REPLACE(@cd_cliente, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_nombre = ' + ISNULL('''' + REPLACE(@ds_cliname, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_dir = ' + ISNULL('''' + REPLACE(@ds_clidir, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_ciudad = ' + ISNULL('''' + REPLACE(@ds_clicity, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_tel = ' + ISNULL('''' + REPLACE(@ds_clitel, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_dirdesp = ' + ISNULL('''' + REPLACE(@ds_clidir, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_email = ' + ISNULL('''' + REPLACE(@ds_ClienteEmail, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_contacto = ' + ISNULL('''' + REPLACE(@ds_cliname, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@ds_cliente_contacto_email = ' + ISNULL('''' + REPLACE(@ds_ClienteEmail, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@cd_tercero_codigo = ' + ISNULL('''' + SUBSTRING(REPLACE(@cd_tercero_real, '''', ''''''), 1, 25) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_tercero_nombre = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_cliname, '''', ''''''), 1, 250) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@cd_cliente_codigo = ' + ISNULL('''' + SUBSTRING(REPLACE(@cd_cliente, '''', ''''''), 1, 25) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_nombre = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_cliname, '''', ''''''), 1, 250) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_dir = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_clidir, '''', ''''''), 1, 250) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_ciudad = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_clicity, '''', ''''''), 1, 40) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_tel = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_clitel, '''', ''''''), 1, 25) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_dirdesp = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_clidir, '''', ''''''), 1, 250) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_email = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_ClienteEmail, '''', ''''''), 1, 60) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_contacto = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_cliname, '''', ''''''), 1, 40) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@ds_cliente_contacto_email = ' + ISNULL('''' + SUBSTRING(REPLACE(@ds_ClienteEmail, '''', ''''''), 1, 60) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@id_monedas_iata = ' + ISNULL(CAST(@id_monedas_iata AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
-							'@cd_vendedor = ' + ISNULL('''' + REPLACE(@cd_vendedor, '''', '''''') + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
+							'@cd_vendedor = ' + ISNULL('''' + SUBSTRING(REPLACE(@cd_vendedor, '''', ''''''), 1, 3) + '''', 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@id_tiqueteador = ' + ISNULL(CAST(@id_tiqueteador AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +
 							'@bn_anexo = NULL,' + CHAR(13) + CHAR(10) +
 							'@Tcambio = ' + ISNULL(CAST(@am_TasaCambio AS VARCHAR), 'NULL') + ',' + CHAR(13) + CHAR(10) +

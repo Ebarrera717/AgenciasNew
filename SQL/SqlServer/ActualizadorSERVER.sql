@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-11-11T17:19:23.350Z
+-- Fecha de Generación: 2026-11-12T17:41:06.987Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -8228,21 +8228,21 @@ BEGIN
                     CAST(0 AS DECIMAL(18,2)) AS [am_Comision],
                     -- Titular: primer pasajero con nombres y apellidos separados
                     COALESCE(
-                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.firstName)), 1, 30), ''),
+                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.firstName)), 1, 20), ''),
                         CASE 
-                            WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, 30)
+                            WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, 20)
                             WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
                                 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - 1)
                             ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) - 1)
                         END
                     ) AS [ds_paxname],
                     COALESCE(
-                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.lastName)), 1, 30), ''),
+                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.lastName)), 1, 20), ''),
                         CASE 
                             WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN ''
                             WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
-                                THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1, 100)), 1, 30)
-                            ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) + 1, 100)), 1, 30)
+                                THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1, 100)), 1, 20)
+                            ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) + 1, 100)), 1, 20)
                         END
                     ) AS [ds_paxape],
                     'SR' AS [ds_paxprefix],
@@ -8385,27 +8385,27 @@ BEGIN
                             ep.id AS [id_item],
                             3 AS [in_tipoitem],
                             COALESCE(
-                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.firstName)), 1, 50), ''),
+                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.firstName)), 1, 30), ''),
                                 CASE 
-                                    WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, 50)
+                                    WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, 30)
                                     WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
                                         THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - 1)
                                     ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) - 1)
                                 END
                             ) AS [ds_paxname],
                             COALESCE(
-                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.lastName)), 1, 50), ''),
+                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.lastName)), 1, 30), ''),
                                 CASE 
                                     WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN ''
                                     WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
-                                        THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1, 100)), 1, 50)
-                                    ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) + 1, 100)), 1, 50)
+                                        THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1, 100)), 1, 30)
+                                    ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) + 1, 100)), 1, 30)
                                 END
                             ) AS [ds_paxape],
                             'SR' AS [ds_paxprefix],
                             '' AS [ds_paxclasificacion],
                             '' AS [cd_voucherpax],
-                            SUBSTRING(ISNULL(pp.document, c.document), 1, 50) AS [cd_paxidentificacion],
+                            SUBSTRING(ISNULL(pp.document, c.document), 1, 25) AS [cd_paxidentificacion],
                             0 AS [in_edad],
                             '' AS [cd_tiquete]
                         FROM (SELECT 1 AS dummy) d
@@ -9550,21 +9550,21 @@ BEGIN
                     CAST(0 AS DECIMAL(18,2)) AS [am_Comision],
                     -- Titular: primer pasajero con nombres y apellidos separados
                     COALESCE(
-                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.firstName)), 1, 30), ''),
+                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.firstName)), 1, 20), ''),
                         CASE 
-                            WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, 30)
+                            WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, 20)
                             WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
                                 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - 1)
                             ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) - 1)
                         END
                     ) AS [ds_paxname],
                     COALESCE(
-                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.lastName)), 1, 30), ''),
+                        NULLIF(SUBSTRING(LTRIM(RTRIM(pax1.lastName)), 1, 20), ''),
                         CASE 
                             WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) = 0 THEN ''
                             WHEN LEN(LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), ' ', '')) = 1 
-                                THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1, 100)), 1, 30)
-                            ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) + 1, 100)), 1, 30)
+                                THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1, 100)), 1, 20)
+                            ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pax1.name, c.name)))) + 1) + 1, 100)), 1, 20)
                         END
                     ) AS [ds_paxape],
                     'SR' AS [ds_paxprefix],
@@ -9707,27 +9707,27 @@ BEGIN
                             ep.id AS [id_item],
                             3 AS [in_tipoitem],
                             COALESCE(
-                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.firstName)), 1, 50), ''),
+                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.firstName)), 1, 30), ''),
                                 CASE 
-                                    WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, 50)
+                                    WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, 30)
                                     WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
                                         THEN SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - 1)
                                     ELSE SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), 1, CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) - 1)
                                 END
                             ) AS [ds_paxname],
                             COALESCE(
-                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.lastName)), 1, 50), ''),
+                                NULLIF(SUBSTRING(LTRIM(RTRIM(pp.lastName)), 1, 30), ''),
                                 CASE 
                                     WHEN CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) = 0 THEN ''
                                     WHEN LEN(LTRIM(RTRIM(ISNULL(pp.name, c.name)))) - LEN(REPLACE(LTRIM(RTRIM(ISNULL(pp.name, c.name))), ' ', '')) = 1 
-                                        THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1, 100)), 1, 50)
-                                    ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) + 1, 100)), 1, 50)
+                                        THEN SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1, 100)), 1, 30)
+                                    ELSE SUBSTRING(LTRIM(SUBSTRING(LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name))), CHARINDEX(' ', LTRIM(RTRIM(ISNULL(pp.name, c.name)))) + 1) + 1, 100)), 1, 30)
                                 END
                             ) AS [ds_paxape],
                             'SR' AS [ds_paxprefix],
                             '' AS [ds_paxclasificacion],
                             '' AS [cd_voucherpax],
-                            SUBSTRING(ISNULL(pp.document, c.document), 1, 50) AS [cd_paxidentificacion],
+                            SUBSTRING(ISNULL(pp.document, c.document), 1, 25) AS [cd_paxidentificacion],
                             0 AS [in_edad],
                             '' AS [cd_tiquete]
                         FROM (SELECT 1 AS dummy) d

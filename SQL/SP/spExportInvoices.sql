@@ -583,14 +583,14 @@ BEGIN
         COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ct.code = 'CMB'), 0) AS am_comb,
         COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ipt."isMain" = false AND ct.code NOT IN('CMB','TUA','IVA')), 0) AS am_vat,
         COALESCE(ep."sellerCommission", 0) AS am_Comision,
-		COALESCE(
+		SUBSTRING(COALESCE(
             NULLIF(TRIM(epp."firstName"), ''),
             CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN TRIM(epp.name) ELSE COALESCE(arr[1], '') END
-        ) AS ds_paxname,
-		COALESCE(
+        ), 1, 20) AS ds_paxname,
+		SUBSTRING(COALESCE(
             NULLIF(TRIM(epp."lastName"), ''),
             CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END
-        ) AS ds_paxape,
+        ), 1, 20) AS ds_paxape,
 		CASE WHEN TRIM(epp.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)::char(3) ELSE ''::char(3) END AS ds_paxprefix,
         '' AS cd_tourcode,
         0 AS NumTktConj,
@@ -684,8 +684,8 @@ BEGIN
         COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS dt_salida,
         0 AS am_pordescuento,
         0 AS am_basedescuento,
-        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS Fecha_Salida,
-        COALESCE(ep."checkInDate", e.date) AS Fecha_Llegada,
+        COALESCE(ep."checkInDate", e.date) AS Fecha_Salida,
+        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS Fecha_Llegada,
         SUBSTRING(COALESCE(ep."providerInvoice", ''), 1, 25) AS cd_facturaproveedor,
         COALESCE(ep."providerDueDate", ep."checkInDate", e.date) AS dt_fechavencimientoproveedor,
         '' AS ColId,
@@ -739,8 +739,8 @@ BEGIN
 		COALESCE(epi."origin",'') AS ds_origen, 
 		COALESCE(epi."destination",'') AS ds_destino, 
 		COALESCE(epi."class",'') AS ds_clase,
-		COALESCE(epi."checkInDate", CURRENT_DATE) AS dt_llegada,
-		COALESCE(epi."checkOutDate",CURRENT_DATE) AS dt_salida,
+		COALESCE(epi."checkOutDate", CURRENT_DATE) AS dt_llegada,
+		COALESCE(epi."checkInDate", CURRENT_DATE) AS dt_salida,
 		COALESCE(epi."terminal",'') AS ds_terminal,
 		COALESCE(epi."prestadoraCode",'') AS cd_aerolinea,
 		COALESCE(epi."farebasis",'') AS cd_farebasis,
@@ -763,14 +763,14 @@ BEGIN
         f.id_factura AS id_factura,
         itm.id_item AS id_item,
         itm.in_tipoitem AS in_tipoitem,
-	    COALESCE(
+	    SUBSTRING(COALESCE(
             NULLIF(TRIM(p."lastName"), ''),
             CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END
-        ) AS ds_paxape,
-	    COALESCE(
+        ), 1, 30) AS ds_paxape,
+	    SUBSTRING(COALESCE(
             NULLIF(TRIM(p."firstName"), ''),
             CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name) ELSE COALESCE(arr[1], '') END
-        ) AS ds_paxname,
+        ), 1, 30) AS ds_paxname,
 	    CASE WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)::char(3) ELSE ''::char(3) END AS ds_paxprefix,
         '' AS ds_paxClasificacion,
         '' AS cd_voucherpax,

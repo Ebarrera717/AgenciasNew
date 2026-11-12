@@ -682,9 +682,9 @@ BEGIN
 			dt_fecha = ISNULL(C.Cotizacion.value('dt_fecha[1]','SMALLDATETIME'),'19000101'),
 			id_usuarioAct = ISNULL(TRY_CAST(C.Cotizacion.value('cd_usuario[1]','VARCHAR(250)') AS INT), 1),
 			dt_fechaAct = ISNULL(C.Cotizacion.value('dt_fechaAct[1]','SMALLDATETIME'),'19000101'),
-			cd_tercero_codigo = ISNULL(C.Cotizacion.value('cd_tercero_codigo[1]','VARCHAR(25)'), ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),'')),
+			cd_tercero_codigo = SUBSTRING(ISNULL(C.Cotizacion.value('cd_tercero_codigo[1]','VARCHAR(50)'), ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(50)'),'')), 1, 25),
 			ds_tercero_nombre = ISNULL(C.Cotizacion.value('ds_tercero_nombre[1]','VARCHAR(250)'), ISNULL(C.Cotizacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),'')),
-			cd_cliente_codigo = ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(25)'),''),
+			cd_cliente_codigo = SUBSTRING(ISNULL(C.Cotizacion.value('cd_cliente_codigo[1]','VARCHAR(50)'),''), 1, 10),
 			ds_cliente_nombre = ISNULL(C.Cotizacion.value('ds_cliente_nombre[1]','VARCHAR(250)'),''),
 			ds_cliente_dir = ISNULL(C.Cotizacion.value('ds_cliente_dir[1]','VARCHAR(250)'),''),
 			ds_cliente_ciudad = ISNULL(C.Cotizacion.value('ds_cliente_ciudad[1]','VARCHAR(40)'),''),
@@ -694,7 +694,7 @@ BEGIN
 			ds_cliente_contacto = ISNULL(C.Cotizacion.value('ds_cliente_contacto[1]','VARCHAR(40)'),''),
 			ds_cliente_contacto_email = ISNULL(C.Cotizacion.value('ds_cliente_contacto_email[1]','VARCHAR(60)'),''),
 			id_monedas_IATA = ISNULL((SELECT TOP 1 id FROM dbo.Monedas_IATA WHERE id = 1), (SELECT TOP 1 id FROM dbo.Monedas_IATA ORDER BY id ASC)),
-			cd_vendedor = ISNULL(@val_cd_vendedor, '000'),
+			cd_vendedor = SUBSTRING(ISNULL(@val_cd_vendedor, '000'), 1, 3),
 			id_tiqueteador = ISNULL(
 				(SELECT TOP 1 id FROM dbo.Tiqueteadores WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.Cotizacion.value('cd_tiqueteador[1]','VARCHAR(25)')))),
 				ISNULL(
@@ -711,7 +711,7 @@ BEGIN
 			bn_anexo = NULL,
 			am_tcambio = ISNULL(C.Cotizacion.value('am_tcambio[1]','SMALLMONEY'),1),
 			am_tcambiousd = ISNULL(C.Cotizacion.value('am_tcambiousd[1]','MONEY'),1),
-			cd_cencosto = ISNULL(C.Cotizacion.value('cd_cencosto[1]','VARCHAR(16)'),''),
+			cd_cencosto = SUBSTRING(ISNULL(C.Cotizacion.value('cd_cencosto[1]','VARCHAR(50)'),''), 1, 16),
 			ds_observacion = ISNULL(C.Cotizacion.value('ds_observacion[1]','VARCHAR(8000)'),''),
 			ds_Campo_libre1 = ISNULL(C.Cotizacion.value('ds_Campo_libre1[1]','VARCHAR(500)'),''),
 			ds_Campo_libre2 = ISNULL(C.Cotizacion.value('ds_Campo_libre2[1]','VARCHAR(500)'),''),
@@ -734,7 +734,7 @@ BEGIN
 			ds_AlertaSolicitud = '',
 			bl_comisiona = 0,
 			ds_FormaDePago = ISNULL(C.Cotizacion.value('ds_FormaDePago[1]','VARCHAR(250)'),''),
-			ds_records = ISNULL(C.Cotizacion.value('ds_records[1]','VARCHAR(25)'),''),
+			ds_records = SUBSTRING(ISNULL(C.Cotizacion.value('ds_records[1]','VARCHAR(100)'),''), 1, 25),
 			bl_entregadoCliente = 0,
 			dt_entregadoCliente = NULL,
 			id_sys_entidades = ISNULL(NULLIF(TRY_CAST(C.Cotizacion.value('id_sys_entidades[1]','VARCHAR(25)') AS INT), 0), 65),
@@ -745,7 +745,7 @@ BEGIN
 			dt_CheckOutPagoDestino = NULL,
 			bl_fechaPagoDestino = 0,
 			ds_hotelTieneTiquete = NULL,
-			ds_GDS = C.Cotizacion.value('ds_GDS[1]','VARCHAR(2)'),
+			ds_GDS = SUBSTRING(ISNULL(C.Cotizacion.value('ds_GDS[1]','VARCHAR(50)'),''), 1, 2),
 			id_Evento = NULL,
 			id_Cotizacion = NULL,
 			bl_existe = 0
@@ -962,20 +962,26 @@ BEGIN
 			cd_prov_hotel=ISNULL(C.CotizacionServicios.value('cd_prov_hotel[1]','VARCHAR(25)'),'') ,
 			cd_prov_car=ISNULL(C.CotizacionServicios.value('cd_prov_car[1]','VARCHAR(25)'),'') ,
 			cd_prov_air=ISNULL(C.CotizacionServicios.value('cd_prov_air[1]','VARCHAR(25)'),'') ,
-			ds_destino=ISNULL(C.CotizacionServicios.value('ds_destino[1]','VARCHAR(25)'),'') ,
+			ds_destino=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_destino[1]','VARCHAR(100)'),''), 1, 30) ,
 			ds_servicio=ISNULL(C.CotizacionServicios.value('ds_servicio[1]','VARCHAR(250)'), ISNULL(C.CotizacionServicios.value('servicios[1]','VARCHAR(250)'), '')) ,
-			ds_descrip=ISNULL(C.CotizacionServicios.value('ds_descrip[1]','VARCHAR(500)'),'') ,
-			ds_paxname=ISNULL(C.CotizacionServicios.value('ds_paxname[1]','VARCHAR(25)'),'') ,
-			ds_paxape=ISNULL(C.CotizacionServicios.value('ds_paxape[1]','VARCHAR(25)'),'') ,
-			cd_paxtype=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_paxtype[1]','VARCHAR(25)'),''), 1, 3) ,
+			ds_descrip=ISNULL(C.CotizacionServicios.value('ds_descrip[1]','VARCHAR(4000)'),'') ,
+			ds_paxname=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_paxname[1]','VARCHAR(150)'),''), 1, 20) ,
+			ds_paxape=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_paxape[1]','VARCHAR(150)'),''), 1, 20) ,
+			cd_paxtype=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_paxtype[1]','VARCHAR(50)'),''), 1, 3) ,
 			in_nacionalidad=ISNULL(C.CotizacionServicios.value('in_nacionalidad[1]','INT'),1) ,
-			cd_voucher=ISNULL(C.CotizacionServicios.value('cd_voucher[1]','VARCHAR(25)'),'') ,
+			cd_voucher=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_voucher[1]','VARCHAR(50)'),''), 1, 20) ,
 			in_cantpax=ISNULL(C.CotizacionServicios.value('in_cantpax[1]','INT'),1) ,
-			dt_llegada=ISNULL(C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), ISNULL(C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), '19000101')),
-			dt_salida=ISNULL(C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), ISNULL(C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), '19000101')),
-			cd_cencosto=ISNULL(C.CotizacionServicios.value('cd_cencosto[1]','VARCHAR(25)'),'')  ,
-			cd_auxiliar=ISNULL(C.CotizacionServicios.value('cd_auxiliar[1]','VARCHAR(25)'),'')  ,
-			cd_item =ISNULL(C.CotizacionServicios.value('cd_item[1]','VARCHAR(25)'),'') ,
+			-- En Zeus ERP (dbo.CotizacionServicios):
+			-- dt_salida = Check In (Fecha Inicial)
+			-- dt_llegada = Check Out (Fecha Final)
+			-- dt_FechaSalidaSrv = Salida del servicio (Fecha Inicial)
+			-- dt_FechaLlegadaSrv = Llegada del servicio (Fecha Final)
+			-- NOTA POSICIONAL T-SQL: En el INSERT la columna ordinal 16 es dt_llegada y la 17 es dt_salida.
+			dt_llegada=COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), '19000101'),
+			dt_salida=COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), '19000101'),
+			cd_cencosto=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_cencosto[1]','VARCHAR(50)'),''), 1, 16)  ,
+			cd_auxiliar=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_auxiliar[1]','VARCHAR(50)'),''), 1, 16)  ,
+			cd_item =SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_item[1]','VARCHAR(50)'),''), 1, 16) ,
 			am_valorprov = 0,
 			id_monedaprov = NULL,
 			ds_InfoAdicional ='',
@@ -996,37 +1002,67 @@ BEGIN
 			Valor_Comision=ISNULL(C.CotizacionServicios.value('valor_comision[1]','MONEY'),0) ,
 			Valor_Recaudo=0,
 			dias_recaudo=0,
-			ds_paxClasificacion=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_paxclasificacion[1]','VARCHAR(25)'),''), 1, 7) ,
+			ds_paxClasificacion=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_paxclasificacion[1]','VARCHAR(50)'),''), 1, 7) ,
 			id_tipoplan=NULL,
 			id_acomodacion=NULL ,
-			in_dias=ISNULL(C.CotizacionServicios.value('in_dias[1]','INT'),1),
-			in_noches=ISNULL(C.CotizacionServicios.value('in_noches[1]','INT'),1) ,
-			ds_records =COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(25)'))), ''), '') ,
+			in_dias=COALESCE(
+				NULLIF(C.CotizacionServicios.value('in_dias[1]','INT'), 0),
+				NULLIF(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
+				), 0),
+				1
+			),
+			in_noches=COALESCE(
+				NULLIF(C.CotizacionServicios.value('in_noches[1]','INT'), 0),
+				NULLIF(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
+				), 0),
+				1
+			),
+			ds_records =SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(100)'))), ''), ''), 1, 25) ,
 			id_GrConcepto=NULL,
-			in_diasSrv=0,
-			in_nochesSrv=0 ,
+			in_diasSrv=COALESCE(
+				NULLIF(C.CotizacionServicios.value('in_diassrv[1]','INT'), 0),
+				NULLIF(C.CotizacionServicios.value('in_dias[1]','INT'), 0),
+				NULLIF(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
+				), 0),
+				1
+			),
+			in_nochesSrv=COALESCE(
+				NULLIF(C.CotizacionServicios.value('in_nochessrv[1]','INT'), 0),
+				NULLIF(C.CotizacionServicios.value('in_noches[1]','INT'), 0),
+				NULLIF(DATEDIFF(day, 
+					COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME')), 
+					COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'))
+				), 0),
+				1
+			),
 			Id_Especialista=NULL ,
 			am_porcentaje_descuento=0 ,
 			am_valor_descuento=0 ,
 			ds_motivo_descuento='' ,
 			id_cargosdesc_descuento=NULL,
 			in_NumeroOpcion=0 ,
-			dt_FechaSalidaSrv=GETDATE() ,
-			dt_FechaLlegadaSrv=GETDATE() ,
-			cd_localizador=COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(25)'))), ''), '') ,
-			cd_voucherpax='' ,
+			dt_FechaSalidaSrv=COALESCE(C.CotizacionServicios.value('dt_fechasalidasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_llegada[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_llegada[1]','SMALLDATETIME'), GETDATE()) ,
+			dt_FechaLlegadaSrv=COALESCE(C.CotizacionServicios.value('dt_fechallegadasrv[1]','SMALLDATETIME'), C.CotizacionServicios.value('dt_salida[1]','SMALLDATETIME'), C.CotizacionServicios.value('fecha_salida[1]','SMALLDATETIME'), GETDATE()) ,
+			cd_localizador=SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('codigoreserva[1]','VARCHAR(100)'))), ''), ''), 1, 25) ,
+			cd_voucherpax=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_voucherpax[1]','VARCHAR(50)'),''), 1, 25) ,
 			am_basecomisionableprov=0 ,
 			am_porcomisionprov=0 ,
-			cd_NumeFac='' ,
+			cd_NumeFac=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_numefac[1]','VARCHAR(50)'),''), 1, 15) ,
 			dt_VenceFac=GETDATE() ,
 			id_AcomodacionSrv=NULL ,
 			id_TipoPlanSrv=NULL ,
 			in_habitaciones=0 ,
 			in_habitacionesSrv=0 ,
-			cd_Consecutivo_VariablesAdicionales=ISNULL(C.CotizacionServicios.value('cd_consecutivo_variablesadicionales[1]','VARCHAR(25)'),'') ,
-			cd_confirmacion=COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_confirmacion[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(25)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(25)'))), ''), ''),
-			ds_confirmadopor='',
-			cd_paxidentificacion='',
+			cd_Consecutivo_VariablesAdicionales=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_consecutivo_variablesadicionales[1]','VARCHAR(50)'),''), 1, 8) ,
+			cd_confirmacion=SUBSTRING(COALESCE(NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_confirmacion[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('ds_records[1]','VARCHAR(100)'))), ''), NULLIF(LTRIM(RTRIM(C.CotizacionServicios.value('cd_localizador[1]','VARCHAR(100)'))), ''), ''), 1, 25),
+			ds_confirmadopor=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_confirmadopor[1]','VARCHAR(500)'),''), 1, 250),
+			cd_paxidentificacion=SUBSTRING(ISNULL(C.CotizacionServicios.value('cd_paxidentificacion[1]','VARCHAR(50)'),''), 1, 25),
 			bl_politicaCancelacion=0,
 			dt_politicaCancelacion=NULL,
 			id_tipoHabitacion=NULL,
@@ -1054,14 +1090,19 @@ BEGIN
 			id_Aerolinea=NULL ,
 			in_EdadPax=0,
 			am_PorFacParcial=0,
-			ds_GDS='',
+			ds_GDS=SUBSTRING(ISNULL(C.CotizacionServicios.value('ds_gds[1]','VARCHAR(50)'),''), 1, 2),
 			dt_fechaficheroBBVA=GETDATE(),
 			bl_tiquete=0,
 			am_basedescuento=0,
 			am_pordescuento=0,
 			id_CotizacionServicios_Depende=NULL,
 			id_CotizacionServicios=NULL,
-			cd_Cotizacion = ISNULL(C.CotizacionServicios.value('cd_cotizacion[1]','VARCHAR(25)'),'') 
+			cd_Cotizacion = CASE 
+				WHEN ISNUMERIC(RTRIM(LTRIM(COALESCE(C.CotizacionServicios.value('cd_cotizacion[1]','VARCHAR(25)'), C.CotizacionServicios.value('cd_Cotizacion[1]','VARCHAR(25)'))))) = 1 
+				     AND LEN(RTRIM(LTRIM(COALESCE(C.CotizacionServicios.value('cd_cotizacion[1]','VARCHAR(25)'), C.CotizacionServicios.value('cd_Cotizacion[1]','VARCHAR(25)'))))) < 8
+				THEN RIGHT('00000000' + RTRIM(LTRIM(COALESCE(C.CotizacionServicios.value('cd_cotizacion[1]','VARCHAR(25)'), C.CotizacionServicios.value('cd_Cotizacion[1]','VARCHAR(25)')))), 8)
+				ELSE SUBSTRING(RTRIM(LTRIM(COALESCE(C.CotizacionServicios.value('cd_cotizacion[1]','VARCHAR(25)'), C.CotizacionServicios.value('cd_Cotizacion[1]','VARCHAR(25)'), ''))), 1, 8)
+			END 
 		 FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios') AS C(CotizacionServicios)
 		 LEFT JOIN dbo.ConceptoFacturacion CF ON RTRIM(LTRIM(CF.cd_codigo)) = RTRIM(LTRIM(C.CotizacionServicios.value('cd_conceptofacturacion[1]','VARCHAR(25)')))
 		 LEFT JOIN dbo.TiposServicios TS ON TS.cd_codigo=C.CotizacionServicios.value('cd_tiposservicio[1]','VARCHAR(25)')
@@ -1449,7 +1490,7 @@ BEGIN
 		UPDATE CS
 		SET CS.id_cotizacion=CC.id_Cotizacion
 		FROM @CotizacionServicios CS
-		INNER JOIN @Cotizacion CC ON CC.cd_consecutivo=CS.cd_Cotizacion
+		INNER JOIN @Cotizacion CC ON (CC.cd_consecutivo=CS.cd_Cotizacion OR TRY_CAST(CC.cd_consecutivo AS INT) = TRY_CAST(CS.cd_Cotizacion AS INT))
 
 		;WITH CTE_EX AS (
 			SELECT CS_EX.*, ROW_NUMBER() OVER (PARTITION BY CS_EX.id_Cotizacion ORDER BY CS_EX.id ASC) AS rn
@@ -1462,12 +1503,12 @@ BEGIN
 			INNER JOIN @Cotizacion CC ON CC.id_Cotizacion = CS.id_Cotizacion AND CC.bl_existe = 1
 		)
 		UPDATE EX
-		SET EX.ds_records = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.ds_records, N1.ds_records))), '') <> '' THEN COALESCE(N.ds_records, N1.ds_records) ELSE EX.ds_records END,
-		    EX.cd_localizador = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.cd_localizador, N1.cd_localizador))), '') <> '' THEN COALESCE(N.cd_localizador, N1.cd_localizador) ELSE EX.cd_localizador END,
-		    EX.cd_confirmacion = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.cd_confirmacion, N1.cd_confirmacion))), '') <> '' THEN COALESCE(N.cd_confirmacion, N1.cd_confirmacion) ELSE EX.cd_confirmacion END,
-		    EX.ds_servicio = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_servicio)), '') <> '' THEN N.ds_servicio ELSE EX.ds_servicio END,
-		    EX.ds_descrip = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_descrip)), '') <> '' THEN N.ds_descrip ELSE EX.ds_descrip END,
-		    EX.ds_destino = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_destino)), '') <> '' THEN N.ds_destino ELSE EX.ds_destino END,
+		SET EX.ds_records = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.ds_records, N1.ds_records))), '') <> '' THEN SUBSTRING(COALESCE(N.ds_records, N1.ds_records), 1, 25) ELSE EX.ds_records END,
+		    EX.cd_localizador = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.cd_localizador, N1.cd_localizador))), '') <> '' THEN SUBSTRING(COALESCE(N.cd_localizador, N1.cd_localizador), 1, 25) ELSE EX.cd_localizador END,
+		    EX.cd_confirmacion = CASE WHEN ISNULL(LTRIM(RTRIM(COALESCE(N.cd_confirmacion, N1.cd_confirmacion))), '') <> '' THEN SUBSTRING(COALESCE(N.cd_confirmacion, N1.cd_confirmacion), 1, 25) ELSE EX.cd_confirmacion END,
+		    EX.ds_servicio = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_servicio)), '') <> '' THEN SUBSTRING(N.ds_servicio, 1, 250) ELSE EX.ds_servicio END,
+		    EX.ds_descrip = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_descrip)), '') <> '' THEN SUBSTRING(N.ds_descrip, 1, 4000) ELSE EX.ds_descrip END,
+		    EX.ds_destino = CASE WHEN ISNULL(LTRIM(RTRIM(N.ds_destino)), '') <> '' THEN SUBSTRING(N.ds_destino, 1, 30) ELSE EX.ds_destino END,
 		    EX.dt_llegada = COALESCE(N.dt_llegada, EX.dt_llegada),
 		    EX.dt_salida = COALESCE(N.dt_salida, EX.dt_salida),
 		    EX.dt_FechaSalidaSrv = COALESCE(N.dt_FechaSalidaSrv, EX.dt_FechaSalidaSrv),
@@ -1596,7 +1637,7 @@ BEGIN
 			cs.id_Cotizacion,
 			cs.id_fac_factura,
 			cs.id_fac_remision,
-			cs.cd_proveedores,
+			SUBSTRING(RTRIM(LTRIM(cs.cd_proveedores)), 1, 10),
 			cs.ds_tiposervnm ,
 			cs.cd_prov_hotel,
 			cs.cd_prov_car,
@@ -1604,8 +1645,8 @@ BEGIN
 			cs.ds_destino ,
 			cs.ds_servicio,
 			cs.ds_descrip ,
-			cs.ds_paxname,
-			cs.ds_paxape,
+			SUBSTRING(ISNULL(cs.ds_paxname, ''), 1, 20),
+			SUBSTRING(ISNULL(cs.ds_paxape, ''), 1, 20),
 			cs.cd_paxtype ,
 			cs.in_nacionalidad,
 			cs.cd_voucher,
@@ -1700,7 +1741,7 @@ BEGIN
 			cs.am_pordescuento,
 			cs.id_CotizacionServicios_Depende	
 		FROM @CotizacionServicios cs
-		INNER JOIN @Cotizacion c ON c.cd_consecutivo=cs.cd_Cotizacion AND c.bl_existe=0
+		INNER JOIN @Cotizacion c ON (c.cd_consecutivo=cs.cd_Cotizacion OR TRY_CAST(c.cd_consecutivo AS INT) = TRY_CAST(cs.cd_Cotizacion AS INT)) AND c.bl_existe=0
 
 		UPDATE CCS
 		SET CCS.id_CotizacionServicios=CS.id

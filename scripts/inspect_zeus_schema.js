@@ -11,15 +11,13 @@ async function run() {
         port: 1433
     });
 
-    console.log('--- spze_ListadoCamposServicio / spze_ItemsCampos DEF ---');
-    const sp1 = await pool.request().query("SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.spze_ListadoCamposServicio')) as def");
-    console.log('spze_ListadoCamposServicio:', sp1.recordset[0]?.def);
+    console.log('--- Fac_Servicios Date Columns ---');
+    const cols = await pool.request().query("SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Fac_Servicios' AND (COLUMN_NAME LIKE '%fec%' OR COLUMN_NAME LIKE '%dt_%' OR COLUMN_NAME LIKE '%salida%' OR COLUMN_NAME LIKE '%llegada%') ORDER BY ORDINAL_POSITION");
+    console.log(cols.recordset);
 
-    const sp2 = await pool.request().query("SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.spze_ItemsCampos')) as def");
-    console.log('spze_ItemsCampos:', sp2.recordset[0]?.def);
-
-    const sp3 = await pool.request().query("SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.spza_FacturaProveedor_Consultar')) as def");
-    console.log('spza_FacturaProveedor_Consultar:', sp3.recordset[0]?.def);
+    console.log('--- spza_Servicio_Vender Parameters ---');
+    const params = await pool.request().query("SELECT PARAMETER_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.PARAMETERS WHERE SPECIFIC_NAME = 'spza_Servicio_Vender' ORDER BY ORDINAL_POSITION");
+    console.log(params.recordset);
 
     await pool.close();
 }

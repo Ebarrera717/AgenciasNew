@@ -2,15 +2,18 @@ const fs = require('fs');
 const path = require('path');
 const mssql = require('mssql');
 
-const spFile = path.join(__dirname, '..', 'SQL', 'ZeusERP', 'spCotizacionesCrear.sql');
-const spSql = fs.readFileSync(spFile, 'utf8');
+const spCotizacionesFile = path.join(__dirname, '..', 'SQL', 'ZeusERP', 'spCotizacionesCrear.sql');
+const spCotizacionesSql = fs.readFileSync(spCotizacionesFile, 'utf8');
+
+const spFacturacionesFile = path.join(__dirname, '..', 'SQL', 'ZeusERP', 'spFacturacionesCrear.sql');
+const spFacturacionesSql = fs.readFileSync(spFacturacionesFile, 'utf8');
 
 const targetDbs = ['ZeusAgencias_Colaereo', 'ZeusAgencias_Colaereo_Prueba'];
 
 (async () => {
     for (const db of targetDbs) {
         console.log(`\n======================================================`);
-        console.log(`Inyectando spCotizacionesCrear y reparando cotizaciones en [${db}] (192.168.15.8)...`);
+        console.log(`Inyectando SPs en [${db}] (192.168.15.8)...`);
         console.log(`======================================================`);
         let pool = null;
         try {
@@ -23,25 +26,29 @@ const targetDbs = ['ZeusAgencias_Colaereo', 'ZeusAgencias_Colaereo_Prueba'];
                 requestTimeout: 60000
             });
 
-            // Dividir por bloques GO
-            const batches = spSql.split(/^GO\s*$/mi).map(b => b.trim()).filter(b => b.length > 0);
-            let bIdx = 0;
-            for (const batch of batches) {
-                bIdx++;
+            // 1. Inyectar spCotizacionesCrear
+            console.log(`  -> Inyectando spCotizacionesCrear...`);
+            const cotBatches = spCotizacionesSql.split(/^GO\s*$/mi).map(b => b.trim()).filter(b => b.length > 0);
+            for (const batch of cotBatches) {
                 await pool.request().batch(batch);
-                console.log(`  -> Lote #${bIdx} ejecutado con éxito.`);
             }
+            console.log(`  ✅ spCotizacionesCrear inyectado con éxito.`);
 
-            // Verificar que el objeto existe y compilar sin errores
-            const chk = await pool.request().query("SELECT OBJECT_ID('dbo.spCotizacionesCrear') as sp_id, OBJECT_DEFINITION(OBJECT_ID('dbo.spCotizacionesCrear')) as def");
-            const spId = chk.recordset[0]?.sp_id;
-            const spDef = chk.recordset[0]?.def || '';
-            const hasNewTq = spDef.includes('WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(C.Cotizacion.value');
-            const hasNewCity = spDef.includes('COT.ds_cliente_ciudad = LEFT(COALESCE(NULLIF(RTRIM(LTRIM(CL.CIUDAD))');
+            // 2. Inyectar spFacturacionesCrear
+            console.log(`  -> Inyectando spFacturacionesCrear...`);
+            const facBatches = spFacturacionesSql.split(/^GO\s*$/mi).map(b => b.trim()).filter(b => b.length > 0);
+            for (const batch of facBatches) {
+                await pool.request().batch(batch);
+            }
+            console.log(`  ✅ spFacturacionesCrear inyectado con éxito.`);
 
-            console.log(`✅ [${db}]: spCotizacionesCrear presente con ID ${spId}.`);
-            console.log(`   - Soporte Tiqueteador por cd_codigo: ${hasNewTq ? 'SÍ' : 'NO'}`);
-            console.log(`   - Enriquecimiento Ciudad/Teléfono prioritario desde CLIENTES: ${hasNewCity ? 'SÍ' : 'NO'}`);
+            // Verificar ambos SPs
+            const chkCot = await pool.request().query("SELECT OBJECT_ID('dbo.spCotizacionesCrear') as sp_id");
+            const chkFac = await pool.request().query("SELECT OBJECT_ID('dbo.spFacturacionesCrear') as sp_id");
+
+            console.log(`✅ [${db}]:`);
+            console.log(`   - spCotizacionesCrear: ID ${chkCot.recordset[0]?.sp_id}`);
+            console.log(`   - spFacturacionesCrear: ID ${chkFac.recordset[0]?.sp_id}`);
 
             // Actualizar todas las cotizaciones en dbo.Cotizacion que tengan ciudad o teléfono vacío
             const fixRes = await pool.request().query(`
