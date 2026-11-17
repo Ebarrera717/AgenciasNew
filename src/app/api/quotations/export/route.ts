@@ -13,9 +13,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'No quotation IDs provided', traceCode }, { status: 400 })
         }
 
-        const idArray: number[] = (Array.isArray(ids) ? ids : ids.toString().split(','))
-            .map((id: any) => parseInt(String(id).trim(), 10))
-            .filter((n: number) => !isNaN(n));
+        const idArray: number[] = Array.from(new Set(
+            (Array.isArray(ids) ? ids : ids.toString().split(','))
+                .map((id: any) => parseInt(String(id).trim(), 10))
+                .filter((n: number) => !isNaN(n))
+        ));
 
         if (idArray.length === 0) {
             return NextResponse.json({ message: 'No valid quotation IDs provided', traceCode }, { status: 400 });

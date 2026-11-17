@@ -175,7 +175,9 @@ BEGIN
                     AND NULLIF(qp.passenger, '') IS NOT NULL 
                     LIMIT 1
                 ), 'Mismo titular')
-            )
+            ),
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate"
         )
     FROM public."Quotation" q
     LEFT JOIN public."Client" c ON q."clientId" = c.id

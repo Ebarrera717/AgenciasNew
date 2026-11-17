@@ -5549,7 +5549,9 @@ BEGIN
             'reservationCode', q."reservationCode",
             'copyFieldsToProducts', COALESCE(q."copyFieldsToProducts", true),
             'manualDescription', q."manualDescription",
-            'observations', q."observations"
+            'observations', q."observations",
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate"
         ) || jsonb_build_object(
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,
@@ -5895,7 +5897,9 @@ BEGIN
                     AND NULLIF(qp.passenger, '') IS NOT NULL 
                     LIMIT 1
                 ), 'Mismo titular')
-            )
+            ),
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate"
         )
     FROM public."Quotation" q
     LEFT JOIN public."Client" c ON q."clientId" = c.id
@@ -6022,6 +6026,8 @@ BEGIN
             ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate",
             'passengerFirstName', q."passengerFirstName",
             'passengerLastName', q."passengerLastName",
             'passenger', q.passenger,
@@ -14119,19 +14125,19 @@ BEGIN
 		id INT GENERATED ALWAYS AS IDENTITY,
 		cd_Cotizacion VARCHAR(25),
 		cd_CotizacionServicios VARCHAR(25),
-		cd_codigo VARCHAR(3),
+		cd_codigo VARCHAR(25),
 		ds_FPnm VARCHAR(100),
 		bl_FPrepresenta BIT(1) DEFAULT B'0',
 		id_TarjetasCredito INT,
 		cd_tccode VARCHAR(10),
 		ds_tcnumber VARCHAR(16),
 		ds_tcvoucher VARCHAR(25),
-		cd_idbanco VARCHAR(3),
+		cd_idbanco VARCHAR(25),
 		ds_cheque VARCHAR(30),
 		ds_referencia VARCHAR(50),
 		am_valor DECIMAL,
 		ds_tcexp VARCHAR(7),
-		ds_plaza VARCHAR(3),
+		ds_plaza VARCHAR(25),
 		ds_Poliza VARCHAR(20),
 		ds_PolAnexo VARCHAR(20),
 		am_valor_ME DECIMAL DEFAULT 0,
@@ -14650,7 +14656,7 @@ BEGIN
 	SELECT
 		cs.cd_Cotizacion,
 		cs.cd_Consecutivo_VARiablesAdicionales AS cd_CotizacionServicios,
-		COALESCE(p.code,'') AS cd_codigo,
+		SUBSTRING(COALESCE(p.code, qpmt."paymentMethod", ''), 1, 25) AS cd_codigo,
 		COALESCE(qpmt."paymentMethod", '') AS ds_FPnm,
 		B'0' AS bl_FPrepresenta,
 		COALESCE(qpmt."cardNumber", '') AS ds_tcnumber,

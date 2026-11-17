@@ -80,6 +80,8 @@ BEGIN
             ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate",
             'passengerFirstName', q."passengerFirstName",
             'passengerLastName', q."passengerLastName",
             'passenger', q.passenger,

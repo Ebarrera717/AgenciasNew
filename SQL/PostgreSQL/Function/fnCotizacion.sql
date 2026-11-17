@@ -56,7 +56,9 @@ BEGIN
             'reservationCode', q."reservationCode",
             'copyFieldsToProducts', COALESCE(q."copyFieldsToProducts", true),
             'manualDescription', q."manualDescription",
-            'observations', q."observations"
+            'observations', q."observations",
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate"
         ) || jsonb_build_object(
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,

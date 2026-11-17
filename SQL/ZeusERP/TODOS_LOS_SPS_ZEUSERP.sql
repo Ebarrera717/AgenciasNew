@@ -567,19 +567,19 @@ BEGIN
 			id_CotizacionServicios INT NULL,
 			Id_Cotizacion INT NULL,
 			id_FormasPago INT NULL,
-			cd_codigo VARCHAR(3) NULL,
+			cd_codigo VARCHAR(25) NULL,
 			ds_FPnm VARCHAR(50) NULL,
 			bl_FPrepresenta BIT NOT NULL DEFAULT 0,
 			id_TarjetasCredito INT NULL,
 			cd_tccode NCHAR(10) NULL,
 			ds_tcnumber CHAR(16) NULL,
 			ds_tcvoucher VARCHAR(25) NULL,
-			cd_idbanco CHAR(3) NULL,
+			cd_idbanco VARCHAR(25) NULL,
 			ds_cheque VARCHAR(30) NULL,
 			ds_referencia VARCHAR(50) NULL,
 			am_valor MONEY NOT NULL DEFAULT 0,
 			ds_tcexp VARCHAR(7) NULL,
-			ds_plaza CHAR(3) NULL,
+			ds_plaza VARCHAR(25) NULL,
 			ds_Poliza VARCHAR(20) NULL,
 			ds_PolAnexo VARCHAR(20) NULL,
 			am_valor_ME MONEY NOT NULL DEFAULT 0,
@@ -1727,8 +1727,22 @@ BEGIN
 				ds_hotelTieneTiquete, 
 				ds_GDS, 	
 				id_evento
-		FROM @Cotizacion
-		WHERE bl_existe=0
+		FROM (
+			SELECT *, ROW_NUMBER() OVER(PARTITION BY cd_consecutivo ORDER BY id ASC) AS rn_cot
+			FROM @Cotizacion
+		) COT_INSERT
+		WHERE COT_INSERT.rn_cot = 1
+		  AND COT_INSERT.bl_existe = 0
+		  AND NOT EXISTS (
+			  SELECT 1 FROM dbo.Cotizacion EX WITH (NOLOCK)
+			  WHERE RTRIM(LTRIM(EX.cd_consecutivo)) = RTRIM(LTRIM(COT_INSERT.cd_consecutivo))
+				 OR (
+					 ISNUMERIC(RTRIM(LTRIM(EX.cd_consecutivo))) = 1 
+					 AND ISNUMERIC(RTRIM(LTRIM(COT_INSERT.cd_consecutivo))) = 1 
+					 AND CAST(RTRIM(LTRIM(EX.cd_consecutivo)) AS BIGINT) = CAST(RTRIM(LTRIM(COT_INSERT.cd_consecutivo)) AS BIGINT)
+				 )
+				 OR RIGHT('00000000' + RTRIM(LTRIM(EX.cd_consecutivo)), 8) = RTRIM(LTRIM(COT_INSERT.cd_consecutivo))
+		  );
 
 		UPDATE CC
 		SET CC.id_cotizacion=C.id
@@ -2221,7 +2235,7 @@ BEGIN
 		SELECT
 			FP.FormasPago.value('cd_cotizacion[1]', 'VARCHAR(25)') AS cd_Cotizacion,
 			FP.FormasPago.value('cd_cotizacionservicios[1]', 'VARCHAR(25)') AS cd_CotizacionServicios,
-			ISNULL(FP.FormasPago.value('cd_codigo[1]', 'VARCHAR(3)'), '') AS cd_codigo,
+			ISNULL(FP.FormasPago.value('cd_codigo[1]', 'VARCHAR(25)'), '') AS cd_codigo,
 			ISNULL(FP.FormasPago.value('ds_fpnm[1]', 'VARCHAR(50)'), '') AS ds_FPnm,
 			ISNULL(FP.FormasPago.value('bl_fprepresenta[1]', 'BIT'), 0) AS bl_FPrepresenta,
 			ISNULL(FP.FormasPago.value('ds_tcnumber[1]', 'CHAR(16)'), '') AS ds_tcnumber,
