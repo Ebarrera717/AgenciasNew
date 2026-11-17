@@ -1213,7 +1213,16 @@ BEGIN
 			cd_Cotizacion=ISNULL(C.CotizacionImpuestos.value('cd_cotizacion[1]','VARCHAR(25)'),''),
 			cd_CotizacionServicios=ISNULL(C.CotizacionImpuestos.value('cd_cotizacionservicios[1]','VARCHAR(25)'),'')
 		FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios/CotizacionImpuestos') AS C(CotizacionImpuestos)
-		LEFT JOIN dbo.ImpRet IR ON IR.cd_codigo=ISNULL(C.CotizacionImpuestos.value('cd_impret[1]','VARCHAR(3)'),'') 
+		OUTER APPLY (
+			SELECT TOP 1 IR1.id, IR1.cd_cuenta
+			FROM dbo.ImpRet IR1
+			WHERE LTRIM(RTRIM(IR1.cd_codigo)) = LTRIM(RTRIM(C.CotizacionImpuestos.value('cd_impret[1]','VARCHAR(25)')))
+			   OR IR1.id = TRY_CAST(C.CotizacionImpuestos.value('cd_impret[1]','VARCHAR(25)') AS INT)
+			   OR LTRIM(RTRIM(IR1.ds_nombre)) = LTRIM(RTRIM(C.CotizacionImpuestos.value('ds_impas[1]','VARCHAR(50)')))
+			ORDER BY CASE WHEN LTRIM(RTRIM(IR1.cd_codigo)) = LTRIM(RTRIM(C.CotizacionImpuestos.value('cd_impret[1]','VARCHAR(25)'))) THEN 1
+			              WHEN IR1.id = TRY_CAST(C.CotizacionImpuestos.value('cd_impret[1]','VARCHAR(25)') AS INT) THEN 2
+			              ELSE 3 END
+		) IR 
 
 		INSERT INTO @VariableDatosMaestro(
 			IDEN_Maestro ,
@@ -1536,10 +1545,28 @@ BEGIN
 		    EX.in_dias = COALESCE(NULLIF(N.in_dias, 0), NULLIF(N.in_noches, 0), NULLIF(EX.in_dias, 0), 1),
 		    EX.in_diasSrv = COALESCE(NULLIF(N.in_diasSrv, 0), NULLIF(N.in_dias, 0), NULLIF(EX.in_diasSrv, 0), 1),
 		    EX.in_habitaciones = COALESCE(NULLIF(N.in_habitaciones, 0), NULLIF(EX.in_habitaciones, 0), 1),
-		    EX.in_habitacionesSrv = COALESCE(NULLIF(N.in_habitacionesSrv, 0), NULLIF(EX.in_habitacionesSrv, 0), 1)
+		    EX.in_habitacionesSrv = COALESCE(NULLIF(N.in_habitacionesSrv, 0), NULLIF(EX.in_habitacionesSrv, 0), 1),
+		    EX.cd_Consecutivo_VariablesAdicionales = COALESCE(NULLIF(N.cd_Consecutivo_VariablesAdicionales, ''), EX.cd_Consecutivo_VariablesAdicionales)
 		FROM CTE_EX EX
 		LEFT JOIN CTE_NEW N ON EX.id_Cotizacion = N.id_Cotizacion AND EX.rn = N.rn
-		LEFT JOIN CTE_NEW N1 ON EX.id_Cotizacion = N1.id_Cotizacion AND N1.rn = 1
+		LEFT JOIN CTE_NEW N1 ON EX.id_Cotizacion = N1.id_Cotizacion AND N1.rn = 1;
+
+		-- Si la cotización ya existía en Zeus (bl_existe = 1), mapear los id_CotizacionServicios correspondientes en @CotizacionServicios
+		;WITH CTE_EX_MAP AS (
+			SELECT CS_EX.id, CS_EX.id_Cotizacion, ROW_NUMBER() OVER (PARTITION BY CS_EX.id_Cotizacion ORDER BY CS_EX.id ASC) AS rn
+			FROM dbo.CotizacionServicios CS_EX
+			INNER JOIN @Cotizacion CC ON CC.id_Cotizacion = CS_EX.id_Cotizacion AND CC.bl_existe = 1
+		),
+		CTE_NEW_MAP AS (
+			SELECT CS.id AS new_id, CS.id_Cotizacion, ROW_NUMBER() OVER (PARTITION BY CS.id_Cotizacion ORDER BY CS.id ASC) AS rn
+			FROM @CotizacionServicios CS
+			INNER JOIN @Cotizacion CC ON CC.id_Cotizacion = CS.id_Cotizacion AND CC.bl_existe = 1
+		)
+		UPDATE CS
+		SET CS.id_CotizacionServicios = EX.id
+		FROM @CotizacionServicios CS
+		JOIN CTE_NEW_MAP N ON N.new_id = CS.id
+		JOIN CTE_EX_MAP EX ON EX.id_Cotizacion = N.id_Cotizacion AND EX.rn = N.rn;
 		
 		INSERT INTO CotizacionServicios(
 			id_TiposConceptFac,
@@ -1803,12 +1830,34 @@ BEGIN
 		FROM @CotizacionServicios_PaxAdicional
 		WHERE id_CotizacionServicios IS NOT NULL 
 
+		-- =========================================================================
+		-- PROCESAMIENTO Y SINCRONIZACIÓN DE CARGOS (@CotizacionCargos)
+		-- =========================================================================
+		-- 1. Mapear id_CotizacionServicios en @CotizacionCargos (tanto para bl_existe=0 como bl_existe=1)
 		UPDATE CC
-		SET CC.id_CotizacionServicios=CS.id
+		SET CC.id_CotizacionServicios = CS.id_CotizacionServicios
 		FROM @CotizacionCargos CC
-		INNER JOIN dbo.CotizacionServicios CS ON CS.cd_Consecutivo_VariablesAdicionales=CC.cd_CotizacionServicios
-		INNER JOIN @Cotizacion C ON C.cd_consecutivo = CC.cd_Cotizacion AND bl_existe=0
-		
+		INNER JOIN @CotizacionServicios CS ON CS.cd_Consecutivo_VariablesAdicionales = CC.cd_CotizacionServicios
+		WHERE CC.id_CotizacionServicios IS NULL;
+
+		UPDATE CC
+		SET CC.id_CotizacionServicios = CS.id
+		FROM @CotizacionCargos CC
+		INNER JOIN dbo.CotizacionServicios CS ON CS.cd_Consecutivo_VariablesAdicionales = CC.cd_CotizacionServicios
+		WHERE CC.id_CotizacionServicios IS NULL;
+
+		-- Si aun es NULL y la cotizacion solo tiene 1 servicio, asociarlo a ese servicio
+		UPDATE CC
+		SET CC.id_CotizacionServicios = CS.id_CotizacionServicios
+		FROM @CotizacionCargos CC
+		CROSS APPLY (
+			SELECT TOP 1 CS1.id_CotizacionServicios
+			FROM @CotizacionServicios CS1
+			WHERE CS1.id_CotizacionServicios IS NOT NULL
+		) CS
+		WHERE CC.id_CotizacionServicios IS NULL;
+
+		-- 2. Para cotizaciones NUEVAS (bl_existe = 0): Insertar todos los cargos
 		INSERT INTO dbo.CotizacionCargos(
 			id_CotizacionServicios,
 			id_cargosdesc,
@@ -1818,8 +1867,73 @@ BEGIN
 			am_credito,
 			am_contado_ME,
 			am_credito_ME
-		 )
-		 SELECT
+		)
+		SELECT
+			CC.id_CotizacionServicios,
+			CC.id_cargosdesc,
+			CC.ds_cargonm,
+			CC.bl_noshow,
+			CC.am_contado,
+			CC.am_credito,
+			CC.am_contado_ME,
+			CC.am_credito_ME
+		FROM @CotizacionCargos CC
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 0
+		WHERE CC.id_CotizacionServicios IS NOT NULL;
+
+		-- Mapear id_CotizacionCargos para cotizaciones nuevas (bl_existe = 0)
+		UPDATE CC
+		SET CC.id_CotizacionCargos = C.id
+		FROM @CotizacionCargos CC
+		INNER JOIN dbo.CotizacionCargos C ON C.id_cargosdesc = CC.id_cargosdesc AND C.id_CotizacionServicios = CC.id_CotizacionServicios
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 0;
+
+		UPDATE CC
+		SET CC.id_CotizacionCargos = C.id
+		FROM @CotizacionCargos CC
+		CROSS APPLY (
+			SELECT TOP 1 C1.id
+			FROM dbo.CotizacionCargos C1
+			WHERE C1.id_CotizacionServicios = CC.id_CotizacionServicios
+			ORDER BY CASE WHEN C1.ds_cargonm LIKE '%TAR%' OR C1.id_cargosdesc = 1 THEN 0 ELSE 1 END, C1.id ASC
+		) C
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 0
+		WHERE CC.id_CotizacionCargos IS NULL AND CC.id_CotizacionServicios IS NOT NULL;
+
+		-- 3. Para cotizaciones YA EXISTENTES (bl_existe = 1):
+		-- 3.1 Mapear cargos existentes de los servicios
+		UPDATE CC
+		SET CC.id_CotizacionCargos = C.id
+		FROM @CotizacionCargos CC
+		INNER JOIN dbo.CotizacionCargos C ON C.id_CotizacionServicios = CC.id_CotizacionServicios
+		                                 AND (C.id_cargosdesc = CC.id_cargosdesc OR C.ds_cargonm = CC.ds_cargonm)
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 1;
+
+		-- Si no hubo match por cargo exacto pero el servicio ya tiene cargos, mapear al primer cargo
+		UPDATE CC
+		SET CC.id_CotizacionCargos = C.id
+		FROM @CotizacionCargos CC
+		CROSS APPLY (
+			SELECT TOP 1 C1.id
+			FROM dbo.CotizacionCargos C1
+			WHERE C1.id_CotizacionServicios = CC.id_CotizacionServicios
+			ORDER BY CASE WHEN C1.ds_cargonm LIKE '%TAR%' OR C1.id_cargosdesc = 1 THEN 0 ELSE 1 END, C1.id ASC
+		) C
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 1
+		WHERE CC.id_CotizacionCargos IS NULL AND CC.id_CotizacionServicios IS NOT NULL;
+
+		-- 3.2 Actualizar montos en dbo.CotizacionCargos para cargos existentes
+		UPDATE C
+		SET C.am_contado = CC.am_contado,
+		    C.am_credito = CC.am_credito,
+		    C.am_contado_ME = CC.am_contado_ME,
+		    C.am_credito_ME = CC.am_credito_ME
+		FROM dbo.CotizacionCargos C
+		INNER JOIN @CotizacionCargos CC ON CC.id_CotizacionCargos = C.id
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 1;
+
+		-- 3.3 Insertar cargos nuevos para servicios existentes si los hubiere
+		INSERT INTO dbo.CotizacionCargos(
 			id_CotizacionServicios,
 			id_cargosdesc,
 			ds_cargonm,
@@ -1828,29 +1942,90 @@ BEGIN
 			am_credito,
 			am_contado_ME,
 			am_credito_ME
-		 FROM @CotizacionCargos
-		 WHERE id_CotizacionServicios IS NOT NULL 
+		)
+		SELECT
+			CC.id_CotizacionServicios,
+			CC.id_cargosdesc,
+			CC.ds_cargonm,
+			CC.bl_noshow,
+			CC.am_contado,
+			CC.am_credito,
+			CC.am_contado_ME,
+			CC.am_credito_ME
+		FROM @CotizacionCargos CC
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 1
+		WHERE CC.id_CotizacionCargos IS NULL AND CC.id_CotizacionServicios IS NOT NULL;
 
-		 --SELECT c.*
-		 --FROM CotizacionCargos C
-		 --INNER JOIN @CotizacionCargos CC ON CC.id_cargosdesc=C.id_cargosdesc AND CC.id_CotizacionServicios=C.id_CotizacionServicios
+		-- Mapear el ID recién insertado
+		UPDATE CC
+		SET CC.id_CotizacionCargos = C.id
+		FROM @CotizacionCargos CC
+		INNER JOIN dbo.CotizacionCargos C ON C.id_CotizacionServicios = CC.id_CotizacionServicios
+		                                 AND (C.id_cargosdesc = CC.id_cargosdesc OR C.ds_cargonm = CC.ds_cargonm)
+		INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 1
+		WHERE CC.id_CotizacionCargos IS NULL;
 
-		 UPDATE CC
-		 SET CC.id_CotizacionCargos=C.id
-		 FROM @CotizacionCargos CC
-		 INNER JOIN dbo.CotizacionCargos C ON C.id_cargosdesc=CC.id_cargosdesc AND C.id_CotizacionServicios=CC.id_CotizacionServicios
-		 INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND bl_existe=0
-		 
-		 --select  * from @CotizacionCargos
-		 
-		 UPDATE I
-		 SET I.id_CotizacionCargos=C.id_CotizacionCargos
-		 FROM @CotizacionImpuestos I
-		 INNER JOIN @CotizacionCargos C ON C.cd_CotizacionCargos = I.cd_CotizacionCargos AND C.cd_CotizacionServicios=I.cd_CotizacionServicios
-		 INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = C.cd_Cotizacion AND bl_existe=0
+		-- =========================================================================
+		-- PROCESAMIENTO Y SINCRONIZACIÓN DE IMPUESTOS (@CotizacionImpuestos)
+		-- =========================================================================
+		-- Nivel 1: Match exacto por cd_CotizacionCargos y cd_CotizacionServicios
+		UPDATE I
+		SET I.id_CotizacionCargos = C.id_CotizacionCargos
+		FROM @CotizacionImpuestos I
+		INNER JOIN @CotizacionCargos C ON C.cd_CotizacionCargos = I.cd_CotizacionCargos 
+		                              AND C.cd_CotizacionServicios = I.cd_CotizacionServicios
+		WHERE C.id_CotizacionCargos IS NOT NULL;
 
+		-- Nivel 2: Fallback por cd_CotizacionServicios al cargo principal (TARIFA / primer cargo)
+		UPDATE I
+		SET I.id_CotizacionCargos = C.id_CotizacionCargos
+		FROM @CotizacionImpuestos I
+		CROSS APPLY (
+			SELECT TOP 1 CC.id_CotizacionCargos
+			FROM @CotizacionCargos CC
+			WHERE CC.cd_CotizacionServicios = I.cd_CotizacionServicios
+			  AND CC.id_CotizacionCargos IS NOT NULL
+			ORDER BY CASE WHEN CC.ds_cargonm LIKE '%TAR%' OR CC.id_cargosdesc = 1 THEN 0 ELSE 1 END, CC.id ASC
+		) C
+		WHERE I.id_CotizacionCargos IS NULL;
 
-		 INSERT INTO dbo.CotizacionImpuestos(
+		-- Nivel 3: Fallback por cargo existente en base de datos para ese servicio
+		UPDATE I
+		SET I.id_CotizacionCargos = C.id
+		FROM @CotizacionImpuestos I
+		CROSS APPLY (
+			SELECT TOP 1 CC_EX.id
+			FROM dbo.CotizacionCargos CC_EX
+			INNER JOIN @CotizacionServicios CS ON CS.id_CotizacionServicios = CC_EX.id_CotizacionServicios
+			WHERE CS.cd_Consecutivo_VariablesAdicionales = I.cd_CotizacionServicios
+			ORDER BY CASE WHEN CC_EX.ds_cargonm LIKE '%TAR%' OR CC_EX.id_cargosdesc = 1 THEN 0 ELSE 1 END, CC_EX.id ASC
+		) C
+		WHERE I.id_CotizacionCargos IS NULL;
+
+		-- Nivel 4: Fallback al primer cargo disponible de toda la cotizacion
+		UPDATE I
+		SET I.id_CotizacionCargos = C.id_CotizacionCargos
+		FROM @CotizacionImpuestos I
+		CROSS APPLY (
+			SELECT TOP 1 CC.id_CotizacionCargos
+			FROM @CotizacionCargos CC
+			WHERE CC.id_CotizacionCargos IS NOT NULL
+			ORDER BY CASE WHEN CC.ds_cargonm LIKE '%TAR%' OR CC.id_cargosdesc = 1 THEN 0 ELSE 1 END, CC.id ASC
+		) C
+		WHERE I.id_CotizacionCargos IS NULL;
+
+		-- Para cotizaciones existentes (bl_existe = 1), eliminar impuestos anteriores de los cargos afectados para refrescar
+		DELETE CI_EX
+		FROM dbo.CotizacionImpuestos CI_EX
+		WHERE CI_EX.id_CotizacionCargos IN (
+			SELECT DISTINCT CC.id_CotizacionCargos 
+			FROM @CotizacionCargos CC 
+			INNER JOIN @Cotizacion CT ON CT.cd_consecutivo = CC.cd_Cotizacion AND CT.bl_existe = 1
+			WHERE CC.id_CotizacionCargos IS NOT NULL
+		);
+
+		-- Insertar impuestos (tanto para bl_existe = 0 como bl_existe = 1)
+		INSERT INTO dbo.CotizacionImpuestos(
 			id_CotizacionCargos,
 			id_ImpRet,
 			ds_Impas,
@@ -1874,7 +2049,7 @@ BEGIN
 			am_contado_ME,
 			am_credito_ME
 		FROM @CotizacionImpuestos
-		WHERE id_CotizacionCargos IS NOT NULL 
+		WHERE id_CotizacionCargos IS NOT NULL; 
 		
 		INSERT INTO dbo.VariableDatosMaestro(
 			IDEN_Maestro,
@@ -2006,9 +2181,15 @@ BEGIN
 		FROM @CotizacionServiciosFormasPago FP
 		LEFT JOIN dbo.FormasPago FPM ON FPM.cd_codigo = FP.cd_codigo
 		INNER JOIN dbo.CotizacionServicios CS ON CS.cd_Consecutivo_VariablesAdicionales = FP.cd_CotizacionServicios
-		INNER JOIN @Cotizacion C ON C.cd_consecutivo = FP.cd_Cotizacion AND C.bl_existe=0
+		INNER JOIN @Cotizacion C ON C.cd_consecutivo = FP.cd_Cotizacion;
 
-		-- Insertar en tabla real
+		-- Si bl_existe = 1, refrescar formas de pago para servicios existentes
+		DELETE FP_EX
+		FROM dbo.CotizacionServiciosFormasPago FP_EX
+		INNER JOIN @CotizacionServiciosFormasPago FP ON FP.id_CotizacionServicios = FP_EX.id_CotizacionServicios
+		INNER JOIN @Cotizacion C ON C.cd_consecutivo = FP.cd_Cotizacion AND C.bl_existe = 1;
+
+		-- Insertar en tabla real (para bl_existe = 0 y bl_existe = 1)
 		INSERT INTO dbo.CotizacionServiciosFormasPago(
 			id_CotizacionServicios,
 			Id_Cotizacion,
@@ -2053,7 +2234,7 @@ BEGIN
 			ds_tcautorizacion,
 			in_tccuotas
 		FROM @CotizacionServiciosFormasPago
-		WHERE id_CotizacionServicios IS NOT NULL
+		WHERE id_CotizacionServicios IS NOT NULL;
 
 		--ROLLBACK TRANSACTION;
         COMMIT TRANSACTION;
@@ -2066,7 +2247,7 @@ BEGIN
         SELECT 
             cd_consecutivo AS Cotizacion,
             CASE 
-                WHEN bl_existe = 1 THEN 'Ya existe en SQL Server'
+                WHEN bl_existe = 1 THEN 'Actualizada exitosamente en SQL Server'
                 ELSE 'Creada exitosamente'
             END AS Estado,
             bl_existe,
