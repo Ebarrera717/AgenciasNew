@@ -253,7 +253,7 @@ BEGIN
                     CAST(0 AS DECIMAL(18,2)) AS [am_porcomision],
                     '2' AS [cd_tiposconceptfac],
                     COALESCE(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), 'FAC', '01') AS [cd_conceptofacturacion],
-                    COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), 'HOTEL', '01') AS [cd_tiposservicio],
+                    COALESCE(NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), '') AS [cd_tiposservicio],
                     SUBSTRING(COALESCE(
                         NULLIF(RTRIM(LTRIM(prv.code)), ''),
                         NULLIF(RTRIM(LTRIM(prv.airlineCode)), ''),

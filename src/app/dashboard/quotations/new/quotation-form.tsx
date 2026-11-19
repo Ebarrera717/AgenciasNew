@@ -14,6 +14,7 @@ import GlobalPaymentModal from '@/app/dashboard/invoices/new/GlobalPaymentModal'
 import QuotationInvoiceModal from '../QuotationInvoiceModal'
 import ManualServicesModal, { ManualServiceItem } from './ManualServicesModal'
 import QuotationHistoryDetailModal from '../QuotationHistoryDetailModal'
+import ZeusServiceTypeField, { ZeusServiceTypeItem, ZeusServiceTypeValidation } from '@/components/ZeusServiceTypeField'
 
 
 interface QuotationFormData {
@@ -249,7 +250,20 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
     const [selectedHistoryItemForDetail, setSelectedHistoryItemForDetail] = useState<any | null>(null)
     const [isHistoryDetailModalOpen, setIsHistoryDetailModalOpen] = useState(false)
     const [deletingZeus, setDeletingZeus] = useState(false)
+    const [zeusServiceTypes, setZeusServiceTypes] = useState<ZeusServiceTypeItem[]>([])
+    const [serviceTypeValidations, setServiceTypeValidations] = useState<Record<number, ZeusServiceTypeValidation>>({})
     const router = useRouter()
+
+    useEffect(() => {
+        fetch('/api/zeus/service-types')
+            .then(r => r.json())
+            .then(d => {
+                if (d?.success && Array.isArray(d.items)) {
+                    setZeusServiceTypes(d.items)
+                }
+            })
+            .catch(() => { /* ZeusERP opcional en carga inicial */ })
+    }, [])
 
     const handleDeleteFromZeus = async () => {
         if (!quotationId) return;
@@ -339,6 +353,47 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 }
             }
 
+            // Validar campos "Servicio / Tipo" contra tipos de servicio activos en ZeusERP
+            const normalizedServiceTypes: Record<number, string> = {};
+            const invalidServiceTypes: string[] = [];
+            for (let idx = 0; idx < formData.items.length; idx++) {
+                const rawSt = (formData.items[idx]?.serviceType || '').trim();
+                if (!rawSt) {
+                    normalizedServiceTypes[idx] = '';
+                    continue;
+                }
+                try {
+                    const vRes = await fetch(`/api/zeus/service-types?validate=${encodeURIComponent(rawSt)}`);
+                    const vData = await vRes.json();
+                    if (vRes.ok && vData.success) {
+                        if (vData.valid && vData.status === 'ACTIVE') {
+                            normalizedServiceTypes[idx] = vData.code || rawSt;
+                        } else {
+                            invalidServiceTypes.push(`• Ítem #${idx + 1}: ${vData.message || `"${rawSt}" no es un tipo de servicio válido y activo en ZeusERP.`}`);
+                            normalizedServiceTypes[idx] = '';
+                        }
+                    } else {
+                        // Si ZeusERP no está accesible, mantener sin bloquear si no se pudo consultar
+                        normalizedServiceTypes[idx] = rawSt;
+                    }
+                } catch {
+                    normalizedServiceTypes[idx] = rawSt;
+                }
+            }
+
+            if (invalidServiceTypes.length > 0) {
+                const proceedClear = confirm(
+                    `⚠️ Validación de Servicio / Tipo (ZeusERP):\n\n${invalidServiceTypes.join('\n')}\n\n` +
+                    `Los valores inexistentes o inactivos NO pueden enviarse a ZeusERP como tipos de servicio válidos.\n\n` +
+                    `• Presiona "Aceptar" para guardar dejando vacío el campo Servicio / Tipo en esos ítems.\n` +
+                    `• Presiona "Cancelar" para volver y corregir el valor manualmente o con la lupa.`
+                );
+                if (!proceedClear) {
+                    setSaving(false);
+                    return;
+                }
+            }
+
             const payload = {
                 ...formData,
                 comisionPropiaPercentage: calculatedComisionPropia,
@@ -355,7 +410,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                 ticketPrinterCode: selectedPrinter?.code || null,
                 totalAmount: total,
                 combos: (formData.selectedCombos || []).map(c => ({ comboId: c.id })),
-                items: formData.items.map(item => {
+                items: formData.items.map((item, itemIdx) => {
                     const taxes: any[] = [];
 
                     const defaultMainTax = data?.taxes?.find((t: any) => t.type === 'PRINCIPAL' || t.code === 'TAR' || t.name?.toUpperCase().includes('TARIFA'));
@@ -389,6 +444,7 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                         prestadoraId: item.prestadoraId || null,
                         prestadoraCode: selPrest?.code || null,
                         cost: item.cost || 0,
+                        serviceType: normalizedServiceTypes[itemIdx] ?? '',
                         service: item.service || item.servicios || '',
                         servicios: item.servicios || item.service || '',
                         payments: Array.isArray(item.payments) ? item.payments : [],
@@ -1922,12 +1978,17 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                 value={item.productId}
                                                 onChange={(val) => {
                                                     const p = data.products.find((prod: any) => prod.id.toString() === val);
+                                                    const prodSt = (p?.serviceType || '').trim();
+                                                    const matchedZeus = prodSt
+                                                        ? zeusServiceTypes.find(t => t.code.toUpperCase() === prodSt.toUpperCase() || t.description.toUpperCase() === prodSt.toUpperCase())
+                                                        : undefined;
                                                     const newItems = [...formData.items];
                                                     newItems[index] = {
                                                         ...newItems[index],
                                                         productId: val,
                                                         price: 0,
-                                                        cost: p?.cost || 0
+                                                        cost: p?.cost || 0,
+                                                        serviceType: matchedZeus ? matchedZeus.code : ''
                                                     };
                                                     setFormData({ ...formData, items: newItems });
                                                 }}
@@ -2107,7 +2168,12 @@ export default function QuotationForm({ quotationId }: { quotationId?: string })
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Servicio / Tipo</label>
-                                                    <input type="text" className="w-full h-9 bg-white dark:bg-zinc-900 rounded-lg px-2 border border-zinc-200 dark:border-zinc-800 outline-none text-xs" value={item.serviceType} onChange={(e) => updateItem(index, 'serviceType', e.target.value)} />
+                                                    <ZeusServiceTypeField
+                                                        value={item.serviceType || ''}
+                                                        onChange={(val) => updateItem(index, 'serviceType', val)}
+                                                        preloadedTypes={zeusServiceTypes}
+                                                        onValidationChange={(v) => setServiceTypeValidations(prev => ({ ...prev, [index]: v }))}
+                                                    />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-[10px] uppercase font-bold text-zinc-400 h-7 flex items-end leading-tight pb-0.5">Reservación</label>

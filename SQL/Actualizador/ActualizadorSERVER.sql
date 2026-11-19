@@ -1,7 +1,7 @@
 -- ============================================================================
 -- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN IDEMPOTENTE PARA SQL SERVER
 -- Generado Automáticamente por deploy/sync_sqlserver_updater.js
--- Fecha de Generación: 2026-11-17T23:07:30.682Z
+-- Fecha de Generación: 2026-11-19T21:31:18.691Z
 -- Motor: Microsoft SQL Server 2016+ (T-SQL)
 -- ============================================================================
 
@@ -8335,7 +8335,7 @@ BEGIN
                     CAST(0 AS DECIMAL(18,2)) AS [am_porcomision],
                     '2' AS [cd_tiposconceptfac],
                     COALESCE(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), 'FAC', '01') AS [cd_conceptofacturacion],
-                    COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), 'HOTEL', '01') AS [cd_tiposservicio],
+                    COALESCE(NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), '') AS [cd_tiposservicio],
                     SUBSTRING(COALESCE(
                         NULLIF(RTRIM(LTRIM(prv.code)), ''),
                         NULLIF(RTRIM(LTRIM(prv.airlineCode)), ''),
@@ -9657,7 +9657,7 @@ BEGIN
                     CAST(0 AS DECIMAL(18,2)) AS [am_porcomision],
                     '2' AS [cd_tiposconceptfac],
                     COALESCE(NULLIF(LTRIM(RTRIM(pr.billingConcept)), ''), NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), 'FAC', '01') AS [cd_conceptofacturacion],
-                    COALESCE(NULLIF(LTRIM(RTRIM(ep.serviceType)), ''), NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), 'HOTEL', '01') AS [cd_tiposservicio],
+                    COALESCE(NULLIF(LTRIM(RTRIM(pr.serviceType)), ''), '') AS [cd_tiposservicio],
                     SUBSTRING(COALESCE(
                         NULLIF(RTRIM(LTRIM(prv.code)), ''),
                         NULLIF(RTRIM(LTRIM(prv.airlineCode)), ''),

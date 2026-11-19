@@ -656,7 +656,7 @@ BEGIN
         0 AS am_porcomision,
         '' AS cd_tiposconceptfac,
         COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') AS cd_conceptofacturacion,
-        COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
+        COALESCE(NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
         SUBSTRING(COALESCE(
             NULLIF(TRIM(prov.code), ''),
             NULLIF(TRIM(prov."airlineCode"), ''),

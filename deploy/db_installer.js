@@ -300,7 +300,30 @@ async function run() {
     if (fs.existsSync(dataFile)) {
         console.log(`\n${colors.bright}[4/5] Sembrando catálogos y datos iniciales requeridos (Inicial.sql)...${colors.reset}`);
         const sqlInit = fs.readFileSync(dataFile, 'utf8');
-        const statements = sqlInit.split(/;\s*[\r\n]+/);
+        
+        // Parser que respeta bloques DO $$ ... END $$; y comentarios
+        const statements = [];
+        let currentStmt = '';
+        let inDollar = false;
+        for (const line of sqlInit.split(/\r?\n/)) {
+            const trimmedLine = line.trim();
+            if (!inDollar && trimmedLine.startsWith('--')) continue;
+            if (trimmedLine.includes('$$')) {
+                const count = (trimmedLine.match(/\$\$/g) || []).length;
+                if (count % 2 !== 0) {
+                    inDollar = !inDollar;
+                }
+            }
+            currentStmt += line + '\n';
+            if (!inDollar && trimmedLine.endsWith(';')) {
+                const st = currentStmt.trim();
+                if (st) statements.push(st);
+                currentStmt = '';
+            }
+        }
+        const remStmt = currentStmt.trim();
+        if (remStmt && !remStmt.startsWith('--')) statements.push(remStmt);
+
         let executedCount = 0;
         let skippedCount = 0;
 
@@ -308,7 +331,7 @@ async function run() {
             const trimmed = stmt.trim();
             if (!trimmed || trimmed.startsWith('--')) continue;
             try {
-                await dbClient.query(trimmed + ';');
+                await dbClient.query(trimmed.endsWith(';') ? trimmed : trimmed + ';');
                 executedCount++;
             } catch (e) {
                 if (e.code === '23505') {
@@ -400,45 +423,45 @@ async function run() {
         await dbClient.query(`
             DO $$
             BEGIN
-                UPDATE public."Quotation"
-                SET "passengerFirstName" = split_part(TRIM("passenger"), ' ', 1),
-                    "passengerLastName" = CASE 
-                        WHEN position(' ' in TRIM("passenger")) > 0 
-                        THEN TRIM(substring(TRIM("passenger") from position(' ' in TRIM("passenger")) + 1))
-                        ELSE ''
-                    END
-                WHERE ("passengerFirstName" IS NULL OR TRIM("passengerFirstName") = '')
-                  AND "passenger" IS NOT NULL AND TRIM("passenger") <> '';
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passengerFirstName'
+                ) AND EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passenger'
+                ) THEN
+                    EXECUTE '
+                        UPDATE public."Quotation"
+                        SET "passengerFirstName" = split_part(TRIM("passenger"), '' '', 1),
+                            "passengerLastName" = CASE 
+                                WHEN position('' '' in TRIM("passenger")) > 0 
+                                THEN TRIM(substring(TRIM("passenger") from position('' '' in TRIM("passenger")) + 1))
+                                ELSE ''''
+                            END
+                        WHERE ("passengerFirstName" IS NULL OR TRIM("passengerFirstName") = '''')
+                          AND "passenger" IS NOT NULL AND TRIM("passenger") <> ''''
+                    ';
+                END IF;
 
-                UPDATE public."QuotationProductPassenger"
-                SET "firstName" = split_part(TRIM("name"), ' ', 1),
-                    "lastName" = CASE 
-                        WHEN position(' ' in TRIM("name")) > 0 
-                        THEN TRIM(substring(TRIM("name") from position(' ' in TRIM("name")) + 1))
-                        ELSE ''
-                    END
-                WHERE ("firstName" IS NULL OR TRIM("firstName") = '')
-                  AND "name" IS NOT NULL AND TRIM("name") <> '';
-
-                UPDATE public."Invoices"
-                SET "passengerFirstName" = split_part(TRIM("passenger"), ' ', 1),
-                    "passengerLastName" = CASE 
-                        WHEN position(' ' in TRIM("passenger")) > 0 
-                        THEN TRIM(substring(TRIM("passenger") from position(' ' in TRIM("passenger")) + 1))
-                        ELSE ''
-                    END
-                WHERE ("passengerFirstName" IS NULL OR TRIM("passengerFirstName") = '')
-                  AND "passenger" IS NOT NULL AND TRIM("passenger") <> '';
-
-                UPDATE public."InvoicesProductPassenger"
-                SET "firstName" = split_part(TRIM("name"), ' ', 1),
-                    "lastName" = CASE 
-                        WHEN position(' ' in TRIM("name")) > 0 
-                        THEN TRIM(substring(TRIM("name") from position(' ' in TRIM("name")) + 1))
-                        ELSE ''
-                    END
-                WHERE ("firstName" IS NULL OR TRIM("firstName") = '')
-                  AND "name" IS NOT NULL AND TRIM("name") <> '';
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'firstName'
+                ) AND EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'name'
+                ) THEN
+                    EXECUTE '
+                        UPDATE public."QuotationProductPassenger"
+                        SET "firstName" = split_part(TRIM("name"), '' '', 1),
+                            "lastName" = CASE 
+                                WHEN position('' '' in TRIM("name")) > 0 
+                                THEN TRIM(substring(TRIM("name") from position('' '' in TRIM("name")) + 1))
+                                ELSE ''''
+                            END
+                        WHERE ("firstName" IS NULL OR TRIM("firstName") = '''')
+                          AND "name" IS NOT NULL AND TRIM("name") <> ''''
+                    ';
+                END IF;
             END $$;
         `);
         console.log(`  ${colors.green}[OK] Migración de datos históricos verificada y aplicada.${colors.reset}`);

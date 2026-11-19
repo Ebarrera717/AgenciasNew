@@ -1309,22 +1309,14 @@ BEGIN
 			am_porcomision = ISNULL(F.Item.value('am_porcomision[1]','MONEY'),0),
 			id_tiposconceptfac = ISNULL(CF.id_TiposConceptoFacturacion, ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id_TiposConceptoFacturacion FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 2))),
 			id_conceptofacturacion = ISNULL(CF.id, ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))), ISNULL((SELECT TOP 1 id FROM dbo.ConceptoFacturacion WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = 'SOP'), 3))),
-			id_tiposservicio = ISNULL(
-				TS.id,
-				ISNULL(
-					(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(50)')))),
-					ISNULL(
-						(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(100)')))),
-						ISNULL(
-							(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('ds_servicio[1]','VARCHAR(100)')))),
-							ISNULL(
-								(SELECT TOP 1 TSA2.id_TipoServicio FROM dbo.tiposServicio_asignados TSA2 WITH (NOLOCK) JOIN dbo.TiposServicios TS2 WITH (NOLOCK) ON TS2.id = TSA2.id_TipoServicio WHERE TSA2.id_ConceptoFacturacion = CF.id),
-								ISNULL((SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE RTRIM(LTRIM(cd_codigo)) = 'htn'), 1)
-							)
-						)
-					)
+			id_tiposservicio = CASE
+				WHEN LTRIM(RTRIM(ISNULL(F.Item.value('cd_tiposservicio[1]','VARCHAR(50)'), ''))) = '' THEN NULL
+				ELSE COALESCE(
+					TS.id,
+					(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE ISNULL(bl_inactivo, 0) = 0 AND RTRIM(LTRIM(cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(50)')))),
+					(SELECT TOP 1 id FROM dbo.TiposServicios WITH (NOLOCK) WHERE ISNULL(bl_inactivo, 0) = 0 AND RTRIM(LTRIM(ds_nombre)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(100)'))))
 				)
-			),
+			END,
 			cd_proveedores = SUBSTRING(ISNULL(F.Item.value('cd_proveedores[1]','VARCHAR(50)'),''), 1, 25),
 			ds_servicio = SUBSTRING(ISNULL(F.Item.value('ds_servicio[1]','VARCHAR(500)'), ISNULL(F.Item.value('servicios[1]','VARCHAR(500)'), '')), 1, 250),
 			am_valorprov = ISNULL(F.Item.value('am_valorprov[1]','MONEY'),0),
@@ -1363,7 +1355,7 @@ BEGIN
 		LEFT JOIN dbo.Entidades ED WITH (NOLOCK) ON ED.cd_codigo = F.Item.value('cd_entdist[1]','VARCHAR(25)')
 		LEFT JOIN dbo.Entidades	EV WITH (NOLOCK) ON EV.cd_codigo = F.Item.value('cd_entvend[1]','VARCHAR(25)')
 		LEFT JOIN dbo.Tiqueteadores	TQ WITH (NOLOCK) ON TQ.cd_codigo = F.Item.value('cd_tiqueteadores[1]','VARCHAR(25)')
-		LEFT JOIN dbo.TiposServicios TS WITH (NOLOCK) ON TS.cd_codigo = F.Item.value('cd_tiposservicio[1]','VARCHAR(25)')
+		LEFT JOIN dbo.TiposServicios TS WITH (NOLOCK) ON RTRIM(LTRIM(TS.cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_tiposservicio[1]','VARCHAR(25)'))) AND ISNULL(TS.bl_inactivo, 0) = 0
 		LEFT JOIN dbo.ConceptoFacturacion CF WITH (NOLOCK) ON RTRIM(LTRIM(CF.cd_codigo)) = RTRIM(LTRIM(F.Item.value('cd_conceptofacturacion[1]','VARCHAR(25)')))
 		LEFT JOIN dbo.TipoProveedores TP WITH (NOLOCK) ON TP.cd_codigo = F.Item.value('cd_tipoproveedor[1]','VARCHAR(25)')
 		

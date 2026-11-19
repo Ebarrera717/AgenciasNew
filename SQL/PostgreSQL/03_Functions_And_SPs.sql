@@ -8037,7 +8037,7 @@ BEGIN
         0 AS am_porcomision,
         '' AS cd_tiposconceptfac,
         COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') AS cd_conceptofacturacion,
-        COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
+        COALESCE(NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
         SUBSTRING(COALESCE(
             NULLIF(TRIM(prov.code), ''),
             NULLIF(TRIM(prov."airlineCode"), ''),
@@ -9071,7 +9071,7 @@ BEGIN
     SELECT 
         COALESCE(pr."type", '') as cd_TiposConceptFac, 
         COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') as cd_ConceptoFacturacion, 
-        COALESCE(NULLIF(TRIM(qp."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') as cd_TiposServicio, 
+        COALESCE(NULLIF(TRIM(qp."serviceType"), ''), '') as cd_TiposServicio, 
         q.cd_consecutivo as cd_Cotizacion,
         '' as cd_fac_factura, 
         '' as cd_fac_remision, 
