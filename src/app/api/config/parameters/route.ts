@@ -93,6 +93,11 @@ export async function GET(req: NextRequest) {
                         INSERT INTO dbo.[SystemParameter] ([code], [name], [value])
                         VALUES ('EncriptarClaves', 'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0');
                     END;
+                    IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = 'EnviarTiposFacturacionHotelesZeus')
+                    BEGIN
+                        INSERT INTO dbo.[SystemParameter] ([code], [name], [value])
+                        VALUES ('EnviarTiposFacturacionHotelesZeus', 'Enviar Tipos de Facturación de Hoteles a Zeus ERP (1: Sí, 0: No)', '1');
+                    END;
                 `);
                 const res = await pool.request().query(`
                     SELECT [id], [code], [name], [value]
@@ -108,7 +113,9 @@ export async function GET(req: NextRequest) {
         }
         await prisma.$queryRawUnsafe(`
             INSERT INTO public."SystemParameter" (code, name, value)
-            VALUES ('EncriptarClaves', 'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0')
+            VALUES 
+                ('EncriptarClaves', 'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0'),
+                ('EnviarTiposFacturacionHotelesZeus', 'Enviar Tipos de Facturación de Hoteles a Zeus ERP (1: Sí, 0: No)', '1')
             ON CONFLICT (code) DO NOTHING;
         `).catch(() => {});
         const parameters = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM public.fnParameterListar()`)

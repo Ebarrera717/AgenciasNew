@@ -323,6 +323,57 @@ class KorexDatabaseReleaseGuardian {
       }
     }
 
+    // 4.5. Validación Bloqueante de Paridad SHA-256 entre Fuentes Maestras y Copias de Distribución (Skill updater-parity-and-dryrun-guardian)
+    console.log('\n--- VALIDACIÓN DE PARIDAD SHA-256 DE ACTUALIZADORES ---');
+    const parityGroups = [
+      {
+        label: 'PostgreSQL Actualizador',
+        master: path.join(this.rootDir, 'SQL', 'PostgreSQL', 'Actualizador.sql'),
+        mirrors: [
+          path.join(this.rootDir, 'SQL', 'Actualizador', 'Actualizador.sql'),
+          path.join(this.rootDir, 'SQL', 'Actualizador.SQL'),
+          path.join(this.rootDir, 'RELEASE_KOREX', 'SQL', 'Actualizador.SQL')
+        ]
+      },
+      {
+        label: 'SQL Server Actualizador',
+        master: path.join(this.rootDir, 'SQL', 'SqlServer', 'ActualizadorSERVER.sql'),
+        mirrors: [
+          path.join(this.rootDir, 'SQL', 'SqlServer', 'Actualizador.sql'),
+          path.join(this.rootDir, 'SQL', 'Actualizador', 'ActualizadorSERVER.sql'),
+          path.join(this.rootDir, 'RELEASE_KOREX', 'SQL', 'ActualizadorSERVER.SQL')
+        ]
+      },
+      {
+        label: 'Zeus ERP Consolidado',
+        master: path.join(this.rootDir, 'SQL', 'ZeusERP', 'TODOS_LOS_SPS_Y_FUNCIONES_ZEUSERP.sql'),
+        mirrors: [
+          path.join(this.rootDir, 'SQL', 'ZeusERP', 'TODOS_LOS_SPS_ZEUSERP.sql')
+        ]
+      }
+    ];
+
+    for (const group of parityGroups) {
+      if (!fs.existsSync(group.master)) {
+        console.error(`❌ [BLOQUEANTE] Fuente maestra faltante (${group.label}): ${path.relative(this.rootDir, group.master)}`);
+        errorsCount++;
+        continue;
+      }
+      const masterHash = computeHash(fs.readFileSync(group.master, 'utf8'));
+      let syncedMirrors = 0;
+      for (const mirror of group.mirrors) {
+        if (!fs.existsSync(mirror)) continue;
+        const mirrorHash = computeHash(fs.readFileSync(mirror, 'utf8'));
+        if (mirrorHash !== masterHash) {
+          console.error(`❌ [BLOQUEANTE] Deriva SHA-256 en ${group.label}: ${path.relative(this.rootDir, mirror)} (${mirrorHash.slice(0, 12)}) != maestra (${masterHash.slice(0, 12)})`);
+          errorsCount++;
+        } else {
+          syncedMirrors++;
+        }
+      }
+      console.log(`✅ Paridad SHA-256 OK [${group.label}]: ${syncedMirrors} copia(s) idénticas a maestra (${masterHash.slice(0, 12)})`);
+    }
+
     if (errorsCount > 0) {
       console.error(`\n❌ GENERATION FAILED: Se detectaron ${errorsCount} inconsistencias en los scripts generados.`);
       console.log('EXIT CODE: 1\n================================================================\n');
@@ -332,7 +383,7 @@ class KorexDatabaseReleaseGuardian {
       return false;
     }
 
-    console.log('✅ VALIDACIÓN COMPLETA: Todos los objetos coinciden entre Fuentes, Manifiestos y Paquetes Generados.');
+    console.log('✅ VALIDACIÓN COMPLETA: Todos los objetos y copias de actualizadores coinciden al 100% (Fuentes, Manifiestos, Paridad SHA-256 y Paquetes Generados).');
     console.log('RESULTADO: GENERATION SUCCESS');
     console.log('EXIT CODE: 0\n================================================================\n');
     return true;

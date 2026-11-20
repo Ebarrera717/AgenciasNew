@@ -291,7 +291,7 @@ export const MANUAL_MODULES: ManualModule[] = [
                     'Los campos Fecha de Vencimiento Proveedor y Factura Proveedor son persistidos en base de datos y se transmiten automáticamente a Zeus ERP insertando/actualizando la tabla dbo.FacturaProveedor vinculada a la factura creada.',
                     'Los campos Check-In, Check-Out y Servicios son transmitidos a Zeus ERP guardándose en las columnas dt_llegada, dt_salida, dt_FechaSalidaSrv, dt_FechaLlegadaSrv y ds_servicio de dbo.Fac_Servicios.',
                     'La plantilla de facturas descargable contiene ejemplos detallados de líneas aéreas, hoteles, servicios, itinerarios, formas de pago y datos de proveedor.',
-                    'Para servicios de terceros y hotelería exportados a Zeus ERP, se genera automáticamente el desglose de Tipos Facturación de Hoteles (Fac_Servicios_TiposFacturacionHoteles) con tipo por defecto "Noches" (NCH), cantidad, valor unitario y cargo a aplicar mapeados directamente desde las columnas de Precio Unitario, Cantidad y Cargo Principal de la factura / Excel.'
+                    'Para servicios de terceros y hotelería exportados a Zeus ERP, el envío del desglose de Tipos Facturación de Hoteles (Fac_Servicios_TiposFacturacionHoteles) se controla mediante el parámetro general del sistema "EnviarTiposFacturacionHotelesZeus" (1 = Sí, 0 = No). Cuando está habilitado y la cantidad de noches es mayor a cero, Korex calcula automáticamente el valor unitario por noche dividiendo el valor total del servicio entre la cantidad de noches (Valor por noche = Valor del servicio / Cantidad de noches), conservando el valor total sin alteraciones.'
                 ],
                 steps: [
                     {

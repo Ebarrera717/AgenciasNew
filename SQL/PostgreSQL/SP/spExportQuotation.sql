@@ -29,6 +29,7 @@ DECLARE
     v_msg     TEXT;
     v_context TEXT;
     v_line    TEXT;
+    v_enviar_tipos_fac_hoteles VARCHAR(50) := '1';
 BEGIN
     -- 1. Inicializar
     mensaje_resultado := '';
@@ -306,7 +307,7 @@ BEGIN
 		in_cantidad INT,
 		am_contado DECIMAL,
 		am_credito DECIMAL,
-		am_valor DECIMAL GENERATED ALWAYS AS (am_contado + am_credito) STORED,
+		am_valor DECIMAL,
 		ds_cargonm varchar(50) NULL
 	) ON COMMIT DROP;
 
@@ -794,29 +795,57 @@ BEGIN
 	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = cs.orig_id_ref and tp."chargeAndTaxId" = qp."mainTaxId"
     WHERE COALESCE(target_ct.type, ct.type) = 'TAX';
 
-	INSERT INTO Fac_Servicios_TiposFacturacionHoteles(
-		cd_Cotizacion,
-		cd_CotizacionServicios,
-		cd_TiposFacturacionHoteles,
-		cd_cargosdesc,
-		in_cantidad,
-		am_contado,
-		am_credito,
-		ds_cargonm
-	)	
-	SELECT 
-		'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
-		'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
-		'NCH' AS cd_TiposFacturacionHoteles, --ADT Adulto,CHD Niño,HAB Habitacion,CAN Cantidad,NCH Noches
-		COALESCE(ct."code",'TAR') AS cd_cargosdesc,
-		COALESCE(NULLIF(qp.nights, 0), GREATEST(ABS(DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) AS in_cantidad,
-		COALESCE(tp."explicitAmount",0)/COALESCE(qp."quantity",1) AS am_contado,
-		0 AS am_credito,
-		COALESCE(ct."name",'Tarifa') AS ds_cargonm
-	FROM public."QuotationProduct" qp
-	JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
-	LEFT JOIN public."ChargeAndTax" ct ON ct.id = qp."mainTaxId"
-	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = qp."id" and tp."chargeAndTaxId" = qp."mainTaxId";
+	-- Poblar Fac_Servicios_TiposFacturacionHoteles (controlado por parámetro general EnviarTiposFacturacionHotelesZeus)
+	SELECT COALESCE(TRIM(value), '1')
+	INTO v_enviar_tipos_fac_hoteles
+	FROM public."SystemParameter"
+	WHERE UPPER(code) = 'ENVIARTIPOSFACTURACIONHOTELESZEUS'
+	LIMIT 1;
+
+	IF UPPER(COALESCE(v_enviar_tipos_fac_hoteles, '1')) IN ('1', 'TRUE', 'SI', 'S') THEN
+		INSERT INTO Fac_Servicios_TiposFacturacionHoteles(
+			cd_Cotizacion,
+			cd_CotizacionServicios,
+			cd_TiposFacturacionHoteles,
+			cd_cargosdesc,
+			in_cantidad,
+			am_valor,
+			am_contado,
+			am_credito,
+			ds_cargonm
+		)	
+		SELECT 
+			'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
+			'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
+			'NCH' AS cd_TiposFacturacionHoteles, --ADT Adulto,CHD Niño,HAB Habitacion,CAN Cantidad,NCH Noches
+			COALESCE(ct."code",'TAR') AS cd_cargosdesc,
+			nh.calc_nights AS in_cantidad,
+			ROUND((nh.total_val / NULLIF(nh.calc_nights, 0))::numeric, 2) AS am_valor,
+			nh.total_val AS am_contado,
+			0 AS am_credito,
+			COALESCE(ct."name",'Tarifa') AS ds_cargonm
+		FROM public."QuotationProduct" qp
+		JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
+		LEFT JOIN public."ChargeAndTax" ct ON ct.id = qp."mainTaxId"
+		LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = qp."id" and tp."chargeAndTaxId" = qp."mainTaxId"
+		CROSS JOIN LATERAL (
+			SELECT
+				CASE
+					WHEN qp.nights IS NOT NULL AND qp.nights > 0 THEN qp.nights
+					WHEN qp."checkInDate" IS NOT NULL AND qp."checkOutDate" IS NOT NULL
+					     AND (DATE(qp."checkOutDate") - DATE(qp."checkInDate")) > 0
+					THEN (DATE(qp."checkOutDate") - DATE(qp."checkInDate"))::int
+					ELSE 0
+				END AS calc_nights,
+				ROUND(COALESCE(
+					NULLIF(tp."explicitAmount", 0),
+					COALESCE(qp.price, 0) * COALESCE(NULLIF(qp.quantity, 0), 1),
+					0
+				)::numeric, 2) AS total_val
+		) nh
+		WHERE nh.calc_nights > 0
+		  AND nh.total_val > 0;
+	END IF;
 
 	INSERT INTO CotizacionServicios_TipoProv(
 		cd_Cotizacion,

@@ -75,6 +75,11 @@ BEGIN
     INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'ModoFacturacionAuto', N'Modo de Facturación Automática (Zeus/Local)', N'FALSE');
 END;
 
+IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'EnviarTiposFacturacionHotelesZeus')
+BEGIN
+    INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'EnviarTiposFacturacionHotelesZeus', N'Enviar Tipos de Facturación de Hoteles a Zeus ERP (1: Sí, 0: No)', N'1');
+END;
+
 IF NOT EXISTS (SELECT 1 FROM dbo.[SystemParameter] WHERE [code] = N'AGENCY_NAME')
 BEGIN
     INSERT INTO dbo.[SystemParameter] ([code], [name], [value]) VALUES (N'AGENCY_NAME', N'Nombre o Razón Social de la Agencia', N'');

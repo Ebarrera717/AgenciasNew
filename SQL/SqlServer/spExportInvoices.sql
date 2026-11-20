@@ -519,7 +519,7 @@ BEGIN
                         WHERE ipv.invoiceProductId = ep.id
                         FOR XML PATH('Variables'), TYPE
                     ),
-                    -- Sub-nodo: TiposFacturacionHoteles (para desglose de tarifas por noche/unidad en hoteles y servicios)
+                    -- Sub-nodo: TiposFacturacionHoteles (controlado por parámetro general EnviarTiposFacturacionHotelesZeus)
                     (
                         SELECT 
                             e.id AS [id_factura],
@@ -527,20 +527,20 @@ BEGIN
                             3 AS [in_tipoitem],
                             'NCH' AS [cd_tiposfacturacionhoteles],
                             'Noches' AS [ds_tiposfacturacionhoteles],
-                            COALESCE(NULLIF(ep.nights, 0), CASE WHEN DATEDIFF(day, ISNULL(ep.checkInDate, GETDATE()), ISNULL(ep.checkOutDate, ISNULL(ep.checkInDate, GETDATE()))) > 0 THEN DATEDIFF(day, ISNULL(ep.checkInDate, GETDATE()), ISNULL(ep.checkOutDate, ISNULL(ep.checkInDate, GETDATE()))) ELSE 1 END) AS [in_cantidad],
-                            CAST(ISNULL(ep.price, 0) AS DECIMAL(18,2)) AS [am_valor],
+                            nh.calc_nights AS [in_cantidad],
+                            CAST(ROUND(nh.total_val / NULLIF(CAST(nh.calc_nights AS DECIMAL(18,4)), 0), 2) AS DECIMAL(18,2)) AS [am_valor],
                             CASE 
                                 WHEN NOT EXISTS (
                                     SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
                                     WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) LIKE '%tarjeta%' OR LOWER(ipp.paymentMethod) LIKE '%credito%')
-                                ) THEN CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2))
+                                ) THEN nh.total_val
                                 WHEN NOT EXISTS (
                                     SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
                                     WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
                                 ) THEN CAST(0 AS DECIMAL(18,2))
                                 ELSE CAST(
                                     ROUND(
-                                        ISNULL(ep.price * ep.quantity, 0) * 
+                                        nh.total_val * 
                                         ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
                                         NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
                                     , 2) AS DECIMAL(18,2)
@@ -554,12 +554,12 @@ BEGIN
                                 WHEN NOT EXISTS (
                                     SELECT 1 FROM dbo.[InvoicesProductPayment] ipp 
                                     WHERE ipp.invoiceProductId = ep.id AND (LOWER(ipp.paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(ipp.paymentMethod) NOT LIKE '%credito%')
-                                ) THEN CAST(ISNULL(ep.price * ep.quantity, 0) AS DECIMAL(18,2))
+                                ) THEN nh.total_val
                                 ELSE CAST(
                                     (
-                                        ISNULL(ep.price * ep.quantity, 0) - 
+                                        nh.total_val - 
                                         ROUND(
-                                            ISNULL(ep.price * ep.quantity, 0) * 
+                                            nh.total_val * 
                                             ISNULL((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id AND LOWER(paymentMethod) NOT LIKE '%tarjeta%' AND LOWER(paymentMethod) NOT LIKE '%credito%'), 0) / 
                                             NULLIF((SELECT SUM(amount) FROM dbo.[InvoicesProductPayment] WHERE invoiceProductId = ep.id), 0)
                                         , 2)
@@ -570,7 +570,21 @@ BEGIN
                             ISNULL(ct_main.name, 'TARIFA') AS [ds_cargonm],
                             ISNULL(ct_main.id, 1) AS [id_cargosdesc]
                         FROM (SELECT 1 AS dummy) d
+                        CROSS APPLY (
+                            SELECT
+                                CASE
+                                    WHEN ep.nights IS NOT NULL AND ep.nights > 0 THEN ep.nights
+                                    WHEN ep.checkInDate IS NOT NULL AND ep.checkOutDate IS NOT NULL
+                                         AND DATEDIFF(day, ep.checkInDate, ep.checkOutDate) > 0
+                                    THEN DATEDIFF(day, ep.checkInDate, ep.checkOutDate)
+                                    ELSE 0
+                                END AS calc_nights,
+                                CAST(ISNULL(ep.price, 0) * ISNULL(NULLIF(ep.quantity, 0), 1) AS DECIMAL(18,2)) AS total_val
+                        ) nh
                         LEFT JOIN dbo.[ChargeAndTax] ct_main ON ct_main.id = ep.mainTaxId
+                        WHERE UPPER(ISNULL((SELECT TOP 1 LTRIM(RTRIM([value])) FROM dbo.[SystemParameter] WHERE UPPER([code]) = N'ENVIARTIPOSFACTURACIONHOTELESZEUS'), N'1')) IN (N'1', N'TRUE', N'SI', N'S')
+                          AND nh.calc_nights > 0
+                          AND nh.total_val > 0
                         FOR XML PATH('TiposFacturacionHoteles'), TYPE
                     )
                 FROM dbo.[InvoicesProduct] ep

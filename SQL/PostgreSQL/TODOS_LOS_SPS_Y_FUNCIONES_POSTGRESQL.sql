@@ -7411,6 +7411,7 @@ DECLARE
     v_context TEXT;
     v_line    TEXT;
     v_err_concept TEXT := '';
+    v_enviar_tipos_fac_hoteles VARCHAR(50) := '1';
 BEGIN
     -- 1. Inicializar
     mensaje_resultado := '';
@@ -8363,69 +8364,90 @@ BEGIN
     JOIN Item itm ON v."invoiceProductId" = itm.id_referencia_origen
     JOIN Facturacion f ON itm.id_factura = f.id_factura;
 
-    -- 10.1. Poblar Tabla Fac_Servicios_TiposFacturacionHoteles
-    INSERT INTO Fac_Servicios_TiposFacturacionHoteles (
-        id_factura,
-        id_item,
-        in_tipoitem,
-        cd_TiposFacturacionHoteles,
-        ds_TiposFacturacionHoteles,
-        in_cantidad,
-        am_valor,
-        am_contado,
-        am_credito,
-        cd_cargosdesc,
-        ds_cargonm,
-        id_cargosdesc
-    )
-    SELECT
-        f.id_factura,
-        itm.id_item,
-        3 AS in_tipoitem,
-        'NCH' AS cd_TiposFacturacionHoteles,
-        'Noches' AS ds_TiposFacturacionHoteles,
-        COALESCE(NULLIF(ep.nights, 0), GREATEST(ABS(DATE(COALESCE(ep."checkOutDate", ep."checkInDate", CURRENT_DATE)) - DATE(COALESCE(ep."checkInDate", CURRENT_DATE))), 1)) AS in_cantidad,
-        COALESCE(ep.price, 0) AS am_valor,
-        CASE 
-            WHEN NOT EXISTS (
-                SELECT 1 FROM public."InvoicesProductPayment" ipp 
-                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
-            ) THEN COALESCE(ep.price * ep.quantity, 0)
-            WHEN NOT EXISTS (
-                SELECT 1 FROM public."InvoicesProductPayment" ipp 
-                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
-            ) THEN 0
-            ELSE ROUND(
-                (COALESCE(ep.price * ep.quantity, 0) * 
-                COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
-                NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id), 0))::numeric, 2
-            )
-        END AS am_contado,
-        CASE 
-            WHEN NOT EXISTS (
-                SELECT 1 FROM public."InvoicesProductPayment" ipp 
-                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
-            ) THEN 0
-            WHEN NOT EXISTS (
-                SELECT 1 FROM public."InvoicesProductPayment" ipp 
-                WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
-            ) THEN COALESCE(ep.price * ep.quantity, 0)
-            ELSE (
-                COALESCE(ep.price * ep.quantity, 0) - 
-                ROUND(
-                    (COALESCE(ep.price * ep.quantity, 0) * 
+    -- 10.1. Poblar Tabla Fac_Servicios_TiposFacturacionHoteles (controlado por parámetro general EnviarTiposFacturacionHotelesZeus)
+    SELECT COALESCE(TRIM(value), '1')
+    INTO v_enviar_tipos_fac_hoteles
+    FROM public."SystemParameter"
+    WHERE UPPER(code) = 'ENVIARTIPOSFACTURACIONHOTELESZEUS'
+    LIMIT 1;
+
+    IF UPPER(COALESCE(v_enviar_tipos_fac_hoteles, '1')) IN ('1', 'TRUE', 'SI', 'S') THEN
+        INSERT INTO Fac_Servicios_TiposFacturacionHoteles (
+            id_factura,
+            id_item,
+            in_tipoitem,
+            cd_TiposFacturacionHoteles,
+            ds_TiposFacturacionHoteles,
+            in_cantidad,
+            am_valor,
+            am_contado,
+            am_credito,
+            cd_cargosdesc,
+            ds_cargonm,
+            id_cargosdesc
+        )
+        SELECT
+            f.id_factura,
+            itm.id_item,
+            3 AS in_tipoitem,
+            'NCH' AS cd_TiposFacturacionHoteles,
+            'Noches' AS ds_TiposFacturacionHoteles,
+            nh.calc_nights AS in_cantidad,
+            ROUND((nh.total_val / NULLIF(nh.calc_nights, 0))::numeric, 2) AS am_valor,
+            CASE 
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+                ) THEN nh.total_val
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+                ) THEN 0
+                ELSE ROUND(
+                    (nh.total_val * 
                     COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
                     NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id), 0))::numeric, 2
                 )
-            )
-        END AS am_credito,
-        COALESCE(ct_main.code, 'TAR') AS cd_cargosdesc,
-        COALESCE(ct_main.name, 'TARIFA') AS ds_cargonm,
-        COALESCE(ct_main.id, 1) AS id_cargosdesc
-    FROM public."InvoicesProduct" ep
-    JOIN Item itm ON ep.id = itm.id_item
-    JOIN Facturacion f ON itm.id_factura = f.id_factura
-    LEFT JOIN public."ChargeAndTax" ct_main ON ct_main.id = ep."mainTaxId";
+            END AS am_contado,
+            CASE 
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+                ) THEN 0
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+                ) THEN nh.total_val
+                ELSE (
+                    nh.total_val - 
+                    ROUND(
+                        (nh.total_val * 
+                        COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                        NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id), 0))::numeric, 2
+                    )
+                )
+            END AS am_credito,
+            COALESCE(ct_main.code, 'TAR') AS cd_cargosdesc,
+            COALESCE(ct_main.name, 'TARIFA') AS ds_cargonm,
+            COALESCE(ct_main.id, 1) AS id_cargosdesc
+        FROM public."InvoicesProduct" ep
+        JOIN Item itm ON ep.id = itm.id_item
+        JOIN Facturacion f ON itm.id_factura = f.id_factura
+        LEFT JOIN public."ChargeAndTax" ct_main ON ct_main.id = ep."mainTaxId"
+        CROSS JOIN LATERAL (
+            SELECT
+                CASE
+                    WHEN ep.nights IS NOT NULL AND ep.nights > 0 THEN ep.nights
+                    WHEN ep."checkInDate" IS NOT NULL AND ep."checkOutDate" IS NOT NULL
+                         AND (DATE(ep."checkOutDate") - DATE(ep."checkInDate")) > 0
+                    THEN (DATE(ep."checkOutDate") - DATE(ep."checkInDate"))::int
+                    ELSE 0
+                END AS calc_nights,
+                ROUND((COALESCE(ep.price, 0) * COALESCE(NULLIF(ep.quantity, 0), 1))::numeric, 2) AS total_val
+        ) nh
+        WHERE nh.calc_nights > 0
+          AND nh.total_val > 0;
+    END IF;
 
     -- 11. Generar XML
     SELECT xmlroot(
@@ -8621,6 +8643,7 @@ DECLARE
     v_msg     TEXT;
     v_context TEXT;
     v_line    TEXT;
+    v_enviar_tipos_fac_hoteles VARCHAR(50) := '1';
 BEGIN
     -- 1. Inicializar
     mensaje_resultado := '';
@@ -8898,7 +8921,7 @@ BEGIN
 		in_cantidad INT,
 		am_contado DECIMAL,
 		am_credito DECIMAL,
-		am_valor DECIMAL GENERATED ALWAYS AS (am_contado + am_credito) STORED,
+		am_valor DECIMAL,
 		ds_cargonm varchar(50) NULL
 	) ON COMMIT DROP;
 
@@ -9386,29 +9409,57 @@ BEGIN
 	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = cs.orig_id_ref and tp."chargeAndTaxId" = qp."mainTaxId"
     WHERE COALESCE(target_ct.type, ct.type) = 'TAX';
 
-	INSERT INTO Fac_Servicios_TiposFacturacionHoteles(
-		cd_Cotizacion,
-		cd_CotizacionServicios,
-		cd_TiposFacturacionHoteles,
-		cd_cargosdesc,
-		in_cantidad,
-		am_contado,
-		am_credito,
-		ds_cargonm
-	)	
-	SELECT 
-		'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
-		'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
-		'NCH' AS cd_TiposFacturacionHoteles, --ADT Adulto,CHD Niño,HAB Habitacion,CAN Cantidad,NCH Noches
-		COALESCE(ct."code",'TAR') AS cd_cargosdesc,
-		COALESCE(NULLIF(qp.nights, 0), GREATEST(ABS(DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) AS in_cantidad,
-		COALESCE(tp."explicitAmount",0)/COALESCE(qp."quantity",1) AS am_contado,
-		0 AS am_credito,
-		COALESCE(ct."name",'Tarifa') AS ds_cargonm
-	FROM public."QuotationProduct" qp
-	JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
-	LEFT JOIN public."ChargeAndTax" ct ON ct.id = qp."mainTaxId"
-	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = qp."id" and tp."chargeAndTaxId" = qp."mainTaxId";
+	-- Poblar Fac_Servicios_TiposFacturacionHoteles (controlado por parámetro general EnviarTiposFacturacionHotelesZeus)
+	SELECT COALESCE(TRIM(value), '1')
+	INTO v_enviar_tipos_fac_hoteles
+	FROM public."SystemParameter"
+	WHERE UPPER(code) = 'ENVIARTIPOSFACTURACIONHOTELESZEUS'
+	LIMIT 1;
+
+	IF UPPER(COALESCE(v_enviar_tipos_fac_hoteles, '1')) IN ('1', 'TRUE', 'SI', 'S') THEN
+		INSERT INTO Fac_Servicios_TiposFacturacionHoteles(
+			cd_Cotizacion,
+			cd_CotizacionServicios,
+			cd_TiposFacturacionHoteles,
+			cd_cargosdesc,
+			in_cantidad,
+			am_valor,
+			am_contado,
+			am_credito,
+			ds_cargonm
+		)	
+		SELECT 
+			'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
+			'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
+			'NCH' AS cd_TiposFacturacionHoteles, --ADT Adulto,CHD Niño,HAB Habitacion,CAN Cantidad,NCH Noches
+			COALESCE(ct."code",'TAR') AS cd_cargosdesc,
+			nh.calc_nights AS in_cantidad,
+			ROUND((nh.total_val / NULLIF(nh.calc_nights, 0))::numeric, 2) AS am_valor,
+			nh.total_val AS am_contado,
+			0 AS am_credito,
+			COALESCE(ct."name",'Tarifa') AS ds_cargonm
+		FROM public."QuotationProduct" qp
+		JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
+		LEFT JOIN public."ChargeAndTax" ct ON ct.id = qp."mainTaxId"
+		LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = qp."id" and tp."chargeAndTaxId" = qp."mainTaxId"
+		CROSS JOIN LATERAL (
+			SELECT
+				CASE
+					WHEN qp.nights IS NOT NULL AND qp.nights > 0 THEN qp.nights
+					WHEN qp."checkInDate" IS NOT NULL AND qp."checkOutDate" IS NOT NULL
+					     AND (DATE(qp."checkOutDate") - DATE(qp."checkInDate")) > 0
+					THEN (DATE(qp."checkOutDate") - DATE(qp."checkInDate"))::int
+					ELSE 0
+				END AS calc_nights,
+				ROUND(COALESCE(
+					NULLIF(tp."explicitAmount", 0),
+					COALESCE(qp.price, 0) * COALESCE(NULLIF(qp.quantity, 0), 1),
+					0
+				)::numeric, 2) AS total_val
+		) nh
+		WHERE nh.calc_nights > 0
+		  AND nh.total_val > 0;
+	END IF;
 
 	INSERT INTO CotizacionServicios_TipoProv(
 		cd_Cotizacion,

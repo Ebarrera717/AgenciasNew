@@ -1266,8 +1266,8 @@ BEGIN
 			   id_cargosdesc=ISNULL(CD.id,1),
 			   ds_cargonm=ISNULL(CD.ds_nombre,'Tarifa')
 		FROM @xmlData.nodes('Cotizaciones/Cotizacion/CotizacionServicios/Fac_Servicios_TiposFacturacionHoteles') AS C(TiposFacturacionHoteles)
-		LEFT JOIN dbo.TiposFacturacionHoteles TF ON TF.cd_codigo=ISNULL(C.TiposFacturacionHoteles.value('cd_tiposfacturacionhotel[1]','VARCHAR(3)'),'') 
-		LEFT JOIN dbo.CargosDesc CD ON CD.cd_codigo=ISNULL(C.TiposFacturacionHoteles.value('cd_cargosdesc[1]','VARCHAR(3)'),'') 
+		LEFT JOIN dbo.TiposFacturacionHoteles TF ON TF.cd_codigo=ISNULL(C.TiposFacturacionHoteles.value('cd_tiposfacturacionhoteles[1]','VARCHAR(25)'),'') 
+		LEFT JOIN dbo.CargosDesc CD ON CD.cd_codigo=ISNULL(C.TiposFacturacionHoteles.value('cd_cargosdesc[1]','VARCHAR(25)'),'') 
 
 		INSERT INTO @CotizacionServicios_TipoProv(
 			cd_Cotizacion,
@@ -2071,18 +2071,31 @@ BEGIN
 		
 		UPDATE TF
 		SET TF.id_CotizacionServicios=CS.id_CotizacionServicios,
-		    TF.in_cantidad = CASE WHEN TF.Id_TiposFacturacionHoteles = 5 THEN COALESCE(NULLIF(CS.in_noches, 0), NULLIF(CS.in_nochesSrv, 0), NULLIF(TF.in_cantidad, 0), 1) ELSE TF.in_cantidad END
+		    TF.in_cantidad = CASE
+		        WHEN ISNULL(TF.in_cantidad, 0) > 0 THEN TF.in_cantidad
+		        WHEN TF.Id_TiposFacturacionHoteles = 5 THEN COALESCE(NULLIF(CS.in_noches, 0), NULLIF(CS.in_nochesSrv, 0), 0)
+		        ELSE TF.in_cantidad
+		    END
 		FROM @Fac_Servicios_TiposFacturacionHoteles TF
 		INNER JOIN @CotizacionServicios CS ON CS.cd_Consecutivo_VariablesAdicionales = TF.cd_CotizacionServicios
 		INNER JOIN @Cotizacion C ON C.cd_consecutivo = CS.cd_Cotizacion AND C.bl_existe=0;
 
-		-- Si la cotización ya existía en Zeus, actualizar in_cantidad en dbo.Fac_Servicios_TiposFacturacionHoteles
-		UPDATE FTH
-		SET FTH.in_cantidad = COALESCE(NULLIF(CS.in_noches, 0), NULLIF(CS.in_nochesSrv, 0), 1)
-		FROM dbo.Fac_Servicios_TiposFacturacionHoteles FTH
-		INNER JOIN dbo.CotizacionServicios CS ON CS.id = FTH.id_CotizacionServicios
-		INNER JOIN @Cotizacion C ON C.id_Cotizacion = CS.id_Cotizacion AND C.bl_existe = 1
-		WHERE FTH.Id_TiposFacturacionHoteles = 5;
+		-- Si la cotización ya existía en Zeus y se enviaron TiposFacturacionHoteles en el XML, sincronizar valores
+		IF EXISTS (SELECT 1 FROM @Fac_Servicios_TiposFacturacionHoteles WHERE ISNULL(in_cantidad, 0) > 0)
+		BEGIN
+			UPDATE FTH
+			SET FTH.in_cantidad = TF.in_cantidad,
+			    FTH.am_valor = TF.am_valor,
+			    FTH.am_contado = TF.am_contado,
+			    FTH.am_credito = TF.am_credito
+			FROM dbo.Fac_Servicios_TiposFacturacionHoteles FTH
+			INNER JOIN dbo.CotizacionServicios CS ON CS.id = FTH.id_CotizacionServicios
+			INNER JOIN @Cotizacion C ON C.id_Cotizacion = CS.id_Cotizacion AND C.bl_existe = 1
+			INNER JOIN @Fac_Servicios_TiposFacturacionHoteles TF
+			    ON TF.cd_CotizacionServicios = CS.cd_Consecutivo_VariablesAdicionales
+			   AND TF.Id_TiposFacturacionHoteles = FTH.Id_TiposFacturacionHoteles
+			WHERE ISNULL(TF.in_cantidad, 0) > 0;
+		END;
 
 		INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles(
 			id_Fac_Servicios,
@@ -2108,6 +2121,8 @@ BEGIN
 			   ds_cargonm
 		FROM @Fac_Servicios_TiposFacturacionHoteles
 		WHERE Id_TiposFacturacionHoteles IS NOT NULL
+		  AND id_CotizacionServicios IS NOT NULL
+		  AND ISNULL(in_cantidad, 0) > 0;
 
 
 		UPDATE TP

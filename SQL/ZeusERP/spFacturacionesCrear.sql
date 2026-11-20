@@ -2391,13 +2391,14 @@ BEGIN
 						IF @calc_noches IS NULL OR @calc_noches <= 0 SET @calc_noches = 1;
 						DECLARE @calc_dias INT = @calc_noches;
 
-						-- Build TiposFacturacionHoteles SQL
+						-- Build TiposFacturacionHoteles SQL (estrictamente controlado por XML desde Korex / parámetro EnviarTiposFacturacionHotelesZeus)
 						SET @SrvHtlSqlStmt = '';
 						DECLARE @th_id_tiposfacturacionhoteles INT, @th_in_cantidad INT, @th_am_valor MONEY, @th_am_contado MONEY, @th_am_credito MONEY, @th_id_cargosdesc INT, @th_ds_cargonm VARCHAR(100);
 						DECLARE curItemSrvHtl CURSOR LOCAL FAST_FORWARD FOR
 						SELECT Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, id_cargosdesc, ds_cargonm
 						FROM #TmpTiposFacturacionHoteles
-						WHERE id_item = @gen_id_item;
+						WHERE id_item = @gen_id_item
+						  AND ISNULL(in_cantidad, 0) > 0;
 
 						OPEN curItemSrvHtl;
 						FETCH NEXT FROM curItemSrvHtl INTO @th_id_tiposfacturacionhoteles, @th_in_cantidad, @th_am_valor, @th_am_contado, @th_am_credito, @th_id_cargosdesc, @th_ds_cargonm;
@@ -2406,7 +2407,7 @@ BEGIN
 							SET @SrvHtlSqlStmt = @SrvHtlSqlStmt + CHAR(13) + CHAR(10) + 
 								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
 								' VALUES (@NewSrvId, NULL, ' + CAST(ISNULL(@th_id_tiposfacturacionhoteles, 5) AS VARCHAR) + ', ' +
-								CAST(CASE WHEN ISNULL(@th_id_tiposfacturacionhoteles, 5) = 5 THEN ISNULL(NULLIF(@th_in_cantidad, 0), @calc_noches) ELSE ISNULL(@th_in_cantidad, 1) END AS VARCHAR) + ', ' +
+								CAST(@th_in_cantidad AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_valor, 0) AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_contado, 0) AS VARCHAR) + ', ' +
 								CAST(ISNULL(@th_am_credito, 0) AS VARCHAR) + ', NULL, ' +
@@ -2416,23 +2417,6 @@ BEGIN
 						END;
 						CLOSE curItemSrvHtl;
 						DEALLOCATE curItemSrvHtl;
-
-						-- Fallback si no vinieron TiposFacturacionHoteles en el XML pero el ítem es de servicio/hotel
-						IF ISNULL(@SrvHtlSqlStmt, '') = '' AND @calc_noches IS NOT NULL
-						BEGIN
-							DECLARE @fb_cargoid INT = 1;
-							DECLARE @fb_cargonm VARCHAR(100) = 'Tarifa';
-							SELECT TOP 1 @fb_cargoid = id_carg, @fb_cargonm = ds_nombre FROM #TmpFacturaCargos WHERE id_item = @gen_id_item AND cd_tipo IN ('C','D') ORDER BY in_orden ASC;
-							IF @fb_cargoid IS NULL SET @fb_cargoid = 1;
-							IF @fb_cargonm IS NULL SET @fb_cargonm = 'Tarifa';
-
-							SET @SrvHtlSqlStmt = CHAR(13) + CHAR(10) + 
-								' INSERT INTO dbo.Fac_Servicios_TiposFacturacionHoteles (id_Fac_Servicios, id_CotizacionServicios, Id_TiposFacturacionHoteles, in_cantidad, am_valor, am_contado, am_credito, Id_Cotizacion_Solicitud, id_cargosdesc, ds_cargonm) ' +
-								' VALUES (@NewSrvId, NULL, 5, ' + CAST(ISNULL(@calc_noches, 1) AS VARCHAR) + ', ' +
-								CAST(ISNULL(@gen_am_tarifa / NULLIF(@calc_noches, 0), @gen_am_tarifa) AS VARCHAR) + ', ' +
-								CAST(ISNULL(@gen_am_tarifa, 0) AS VARCHAR) + ', 0, NULL, ' +
-								CAST(@fb_cargoid AS VARCHAR) + ', ''' + REPLACE(@fb_cargonm, '''', '''''') + ''');';
-						END;
 
 						SET @SrvSqlStmt = @SrvVarsSqlStmt + @SrvCargSqlStmt + @SrvFpSqlStmt + @SrvProvSqlStmt + @SrvHtlSqlStmt;
 						

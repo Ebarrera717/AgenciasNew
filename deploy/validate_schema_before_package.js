@@ -768,8 +768,23 @@ async function validateAndPrepareSchema(customConnStr) {
   }
   console.log("  [OK] Auditoría de firmas de parámetros entre API Routes y DB completada con 0 errores.");
 
-  // 4. Sincronizar scripts actualizadores
+  // 4. Sincronizar scripts actualizadores PostgreSQL desde la fuente única SQL/PostgreSQL/Actualizador.sql
   console.log("\n[PASO 4/4] Sincronizando scripts actualizadores (Actualizador.sql)...");
+  const pgMasterUpdater = path.join(rootDir, 'SQL', 'PostgreSQL', 'Actualizador.sql');
+  if (fs.existsSync(pgMasterUpdater)) {
+    const pgTargets = [
+      path.join(rootDir, 'SQL', 'Actualizador', 'Actualizador.sql'),
+      path.join(rootDir, 'SQL', 'Actualizador.SQL'),
+      path.join(rootDir, 'RELEASE_KOREX', 'SQL', 'Actualizador.SQL')
+    ];
+    for (const target of pgTargets) {
+      const targetDir = path.dirname(target);
+      if (fs.existsSync(targetDir)) {
+        fs.copyFileSync(pgMasterUpdater, target);
+        console.log(`  [SYNC] Actualizador PostgreSQL sincronizado -> ${path.relative(rootDir, target)}`);
+      }
+    }
+  }
   const updateScriptPath = path.join(rootDir, 'scratch', 'update_sql_actualizadores.js');
   if (fs.existsSync(updateScriptPath)) {
     require(updateScriptPath);

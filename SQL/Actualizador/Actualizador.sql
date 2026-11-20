@@ -1,2229 +1,110 @@
--- ==========================================================
--- ARCHIVO ACTUALIZADOR COMPLETO: TABLAS + FUNCIONES + SPS
--- Generado Automáticamente
--- ==========================================================
+-- ============================================================================
+-- AGENCIASNEW - SCRIPT DE ACTUALIZACIÓN COMPLETA PARA POSTGRESQL
+-- Archivo: SQL/PostgreSQL/Actualizador.sql
+-- Motor: PostgreSQL 12+ (PL/pgSQL)
+-- ============================================================================
 
--- >>> 1. CREACIÓN DE TABLAS E ÍNDICES (TABLEINI) <<<
-
-do $$
-BEGIN
-
-    CREATE TABLE IF NOT EXISTS public."Branch" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        logo bytea,
-        template bytea,
-        "templateConfig" jsonb,
-        "htmlTemplate" text
-    );
-    CREATE TABLE IF NOT EXISTS public."Client" (
-        id integer NOT NULL,
-        name text NOT NULL,
-        document text NOT NULL,
-        "contactInfo" text,
-        address text,
-        "mandatoryVariables" jsonb
-    );
-    CREATE TABLE IF NOT EXISTS public."Implant" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        "branchId" integer,
-        logo bytea,
-        template bytea,
-        "templateConfig" jsonb,
-        "htmlTemplate" text,
-        "Logo" bytea
-    );
-    CREATE TABLE IF NOT EXISTS public."ChargeAndTax" (
-        id integer NOT NULL,
-        name text NOT NULL,
-        type text NOT NULL,
-        "valueType" text NOT NULL,
-        value double precision NOT NULL,
-        "isEditable" boolean DEFAULT true NOT NULL,
-        code text
-    );
-    CREATE TABLE IF NOT EXISTS public."Menu" (
-        id integer NOT NULL,
-        code character varying(100) NOT NULL,
-        name character varying(255) NOT NULL,
-        parent integer,
-        action character varying(500) NOT NULL,
-        activo boolean DEFAULT true
-    );
-    CREATE TABLE IF NOT EXISTS public."SystemParameter" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        value text NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS public."Product" (
-        id integer NOT NULL,
-        type text NOT NULL,
-        description text NOT NULL,
-        "basePrice" double precision NOT NULL,
-        cost double precision DEFAULT 0,
-        "billingConcept" text,
-        "serviceType" text,
-        code text,
-        "airlineItinerary" text,
-        "classItinerary" text,
-        "flightItinerary" text,
-        "ticketTypeId" integer,
-        "mandatoryFields" jsonb
-    );
-    CREATE TABLE IF NOT EXISTS public."Seller" (
-        id integer NOT NULL,
-        code text,
-        name text NOT NULL,
-        email text
-    );
-    CREATE TABLE IF NOT EXISTS public."TicketPrinter" (
-        id integer NOT NULL,
-        code text,
-        name text NOT NULL,
-        email text
-    );
-    CREATE TABLE IF NOT EXISTS public."MasterVariable" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS public."Airports" (
-        id integer NOT NULL,
-        code character varying(10) NOT NULL,
-        name character varying(150) NOT NULL,
-        "citiesId" integer NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Airports_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Airports_id_seq" OWNED BY public."Airports".id;
-    CREATE TABLE IF NOT EXISTS public."Attachment" (
-        id integer NOT NULL,
-        "quotationId" integer NOT NULL,
-        "fileName" text NOT NULL,
-        "fileType" text NOT NULL,
-        "fileSize" integer NOT NULL,
-        "fileContent" bytea NOT NULL,
-        "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Attachment_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Attachment_id_seq" OWNED BY public."Attachment".id;
-    CREATE TABLE IF NOT EXISTS public."BookingGDS" (
-        id integer NOT NULL,
-        code character varying(25) NOT NULL,
-        type character varying(25) NOT NULL,
-        blanch character varying(25) NOT NULL,
-        implant character varying(25),
-        external boolean DEFAULT false NOT NULL,
-        gds integer,
-        date timestamp without time zone DEFAULT now(),
-        currency text NOT NULL,
-        "exchangeRate" double precision NOT NULL,
-        "tiquetPrinter" character varying(25) NOT NULL,
-        seller character varying(25) NOT NULL,
-        client character varying(25) NOT NULL,
-        booking text,
-        typetransaction character varying(25),
-        iata character varying(25),
-        description text,
-        observation text,
-        state character varying(25)
-    );
-    CREATE TABLE IF NOT EXISTS public."BookingGDSInvoiceAutoLog" (
-        "Id" integer NOT NULL,
-        "branchId" integer,
-        "implanteId" integer,
-        date timestamp without time zone,
-        menssage text,
-        "bookingCode" character varying(25),
-        "bookingId" integer,
-        error boolean,
-        file text,
-        "userId" integer
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingGDSInvoiceAutoLog_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingGDSInvoiceAutoLog_id_seq" OWNED BY public."BookingGDSInvoiceAutoLog"."Id";
-    CREATE SEQUENCE IF NOT EXISTS public."BookingGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingGDS_id_seq" OWNED BY public."BookingGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingProductFEEGDS" (
-        id integer NOT NULL,
-        "bookingProductId" integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        type text NOT NULL,
-        description text NOT NULL,
-        billigconcept text NOT NULL,
-        servicetype text NOT NULL,
-        amount double precision NOT NULL,
-        tax double precision NOT NULL,
-        other double precision NOT NULL,
-        total double precision NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingProductFEEGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingProductFEEGDS_id_seq" OWNED BY public."BookingProductFEEGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingProductGDS" (
-        id integer NOT NULL,
-        "bookingId" integer NOT NULL,
-        code character varying(25) NOT NULL,
-        type character varying(25),
-        service text,
-        description text,
-        prestadoracode character varying(25),
-        prestadorainitials character varying(25),
-        prestadoradist character varying(25),
-        provider character varying(25),
-        quantity integer NOT NULL,
-        price double precision NOT NULL,
-        cost double precision DEFAULT 0,
-        "checkInDate" timestamp(3) without time zone,
-        "checkOutDate" timestamp(3) without time zone,
-        nights integer,
-        "paxAdults" integer,
-        "paxChildren" integer,
-        "serviceType" text,
-        "billingConcept" text,
-        destination text,
-        "reservationCode" text,
-        "sellerCom" double precision,
-        "ticketPrinterCom" double precision,
-        "inNationality" integer DEFAULT 1,
-        state character varying(25) DEFAULT 'NUEVO'::character varying,
-        conjunction integer DEFAULT 0,
-        revised character varying(25),
-        typeproduct character varying(25),
-        consecutive character varying(25),
-        penalty character varying(25)
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingProductGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingProductGDS_id_seq" OWNED BY public."BookingProductGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingProductItineraryGDS" (
-        id integer NOT NULL,
-        "bookingProductId" integer NOT NULL,
-        orden integer,
-        origin text NOT NULL,
-        destination text NOT NULL,
-        class text NOT NULL,
-        "checkInDate" timestamp(3) without time zone,
-        "checkOutDate" timestamp(3) without time zone,
-        terminal text NOT NULL,
-        "prestadoraCode" text NOT NULL,
-        farebasis text NOT NULL,
-        "Numflight" character varying(25),
-        "Typeflight" character varying(1),
-        amount double precision NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingProductItineraryGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingProductItineraryGDS_id_seq" OWNED BY public."BookingProductItineraryGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingProductPassangerGDS" (
-        id integer NOT NULL,
-        "bookingProductId" integer NOT NULL,
-        code character varying(25),
-        firstnm character varying(30),
-        lastnm character varying(30),
-        prefix character varying(25),
-        identification character varying(25),
-        phone character varying(25),
-        email character varying(250)
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingProductPassangerGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingProductPassangerGDS_id_seq" OWNED BY public."BookingProductPassangerGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingProductPaymentGDS" (
-        id integer NOT NULL,
-        "bookingProductId" integer,
-        "bookingProductFEEId" integer,
-        code character varying(50) NOT NULL,
-        name character varying(50) NOT NULL,
-        type character varying(50) NOT NULL,
-        typecreditcard character varying(25),
-        numbercreditcard character varying(16),
-        vouchercreditcard character varying(25),
-        expiredcreditcard character varying(5),
-        authcreditcard character varying(25),
-        quotas integer,
-        bank character varying(25),
-        square character varying(30),
-        reference character varying(50),
-        policy character varying(25),
-        policyannex character varying(25),
-        amount double precision NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingProductPaymentGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingProductPaymentGDS_id_seq" OWNED BY public."BookingProductPaymentGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingProductTaxGDS" (
-        id integer NOT NULL,
-        "bookingProductId" integer NOT NULL,
-        code character varying(25) NOT NULL,
-        name character varying(50) NOT NULL,
-        type character varying(25) NOT NULL,
-        ismain boolean DEFAULT false,
-        percentage double precision NOT NULL,
-        amount double precision NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingProductTaxGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingProductTaxGDS_id_seq" OWNED BY public."BookingProductTaxGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingProductVariableGDS" (
-        id integer NOT NULL,
-        "bookingProductId" integer NOT NULL,
-        code text,
-        name text,
-        value text
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingProductVariableGDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingProductVariableGDS_id_seq" OWNED BY public."BookingProductVariableGDS".id;
-    CREATE TABLE IF NOT EXISTS public."BookingsGDSInvoiceAuto" (
-        id integer NOT NULL,
-        "Branch" character varying(25),
-        implant character varying(25),
-        "bookingCode" character varying(25),
-        "bookingId" integer
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingsGDSInvoiceAuto_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingsGDSInvoiceAuto_id_seq" OWNED BY public."BookingsGDSInvoiceAuto".id;
-    CREATE TABLE IF NOT EXISTS public."BookingsGDS_log" (
-        id integer NOT NULL,
-        blanch character varying(25),
-        implant character varying(25),
-        message text,
-        file character varying(250),
-        codebooking character varying(50),
-        booking text,
-        error integer DEFAULT 0 NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BookingsGDS_log_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BookingsGDS_log_id_seq" OWNED BY public."BookingsGDS_log".id;
-    CREATE TABLE IF NOT EXISTS public."BranchGDSInvoiceAuto" (
-        id integer NOT NULL,
-        "branchId" integer NOT NULL,
-        "gdsId" integer NOT NULL,
-        "EnvoiceAuto" boolean DEFAULT false
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."BranchGDSInvoiceAuto_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."BranchGDSInvoiceAuto_id_seq" OWNED BY public."BranchGDSInvoiceAuto".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Branch_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Branch_id_seq" OWNED BY public."Branch".id;
-    CREATE TABLE IF NOT EXISTS public."CellCustomization" (
-        id integer NOT NULL,
-        code character varying(50) NOT NULL,
-        name character varying(100) NOT NULL,
-        value character varying(10),
-        "branchId" integer,
-        "implantId" integer
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."CellCustomization_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."CellCustomization_id_seq" OWNED BY public."CellCustomization".id;
-    CREATE SEQUENCE IF NOT EXISTS public."ChargeAndTax_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."ChargeAndTax_id_seq" OWNED BY public."ChargeAndTax".id;
-    CREATE TABLE IF NOT EXISTS public."Cities" (
-        id integer NOT NULL,
-        code character varying(10) NOT NULL,
-        name character varying(100) NOT NULL,
-        "countriesId" integer NOT NULL,
-        statecode character varying(25),
-        iata character varying(10)
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Cities_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Cities_id_seq" OWNED BY public."Cities".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Client_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Client_id_seq" OWNED BY public."Client".id;
-    CREATE TABLE IF NOT EXISTS public."Combo" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        cupos integer DEFAULT 0,
-        "currencyId" integer,
-        "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        "updatedAt" timestamp without time zone DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS public."ComboProduct" (
-        id integer NOT NULL,
-        "comboId" integer NOT NULL,
-        "productId" integer NOT NULL,
-        price double precision NOT NULL,
-        cost double precision DEFAULT 0,
-        "checkInDate" timestamp(3) without time zone,
-        "checkOutDate" timestamp(3) without time zone,
-        "prestadoraId" integer,
-        "mainTaxId" integer,
-        "paxAdults" integer,
-        "paxChildren" integer,
-        "providerId" integer,
-        "inNationality" integer DEFAULT 1,
-        quantity integer DEFAULT 1 NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS public."ComboProductTax" (
-        id integer NOT NULL,
-        "comboProductId" integer NOT NULL,
-        "chargeAndTaxId" integer NOT NULL,
-        amount double precision NOT NULL,
-        "isMain" boolean DEFAULT false NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."ComboProductTax_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."ComboProductTax_id_seq" OWNED BY public."ComboProductTax".id;
-    CREATE SEQUENCE IF NOT EXISTS public."ComboProduct_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."ComboProduct_id_seq" OWNED BY public."ComboProduct".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Combo_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Combo_id_seq" OWNED BY public."Combo".id;
-    CREATE TABLE IF NOT EXISTS public."Countries" (
-        id integer NOT NULL,
-        code character varying(10) NOT NULL,
-        name character varying(100) NOT NULL,
-        dane character varying(25),
-        region character varying(50),
-        prefix character varying(10),
-        "curencyId" integer
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Countries_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Countries_id_seq" OWNED BY public."Countries".id;
-    CREATE TABLE IF NOT EXISTS public."CreditCard" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        type text NOT NULL,
-        inactive boolean DEFAULT false NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."CreditCard_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."CreditCard_id_seq" OWNED BY public."CreditCard".id;
-    CREATE TABLE IF NOT EXISTS public."Currency" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        "exchangeRate" double precision NOT NULL,
-        decimals integer DEFAULT 2 NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Currency_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Currency_id_seq" OWNED BY public."Currency".id;
-    CREATE TABLE IF NOT EXISTS public."EquivalencesInterfaces" (
-        id integer NOT NULL,
-        id_interfaces integer NOT NULL,
-        id_master integer NOT NULL,
-        cd_maestro text NOT NULL,
-        cd_codigo text NOT NULL,
-        cd_codigointe text NOT NULL,
-        dt_fecha timestamp without time zone DEFAULT now()
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."EquivalencesInterfaces_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."EquivalencesInterfaces_id_seq" OWNED BY public."EquivalencesInterfaces".id;
-    CREATE TABLE IF NOT EXISTS public."EquivalenciasInterfaces_Log" (
-        id integer NOT NULL,
-        "Id_Interfaces" integer,
-        cd_maestro character varying(50),
-        cd_codigo character varying(50),
-        "cd_codigoInte" character varying(50),
-        cd_operacion character varying(50),
-        ds_xmlpeticion text,
-        ds_xmlrespuesta text,
-        ds_xmlorg text,
-        "ds_Logpeticion" text,
-        fecha_creacion timestamp(6) without time zone DEFAULT now()
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."EquivalenciasInterfaces_Log_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."EquivalenciasInterfaces_Log_id_seq" OWNED BY public."EquivalenciasInterfaces_Log".id;
-    CREATE TABLE IF NOT EXISTS public."FormatCellCustomization" (
-        id integer NOT NULL,
-        "formatId" integer NOT NULL,
-        code character varying(50) NOT NULL,
-        name character varying(100) NOT NULL,
-        value character varying(10)
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."FormatCellCustomization_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."FormatCellCustomization_id_seq" OWNED BY public."FormatCellCustomization".id;
-    CREATE TABLE IF NOT EXISTS public."GDS" (
-        id integer NOT NULL,
-        name text NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."GDS_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."GDS_id_seq" OWNED BY public."GDS".id;
-    CREATE TABLE IF NOT EXISTS public."Prestadora" (
-        id integer NOT NULL,
-        name text NOT NULL,
-        location text,
-        category text,
-        "providerId" integer,
-        code text,
-        type text,
-        initials text,
-        nogds text
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Hotel_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Hotel_id_seq" OWNED BY public."Prestadora".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Implant_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Implant_id_seq" OWNED BY public."Implant".id;
-    CREATE TABLE IF NOT EXISTS public."Interfaces" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        inactivo boolean DEFAULT false NOT NULL,
-        bl_genera_archivoplano boolean DEFAULT false NOT NULL,
-        ds_storedprocedure_archivoplano text,
-        bl_job boolean DEFAULT false NOT NULL,
-        ds_namejob text,
-        bl_facturador boolean DEFAULT false NOT NULL,
-        id_gds integer
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Interfaces_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Interfaces_id_seq" OWNED BY public."Interfaces".id;
-    CREATE TABLE IF NOT EXISTS public."Invoices" (
-        id integer NOT NULL,
-        "internalNumber" character varying(255) NOT NULL,
-        date timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        "clientId" integer NOT NULL,
-        currency character varying(50) NOT NULL,
-        "exchangeRate" double precision NOT NULL,
-        "branchId" integer NOT NULL,
-        "implantId" integer,
-        "sellerId" integer,
-        "ticketPrinterId" integer,
-        "baseCommissionable" double precision NOT NULL,
-        "commissionPercentage" double precision NOT NULL,
-        "chargesAndTaxes" double precision NOT NULL,
-        "totalAmount" double precision NOT NULL,
-        "userId" integer,
-        state character varying(25) DEFAULT 'NUEVO'::character varying
-    );
-    CREATE TABLE IF NOT EXISTS public."InvoicesProduct" (
-        id integer NOT NULL,
-        "invoiceId" integer NOT NULL,
-        "productId" integer NOT NULL,
-        quantity integer NOT NULL,
-        price double precision NOT NULL,
-        cost double precision DEFAULT 0,
-        "providerId" integer,
-        "prestadoraId" integer,
-        "checkInDate" timestamp without time zone,
-        "checkOutDate" timestamp without time zone,
-        nights integer,
-        "paxAdults" integer,
-        "paxChildren" integer,
-        "serviceType" character varying(255),
-        destination character varying(255),
-        "reservationCode" character varying(255),
-        "sellerCommission" double precision,
-        "ticketPrinterCommission" double precision,
-        "comboId" integer,
-        "mainTaxId" integer,
-        "inNationality" integer DEFAULT 1,
-        servicios text,
-        descripcion text,
-        itinerary text,
-        class character varying(100),
-        "ticketTypeId" integer,
-        airline character varying(100)
-    );
-    CREATE TABLE IF NOT EXISTS public."InvoicesProductCombo" (
-        id integer NOT NULL,
-        "invoiceId" integer NOT NULL,
-        "comboId" integer NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."InvoicesProductCombo_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."InvoicesProductCombo_id_seq" OWNED BY public."InvoicesProductCombo".id;
-    CREATE TABLE IF NOT EXISTS public."InvoicesProductItinerary" (
-        id integer NOT NULL,
-        "invoiceProductId" integer NOT NULL,
-        orden integer,
-        origin character varying(255) NOT NULL,
-        destination character varying(255) NOT NULL,
-        class character varying(255),
-        "checkInDate" timestamp without time zone,
-        "checkOutDate" timestamp without time zone,
-        terminal character varying(255),
-        "prestadoraCode" character varying(255),
-        farebasis character varying(255),
-        "Numflight" character varying(25),
-        "Typeflight" character varying(1),
-        amount double precision
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."InvoicesProductItinerary_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."InvoicesProductItinerary_id_seq" OWNED BY public."InvoicesProductItinerary".id;
-    CREATE TABLE IF NOT EXISTS public."InvoicesProductPasenger" (
-        id integer NOT NULL,
-        "invoiceProductId" integer NOT NULL,
-        name character varying(255) NOT NULL,
-        document character varying(255) NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."InvoicesProductPasenger_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."InvoicesProductPasenger_id_seq" OWNED BY public."InvoicesProductPasenger".id;
-    CREATE TABLE IF NOT EXISTS public."InvoicesProductPayment" (
-        id integer NOT NULL,
-        "invoiceProductId" integer NOT NULL,
-        amount double precision NOT NULL,
-        "paymentMethod" character varying(100),
-        date timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-        reference character varying(255),
-        "authorizationCode" text,
-        "cardNumber" text,
-        "creditCardId" integer,
-        "expirationDate" text,
-        voucher text
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."InvoicesProductPayment_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."InvoicesProductPayment_id_seq" OWNED BY public."InvoicesProductPayment".id;
-    CREATE TABLE IF NOT EXISTS public."InvoicesProductTax" (
-        id integer NOT NULL,
-        "invoiceProductId" integer NOT NULL,
-        "chargeAndTaxId" integer NOT NULL,
-        "valueSnapshot" double precision NOT NULL,
-        "valueTypeSnapshot" character varying(50) NOT NULL,
-        "explicitAmount" double precision,
-        "isMain" boolean DEFAULT false
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."InvoicesProductTax_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."InvoicesProductTax_id_seq" OWNED BY public."InvoicesProductTax".id;
-    CREATE TABLE IF NOT EXISTS public."InvoicesProductVariable" (
-        id integer NOT NULL,
-        "invoiceProductId" integer NOT NULL,
-        "masterVariableId" integer NOT NULL,
-        value character varying(255) NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."InvoicesProductVariable_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."InvoicesProductVariable_id_seq" OWNED BY public."InvoicesProductVariable".id;
-    CREATE SEQUENCE IF NOT EXISTS public."InvoicesProduct_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."InvoicesProduct_id_seq" OWNED BY public."InvoicesProduct".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Invoices_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."Invoices_id_seq" OWNED BY public."Invoices".id;
-    CREATE TABLE IF NOT EXISTS public."Master" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        inactivo boolean DEFAULT false NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."MasterVariable_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."MasterVariable_id_seq" OWNED BY public."MasterVariable".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Master_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Master_id_seq" OWNED BY public."Master".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Menu_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."Menu_id_seq" OWNED BY public."Menu".id;
-    CREATE TABLE IF NOT EXISTS public."Payment" (
-        id integer NOT NULL,
-        code text NOT NULL,
-        name text NOT NULL,
-        inactive boolean DEFAULT false NOT NULL,
-        iscash boolean DEFAULT false NOT NULL,
-        iscredit boolean DEFAULT false NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Payment_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Payment_id_seq" OWNED BY public."Payment".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Product_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Product_id_seq" OWNED BY public."Product".id;
-    CREATE TABLE IF NOT EXISTS public."Provider" (
-        id integer NOT NULL,
-        code text,
-        name text NOT NULL,
-        "contactInfo" text,
-        "commissionConfig" jsonb
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Provider_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Provider_id_seq" OWNED BY public."Provider".id;
-    CREATE TABLE IF NOT EXISTS public."Quotation" (
-        id integer NOT NULL,
-        "internalNumber" text NOT NULL,
-        date timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        "clientId" integer NOT NULL,
-        currency text NOT NULL,
-        "exchangeRate" double precision NOT NULL,
-        "branchId" integer NOT NULL,
-        "implantId" integer,
-        "sellerId" integer,
-        "ticketPrinterId" integer,
-        "baseCommissionable" double precision NOT NULL,
-        "commissionPercentage" double precision NOT NULL,
-        "chargesAndTaxes" double precision NOT NULL,
-        "totalAmount" double precision NOT NULL,
-        "userId" integer,
-        state character varying(25) DEFAULT 'Nuevo'::character varying,
-        "stateDescription" text,
-        "stateUpdatedAt" timestamp without time zone,
-        "costoTotal" double precision DEFAULT 0,
-        "valorBase" double precision DEFAULT 0,
-        utilidad double precision DEFAULT 0,
-        "comisionTotalPercentage" double precision DEFAULT 0,
-        "comisionFreelancePercentage" double precision DEFAULT 0,
-        "comisionFreelanceValue" double precision DEFAULT 0,
-        "comisionPropiaPercentage" double precision DEFAULT 0,
-        "comisionPropiaValue" double precision DEFAULT 0,
-        "comisionUtilidadPercentage" double precision DEFAULT 0,
-        destination character varying(255),
-        "startDate" timestamp without time zone,
-        "endDate" timestamp without time zone,
-        passenger character varying(255),
-        "paxAdults" integer,
-        "paxChildren" integer,
-        "reservationCode" character varying(255),
-        "copyFieldsToProducts" boolean DEFAULT true,
-        "manualDescription" text
-    );
-    CREATE TABLE IF NOT EXISTS public."QuotationCombo" (
-        id integer NOT NULL,
-        "quotationId" integer NOT NULL,
-        "comboId" integer NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationCombo_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationCombo_id_seq" OWNED BY public."QuotationCombo".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationFormat" (
-        id integer NOT NULL,
-        name character varying(100) NOT NULL,
-        description character varying(255),
-        template bytea,
-        "templateConfig" jsonb,
-        "htmlTemplate" text,
-        "branchId" integer,
-        "implantId" integer,
-        "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationFormat_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationFormat_id_seq" OWNED BY public."QuotationFormat".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationManualService" (
-        id integer NOT NULL,
-        "quotationId" integer NOT NULL,
-        "providerName" character varying(255),
-        "serviceName" character varying(255),
-        cost double precision DEFAULT 0,
-        "salePrice" double precision DEFAULT 0,
-        utility double precision DEFAULT 0,
-        "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationManualService_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationManualService_id_seq" OWNED BY public."QuotationManualService".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationPrintCustomization" (
-        id integer NOT NULL,
-        "quotationId" integer NOT NULL,
-        html text NOT NULL,
-        "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationPrintCustomization_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationPrintCustomization_id_seq" OWNED BY public."QuotationPrintCustomization".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationPrintDefaultTemplate" (
-        id integer NOT NULL,
-        html text NOT NULL,
-        name character varying(100) DEFAULT 'Default'::character varying,
-        "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationPrintDefaultTemplate_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationPrintDefaultTemplate_id_seq" OWNED BY public."QuotationPrintDefaultTemplate".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationProduct" (
-        id integer NOT NULL,
-        "quotationId" integer NOT NULL,
-        "productId" integer NOT NULL,
-        quantity integer NOT NULL,
-        price double precision NOT NULL,
-        cost double precision DEFAULT 0,
-        "providerId" integer,
-        "prestadoraId" integer,
-        "checkInDate" timestamp(3) without time zone,
-        "checkOutDate" timestamp(3) without time zone,
-        nights integer,
-        "paxAdults" integer,
-        "paxChildren" integer,
-        "serviceType" text,
-        destination text,
-        "reservationCode" text,
-        "sellerCommission" double precision,
-        "ticketPrinterCommission" double precision,
-        "comboId" integer,
-        "mainTaxId" integer,
-        "inNationality" integer DEFAULT 1,
-        service text,
-        description text,
-        servicios text,
-        descripcion text,
-        passenger character varying(255)
-    );
-    CREATE TABLE IF NOT EXISTS public."QuotationProductPassenger" (
-        id integer NOT NULL,
-        "quotationProductId" integer NOT NULL,
-        name text NOT NULL,
-        document text NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationProductPassenger_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationProductPassenger_id_seq" OWNED BY public."QuotationProductPassenger".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationProductPayment" (
-        id integer NOT NULL,
-        "quotationProductId" integer NOT NULL,
-        amount double precision NOT NULL,
-        "paymentMethod" character varying(100),
-        date timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-        reference character varying(255),
-        "creditCardId" integer,
-        "cardNumber" character varying(20),
-        "authorizationCode" character varying(50),
-        voucher character varying(50),
-        "expirationDate" character varying(10)
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationProductPayment_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationProductPayment_id_seq" OWNED BY public."QuotationProductPayment".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationProductTax" (
-        id integer NOT NULL,
-        "quotationProductId" integer NOT NULL,
-        "chargeAndTaxId" integer NOT NULL,
-        "valueSnapshot" double precision NOT NULL,
-        "valueTypeSnapshot" text NOT NULL,
-        "explicitAmount" double precision,
-        "isMain" boolean DEFAULT false NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationProductTax_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationProductTax_id_seq" OWNED BY public."QuotationProductTax".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationProductVariable" (
-        id integer NOT NULL,
-        "quotationProductId" integer NOT NULL,
-        "masterVariableId" integer NOT NULL,
-        value text NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationProductVariable_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationProductVariable_id_seq" OWNED BY public."QuotationProductVariable".id;
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationProduct_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationProduct_id_seq" OWNED BY public."QuotationProduct".id;
-    CREATE TABLE IF NOT EXISTS public."QuotationState" (
-        id integer NOT NULL,
-        code character varying(25) NOT NULL,
-        name character varying(50) NOT NULL,
-        color character varying(20),
-        "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS public."QuotationStateHistory" (
-        id integer NOT NULL,
-        "quotationId" integer NOT NULL,
-        state character varying(25) NOT NULL,
-        description text,
-        "createdAt" timestamp(6) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        "userId" integer
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationStateHistory_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationStateHistory_id_seq" OWNED BY public."QuotationStateHistory".id;
-    CREATE SEQUENCE IF NOT EXISTS public."QuotationState_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."QuotationState_id_seq" OWNED BY public."QuotationState".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Quotation_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Quotation_id_seq" OWNED BY public."Quotation".id;
-    CREATE TABLE IF NOT EXISTS public."Report" (
-        id integer NOT NULL,
-        name character varying(255) NOT NULL,
-        base_table character varying(100),
-        description text,
-        custom_sql text,
-        created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS public."ReportColumns" (
-        id integer NOT NULL,
-        report_id integer NOT NULL,
-        table_alias character varying(20),
-        column_name character varying(100) NOT NULL,
-        alias character varying(150),
-        is_calculated boolean DEFAULT false,
-        is_visible boolean DEFAULT true,
-        formula_expression text,
-        sort_order integer DEFAULT 0
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."ReportColumns_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."ReportColumns_id_seq" OWNED BY public."ReportColumns".id;
-    CREATE TABLE IF NOT EXISTS public."ReportFilters" (
-        id integer NOT NULL,
-        report_id integer NOT NULL,
-        table_alias character varying(20),
-        column_name character varying(100) NOT NULL,
-        filter_label character varying(150),
-        filter_type character varying(50) NOT NULL,
-        operator character varying(20) DEFAULT '='::character varying,
-        sort_order integer DEFAULT 0
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."ReportFilters_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."ReportFilters_id_seq" OWNED BY public."ReportFilters".id;
-    CREATE TABLE IF NOT EXISTS public."ReportJoins" (
-        id integer NOT NULL,
-        report_id integer NOT NULL,
-        table_name character varying(100) NOT NULL,
-        alias character varying(20) NOT NULL,
-        join_type character varying(50) DEFAULT 'INNER JOIN'::character varying NOT NULL,
-        join_condition text NOT NULL,
-        sort_order integer DEFAULT 0
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."ReportJoins_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."ReportJoins_id_seq" OWNED BY public."ReportJoins".id;
-    CREATE TABLE IF NOT EXISTS public."ReportSorts" (
-        id integer NOT NULL,
-        report_id integer NOT NULL,
-        column_expr text NOT NULL,
-        direction character varying(10) DEFAULT 'ASC'::character varying,
-        sort_order integer DEFAULT 0
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."ReportSorts_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."ReportSorts_id_seq" OWNED BY public."ReportSorts".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Report_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."Report_id_seq" OWNED BY public."Report".id;
-    CREATE TABLE IF NOT EXISTS public."Role" (
-        id integer NOT NULL,
-        name text NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."Role_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Role_id_seq" OWNED BY public."Role".id;
-    CREATE SEQUENCE IF NOT EXISTS public."Seller_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."Seller_id_seq" OWNED BY public."Seller".id;
-    CREATE TABLE IF NOT EXISTS public."SystemLog" (
-        id integer NOT NULL,
-        "userId" integer,
-        action text NOT NULL,
-        module text NOT NULL,
-        description text NOT NULL,
-        metadata jsonb,
-        "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."SystemLog_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."SystemLog_id_seq" OWNED BY public."SystemLog".id;
-    CREATE SEQUENCE IF NOT EXISTS public."SystemParameter_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."SystemParameter_id_seq" OWNED BY public."SystemParameter".id;
-    CREATE SEQUENCE IF NOT EXISTS public."TicketPrinter_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."TicketPrinter_id_seq" OWNED BY public."TicketPrinter".id;
-    CREATE TABLE IF NOT EXISTS public."TicketType" (
-        id integer NOT NULL,
-        code character varying(50) NOT NULL,
-        name character varying(255) NOT NULL,
-        description text,
-        "isActive" boolean DEFAULT true
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."TicketType_id_seq"
-        AS integer
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1;
-    ALTER SEQUENCE public."TicketType_id_seq" OWNED BY public."TicketType".id;
-    CREATE TABLE IF NOT EXISTS public."User" (
-        id integer NOT NULL,
-        name text NOT NULL,
-        email text NOT NULL,
-        "passwordHash" text NOT NULL,
-        "resetPasswordToken" text,
-        "resetPasswordExpires" timestamp(3) without time zone,
-        "roleId" integer NOT NULL,
-        "branchId" integer,
-        "implantId" integer,
-        "ticketPrinterId" integer,
-        "canEditReports" boolean DEFAULT false
-    );
-    CREATE SEQUENCE IF NOT EXISTS public."User_id_seq"
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        MAXVALUE 2147483647
-        CACHE 1;
-    ALTER SEQUENCE public."User_id_seq" OWNED BY public."User".id;
-    ALTER TABLE ONLY public."Airports" ALTER COLUMN id SET DEFAULT nextval('public."Airports_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Attachment" ALTER COLUMN id SET DEFAULT nextval('public."Attachment_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingGDSInvoiceAutoLog" ALTER COLUMN "Id" SET DEFAULT nextval('public."BookingGDSInvoiceAutoLog_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingProductFEEGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingProductFEEGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingProductGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingProductGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingProductItineraryGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingProductItineraryGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingProductPassangerGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingProductPassangerGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingProductPaymentGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingProductPaymentGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingProductTaxGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingProductTaxGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingProductVariableGDS" ALTER COLUMN id SET DEFAULT nextval('public."BookingProductVariableGDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingsGDSInvoiceAuto" ALTER COLUMN id SET DEFAULT nextval('public."BookingsGDSInvoiceAuto_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BookingsGDS_log" ALTER COLUMN id SET DEFAULT nextval('public."BookingsGDS_log_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Branch" ALTER COLUMN id SET DEFAULT nextval('public."Branch_id_seq"'::regclass);
-    ALTER TABLE ONLY public."BranchGDSInvoiceAuto" ALTER COLUMN id SET DEFAULT nextval('public."BranchGDSInvoiceAuto_id_seq"'::regclass);
-    ALTER TABLE ONLY public."CellCustomization" ALTER COLUMN id SET DEFAULT nextval('public."CellCustomization_id_seq"'::regclass);
-    ALTER TABLE ONLY public."ChargeAndTax" ALTER COLUMN id SET DEFAULT nextval('public."ChargeAndTax_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Cities" ALTER COLUMN id SET DEFAULT nextval('public."Cities_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Client" ALTER COLUMN id SET DEFAULT nextval('public."Client_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Combo" ALTER COLUMN id SET DEFAULT nextval('public."Combo_id_seq"'::regclass);
-    ALTER TABLE ONLY public."ComboProduct" ALTER COLUMN id SET DEFAULT nextval('public."ComboProduct_id_seq"'::regclass);
-    ALTER TABLE ONLY public."ComboProductTax" ALTER COLUMN id SET DEFAULT nextval('public."ComboProductTax_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Countries" ALTER COLUMN id SET DEFAULT nextval('public."Countries_id_seq"'::regclass);
-    ALTER TABLE ONLY public."CreditCard" ALTER COLUMN id SET DEFAULT nextval('public."CreditCard_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Currency" ALTER COLUMN id SET DEFAULT nextval('public."Currency_id_seq"'::regclass);
-    ALTER TABLE ONLY public."EquivalencesInterfaces" ALTER COLUMN id SET DEFAULT nextval('public."EquivalencesInterfaces_id_seq"'::regclass);
-    ALTER TABLE ONLY public."EquivalenciasInterfaces_Log" ALTER COLUMN id SET DEFAULT nextval('public."EquivalenciasInterfaces_Log_id_seq"'::regclass);
-    ALTER TABLE ONLY public."FormatCellCustomization" ALTER COLUMN id SET DEFAULT nextval('public."FormatCellCustomization_id_seq"'::regclass);
-    ALTER TABLE ONLY public."GDS" ALTER COLUMN id SET DEFAULT nextval('public."GDS_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Implant" ALTER COLUMN id SET DEFAULT nextval('public."Implant_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Interfaces" ALTER COLUMN id SET DEFAULT nextval('public."Interfaces_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Invoices" ALTER COLUMN id SET DEFAULT nextval('public."Invoices_id_seq"'::regclass);
-    ALTER TABLE ONLY public."InvoicesProduct" ALTER COLUMN id SET DEFAULT nextval('public."InvoicesProduct_id_seq"'::regclass);
-    ALTER TABLE ONLY public."InvoicesProductCombo" ALTER COLUMN id SET DEFAULT nextval('public."InvoicesProductCombo_id_seq"'::regclass);
-    ALTER TABLE ONLY public."InvoicesProductItinerary" ALTER COLUMN id SET DEFAULT nextval('public."InvoicesProductItinerary_id_seq"'::regclass);
-    ALTER TABLE ONLY public."InvoicesProductPasenger" ALTER COLUMN id SET DEFAULT nextval('public."InvoicesProductPasenger_id_seq"'::regclass);
-    ALTER TABLE ONLY public."InvoicesProductPayment" ALTER COLUMN id SET DEFAULT nextval('public."InvoicesProductPayment_id_seq"'::regclass);
-    ALTER TABLE ONLY public."InvoicesProductTax" ALTER COLUMN id SET DEFAULT nextval('public."InvoicesProductTax_id_seq"'::regclass);
-    ALTER TABLE ONLY public."InvoicesProductVariable" ALTER COLUMN id SET DEFAULT nextval('public."InvoicesProductVariable_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Master" ALTER COLUMN id SET DEFAULT nextval('public."Master_id_seq"'::regclass);
-    ALTER TABLE ONLY public."MasterVariable" ALTER COLUMN id SET DEFAULT nextval('public."MasterVariable_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Menu" ALTER COLUMN id SET DEFAULT nextval('public."Menu_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Payment" ALTER COLUMN id SET DEFAULT nextval('public."Payment_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Prestadora" ALTER COLUMN id SET DEFAULT nextval('public."Hotel_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Product" ALTER COLUMN id SET DEFAULT nextval('public."Product_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Provider" ALTER COLUMN id SET DEFAULT nextval('public."Provider_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Quotation" ALTER COLUMN id SET DEFAULT nextval('public."Quotation_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationCombo" ALTER COLUMN id SET DEFAULT nextval('public."QuotationCombo_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationFormat" ALTER COLUMN id SET DEFAULT nextval('public."QuotationFormat_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationManualService" ALTER COLUMN id SET DEFAULT nextval('public."QuotationManualService_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationPrintCustomization" ALTER COLUMN id SET DEFAULT nextval('public."QuotationPrintCustomization_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationPrintDefaultTemplate" ALTER COLUMN id SET DEFAULT nextval('public."QuotationPrintDefaultTemplate_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationProduct" ALTER COLUMN id SET DEFAULT nextval('public."QuotationProduct_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationProductPassenger" ALTER COLUMN id SET DEFAULT nextval('public."QuotationProductPassenger_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationProductPayment" ALTER COLUMN id SET DEFAULT nextval('public."QuotationProductPayment_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationProductTax" ALTER COLUMN id SET DEFAULT nextval('public."QuotationProductTax_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationProductVariable" ALTER COLUMN id SET DEFAULT nextval('public."QuotationProductVariable_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationState" ALTER COLUMN id SET DEFAULT nextval('public."QuotationState_id_seq"'::regclass);
-    ALTER TABLE ONLY public."QuotationStateHistory" ALTER COLUMN id SET DEFAULT nextval('public."QuotationStateHistory_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Report" ALTER COLUMN id SET DEFAULT nextval('public."Report_id_seq"'::regclass);
-    ALTER TABLE ONLY public."ReportColumns" ALTER COLUMN id SET DEFAULT nextval('public."ReportColumns_id_seq"'::regclass);
-    ALTER TABLE ONLY public."ReportFilters" ALTER COLUMN id SET DEFAULT nextval('public."ReportFilters_id_seq"'::regclass);
-    ALTER TABLE ONLY public."ReportJoins" ALTER COLUMN id SET DEFAULT nextval('public."ReportJoins_id_seq"'::regclass);
-    ALTER TABLE ONLY public."ReportSorts" ALTER COLUMN id SET DEFAULT nextval('public."ReportSorts_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Role" ALTER COLUMN id SET DEFAULT nextval('public."Role_id_seq"'::regclass);
-    ALTER TABLE ONLY public."Seller" ALTER COLUMN id SET DEFAULT nextval('public."Seller_id_seq"'::regclass);
-    ALTER TABLE ONLY public."SystemLog" ALTER COLUMN id SET DEFAULT nextval('public."SystemLog_id_seq"'::regclass);
-    ALTER TABLE ONLY public."SystemParameter" ALTER COLUMN id SET DEFAULT nextval('public."SystemParameter_id_seq"'::regclass);
-    ALTER TABLE ONLY public."TicketPrinter" ALTER COLUMN id SET DEFAULT nextval('public."TicketPrinter_id_seq"'::regclass);
-    ALTER TABLE ONLY public."TicketType" ALTER COLUMN id SET DEFAULT nextval('public."TicketType_id_seq"'::regclass);
-    ALTER TABLE ONLY public."User" ALTER COLUMN id SET DEFAULT nextval('public."User_id_seq"'::regclass);
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Airports_pkey') THEN
-            ALTER TABLE ONLY public."Airports" ADD CONSTRAINT "Airports_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Attachment_pkey') THEN
-            ALTER TABLE ONLY public."Attachment" ADD CONSTRAINT "Attachment_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingGDSInvoiceAutoLog_pkey') THEN
-            ALTER TABLE ONLY public."BookingGDSInvoiceAutoLog" ADD CONSTRAINT "BookingGDSInvoiceAutoLog_pkey" PRIMARY KEY ("Id");
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingGDS" ADD CONSTRAINT "BookingGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductFEEGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingProductFEEGDS" ADD CONSTRAINT "BookingProductFEEGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingProductGDS" ADD CONSTRAINT "BookingProductGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductItineraryGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingProductItineraryGDS" ADD CONSTRAINT "BookingProductItineraryGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductPassangerGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingProductPassangerGDS" ADD CONSTRAINT "BookingProductPassangerGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductPaymentGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingProductPaymentGDS" ADD CONSTRAINT "BookingProductPaymentGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductTaxGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingProductTaxGDS" ADD CONSTRAINT "BookingProductTaxGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductVariableGDS_pkey') THEN
-            ALTER TABLE ONLY public."BookingProductVariableGDS" ADD CONSTRAINT "BookingProductVariableGDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingsGDSInvoiceAuto_pkey') THEN
-            ALTER TABLE ONLY public."BookingsGDSInvoiceAuto" ADD CONSTRAINT "BookingsGDSInvoiceAuto_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingsGDS_log_pkey') THEN
-            ALTER TABLE ONLY public."BookingsGDS_log" ADD CONSTRAINT "BookingsGDS_log_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BranchGDSInvoiceAuto_pkey') THEN
-            ALTER TABLE ONLY public."BranchGDSInvoiceAuto" ADD CONSTRAINT "BranchGDSInvoiceAuto_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Branch_pkey') THEN
-            ALTER TABLE ONLY public."Branch" ADD CONSTRAINT "Branch_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CellCustomization_pkey') THEN
-            ALTER TABLE ONLY public."CellCustomization" ADD CONSTRAINT "CellCustomization_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ChargeAndTax_code_key') THEN
-            ALTER TABLE ONLY public."ChargeAndTax" ADD CONSTRAINT "ChargeAndTax_code_key" UNIQUE (code);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ChargeAndTax_pkey') THEN
-            ALTER TABLE ONLY public."ChargeAndTax" ADD CONSTRAINT "ChargeAndTax_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Cities_pkey') THEN
-            ALTER TABLE ONLY public."Cities" ADD CONSTRAINT "Cities_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Client_pkey') THEN
-            ALTER TABLE ONLY public."Client" ADD CONSTRAINT "Client_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProductTax_pkey') THEN
-            ALTER TABLE ONLY public."ComboProductTax" ADD CONSTRAINT "ComboProductTax_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProduct_pkey') THEN
-            ALTER TABLE ONLY public."ComboProduct" ADD CONSTRAINT "ComboProduct_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Combo_pkey') THEN
-            ALTER TABLE ONLY public."Combo" ADD CONSTRAINT "Combo_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Countries_pkey') THEN
-            ALTER TABLE ONLY public."Countries" ADD CONSTRAINT "Countries_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CreditCard_pkey') THEN
-            ALTER TABLE ONLY public."CreditCard" ADD CONSTRAINT "CreditCard_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Currency_pkey') THEN
-            ALTER TABLE ONLY public."Currency" ADD CONSTRAINT "Currency_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'EquivalencesInterfaces_pkey') THEN
-            ALTER TABLE ONLY public."EquivalencesInterfaces" ADD CONSTRAINT "EquivalencesInterfaces_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'EquivalenciasInterfaces_Log_pkey') THEN
-            ALTER TABLE ONLY public."EquivalenciasInterfaces_Log" ADD CONSTRAINT "EquivalenciasInterfaces_Log_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FormatCellCustomization_format_code_key') THEN
-            ALTER TABLE ONLY public."FormatCellCustomization" ADD CONSTRAINT "FormatCellCustomization_format_code_key" UNIQUE ("formatId", code);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FormatCellCustomization_pkey') THEN
-            ALTER TABLE ONLY public."FormatCellCustomization" ADD CONSTRAINT "FormatCellCustomization_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'GDS_pkey') THEN
-            ALTER TABLE ONLY public."GDS" ADD CONSTRAINT "GDS_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Implant_pkey') THEN
-            ALTER TABLE ONLY public."Implant" ADD CONSTRAINT "Implant_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductCombo_pkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductCombo" ADD CONSTRAINT "InvoicesProductCombo_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductItinerary_pkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductItinerary" ADD CONSTRAINT "InvoicesProductItinerary_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductPasenger_pkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductPasenger" ADD CONSTRAINT "InvoicesProductPasenger_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductPayment_pkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductPayment" ADD CONSTRAINT "InvoicesProductPayment_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductTax_pkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductTax" ADD CONSTRAINT "InvoicesProductTax_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductVariable_pkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductVariable" ADD CONSTRAINT "InvoicesProductVariable_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProduct_pkey') THEN
-            ALTER TABLE ONLY public."InvoicesProduct" ADD CONSTRAINT "InvoicesProduct_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Invoices_internalNumber_key') THEN
-            ALTER TABLE ONLY public."Invoices" ADD CONSTRAINT "Invoices_internalNumber_key" UNIQUE ("internalNumber");
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Invoices_pkey') THEN
-            ALTER TABLE ONLY public."Invoices" ADD CONSTRAINT "Invoices_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'MasterVariable_pkey') THEN
-            ALTER TABLE ONLY public."MasterVariable" ADD CONSTRAINT "MasterVariable_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Menu_code_key') THEN
-            ALTER TABLE ONLY public."Menu" ADD CONSTRAINT "Menu_code_key" UNIQUE (code);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Menu_pkey') THEN
-            ALTER TABLE ONLY public."Menu" ADD CONSTRAINT "Menu_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Payment_pkey') THEN
-            ALTER TABLE ONLY public."Payment" ADD CONSTRAINT "Payment_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Prestadora_pkey') THEN
-            ALTER TABLE ONLY public."Prestadora" ADD CONSTRAINT "Prestadora_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Product_pkey') THEN
-            ALTER TABLE ONLY public."Product" ADD CONSTRAINT "Product_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Provider_pkey') THEN
-            ALTER TABLE ONLY public."Provider" ADD CONSTRAINT "Provider_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationCombo_pkey') THEN
-            ALTER TABLE ONLY public."QuotationCombo" ADD CONSTRAINT "QuotationCombo_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationFormat_pkey') THEN
-            ALTER TABLE ONLY public."QuotationFormat" ADD CONSTRAINT "QuotationFormat_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationManualService_pkey') THEN
-            ALTER TABLE ONLY public."QuotationManualService" ADD CONSTRAINT "QuotationManualService_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationPrintCustomization_pkey') THEN
-            ALTER TABLE ONLY public."QuotationPrintCustomization" ADD CONSTRAINT "QuotationPrintCustomization_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationPrintCustomization_quotationId_key') THEN
-            ALTER TABLE ONLY public."QuotationPrintCustomization" ADD CONSTRAINT "QuotationPrintCustomization_quotationId_key" UNIQUE ("quotationId");
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationPrintDefaultTemplate_pkey') THEN
-            ALTER TABLE ONLY public."QuotationPrintDefaultTemplate" ADD CONSTRAINT "QuotationPrintDefaultTemplate_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductPassenger_pkey') THEN
-            ALTER TABLE ONLY public."QuotationProductPassenger" ADD CONSTRAINT "QuotationProductPassenger_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductPayment_pkey') THEN
-            ALTER TABLE ONLY public."QuotationProductPayment" ADD CONSTRAINT "QuotationProductPayment_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductTax_pkey') THEN
-            ALTER TABLE ONLY public."QuotationProductTax" ADD CONSTRAINT "QuotationProductTax_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductVariable_pkey') THEN
-            ALTER TABLE ONLY public."QuotationProductVariable" ADD CONSTRAINT "QuotationProductVariable_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProduct_pkey') THEN
-            ALTER TABLE ONLY public."QuotationProduct" ADD CONSTRAINT "QuotationProduct_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationStateHistory_pkey') THEN
-            ALTER TABLE ONLY public."QuotationStateHistory" ADD CONSTRAINT "QuotationStateHistory_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationState_code_key') THEN
-            ALTER TABLE ONLY public."QuotationState" ADD CONSTRAINT "QuotationState_code_key" UNIQUE (code);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationState_pkey') THEN
-            ALTER TABLE ONLY public."QuotationState" ADD CONSTRAINT "QuotationState_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Quotation_pkey') THEN
-            ALTER TABLE ONLY public."Quotation" ADD CONSTRAINT "Quotation_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportColumns_pkey') THEN
-            ALTER TABLE ONLY public."ReportColumns" ADD CONSTRAINT "ReportColumns_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportFilters_pkey') THEN
-            ALTER TABLE ONLY public."ReportFilters" ADD CONSTRAINT "ReportFilters_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportJoins_pkey') THEN
-            ALTER TABLE ONLY public."ReportJoins" ADD CONSTRAINT "ReportJoins_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportSorts_pkey') THEN
-            ALTER TABLE ONLY public."ReportSorts" ADD CONSTRAINT "ReportSorts_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Report_pkey') THEN
-            ALTER TABLE ONLY public."Report" ADD CONSTRAINT "Report_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Role_pkey') THEN
-            ALTER TABLE ONLY public."Role" ADD CONSTRAINT "Role_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Seller_pkey') THEN
-            ALTER TABLE ONLY public."Seller" ADD CONSTRAINT "Seller_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SystemLog_pkey') THEN
-            ALTER TABLE ONLY public."SystemLog" ADD CONSTRAINT "SystemLog_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SystemParameter_pkey') THEN
-            ALTER TABLE ONLY public."SystemParameter" ADD CONSTRAINT "SystemParameter_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TicketPrinter_pkey') THEN
-            ALTER TABLE ONLY public."TicketPrinter" ADD CONSTRAINT "TicketPrinter_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TicketType_code_key') THEN
-            ALTER TABLE ONLY public."TicketType" ADD CONSTRAINT "TicketType_code_key" UNIQUE (code);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TicketType_pkey') THEN
-            ALTER TABLE ONLY public."TicketType" ADD CONSTRAINT "TicketType_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_pkey') THEN
-            ALTER TABLE ONLY public."User" ADD CONSTRAINT "User_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'interfaces_pkey') THEN
-            ALTER TABLE ONLY public."Interfaces" ADD CONSTRAINT "interfaces_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'master_pkey') THEN
-            ALTER TABLE ONLY public."Master" ADD CONSTRAINT "master_pkey" PRIMARY KEY (id);
-        END IF;
-    END $con$;
-    CREATE UNIQUE INDEX IF NOT EXISTS "Branch_code_key" ON public."Branch" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "CellCustomization_branch_code_key" ON public."CellCustomization" USING btree ("branchId", code) WHERE ("branchId" IS NOT NULL);
-    CREATE UNIQUE INDEX IF NOT EXISTS "CellCustomization_implant_code_key" ON public."CellCustomization" USING btree ("implantId", code) WHERE ("implantId" IS NOT NULL);
-    CREATE UNIQUE INDEX IF NOT EXISTS "Client_document_key" ON public."Client" USING btree (document) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Combo_code_key" ON public."Combo" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "CreditCard_code_key" ON public."CreditCard" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Currency_code_key" ON public."Currency" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Hotel_code_key" ON public."Prestadora" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Implant_code_key" ON public."Implant" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "MasterVariable_code_key" ON public."MasterVariable" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Payment_code_key" ON public."Payment" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Product_code_key" ON public."Product" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Provider_code_key" ON public."Provider" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE INDEX IF NOT EXISTS "QuotationStateHistory_quotationId_idx" ON public."QuotationStateHistory" USING btree ("quotationId");
-    CREATE UNIQUE INDEX IF NOT EXISTS "Quotation_internalNumber_key" ON public."Quotation" USING btree ("internalNumber") WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Role_name_key" ON public."Role" USING btree (name) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "Seller_code_key" ON public."Seller" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "SystemParameter_code_key" ON public."SystemParameter" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "TicketPrinter_code_key" ON public."TicketPrinter" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON public."User" USING btree (email) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS "User_resetPasswordToken_key" ON public."User" USING btree ("resetPasswordToken") WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS airports_code_key ON public."Airports" USING btree (code);
-    CREATE UNIQUE INDEX IF NOT EXISTS bookingds_code_key ON public."BookingGDS" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS cities_code_key ON public."Cities" USING btree (code);
-    CREATE UNIQUE INDEX IF NOT EXISTS countries_code_key ON public."Countries" USING btree (code);
-    CREATE UNIQUE INDEX IF NOT EXISTS currency_code_key ON public."Currency" USING btree (code);
-    CREATE UNIQUE INDEX IF NOT EXISTS gds_name_key ON public."GDS" USING btree (name) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS interfaces_code_key ON public."Interfaces" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    CREATE UNIQUE INDEX IF NOT EXISTS master_code_key ON public."Master" USING btree (code) WITH (fillfactor='100', deduplicate_items='true');
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Airports_citiesId_fkey') THEN
-            ALTER TABLE ONLY public."Airports" ADD CONSTRAINT "Airports_citiesId_fkey" FOREIGN KEY ("citiesId") REFERENCES public."Cities"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Attachment_quotationId_fkey') THEN
-            ALTER TABLE ONLY public."Attachment" ADD CONSTRAINT "Attachment_quotationId_fkey" FOREIGN KEY ("quotationId") REFERENCES public."Quotation"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductFEEGDS_bookingProductId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductFEEGDS" ADD CONSTRAINT "BookingProductFEEGDS_bookingProductId_fkey" FOREIGN KEY ("bookingProductId") REFERENCES public."BookingProductGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductGDS_bookingId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductGDS" ADD CONSTRAINT "BookingProductGDS_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES public."BookingGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductItineraryGDS_bookingProductId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductItineraryGDS" ADD CONSTRAINT "BookingProductItineraryGDS_bookingProductId_fkey" FOREIGN KEY ("bookingProductId") REFERENCES public."BookingProductGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductPassangerGDS_bookingProductId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductPassangerGDS" ADD CONSTRAINT "BookingProductPassangerGDS_bookingProductId_fkey" FOREIGN KEY ("bookingProductId") REFERENCES public."BookingProductGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductPaymentGDS_bookingProductFEEId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductPaymentGDS" ADD CONSTRAINT "BookingProductPaymentGDS_bookingProductFEEId_fkey" FOREIGN KEY ("bookingProductFEEId") REFERENCES public."BookingProductFEEGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductPaymentGDS_bookingProductId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductPaymentGDS" ADD CONSTRAINT "BookingProductPaymentGDS_bookingProductId_fkey" FOREIGN KEY ("bookingProductId") REFERENCES public."BookingProductGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductTaxGDS_bookingProductId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductTaxGDS" ADD CONSTRAINT "BookingProductTaxGDS_bookingProductId_fkey" FOREIGN KEY ("bookingProductId") REFERENCES public."BookingProductGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BookingProductVariableGDS_bookingProductId_fkey') THEN
-            ALTER TABLE ONLY public."BookingProductVariableGDS" ADD CONSTRAINT "BookingProductVariableGDS_bookingProductId_fkey" FOREIGN KEY ("bookingProductId") REFERENCES public."BookingProductGDS"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'BranchGDSInvoiceAuto_branchId_fkey') THEN
-            ALTER TABLE ONLY public."BranchGDSInvoiceAuto" ADD CONSTRAINT "BranchGDSInvoiceAuto_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES public."Branch"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CellCustomization_branchId_fkey') THEN
-            ALTER TABLE ONLY public."CellCustomization" ADD CONSTRAINT "CellCustomization_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES public."Branch"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CellCustomization_implantId_fkey') THEN
-            ALTER TABLE ONLY public."CellCustomization" ADD CONSTRAINT "CellCustomization_implantId_fkey" FOREIGN KEY ("implantId") REFERENCES public."Implant"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Cities_countriesId_fkey') THEN
-            ALTER TABLE ONLY public."Cities" ADD CONSTRAINT "Cities_countriesId_fkey" FOREIGN KEY ("countriesId") REFERENCES public."Countries"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProductTax_chargeAndTaxId_fkey') THEN
-            ALTER TABLE ONLY public."ComboProductTax" ADD CONSTRAINT "ComboProductTax_chargeAndTaxId_fkey" FOREIGN KEY ("chargeAndTaxId") REFERENCES public."ChargeAndTax"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProductTax_comboProductId_fkey') THEN
-            ALTER TABLE ONLY public."ComboProductTax" ADD CONSTRAINT "ComboProductTax_comboProductId_fkey" FOREIGN KEY ("comboProductId") REFERENCES public."ComboProduct"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProduct_comboId_fkey') THEN
-            ALTER TABLE ONLY public."ComboProduct" ADD CONSTRAINT "ComboProduct_comboId_fkey" FOREIGN KEY ("comboId") REFERENCES public."Combo"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProduct_prestadoraId_fkey') THEN
-            ALTER TABLE ONLY public."ComboProduct" ADD CONSTRAINT "ComboProduct_prestadoraId_fkey" FOREIGN KEY ("prestadoraId") REFERENCES public."Prestadora"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProduct_productId_fkey') THEN
-            ALTER TABLE ONLY public."ComboProduct" ADD CONSTRAINT "ComboProduct_productId_fkey" FOREIGN KEY ("productId") REFERENCES public."Product"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ComboProduct_providerId_fkey') THEN
-            ALTER TABLE ONLY public."ComboProduct" ADD CONSTRAINT "ComboProduct_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES public."Provider"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Combo_currencyId_fkey') THEN
-            ALTER TABLE ONLY public."Combo" ADD CONSTRAINT "Combo_currencyId_fkey" FOREIGN KEY ("currencyId") REFERENCES public."Currency"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Countries_curencyId_fkey') THEN
-            ALTER TABLE ONLY public."Countries" ADD CONSTRAINT "Countries_curencyId_fkey" FOREIGN KEY ("curencyId") REFERENCES public."Currency"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'EquivalencesInterfaces_id_interfaces_fkey') THEN
-            ALTER TABLE ONLY public."EquivalencesInterfaces" ADD CONSTRAINT "EquivalencesInterfaces_id_interfaces_fkey" FOREIGN KEY (id_interfaces) REFERENCES public."Interfaces"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'EquivalencesInterfaces_id_master_fkey') THEN
-            ALTER TABLE ONLY public."EquivalencesInterfaces" ADD CONSTRAINT "EquivalencesInterfaces_id_master_fkey" FOREIGN KEY (id_master) REFERENCES public."Master"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FormatCellCustomization_formatId_fkey') THEN
-            ALTER TABLE ONLY public."FormatCellCustomization" ADD CONSTRAINT "FormatCellCustomization_formatId_fkey" FOREIGN KEY ("formatId") REFERENCES public."QuotationFormat"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Implant_branchId_fkey') THEN
-            ALTER TABLE ONLY public."Implant" ADD CONSTRAINT "Implant_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES public."Branch"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductItinerary_invoiceProductId_fkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductItinerary" ADD CONSTRAINT "InvoicesProductItinerary_invoiceProductId_fkey" FOREIGN KEY ("invoiceProductId") REFERENCES public."InvoicesProduct"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InvoicesProductPayment_creditCardId_fkey') THEN
-            ALTER TABLE ONLY public."InvoicesProductPayment" ADD CONSTRAINT "InvoicesProductPayment_creditCardId_fkey" FOREIGN KEY ("creditCardId") REFERENCES public."CreditCard"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Prestadora_providerId_fkey') THEN
-            ALTER TABLE ONLY public."Prestadora" ADD CONSTRAINT "Prestadora_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES public."Provider"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Product_ticketTypeId_fkey') THEN
-            ALTER TABLE ONLY public."Product" ADD CONSTRAINT "Product_ticketTypeId_fkey" FOREIGN KEY ("ticketTypeId") REFERENCES public."TicketType"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationCombo_comboId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationCombo" ADD CONSTRAINT "QuotationCombo_comboId_fkey" FOREIGN KEY ("comboId") REFERENCES public."Combo"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationCombo_quotationId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationCombo" ADD CONSTRAINT "QuotationCombo_quotationId_fkey" FOREIGN KEY ("quotationId") REFERENCES public."Quotation"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationFormat_branchId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationFormat" ADD CONSTRAINT "QuotationFormat_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES public."Branch"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationFormat_implantId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationFormat" ADD CONSTRAINT "QuotationFormat_implantId_fkey" FOREIGN KEY ("implantId") REFERENCES public."Implant"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationManualService_quotationId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationManualService" ADD CONSTRAINT "QuotationManualService_quotationId_fkey" FOREIGN KEY ("quotationId") REFERENCES public."Quotation"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductPassenger_quotationProductId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProductPassenger" ADD CONSTRAINT "QuotationProductPassenger_quotationProductId_fkey" FOREIGN KEY ("quotationProductId") REFERENCES public."QuotationProduct"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductPayment_quotationProductId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProductPayment" ADD CONSTRAINT "QuotationProductPayment_quotationProductId_fkey" FOREIGN KEY ("quotationProductId") REFERENCES public."QuotationProduct"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductTax_chargeAndTaxId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProductTax" ADD CONSTRAINT "QuotationProductTax_chargeAndTaxId_fkey" FOREIGN KEY ("chargeAndTaxId") REFERENCES public."ChargeAndTax"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductTax_quotationProductId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProductTax" ADD CONSTRAINT "QuotationProductTax_quotationProductId_fkey" FOREIGN KEY ("quotationProductId") REFERENCES public."QuotationProduct"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductVariable_masterVariableId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProductVariable" ADD CONSTRAINT "QuotationProductVariable_masterVariableId_fkey" FOREIGN KEY ("masterVariableId") REFERENCES public."MasterVariable"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProductVariable_quotationProductId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProductVariable" ADD CONSTRAINT "QuotationProductVariable_quotationProductId_fkey" FOREIGN KEY ("quotationProductId") REFERENCES public."QuotationProduct"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProduct_prestadoraId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProduct" ADD CONSTRAINT "QuotationProduct_prestadoraId_fkey" FOREIGN KEY ("prestadoraId") REFERENCES public."Prestadora"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProduct_productId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProduct" ADD CONSTRAINT "QuotationProduct_productId_fkey" FOREIGN KEY ("productId") REFERENCES public."Product"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProduct_providerId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProduct" ADD CONSTRAINT "QuotationProduct_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES public."Provider"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationProduct_quotationId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationProduct" ADD CONSTRAINT "QuotationProduct_quotationId_fkey" FOREIGN KEY ("quotationId") REFERENCES public."Quotation"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationStateHistory_quotationId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationStateHistory" ADD CONSTRAINT "QuotationStateHistory_quotationId_fkey" FOREIGN KEY ("quotationId") REFERENCES public."Quotation"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuotationStateHistory_userId_fkey') THEN
-            ALTER TABLE ONLY public."QuotationStateHistory" ADD CONSTRAINT "QuotationStateHistory_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."User"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Quotation_branchId_fkey') THEN
-            ALTER TABLE ONLY public."Quotation" ADD CONSTRAINT "Quotation_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES public."Branch"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Quotation_clientId_fkey') THEN
-            ALTER TABLE ONLY public."Quotation" ADD CONSTRAINT "Quotation_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES public."Client"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Quotation_implantId_fkey') THEN
-            ALTER TABLE ONLY public."Quotation" ADD CONSTRAINT "Quotation_implantId_fkey" FOREIGN KEY ("implantId") REFERENCES public."Implant"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Quotation_sellerId_fkey') THEN
-            ALTER TABLE ONLY public."Quotation" ADD CONSTRAINT "Quotation_sellerId_fkey" FOREIGN KEY ("sellerId") REFERENCES public."Seller"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Quotation_ticketPrinterId_fkey') THEN
-            ALTER TABLE ONLY public."Quotation" ADD CONSTRAINT "Quotation_ticketPrinterId_fkey" FOREIGN KEY ("ticketPrinterId") REFERENCES public."TicketPrinter"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Quotation_userId_fkey') THEN
-            ALTER TABLE ONLY public."Quotation" ADD CONSTRAINT "Quotation_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."User"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportColumns_report_id_fkey') THEN
-            ALTER TABLE ONLY public."ReportColumns" ADD CONSTRAINT "ReportColumns_report_id_fkey" FOREIGN KEY (report_id) REFERENCES public."Report"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportFilters_report_id_fkey') THEN
-            ALTER TABLE ONLY public."ReportFilters" ADD CONSTRAINT "ReportFilters_report_id_fkey" FOREIGN KEY (report_id) REFERENCES public."Report"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportJoins_report_id_fkey') THEN
-            ALTER TABLE ONLY public."ReportJoins" ADD CONSTRAINT "ReportJoins_report_id_fkey" FOREIGN KEY (report_id) REFERENCES public."Report"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ReportSorts_report_id_fkey') THEN
-            ALTER TABLE ONLY public."ReportSorts" ADD CONSTRAINT "ReportSorts_report_id_fkey" FOREIGN KEY (report_id) REFERENCES public."Report"(id) ON DELETE CASCADE;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SystemLog_userId_fkey') THEN
-            ALTER TABLE ONLY public."SystemLog" ADD CONSTRAINT "SystemLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES public."User"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_branchId_fkey') THEN
-            ALTER TABLE ONLY public."User" ADD CONSTRAINT "User_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES public."Branch"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_implantId_fkey') THEN
-            ALTER TABLE ONLY public."User" ADD CONSTRAINT "User_implantId_fkey" FOREIGN KEY ("implantId") REFERENCES public."Implant"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_roleId_fkey') THEN
-            ALTER TABLE ONLY public."User" ADD CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES public."Role"(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-        END IF;
-    END $con$;
-    DO $con$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_ticketPrinterId_fkey') THEN
-            ALTER TABLE ONLY public."User" ADD CONSTRAINT "User_ticketPrinterId_fkey" FOREIGN KEY ("ticketPrinterId") REFERENCES public."TicketPrinter"(id) ON UPDATE CASCADE ON DELETE SET NULL;
-        END IF;
-    END $con$;
-
-END $$;
-
--- >>> 1.1. ADICIÓN DE COLUMNAS A TABLAS EXISTENTES (ALTER COLUMNS) <<<
-
+-- >>> 1. ESTRUCTURA Y TABLAS DDL <<<
 DO $$
 BEGIN
+    CREATE SEQUENCE IF NOT EXISTS public."Korex_UpdateHistory_id_seq" START WITH 1;
+    CREATE SEQUENCE IF NOT EXISTS public."Korex_UpdateObjects_id_seq" START WITH 1;
+    CREATE SEQUENCE IF NOT EXISTS public."Korex_UpdateErrors_id_seq" START WITH 1;
+    CREATE SEQUENCE IF NOT EXISTS public."Korex_Installation_id_seq" START WITH 1;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_UpdateHistory') THEN
+        CREATE TABLE public."Korex_UpdateHistory" (
+            "UpdateId" integer DEFAULT nextval('"Korex_UpdateHistory_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+            "VersionAnterior" character varying(50),
+            "VersionNueva" character varying(50) NOT NULL,
+            "Build" character varying(50),
+            "Motor" character varying(50) NOT NULL,
+            "Servidor" character varying(255),
+            "BaseDatos" character varying(255),
+            "FechaInicio" timestamp without time zone DEFAULT now() NOT NULL,
+            "FechaFin" timestamp without time zone,
+            "Estado" character varying(50) NOT NULL,
+            "ExitCode" integer DEFAULT 0 NOT NULL,
+            "Usuario" character varying(150),
+            "Equipo" character varying(150),
+            "ResumenLog" text
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_UpdateObjects') THEN
+        CREATE TABLE public."Korex_UpdateObjects" (
+            "id" integer DEFAULT nextval('"Korex_UpdateObjects_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+            "UpdateId" integer NOT NULL,
+            "ObjectType" character varying(50) NOT NULL,
+            "ObjectName" character varying(255) NOT NULL,
+            "Expected" boolean DEFAULT true NOT NULL,
+            "Executed" boolean DEFAULT false NOT NULL,
+            "Compiled" boolean DEFAULT false NOT NULL,
+            "Validated" boolean DEFAULT false NOT NULL,
+            "HashExpected" character varying(128),
+            "HashActual" character varying(128),
+            "Status" character varying(50) NOT NULL,
+            "ErrorMessage" text,
+            "ExecutionTimeMs" integer DEFAULT 0,
+            "FechaVerificacion" timestamp without time zone DEFAULT now() NOT NULL
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_UpdateErrors') THEN
+        CREATE TABLE public."Korex_UpdateErrors" (
+            "id" integer DEFAULT nextval('"Korex_UpdateErrors_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+            "UpdateId" integer NOT NULL,
+            "ObjectName" character varying(255),
+            "ErrorNumber" integer,
+            "ErrorMessage" text NOT NULL,
+            "StackTrace" text,
+            "Fecha" timestamp without time zone DEFAULT now() NOT NULL
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Korex_Installation') THEN
+        CREATE TABLE public."Korex_Installation" (
+            "id" integer DEFAULT nextval('"Korex_Installation_id_seq"'::regclass) NOT NULL PRIMARY KEY,
+            "AppVersion" character varying(50) NOT NULL,
+            "DbVersion" character varying(50) NOT NULL,
+            "Build" character varying(50),
+            "Motor" character varying(50) NOT NULL,
+            "LastValidationDate" timestamp without time zone DEFAULT now() NOT NULL,
+            "Status" character varying(50) DEFAULT 'HEALTHY' NOT NULL,
+            "Environment" character varying(50) DEFAULT 'PRODUCTION'
+        );
+    END IF;
+
+    -- Garantizar secuencias y valores DEFAULT en tablas de control existentes
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "UpdateId" SET DEFAULT nextval('public."Korex_UpdateHistory_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "FechaInicio" SET DEFAULT now();
+    ALTER TABLE public."Korex_UpdateHistory" ALTER COLUMN "ExitCode" SET DEFAULT 0;
+
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateObjects_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Expected" SET DEFAULT true;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Executed" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Compiled" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "Validated" SET DEFAULT false;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "ExecutionTimeMs" SET DEFAULT 0;
+    ALTER TABLE public."Korex_UpdateObjects" ALTER COLUMN "FechaVerificacion" SET DEFAULT now();
+
+    ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_UpdateErrors_id_seq"'::regclass);
+    ALTER TABLE public."Korex_UpdateErrors" ALTER COLUMN "Fecha" SET DEFAULT now();
+
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "id" SET DEFAULT nextval('public."Korex_Installation_id_seq"'::regclass);
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "LastValidationDate" SET DEFAULT now();
+    ALTER TABLE public."Korex_Installation" ALTER COLUMN "Status" SET DEFAULT 'HEALTHY';
+
+    -- Corrección y saneamiento de consecutivos/internalNumber errados en Quotation
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        UPDATE public."Quotation"
+        SET "internalNumber" = id::text
+        WHERE "internalNumber" IS NULL 
+           OR "internalNumber" LIKE 'QUO-%' 
+           OR "internalNumber" LIKE 'TEMP_%'
+           OR "internalNumber" = '';
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'EquivalenciasInterfaces_Log') THEN
         CREATE TABLE public."EquivalenciasInterfaces_Log" (
             "id" integer DEFAULT nextval('"EquivalenciasInterfaces_Log_id_seq"'::regclass) NOT NULL,
@@ -2849,14 +730,17 @@ BEGIN
             "curencyId" integer
         );
     END IF;
+    CREATE SEQUENCE IF NOT EXISTS public."QuotationState_id_seq" START WITH 1;
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationState') THEN
         CREATE TABLE public."QuotationState" (
             "id" integer DEFAULT nextval('"QuotationState_id_seq"'::regclass) NOT NULL,
             "code" character varying NOT NULL,
             "name" character varying NOT NULL,
             "color" character varying,
-            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+            "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            "isActive" boolean DEFAULT true NOT NULL
         );
+        ALTER SEQUENCE public."QuotationState_id_seq" OWNED BY public."QuotationState".id;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'SystemParameter') THEN
         CREATE TABLE public."SystemParameter" (
@@ -3041,6 +925,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'TransactionConsecutive' AND column_name = 'padding') THEN
         ALTER TABLE public."TransactionConsecutive" ADD COLUMN "padding" integer DEFAULT 4;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'TransactionConsecutive' AND column_name = 'updatedAt') THEN
+        ALTER TABLE public."TransactionConsecutive" ADD COLUMN "updatedAt" timestamp without time zone DEFAULT now();
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Branch' AND column_name = 'id') THEN
         ALTER TABLE public."Branch" ADD COLUMN "id" integer NOT NULL;
@@ -3253,7 +1140,7 @@ BEGIN
         ALTER TABLE public."Airports" ADD COLUMN "name" character varying(150) NOT NULL;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Airports' AND column_name = 'citiesId') THEN
-        ALTER TABLE public."Airports" ADD COLUMN "citiesId" integer NOT NULL;
+        ALTER TABLE public."Airports" ADD COLUMN "citiesId" integer;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Attachment' AND column_name = 'id') THEN
         ALTER TABLE public."Attachment" ADD COLUMN "id" integer NOT NULL;
@@ -3738,7 +1625,7 @@ BEGIN
         ALTER TABLE public."Cities" ADD COLUMN "name" character varying(100) NOT NULL;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Cities' AND column_name = 'countriesId') THEN
-        ALTER TABLE public."Cities" ADD COLUMN "countriesId" integer NOT NULL;
+        ALTER TABLE public."Cities" ADD COLUMN "countriesId" integer;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Cities' AND column_name = 'statecode') THEN
         ALTER TABLE public."Cities" ADD COLUMN "statecode" character varying(25);
@@ -4073,6 +1960,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'zeusInvoiceNumber') THEN
         ALTER TABLE public."Invoices" ADD COLUMN "zeusInvoiceNumber" character varying(100);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'observations') THEN
+        ALTER TABLE public."Invoices" ADD COLUMN "observations" text;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProduct' AND column_name = 'id') THEN
         ALTER TABLE public."InvoicesProduct" ADD COLUMN "id" integer NOT NULL;
     END IF;
@@ -4219,6 +2109,12 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'name') THEN
         ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "name" character varying(255) NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'firstName') THEN
+        ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "firstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'lastName') THEN
+        ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "lastName" character varying(150);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProductPasenger' AND column_name = 'document') THEN
         ALTER TABLE public."InvoicesProductPasenger" ADD COLUMN "document" character varying(255) NOT NULL;
@@ -4427,6 +2323,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passenger') THEN
         ALTER TABLE public."Quotation" ADD COLUMN "passenger" character varying(255);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passengerFirstName') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN "passengerFirstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'passengerLastName') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN "passengerLastName" character varying(150);
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'paxAdults') THEN
         ALTER TABLE public."Quotation" ADD COLUMN "paxAdults" integer;
     END IF;
@@ -4441,6 +2343,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'manualDescription') THEN
         ALTER TABLE public."Quotation" ADD COLUMN "manualDescription" text;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'observations') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN "observations" text;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationCombo' AND column_name = 'id') THEN
         ALTER TABLE public."QuotationCombo" ADD COLUMN "id" integer NOT NULL;
@@ -4615,6 +2520,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'passenger') THEN
         ALTER TABLE public."QuotationProduct" ADD COLUMN "passenger" character varying(255);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'passengerFirstName') THEN
+        ALTER TABLE public."QuotationProduct" ADD COLUMN "passengerFirstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'passengerLastName') THEN
+        ALTER TABLE public."QuotationProduct" ADD COLUMN "passengerLastName" character varying(150);
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'id') THEN
         ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "id" integer NOT NULL;
     END IF;
@@ -4623,6 +2534,12 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'name') THEN
         ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "name" text NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'firstName') THEN
+        ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "firstName" character varying(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'lastName') THEN
+        ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "lastName" character varying(150);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProductPassenger' AND column_name = 'document') THEN
         ALTER TABLE public."QuotationProductPassenger" ADD COLUMN "document" text NOT NULL;
@@ -4707,6 +2624,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationState' AND column_name = 'createdAt') THEN
         ALTER TABLE public."QuotationState" ADD COLUMN "createdAt" timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationState' AND column_name = 'isActive') THEN
+        ALTER TABLE public."QuotationState" ADD COLUMN "isActive" boolean DEFAULT true NOT NULL;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationStateHistory' AND column_name = 'id') THEN
         ALTER TABLE public."QuotationStateHistory" ADD COLUMN "id" integer NOT NULL;
@@ -5575,7 +3495,7 @@ INSERT INTO public."Menu" (code, name, action, activo) VALUES ('REPORTES', 'Repo
 
 INSERT INTO public."Menu" (code, name, action, activo) VALUES ('EJECUCIONES', 'Ejecuciones', '/dashboard/executions', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
 
--- Siembra obligatoria de Rol SUPERADMINISTRADOR y asignación a ebarrera@zagencias.com
+-- Siembra obligatoria de Rol SUPERADMINISTRADOR y asignación fija a ebarrera@zagencias.com y ebarrrera@zagencias.com (password: admin123)
 DO $$
 DECLARE
     v_super_role_id INT;
@@ -5589,9 +3509,31 @@ BEGIN
         SELECT id INTO v_super_role_id FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%' LIMIT 1;
 
         IF v_super_role_id IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'User') THEN
-            UPDATE public."User"
-            SET "roleId" = v_super_role_id
-            WHERE email = 'ebarrera@zagencias.com';
+            -- 1. ebarrera@zagencias.com
+            IF NOT EXISTS (SELECT 1 FROM public."User" WHERE LOWER(email) = 'ebarrera@zagencias.com') THEN
+                INSERT INTO public."User" (name, email, "passwordHash", "roleId", "isActive")
+                VALUES ('Eduardo Barrera', 'ebarrera@zagencias.com', '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', v_super_role_id, true);
+            ELSE
+                UPDATE public."User"
+                SET "name" = 'Eduardo Barrera',
+                    "passwordHash" = '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+                    "roleId" = v_super_role_id,
+                    "isActive" = true
+                WHERE LOWER(email) = 'ebarrera@zagencias.com';
+            END IF;
+
+            -- 2. ebarrrera@zagencias.com
+            IF NOT EXISTS (SELECT 1 FROM public."User" WHERE LOWER(email) = 'ebarrrera@zagencias.com') THEN
+                INSERT INTO public."User" (name, email, "passwordHash", "roleId", "isActive")
+                VALUES ('Eduardo Barrera', 'ebarrrera@zagencias.com', '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2', v_super_role_id, true);
+            ELSE
+                UPDATE public."User"
+                SET "name" = 'Eduardo Barrera',
+                    "passwordHash" = '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+                    "roleId" = v_super_role_id,
+                    "isActive" = true
+                WHERE LOWER(email) = 'ebarrrera@zagencias.com';
+            END IF;
         END IF;
     END IF;
 END $$;
@@ -5672,14 +3614,1640 @@ BEGIN
         ALTER TABLE public."InvoicesProduct" ADD COLUMN IF NOT EXISTS "providerDueDate" timestamp without time zone;
         ALTER TABLE public."InvoicesProduct" ADD COLUMN IF NOT EXISTS "providerInvoice" character varying(100);
     END IF;
+
+    -- Nullable foreign keys for Cities and Airports
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Cities' AND column_name = 'countriesId' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."Cities" ALTER COLUMN "countriesId" DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Airports' AND column_name = 'citiesId' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."Airports" ALTER COLUMN "citiesId" DROP NOT NULL;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationStateHistory' AND column_name = 'metadata') THEN
+        ALTER TABLE public."QuotationStateHistory" ADD COLUMN "metadata" jsonb;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'InvoicesProduct' AND column_name = 'price' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."InvoicesProduct" ALTER COLUMN "price" DROP NOT NULL;
+        ALTER TABLE public."InvoicesProduct" ALTER COLUMN "price" SET DEFAULT 0;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'QuotationProduct' AND column_name = 'price' AND is_nullable = 'NO') THEN
+        ALTER TABLE public."QuotationProduct" ALTER COLUMN "price" DROP NOT NULL;
+        ALTER TABLE public."QuotationProduct" ALTER COLUMN "price" SET DEFAULT 0;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        ALTER TABLE public."Quotation" ADD COLUMN IF NOT EXISTS "zeusInvoiceNumber" character varying(50);
+        ALTER TABLE public."Quotation" ADD COLUMN IF NOT EXISTS "zeusInvoiceDate" timestamp without time zone;
+    END IF;
 END $$;
 
 
 
+-- Unificación y limpieza de parámetros de envío automático de facturas
+DELETE FROM public."SystemParameter" WHERE code IN ('EnviarFacturasAutoSQLserver', 'EnviarFacturaAutoSQLserver', 'EnviarFacturacionAuto', 'EnviarFacturasAuto');
 
--- >>> 2. FUNCIONES <<<
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1') ON CONFLICT (code) DO NOTHING;
 
--- Archivo: fnAirportListar.sql
+-- Control de envío de Tipos de Facturación de Hoteles hacia Zeus ERP (1 = Sí, 0 = No)
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EnviarTiposFacturacionHotelesZeus', 'Enviar Tipos de Facturación de Hoteles a Zeus ERP (1: Sí, 0: No)', '1') ON CONFLICT (code) DO NOTHING;
+
+-- Parametrización dinámica de información enviada a Zeus (Descripción de Ítems y Observaciones)
+INSERT INTO public."SystemParameter" ("code", "name", "value") 
+VALUES ('ZeusItemDescriptionConfig', 'Parametrización Descripción Ítems Zeus ERP', '{"separator":" - ","fields":[{"id":"descripcion_manual","name":"Descripción Manual","enabled":true,"order":1,"label":"Servicio"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":true,"order":2,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":true,"order":3,"label":"Hasta"},{"id":"proveedor","name":"Proveedor","enabled":true,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"nacionalidad","name":"Nacionalidad","enabled":true,"order":6,"label":"Nacionalidad"},{"id":"numero_cotizacion","name":"Número de cotización","enabled":false,"order":7,"label":"Cotización"},{"id":"pasajero","name":"Nombre del pasajero","enabled":false,"order":8,"label":"Pasajero"},{"id":"destino","name":"Destino","enabled":false,"order":9,"label":"Destino"},{"id":"reservacion","name":"Código de Reserva","enabled":false,"order":10,"label":"Reserva"}]}') 
+ON CONFLICT ("code") DO NOTHING;
+
+INSERT INTO public."SystemParameter" ("code", "name", "value") 
+VALUES ('ZeusObservationsConfig', 'Parametrización Observaciones Zeus ERP', '{"separator":" - ","fields":[{"id":"numero_cotizacion","name":"Número de cotización","enabled":true,"order":1,"label":"Cotización"},{"id":"numero_factura","name":"Número de factura","enabled":false,"order":2,"label":"Factura"},{"id":"pasajero","name":"Nombre del pasajero","enabled":true,"order":3,"label":"Pasajero"},{"id":"proveedor","name":"Proveedor","enabled":false,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":false,"order":6,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":false,"order":7,"label":"Hasta"},{"id":"descripcion_adicional","name":"Descripción adicional","enabled":false,"order":8,"label":"Servicios"}]}') 
+ON CONFLICT ("code") DO NOTHING;
+
+
+-- Sincronización universal de secuencias autoincrementales en llaves primarias ('id') para prevenir colisiones 23505
+DO $$
+DECLARE
+    r RECORD;
+    v_seq TEXT;
+    v_max INT;
+BEGIN
+    -- Asegurar secuencia de QuotationState
+    CREATE SEQUENCE IF NOT EXISTS public."QuotationState_id_seq" START WITH 1;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationState') THEN
+        BEGIN
+            ALTER SEQUENCE public."QuotationState_id_seq" OWNED BY public."QuotationState".id;
+            ALTER TABLE public."QuotationState" ALTER COLUMN id SET DEFAULT nextval('public."QuotationState_id_seq"'::regclass);
+        EXCEPTION WHEN OTHERS THEN
+        END;
+    END IF;
+
+    FOR r IN 
+        SELECT c.table_name 
+        FROM information_schema.columns c
+        JOIN information_schema.tables t ON c.table_name = t.table_name AND c.table_schema = t.table_schema
+        WHERE c.table_schema = 'public' 
+          AND t.table_type = 'BASE TABLE'
+          AND c.column_name = 'id' 
+          AND c.data_type IN ('integer', 'bigint')
+    LOOP
+        BEGIN
+            v_seq := pg_get_serial_sequence('public."' || r.table_name || '"', 'id');
+            IF v_seq IS NOT NULL THEN
+                EXECUTE 'SELECT MAX(id) FROM public."' || r.table_name || '"' INTO v_max;
+                IF v_max IS NULL THEN
+                    EXECUTE 'SELECT setval(''' || v_seq || ''', 1, false);';
+                ELSE
+                    EXECUTE 'SELECT setval(''' || v_seq || ''', ' || v_max || ', true);';
+                END IF;
+            END IF;
+        EXCEPTION WHEN OTHERS THEN
+        END;
+    END LOOP;
+END $$;
+
+-- Migración inteligente y no destructiva de registros históricos de Pasajeros (Nombres y Apellidos)
+DO $$
+BEGIN
+    -- Quotation:
+    UPDATE public."Quotation"
+    SET "passengerFirstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN TRIM(passenger)
+            ELSE SPLIT_PART(TRIM(passenger), ' ', 1)
+        END,
+        "passengerLastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(passenger) FROM POSITION(' ' IN TRIM(passenger)) + 1)
+        END
+    WHERE ("passengerFirstName" IS NULL OR "passengerLastName" IS NULL)
+      AND passenger IS NOT NULL AND TRIM(passenger) <> '';
+
+    -- QuotationProduct:
+    UPDATE public."QuotationProduct"
+    SET "passengerFirstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN TRIM(passenger)
+            ELSE SPLIT_PART(TRIM(passenger), ' ', 1)
+        END,
+        "passengerLastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(passenger)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(passenger) FROM POSITION(' ' IN TRIM(passenger)) + 1)
+        END
+    WHERE ("passengerFirstName" IS NULL OR "passengerLastName" IS NULL)
+      AND passenger IS NOT NULL AND TRIM(passenger) <> '';
+
+    -- QuotationProductPassenger:
+    UPDATE public."QuotationProductPassenger"
+    SET "firstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN TRIM(name)
+            ELSE SPLIT_PART(TRIM(name), ' ', 1)
+        END,
+        "lastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(name) FROM POSITION(' ' IN TRIM(name)) + 1)
+        END
+    WHERE ("firstName" IS NULL OR "lastName" IS NULL)
+      AND name IS NOT NULL AND TRIM(name) <> '';
+
+    -- InvoicesProductPasenger:
+    UPDATE public."InvoicesProductPasenger"
+    SET "firstName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN TRIM(name)
+            ELSE SPLIT_PART(TRIM(name), ' ', 1)
+        END,
+        "lastName" = CASE 
+            WHEN POSITION(' ' IN TRIM(name)) = 0 THEN ''
+            ELSE SUBSTRING(TRIM(name) FROM POSITION(' ' IN TRIM(name)) + 1)
+        END
+    WHERE ("firstName" IS NULL OR "lastName" IS NULL)
+      AND name IS NOT NULL AND TRIM(name) <> '';
+END $$;
+
+
+
+-- >>> 2. SEMILLAS Y CONFIGURACIÓN INICIAL <<<
+-- SCRIPT DE DATOS INICIALES - AGENCIAS NEW
+-- RUTA: c:\Proyectos\AgenciasNew\SQL\Data\Inicial.sql
+-- IDEMPOTENTE: Puede ejecutarse múltiples veces sin errores
+
+-- 1. Rol Admin y Superadministrador
+INSERT INTO public."Role" (name)
+VALUES ('Admin'), ('Superadministrador')
+ON CONFLICT (name) DO NOTHING;
+
+
+-- 2. Sucursal
+INSERT INTO public."Branch" (code, name)
+VALUES ('BOG', 'BOG')
+ON CONFLICT (code) DO NOTHING;
+
+-- 3. Clientes, Vendedores, Proveedores y Tiqueteadores
+INSERT INTO public."Client" (document, name)
+VALUES ('73009263', 'Rubiel')
+ON CONFLICT (document) DO NOTHING;
+
+INSERT INTO public."Seller" (code, name, email)
+VALUES ('73009263', 'Rubiel', 'rubiel1985@msn.com')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."Provider" (code, name)
+VALUES ('73009263', 'Rubiel')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."TicketPrinter" (code, name, email)
+VALUES ('73009263', 'Rubiel', 'rubiel1985@msn.com')
+ON CONFLICT (code) DO NOTHING;
+
+-- 4. Usuario Administrativo (Contraseña: 111985)
+INSERT INTO public."User" (email, name, "passwordHash", "roleId", "branchId", "implantId", "ticketPrinterId")
+VALUES (
+    'rubiel1985@msn.com',
+    'Rubiel',
+    '$2b$10$IUxxw/yzr2bpC4wRMUcBYOsrIJrG4e0j.FI/p2baH2CGNfKNLbn.S',
+    (SELECT id FROM public."Role"          WHERE name = 'Admin'),
+    (SELECT id FROM public."Branch"        WHERE code = 'BOG'),
+    null,
+    (SELECT id FROM public."TicketPrinter" WHERE code = '73009263')
+)
+ON CONFLICT (email) DO NOTHING;
+
+-- 4.1 Usuario Superadministrador (Contraseña: 123456789)
+INSERT INTO public."User" (email, name, "passwordHash", "roleId", "branchId", "isActive")
+VALUES (
+    'ebarrera@zagencias.com',
+    'Eduardo Barrera',
+    '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+    (SELECT id FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%' LIMIT 1),
+    (SELECT id FROM public."Branch" WHERE code = 'BOG' LIMIT 1),
+    true
+)
+ON CONFLICT (email) DO UPDATE SET
+    "name" = EXCLUDED."name",
+    "passwordHash" = EXCLUDED."passwordHash",
+    "roleId" = EXCLUDED."roleId",
+    "isActive" = true;
+
+INSERT INTO public."User" (email, name, "passwordHash", "roleId", "branchId", "isActive")
+VALUES (
+    'ebarrrera@zagencias.com',
+    'Eduardo Barrera',
+    '$2b$10$AVrdrbg93Vxi1zrUw4EZguaJZzV4BiVmYk/kiGM8CesmbzyfIcbG2',
+    (SELECT id FROM public."Role" WHERE UPPER(name) LIKE '%SUPERADMIN%' LIMIT 1),
+    (SELECT id FROM public."Branch" WHERE code = 'BOG' LIMIT 1),
+    true
+)
+ON CONFLICT (email) DO UPDATE SET
+    "name" = EXCLUDED."name",
+    "passwordHash" = EXCLUDED."passwordHash",
+    "roleId" = EXCLUDED."roleId",
+    "isActive" = true;
+
+
+-- 5. Productos
+
+INSERT INTO public."Product" (code, type, description, "basePrice", cost)
+VALUES ('HTL','ALOJAMIENTO', 'Hotel', 0, 0)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."Product" (code, type, description, "basePrice", cost)
+VALUES ('RTA','ALQUILER', 'RestaAuto', 0, 0)
+ON CONFLICT (code) DO NOTHING;
+
+
+-- 6. Cargos e Impuestos
+INSERT INTO public."ChargeAndTax" (code, name, type, "valueType", value, "isEditable")
+VALUES
+    ('TAR',   'TAR',   'CHARGE', 'FIXED',      0,  true),
+    ('IVA',   'IVA',   'TAX',    'PERCENTAGE', 19,  true),
+    ('OTROS', 'OTROS', 'CHARGE', 'FIXED',       0,  true)
+ON CONFLICT (code) DO NOTHING;
+
+-- 7. Parámetros de conectividad SQL Server
+INSERT INTO public."SystemParameter" (code, name, value)
+VALUES
+    ('ServidorSQLServer',                'Host de SQL Server',                           ''),
+    ('UsuarioSQLServer',                 'Usuario SQL Server',                           ''),
+    ('ClaveSQLServer',                   'Contraseña SQL Server',                        ''),
+    ('EncriptarClaves',                  'Encriptar Contraseñas de Base de Datos y Zeus ERP (1: Sí, 0: No)', '0'),
+    ('BaseSQLServer',                    'Base de Datos SQL Server',                     ''),
+    ('PuertoSQLServer',                  'Puerto SQL Server',                            ''),
+    ('EnviarCotizacionesAutoSQLserver',  'Envío automático de cotizaciones a SQL Server (1: Sí, 0: No)', '0'),
+	('EnviarFacturacionAutoSQLserver',   'Envío automático a Facturacion SQL Server (1: Sí, 0: No)', '0'),
+	('Pais',                    		 'Pais',                     					 'Colombia'),
+	('MOSTRAR_TOTALIZACION_COTIZACION',  'Mostrar totalización financiera en cotización', 'true')
+ON CONFLICT (code) DO NOTHING;
+
+-- 8. Monedas iniciales
+INSERT INTO public."Currency" (code, name, "exchangeRate")
+VALUES
+    ('COP', 'Peso Colombiano',      1.00),
+    ('USD', 'Dólar Estadounidense', 4200.00),
+    ('EUR', 'Euro',                 4500.00)
+ON CONFLICT (code) DO NOTHING;
+
+
+-- 9. GDS iniciales
+INSERT INTO public."GDS" (name)
+VALUES
+	('SABRE'),
+	('AMADEUS'),
+	('AEROGAL'),
+	('GALILEO'),
+	('ZEUS ON LINE (ZOL)'),
+	('WEB SERVICE'),
+	('KIU'),
+	('IdeasFractal'),
+	('SparkCopa')
+ON CONFLICT (name) DO NOTHING;
+
+-- 10. Configuración de Facturación Automática por Sucursal y GDS
+INSERT INTO public."BranchGDSInvoiceAuto" ("branchId", "gdsId", "EnvoiceAuto")
+SELECT b.id, g.id, false
+FROM public."Branch" b, public."GDS" g
+ON CONFLICT DO NOTHING;
+
+
+-- 10. Interfaces iniciales
+
+
+INSERT INTO public."Interfaces" (code, name, "inactivo", "bl_genera_archivoplano", "ds_storedprocedure_archivoplano", "bl_job", "ds_namejob" ,"bl_facturador", "id_gds")
+VALUES
+    ('SABRE', 'SABRE', true, false, 'spInterfaceSabre', false, '' ,false,  1),
+    ('AMADEUS', 'AMADEUS', true, false, 'spInterfaceAmadeus', false, '', false, 2),
+    ('IdeasFractal', 'IdeasFractal', false, false, 'spInterfaceIdeasFractal', false, '', false,  8)
+ON CONFLICT (code) DO NOTHING;
+
+
+-- 10.5 Módulos de Menú Principal
+CREATE UNIQUE INDEX IF NOT EXISTS "Menu_code_key" ON public."Menu" ("code");
+INSERT INTO public."Menu" (code, name, parent, action, activo)
+VALUES 
+    ('DASHBOARD', 'Dashboard', NULL, '/dashboard', true),
+    ('PRECOTIZACIONES', 'Pre-Cotizaciones', NULL, '/dashboard/prequotations', true),
+    ('COTIZACIONES', 'Cotizaciones', NULL, '/dashboard/quotations/history', true),
+    ('FACTURACION', 'Facturación', NULL, '/dashboard/invoices/history', true),
+    ('MAESTROS', 'Maestros', NULL, '/dashboard/settings', true),
+    ('REPORTES', 'Reportes', NULL, '/dashboard/reports', true),
+    ('EJECUCIONES', 'Ejecuciones', NULL, '/dashboard/executions', true),
+    ('MANUAL', 'Manual Operativo', NULL, '/dashboard/manual', true)
+ON CONFLICT (code) DO UPDATE SET 
+    name = EXCLUDED.name,
+    action = EXCLUDED.action;
+
+-- 11. Maestros
+INSERT INTO public."Master" (code, name, "inactivo")
+VALUES
+    ('SystemParameter', 'parametros', false),
+    ('User', 'usuarios', false),
+    ('Branch', 'sucursales', false),
+    ('Implant', 'implantes', false),
+    ('ChargeAndTax', 'impuestos', false),
+    ('Seller', 'vendedores', false),
+    ('TicketPrinter', 'tiqueteadores', false),
+    ('Prestadora', 'prestadoras', false),
+    ('Client', 'clientes', false),
+    ('Provider', 'proveedores', false),
+    ('ProviderType', 'tipos-proveedores', false),
+    ('Product', 'productos', false),
+    ('MasterVariable', 'variables', false),
+    ('Combo', 'combos', false),
+    ('SystemLog', 'logs', false),
+    ('Currency', 'monedas', false),
+    ('Equivalences', 'equivalencias', false),
+    ('InterfaceExtractParam', 'extraccion-interfaces', false),
+    ('DocumentResolution', 'resoluciones-documentos', false),
+    ('TransactionConsecutive', 'consecutivos-transacciones', false),
+    ('CreditCard', 'tarjetas-credito', false),
+    ('Payment', 'formas-pago', false),
+    ('Countries', 'paises', false),
+    ('Cities', 'ciudades', false),
+    ('Airports', 'aeropuertos', false),
+    ('TicketType', 'tipos-tiquetes', false),
+    ('QuotationState', 'estados-cotizacion', false),
+    ('QuotationFormat', 'formatos-cotizacion', false)
+ON CONFLICT (code) DO NOTHING;
+
+
+-- 12. Paises Iniciales
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId")
+VALUES
+    ('CO', 'Colombia', '169', 'LA', '57', (SELECT id FROM public."Currency" WHERE code = 'COP')),
+    ('US', 'Estados Unidos', '249', 'NA', '1', (SELECT id FROM public."Currency" WHERE code = 'USD')),
+    ('ES', 'España', '245', 'EUR', '34', (SELECT id FROM public."Currency" WHERE code = 'EUR'))
+ON CONFLICT (code) DO NOTHING;
+
+-- 13. Ciudades Iniciales
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata)
+VALUES
+    ('BOG', 'Bogotá', (SELECT id FROM public."Countries" WHERE code = 'CO'), 'CUN', 'BOG'),
+    ('MDE', 'Medellín', (SELECT id FROM public."Countries" WHERE code = 'CO'), 'ANT', 'MDE'),
+    ('MIA', 'Miami', (SELECT id FROM public."Countries" WHERE code = 'US'), 'FL', 'MIA'),
+    ('MAD', 'Madrid', (SELECT id FROM public."Countries" WHERE code = 'ES'), 'MAD', 'MAD')
+ON CONFLICT (code) DO NOTHING;
+
+-- 14. Aeropuertos Iniciales
+INSERT INTO public."Airports" (code, name, "citiesId")
+VALUES
+    ('BOG', 'Aeropuerto Internacional El Dorado', (SELECT id FROM public."Cities" WHERE code = 'BOG')),
+    ('MDE', 'Aeropuerto Internacional Jose Maria Cordova', (SELECT id FROM public."Cities" WHERE code = 'MDE')),
+    ('MIA', 'Miami International Airport', (SELECT id FROM public."Cities" WHERE code = 'MIA')),
+    ('MAD', 'Adolfo Suarez Madrid-Barajas', (SELECT id FROM public."Cities" WHERE code = 'MAD'))
+ON CONFLICT (code) DO NOTHING;
+
+-- 14.5 Formas de Pago Iniciales
+INSERT INTO public."Payment" (code, name, "isActive")
+VALUES
+    ('EFECTIVO',      'Efectivo',                    true),
+    ('TARJETA',       'Tarjeta de Crédito',          true),
+    ('TRANSFERENCIA', 'Transferencia Bancaria',      true),
+    ('CHEQUE',        'Cheque',                      true),
+    ('CREDITO',       'Crédito / Cuenta por Cobrar', true)
+ON CONFLICT (code) DO NOTHING;
+
+-- 14.6 Tarjetas de Crédito Iniciales
+INSERT INTO public."CreditCard" (code, name, type, "isActive")
+VALUES
+    ('VISA',   'Visa',             'CREDIT', true),
+    ('MC',     'MasterCard',       'CREDIT', true),
+    ('AMEX',   'American Express', 'CREDIT', true),
+    ('DINERS', 'Diners Club',      'CREDIT', true)
+ON CONFLICT (code) DO NOTHING;
+
+-- DATOS EXTRAIDOS DE SQL SERVER
+
+-- 15. Monedas Adicionales (desde Paises)
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('DZD', 'Dinar algerino', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('DKK', 'Corona danesa', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('USD', 'Dolares Americanos', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('XOF', 'franco CFA', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SAR', 'Riyal saudi', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('NGN', 'Naira nigeriana', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('AUD', 'Dolar Australiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('GBP', 'Libra Estelina', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MXN', 'Peso Mexicano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('GHS', 'Cedi ghanes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('EUR', 'Euro', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('TRY', 'lira turca', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ETB', 'Birr etiope', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('YER', 'Rial yemeni', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('COP', 'Pesos Colombianos', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ARS', 'Peso argentino', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('RUB', 'Rublo Ruso', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('NOK', 'Corona noruega', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ISK', 'Krona islandesa', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MAD', 'Dirham marroqui', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SEK', 'Corona Sueca', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('INR', 'India Rupees', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('IDR', 'Rupiah indonesia', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('NZD', 'Dolar neozelandes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BRL', 'Real Brasilero', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('KZT', 'Tenge kazajo', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ZAR', 'Rand Sudafricano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SYP', 'Libra siria', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('EGP', 'Libra egipcia', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('JOD', 'Dinar', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CLP', 'Peso chileno', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('XCD', 'Dolar del Caribe Oriental', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MYR', 'Ringgit malayo', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MZN', 'Metical mozambique¤o', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('WST', 'Tala samoano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('PEN', 'Nuevo Sol', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('JPY', 'Yen Japones', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('PYG', 'Guaran¡ paraguayo', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BSD', 'Dolar bahameno', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('AED', 'Dirham de los Emiratos arabes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('XPF', 'Franco CFP', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CUP', 'Cuba Pesos', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('PHP', 'Filipinas Pesos', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BHD', 'Dinar bahreini', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('AZN', 'Franco CFP', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BWP', 'Pula de Botsuana', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('RON', 'Leu rumano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BMD', 'Dolar de Bermuda', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LBP', 'Libra libanesa', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('FJD', 'Dolar fijiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('XAF', 'Franco CFA', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BBD', 'Dolar de Barbados', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('IQD', 'Dinar iraqui', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CNY', 'Yuan Renminbi Chino', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('GMD', 'Dalasi gambiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BIF', 'Franco burunds', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('THB', 'Baht Thailandes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('VEF', 'Bolivar', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MWK', 'Kwacha malauiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ANG', 'Florin antillano neerlandes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CHF', 'FRANCO FRANCES', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CZK', 'Koruna', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('DOP', 'Peso dominicano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('HUF', 'Forint hungaro', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ZWR', 'dolar zimbabuense', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CVE', 'Escudo caboverdiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BZD', 'Dolar de Belice', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BOB', 'Boliviano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('HTG', 'Gourde haitiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BDT', 'Taka de Bangladesh', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('KRW', 'Won Surcoreano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('GNF', 'Franco guineano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LKR', 'Rupia de Sri Lanka', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CAD', 'Dolar Canadiense', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('KYD', 'Dolar caimano de Islas Caiman', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('UYU', 'Peso Uruguayo', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('TZS', 'Chelin tanzano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('HRK', 'Kuna croata', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('TND', 'Dinar tunecino', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('VND', 'dong vietnamita', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('QAR', 'Rial qatari', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('UGX', 'chelín ugandes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('NAD', 'Dolar namibio', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ILS', 'Nuevo shequel israeli', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SLL', 'Leone de Sierra Leona', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('GTQ', 'Quetzal guatemalteco', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('PLN', 'zloty polaco', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('PGK', 'Kina de Papua Nueva Guinea', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('KMF', 'Franco comoriano de Comoras', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('PKR', 'Rupia pakistani', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SBD', 'Dolar de las Islas Salomon', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('HKD', 'Dolar Honkones', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('UAH', 'grivna ucraniana', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('DJF', 'Franco yibutiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('RWF', 'Franco ruandes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('JMD', 'Dolar Jamaicano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SDG', 'Dinar sudanes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('NPR', 'Rupia nepalesa', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LTL', 'Litas lituano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('KWD', 'Dinar kuwaiti', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('AOA', 'Kwanza angoleno', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('CRC', 'Colon costarricense', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ZMK', 'Kwacha zambiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('KES', 'Chelin keniata', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('OMR', 'Rial omani', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('NIO', 'Cordoba nicaraguense', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MVR', 'Rufiyaa maldiva', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LRD', 'Dolar liberiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MUR', 'Rupia mauricia', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LSL', 'Loti lesotense', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SZL', 'Lilangeni suazi', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MRO', 'Ouguiya mauritana', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SRD', 'Dolar surinames', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('KHR', 'Riel camboyano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('TTD', 'dolar de Trinidad y Tobago', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MMK', 'Kyat birmano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LVL', 'Lat leton', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('HNL', 'Lempira hondureno', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SVC', 'Colón salvadoreno', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SCR', 'Rupia de Seychelles', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('SGD', 'Dolar Singapur', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BAM', 'Marco convertible de BosniaHe', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('BGN', 'Lev belgaro', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('UZS', 'Som uzbeko', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('GEL', 'Lari georgiano', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('TOP', 'Dinar kuwaiti', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('IRR', 'Rial irani', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('ALL', 'Lek albanes', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('MGA', 'Ariary malgache', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LYD', 'Dinar libio', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('VUV', 'Vatu de Vanuatu', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('LAK', 'Kip lao', 1.0) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Currency" (code, name, "exchangeRate") VALUES ('STD', 'Dobra de Santo Tomas y Principe', 1.0) ON CONFLICT (code) DO NOTHING;
+
+
+-- 16. Paises (Completos)
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('DZ', 'Algeria', '059', 'AFR', '213', (SELECT id FROM public."Currency" WHERE code = 'DZD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('DK', 'Denmark', '232', 'EUR', '45', (SELECT id FROM public."Currency" WHERE code = 'DKK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('US', 'United States', '249', 'NA', '1', (SELECT id FROM public."Currency" WHERE code = 'USD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CI', 'Cote d Ivoire', '193', 'AFR', '225', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SA', 'Saudi Arabia', '053', 'MEA', '966', (SELECT id FROM public."Currency" WHERE code = 'SAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NG', 'Nigeria', '528', 'AFR', '234', (SELECT id FROM public."Currency" WHERE code = 'NGN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AU', 'Australia', '069', 'PAC', '61', (SELECT id FROM public."Currency" WHERE code = 'AUD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GB', 'United Kingdom', '628', 'EUR', '44', (SELECT id FROM public."Currency" WHERE code = 'GBP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MX', 'Mexico', '493', 'LA', '52', (SELECT id FROM public."Currency" WHERE code = 'MXN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GH', 'Ghana', '289', 'AFR', '233', (SELECT id FROM public."Currency" WHERE code = 'GHS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ES', 'Spain', '245', 'EUR', '34', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TR', 'Turkey', '827', 'ASI', '90', (SELECT id FROM public."Currency" WHERE code = 'TRY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ET', 'Ethiopia', '253', 'AFR', '251', (SELECT id FROM public."Currency" WHERE code = 'ETB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('YE', 'Yemen', '880', 'MEA', '967', (SELECT id FROM public."Currency" WHERE code = 'YER')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CO', 'Colombia', '169', 'LA', '57', (SELECT id FROM public."Currency" WHERE code = 'COP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AR', 'Argentina', '063', 'LA', '54', (SELECT id FROM public."Currency" WHERE code = 'ARS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('RU', 'Russian Federation', '670', 'EUR', '7', (SELECT id FROM public."Currency" WHERE code = 'RUB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NO', 'Norway', '538', 'EUR', '47', (SELECT id FROM public."Currency" WHERE code = 'NOK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('IS', 'Iceland', '379', 'EUR', '354', (SELECT id FROM public."Currency" WHERE code = 'ISK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MA', 'Morocco', '474', 'AFR', '212', (SELECT id FROM public."Currency" WHERE code = 'MAD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('DE', 'Germany', '023', 'EUR', '49', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('FR', 'France', '275', 'EUR', '33', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SE', 'Sweden', '764', 'EUR', '46', (SELECT id FROM public."Currency" WHERE code = 'SEK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('IN', 'India', '361', 'ASI', '91', (SELECT id FROM public."Currency" WHERE code = 'INR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ID', 'Indonesia', '365', 'ASI', '62', (SELECT id FROM public."Currency" WHERE code = 'IDR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('IT', 'Italy', '386', 'EUR', '39', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CK', 'Cook Islands', '183', 'PAC', '682', (SELECT id FROM public."Currency" WHERE code = 'NZD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BR', 'Brazil', '105', 'LA', '55', (SELECT id FROM public."Currency" WHERE code = 'BRL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NZ', 'New Zealand', '548', 'PAC', '64', (SELECT id FROM public."Currency" WHERE code = 'NZD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KZ', 'Kazakstan', '406', 'ASI', '7', (SELECT id FROM public."Currency" WHERE code = 'KZT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ZA', 'South Africa', '756', 'AFR', '27', (SELECT id FROM public."Currency" WHERE code = 'ZAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SY', 'Syrian Arab Republic', '744', 'MEA', '963', (SELECT id FROM public."Currency" WHERE code = 'SYP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AD', 'Andorra', '037', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('EG', 'Egypt', '240', 'MEA', '20', (SELECT id FROM public."Currency" WHERE code = 'EGP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('JO', 'Jordan', '403', 'MEA', '962', (SELECT id FROM public."Currency" WHERE code = 'JOD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NL', 'Netherlands', '573', 'EUR', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CL', 'Chile', '211', 'LA', '56', (SELECT id FROM public."Currency" WHERE code = 'CLP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BE', 'Belgium', '087', 'EUR', '32', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AG', 'Antigua and Barbuda', '043', 'CAR', '1268', (SELECT id FROM public."Currency" WHERE code = 'XCD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MY', 'Malaysia', '455', 'ASI', '60', (SELECT id FROM public."Currency" WHERE code = 'MYR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MZ', 'Mozambique', '505', 'AFR', '258', (SELECT id FROM public."Currency" WHERE code = 'MZN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('WS', 'Samoa', '687', 'PAC', '685', (SELECT id FROM public."Currency" WHERE code = 'WST')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PE', 'Peru', '589', 'LA', '51', (SELECT id FROM public."Currency" WHERE code = 'PEN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('JP', 'Japan', '399', 'ASI', '81', (SELECT id FROM public."Currency" WHERE code = 'JPY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ER', 'Eritrea', '243', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PY', 'Paraguay', '586', 'LA', '595', (SELECT id FROM public."Currency" WHERE code = 'PYG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BS', 'Bahamas', '077', 'CAR', '1242', (SELECT id FROM public."Currency" WHERE code = 'BSD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GR', 'Greece', '301', 'EUR', '30', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AW', 'Aruba', '027', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AE', 'United Arab Emirates', '244', 'MEA', '971', (SELECT id FROM public."Currency" WHERE code = 'AED')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PF', 'French Polynesia', '599', 'PAC', '689', (SELECT id FROM public."Currency" WHERE code = 'XPF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CU', 'Cuba', '199', 'CAR', '53', (SELECT id FROM public."Currency" WHERE code = 'CUP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AI', 'Anguilla', '041', 'CAR', '1264', (SELECT id FROM public."Currency" WHERE code = 'XCD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PH', 'Philippines', '267', 'ASI', '63', (SELECT id FROM public."Currency" WHERE code = 'PHP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BH', 'Bahrain', '080', 'ASI', '973', (SELECT id FROM public."Currency" WHERE code = 'BHD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AZ', 'Azerbaijan', '074', 'ASI', '994', (SELECT id FROM public."Currency" WHERE code = 'AZN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BW', 'Botswana', '101', 'AFR', '267', (SELECT id FROM public."Currency" WHERE code = 'BWP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('RO', 'Romania', '670', 'EUR', '40', (SELECT id FROM public."Currency" WHERE code = 'RON')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BM', 'Bermuda', '090', 'CAR', '1441', (SELECT id FROM public."Currency" WHERE code = 'BMD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('YU', 'Yugoslavia', '885', 'EUR', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LB', 'Lebanon', '431', 'MEA', '961', (SELECT id FROM public."Currency" WHERE code = 'LBP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('FJ', 'Fiji', '870', 'PAC', '679', (SELECT id FROM public."Currency" WHERE code = 'FJD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CF', 'Central African Republic', '640', 'AFR', '236', (SELECT id FROM public."Currency" WHERE code = 'XAF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BB', 'Barbados', '083', 'CAR', '1246', (SELECT id FROM public."Currency" WHERE code = 'BBD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('IQ', 'Iraq', '369', 'MEA', '964', (SELECT id FROM public."Currency" WHERE code = 'IQD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CN', 'China', '215', 'ASI', '86', (SELECT id FROM public."Currency" WHERE code = 'CNY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MH', 'Marshall Islands', '472', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GM', 'Gambia', '285', 'AFR', '220', (SELECT id FROM public."Currency" WHERE code = 'GMD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BI', 'Burundi', '115', 'AFR', '257', (SELECT id FROM public."Currency" WHERE code = 'BIF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TH', 'Thailand', '776', 'ASI', '66', (SELECT id FROM public."Currency" WHERE code = 'THB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ML', 'Mali', '464', 'AFR', '223', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('VE', 'Venezuela', '850', 'LA', '58', (SELECT id FROM public."Currency" WHERE code = 'VEF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MW', 'Malawi', '458', 'AFR', '265', (SELECT id FROM public."Currency" WHERE code = 'MWK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AN', 'Netherlands Antilles', '047', 'CAR', '31', (SELECT id FROM public."Currency" WHERE code = 'ANG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CH', 'Switzerland', '767', 'EUR', '41', (SELECT id FROM public."Currency" WHERE code = 'CHF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CZ', 'Czech Republic', '644', 'EUR', '420', (SELECT id FROM public."Currency" WHERE code = 'CZK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('DO', 'Dominican Republic', '647', 'CAR', '1089', (SELECT id FROM public."Currency" WHERE code = 'DOP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SK', 'Slovakia', '246', 'EUR', '421', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('HU', 'Hungary', '355', 'EUR', '36', (SELECT id FROM public."Currency" WHERE code = 'HUF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ZW', 'Zimbabwe', '665', 'AFR', '263', (SELECT id FROM public."Currency" WHERE code = 'ZWR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CV', 'Cape Verde', '127', 'AFR', '238', (SELECT id FROM public."Currency" WHERE code = 'CVE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BN', 'Brunei Darussalam', '108', 'ASI', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BZ', 'Belize', '088', 'LA', '501', (SELECT id FROM public."Currency" WHERE code = 'BZD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CG', 'Congo', '177', 'AFR', '242', (SELECT id FROM public."Currency" WHERE code = 'XAF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BO', 'Bolivia', '097', 'LA', '591', (SELECT id FROM public."Currency" WHERE code = 'BOB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('HT', 'Haiti', '341', 'CAR', '509', (SELECT id FROM public."Currency" WHERE code = 'HTG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GF', 'French Guiana', '325', 'LA', '594', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PT', 'Portugal', '607', 'EUR', '351', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GP', 'Guadeloupe', '309', 'CAR', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('IE', 'Ireland', '375', 'EUR', '353', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BD', 'Bangladesh', '081', 'ASI', '880', (SELECT id FROM public."Currency" WHERE code = 'BDT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PA', 'Panama', '580', 'LA', '507', (SELECT id FROM public."Currency" WHERE code = 'USD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KR', 'Korea, Republic Of', '190', 'ASI', '82', (SELECT id FROM public."Currency" WHERE code = 'KRW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GN', 'Guinea', '329', 'AFR', '224', (SELECT id FROM public."Currency" WHERE code = 'GNF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LK', 'Sri Lanka', '750', 'ASI', '94', (SELECT id FROM public."Currency" WHERE code = 'LKR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BJ', 'Benin', '229', 'AFR', '229', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('EC', 'Ecuador', '239', 'LA', '593', (SELECT id FROM public."Currency" WHERE code = 'USD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CA', 'Canada', '149', 'NA', '1', (SELECT id FROM public."Currency" WHERE code = 'CAD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KY', 'Cayman Islands', '137', 'CAR', '1345', (SELECT id FROM public."Currency" WHERE code = 'KYD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('UY', 'Uruguay', '845', 'LA', '598', (SELECT id FROM public."Currency" WHERE code = 'UYU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TZ', 'Tanzania, United Republic Of', '780', 'AFR', '255', (SELECT id FROM public."Currency" WHERE code = 'TZS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('HR', 'Croatia', '198', 'EUR', '385', (SELECT id FROM public."Currency" WHERE code = 'HRK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('DM', 'Dominica', '235', 'CAR', '1767', (SELECT id FROM public."Currency" WHERE code = 'XCD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TN', 'Tunisia', '820', 'AFR', '216', (SELECT id FROM public."Currency" WHERE code = 'TND')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SN', 'Senegal', '728', 'AFR', '221', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CM', 'Cameroon', '145', 'AFR', '237', (SELECT id FROM public."Currency" WHERE code = 'XAF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('VN', 'Vietnam', '855', 'ASI', '84', (SELECT id FROM public."Currency" WHERE code = 'VND')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('QA', 'Qatar', '618', 'MEA', '974', (SELECT id FROM public."Currency" WHERE code = 'QAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('UG', 'Uganda', '833', 'AFR', '256', (SELECT id FROM public."Currency" WHERE code = 'UGX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CY', 'Cyprus', '221', 'EUR', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('VG', 'Virgin Islands, British', '863', 'CAR', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NA', 'Namibia', '507', 'AFR', '264', (SELECT id FROM public."Currency" WHERE code = 'NAD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('IL', 'Israel', '383', 'MEA', '972', (SELECT id FROM public."Currency" WHERE code = 'ILS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CD', 'Congo, The Democratic Republic Of', 'NULL', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MQ', 'Martinique', '477', 'CAR', '33', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SL', 'Sierra Leone', '735', 'AFR', '232', (SELECT id FROM public."Currency" WHERE code = 'SLL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GT', 'Guatemala', '317', 'CAR', '502', (SELECT id FROM public."Currency" WHERE code = 'GTQ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PL', 'Poland', '603', 'EUR', '48', (SELECT id FROM public."Currency" WHERE code = 'PLN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TC', 'Turks and Caicos Islands', '823', 'CAR', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NC', 'New Caledonia', '542', 'PAC', '687', (SELECT id FROM public."Currency" WHERE code = 'XPF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GI', 'Gibraltar', '293', 'EUR', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PG', 'Papua New Guinea', '545', 'PAC', '675', (SELECT id FROM public."Currency" WHERE code = 'PGK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GL', 'Greenland', '305', 'NA', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AT', 'Austria', '072', 'EUR', '43', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GU', 'Guam', '313', 'PAC', '671', (SELECT id FROM public."Currency" WHERE code = 'USD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MT', 'Malta', '467', 'EUR', '356', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KM', 'Comoros', '173', 'AFR', '269', (SELECT id FROM public."Currency" WHERE code = 'KMF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TW', 'Taiwan, Province of China', '218', 'ASI', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PK', 'Pakistan', '576', 'ASI', '92', (SELECT id FROM public."Currency" WHERE code = 'PKR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('FI', 'Finland', '271', 'EUR', '358', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SB', 'Solomon Islands', '677', 'PAC', '677', (SELECT id FROM public."Currency" WHERE code = 'SBD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('HK', 'Hong Kong', '351', 'ASI', '852', (SELECT id FROM public."Currency" WHERE code = 'HKD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('UA', 'Ukraine', '830', 'EUR', '380', (SELECT id FROM public."Currency" WHERE code = 'UAH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NU', 'Niue', '531', 'PAC', '683', (SELECT id FROM public."Currency" WHERE code = 'NZD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('DJ', 'Djibouti', 'NULL', 'AFR', '253', (SELECT id FROM public."Currency" WHERE code = 'DJF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('RW', 'Rwanda', '675', 'AFR', '250', (SELECT id FROM public."Currency" WHERE code = 'RWF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('JM', 'Jamaica', '391', 'CAR', '1876', (SELECT id FROM public."Currency" WHERE code = 'JMD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SD', 'Sudan', '759', 'AFR', '249', (SELECT id FROM public."Currency" WHERE code = 'SDG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NP', 'Nepal', '517', 'ASI', '977', (SELECT id FROM public."Currency" WHERE code = 'NPR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LT', 'Lithuania', '443', 'EUR', '9876', (SELECT id FROM public."Currency" WHERE code = 'LTL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KW', 'Kuwait', '413', 'MEA', '965', (SELECT id FROM public."Currency" WHERE code = 'KWD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AO', 'Angola', '040', 'AFR', '244', (SELECT id FROM public."Currency" WHERE code = 'AOA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GA', 'Gabon', '281', 'AFR', '241', (SELECT id FROM public."Currency" WHERE code = 'XAF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TG', 'Togo', '800', 'AFR', '228', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('CR', 'Costa Rica', '196', 'LA', '506', (SELECT id FROM public."Currency" WHERE code = 'CRC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SI', 'Slovenia', '247', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ZM', 'Zambia', '890', 'AFR', '260', (SELECT id FROM public."Currency" WHERE code = 'ZMK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LU', 'Luxembourg', '445', 'EUR', '352', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KE', 'Kenya', '410', 'AFR', '254', (SELECT id FROM public."Currency" WHERE code = 'KES')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MC', 'Monaco', '498', 'EUR', '377', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('OM', 'Oman', '556', 'MEA', '968', (SELECT id FROM public."Currency" WHERE code = 'OMR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MO', 'Macau', '447', 'ASI', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NI', 'Nicaragua', '521', 'LA', '505', (SELECT id FROM public."Currency" WHERE code = 'NIO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MV', 'Maldives', '461', 'ASI', '960', (SELECT id FROM public."Currency" WHERE code = 'MVR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LR', 'Liberia', '434', 'AFR', '231', (SELECT id FROM public."Currency" WHERE code = 'LRD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KI', 'Kiribati', '411', 'PAC', '686', (SELECT id FROM public."Currency" WHERE code = 'AUD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MU', 'Mauritius', '485', 'AFR', '230', (SELECT id FROM public."Currency" WHERE code = 'MUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BY', 'Belarus', '091', 'EUR', '375', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LS', 'Lesotho', '426', 'AFR', '266', (SELECT id FROM public."Currency" WHERE code = 'LSL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SZ', 'Swaziland', '773', 'AFR', '268', (SELECT id FROM public."Currency" WHERE code = 'SZL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MR', 'Mauritania', '488', 'AFR', '222', (SELECT id FROM public."Currency" WHERE code = 'MRO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TD', 'Chad', '203', 'AFR', '235', (SELECT id FROM public."Currency" WHERE code = 'XAF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KN', 'Saint Kitts and Nevis', '695', 'CAR', '1869', (SELECT id FROM public."Currency" WHERE code = 'XCD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('NE', 'Niger', '525', 'AFR', '227', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BF', 'Burkina Faso', '031', 'AFR', '226', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GW', 'Guinea-Bissau', '334', 'AFR', '245', (SELECT id FROM public."Currency" WHERE code = 'XOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SR', 'Suriname', '770', 'LA', '597', (SELECT id FROM public."Currency" WHERE code = 'SRD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('KH', 'Cambodia', '141', 'ASI', '855', (SELECT id FROM public."Currency" WHERE code = 'KHR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TT', 'Trinidad and Tobago', '815', 'CAR', '1868', (SELECT id FROM public."Currency" WHERE code = 'TTD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AS', 'American Samoa', '690', 'PAC', '1684', (SELECT id FROM public."Currency" WHERE code = 'USD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MM', 'Myanmar', '093', 'ASI', '95', (SELECT id FROM public."Currency" WHERE code = 'MMK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LV', 'Latvia', '429', 'EUR', '371', (SELECT id FROM public."Currency" WHERE code = 'LVL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MP', 'Northern Mariana Islands', 'NULL', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('PW', 'Palau', '578', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('HN', 'Honduras', '345', 'LA', '504', (SELECT id FROM public."Currency" WHERE code = 'HNL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('RE', 'Reunion', '660', 'AFR', '33', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SV', 'El Salvador', '242', 'LA', '503', (SELECT id FROM public."Currency" WHERE code = 'SVC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SC', 'Seychelles', '731', 'AFR', '248', (SELECT id FROM public."Currency" WHERE code = 'SCR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('SG', 'Singapore', '741', 'ASI', '65', (SELECT id FROM public."Currency" WHERE code = 'SGD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BA', 'Bosnia and Herzegovina', '029', 'EUR', '387', (SELECT id FROM public."Currency" WHERE code = 'BAM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MK', 'Macedonia, The Former Yugoslav Republic of', '448', 'NULL', 'NULL', (SELECT id FROM public."Currency" WHERE code = 'NULL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('BG', 'Bulgaria', '111', 'EUR', '359', (SELECT id FROM public."Currency" WHERE code = 'BGN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('UZ', 'Uzbekistan', '847', 'ASI', '998', (SELECT id FROM public."Currency" WHERE code = 'UZS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('GE', 'Georgia', '287', 'ASI', '995', (SELECT id FROM public."Currency" WHERE code = 'GEL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('TO', 'Tonga', '810', 'PAC', '676', (SELECT id FROM public."Currency" WHERE code = 'TOP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('IR', 'Iran, Islamic Republic Of', '372', 'MEA', '98', (SELECT id FROM public."Currency" WHERE code = 'IRR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('AL', 'Albania', '017', 'EUR', '355', (SELECT id FROM public."Currency" WHERE code = 'ALL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('EE', 'Estonia', '251', 'EUR', '372', (SELECT id FROM public."Currency" WHERE code = 'EUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('MG', 'Madagascar', '450', 'AFR', '261', (SELECT id FROM public."Currency" WHERE code = 'MGA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LY', 'Libyan Arab Jamahiriya', '438', 'AFR', '218', (SELECT id FROM public."Currency" WHERE code = 'LYD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('VC', 'Saint Vincent and The Grenadines', '705', 'CAR', '1784', (SELECT id FROM public."Currency" WHERE code = 'XCD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('VU', 'Vanuatu', '551', 'PAC', '678', (SELECT id FROM public."Currency" WHERE code = 'VUV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('LA', 'Lao People s Democratic Republic', '420', 'ASI', '856', (SELECT id FROM public."Currency" WHERE code = 'LAK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Countries" (code, name, dane, region, prefix, "curencyId") VALUES ('ST', 'STONIA', '251', 'AFR', '239', (SELECT id FROM public."Currency" WHERE code = 'STD')) ON CONFLICT (code) DO NOTHING;
+
+-- 17. Ciudades (Completas)
+
+-- 18. Aeropuertos (Completos)
+-- 17. Ciudades (Completas)
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HOU', 'Houston', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'HOU') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ANC', 'Anchorage', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'ANC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LIM', 'Lima', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'LIM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DEN', 'Denver', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'DEN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ATL', 'Atlanta', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'ATL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CMH', 'Columbus', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'CMH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BOL', 'Hartford', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'BOL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SEA', 'Seattle', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'SEA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CLE', 'Cleveland', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'CLE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BNA', 'Nashville', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'BNA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BOS', 'Boston', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'BOS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BUF', 'Buffalo', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'BUF') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BWI', 'Baltimore', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'BWI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CHI', 'Chicago', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'CHI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CHS', 'Charleston', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'CHS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DFW', 'Dallas', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'DFW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DAY', 'Dayton', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'DAY') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DUB', 'Dublin', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'DUB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DTT', 'Detroit', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'DTT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('EWR', 'Newark', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'EWR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GEO', 'Georgetown', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'GEO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GLA', 'Glasgow', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'GLA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HNL', 'Honolulu', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'HNL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LAX', 'Los Angeles', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'LAX') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SFO', 'San Francisco', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'SFO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NYC', 'New York', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'NYC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LAS', 'Las Vegas', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'LAS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LGB', 'Long Beach', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'LGB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ORL', 'Orlando', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'ORL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MEM', 'Memphis', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'MEM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MIA', 'Miami', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'MIA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MKE', 'Milwaukee', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'MKE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MSP', 'Minneapolis', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'MSP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MSY', 'New Orleans', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'MSY') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SAN', 'San Diego', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'SAN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NOR', 'Norfolk', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'NOR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PDX', 'Portland', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'PDX') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PHX', 'Phoenix', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'PHX') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('RDU', 'Raleigh', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'RDU') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('RIC', 'Richmond', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'RIC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ROC', 'Rochester', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'ROC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SAI', 'San Antonio', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'SAI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SAV', 'Savannah', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'SAV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SLC', 'Salt Lake City', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'SLC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TPA', 'Tampa', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'TPA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TUS', 'Tucson', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'TUS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YYJ', 'Victoria', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'YYJ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VAP', 'Valparaiso', (SELECT id FROM public."Countries" WHERE code = 'US'), '', 'VAP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ABJ', 'Abidjan', (SELECT id FROM public."Countries" WHERE code = 'CI'), '', 'ABJ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DHA', 'Dhahran', (SELECT id FROM public."Countries" WHERE code = 'SA'), '', 'DHA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('RUH', 'Riyadh', (SELECT id FROM public."Countries" WHERE code = 'SA'), '', 'RUH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('JED', 'Jeddah', (SELECT id FROM public."Countries" WHERE code = 'SA'), '', 'JED') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KAN', 'Kano', (SELECT id FROM public."Countries" WHERE code = 'NG'), '', 'KAN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LOS', 'Lagos', (SELECT id FROM public."Countries" WHERE code = 'NG'), '', 'LOS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SYD', 'Sydney', (SELECT id FROM public."Countries" WHERE code = 'AU'), '', 'SYD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MEL', 'Melbourne', (SELECT id FROM public."Countries" WHERE code = 'AU'), '', 'MEL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ROM', 'Roma', (SELECT id FROM public."Countries" WHERE code = 'AU'), '', 'ROM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PER', 'Perth', (SELECT id FROM public."Countries" WHERE code = 'AU'), '', 'PER') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CNS', 'Cairns', (SELECT id FROM public."Countries" WHERE code = 'AU'), '', 'CNS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HBA', 'Hobart', (SELECT id FROM public."Countries" WHERE code = 'AU'), '', 'HBA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BHD', 'Belfast', (SELECT id FROM public."Countries" WHERE code = 'GB'), '', 'BHD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MME', 'Teesside', (SELECT id FROM public."Countries" WHERE code = 'GB'), '', 'MME') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LBA', 'Leeds', (SELECT id FROM public."Countries" WHERE code = 'GB'), '', 'LBA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LPB', 'La Paz', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'LPB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MID', 'Merida', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'MID') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MZT', 'Mazatlan', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'MZT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MTY', 'Monterrey', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'MTY') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PVR', 'Puerto Vallarta', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'PVR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VER', 'Veracruz', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'VER') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TAM', 'Tampico', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'TAM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GYM', 'Guaymas', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'GYM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GDL', 'Guadalajara', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'GDL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CUN', 'Cancun', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'CUN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CZM', 'Cozumel', (SELECT id FROM public."Countries" WHERE code = 'MX'), '', 'CZM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ACC', 'Accra', (SELECT id FROM public."Countries" WHERE code = 'GH'), '', 'ACC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ALC', 'Alicante', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'ALC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AGP', 'Malaga', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'AGP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BCN', 'Barcelona', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'BCN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BIO', 'Bilbao', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'BIO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GND', 'Granada', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'GND') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('IBZ', 'Ibiza', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'IBZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SVQ', 'Sevilla', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'SVQ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VGO', 'Vigo', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'VGO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VIX', 'Vitoria', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'VIX') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VLC', 'Valencia', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'VLC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ZAZ', 'Zaragoza', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'ZAZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SDR', 'Santander', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'SDR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PNA', 'Pamplona', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'PNA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MJV', 'Murcia', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'MJV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MAD', 'Madrid', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'MAD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MAH', 'Menorca', (SELECT id FROM public."Countries" WHERE code = 'ES'), '', 'MAH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AYT', 'Antalya', (SELECT id FROM public."Countries" WHERE code = 'TR'), '', 'AYT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ANK', 'Ankara', (SELECT id FROM public."Countries" WHERE code = 'TR'), '', 'ANK') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ADD', 'Addis Ababa', (SELECT id FROM public."Countries" WHERE code = 'ET'), '', 'ADD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ADE', 'Aden', (SELECT id FROM public."Countries" WHERE code = 'YE'), '', 'ADE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BAQ', 'Barranquilla', (SELECT id FROM public."Countries" WHERE code = 'CO'), 'ATL', 'BAQ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BOG', 'Bogota', (SELECT id FROM public."Countries" WHERE code = 'CO'), 'BOG', 'BOG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MDE', 'Medellin', (SELECT id FROM public."Countries" WHERE code = 'CO'), 'ANT', 'MDE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CTG', 'Cartagena', (SELECT id FROM public."Countries" WHERE code = 'CO'), 'BOL', 'CTG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CLO', 'Cali', (SELECT id FROM public."Countries" WHERE code = 'CO'), 'VAL', 'CLO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('000001', 'chigorodo', (SELECT id FROM public."Countries" WHERE code = 'CO'), '', '000001') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BHI', 'Bahia Blanca', (SELECT id FROM public."Countries" WHERE code = 'AR'), '', 'BHI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BUE', 'Buenos Aires', (SELECT id FROM public."Countries" WHERE code = 'AR'), '', 'BUE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SLZ', 'San Luis', (SELECT id FROM public."Countries" WHERE code = 'AR'), '', 'SLZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KRS', 'Kristiansand', (SELECT id FROM public."Countries" WHERE code = 'NO'), '', 'KRS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SVG', 'Stavanger', (SELECT id FROM public."Countries" WHERE code = 'NO'), '', 'SVG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BGO', 'Bergen', (SELECT id FROM public."Countries" WHERE code = 'NO'), '', 'BGO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('OSL', 'Oslo', (SELECT id FROM public."Countries" WHERE code = 'NO'), '', 'OSL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CAS', 'Casablanca', (SELECT id FROM public."Countries" WHERE code = 'MA'), '', 'CAS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('RAK', 'Marrakech', (SELECT id FROM public."Countries" WHERE code = 'MA'), '', 'RAK') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('RBA', 'Rabat', (SELECT id FROM public."Countries" WHERE code = 'MA'), '', 'RBA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('STR', 'Stuttgart', (SELECT id FROM public."Countries" WHERE code = 'DE'), '', 'STR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LEJ', 'Leipzig', (SELECT id FROM public."Countries" WHERE code = 'DE'), '', 'LEJ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MUC', 'Munich', (SELECT id FROM public."Countries" WHERE code = 'DE'), '', 'MUC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VER', 'Berlin', (SELECT id FROM public."Countries" WHERE code = 'DE'), '', 'VER') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DUS', 'Dusseldorf', (SELECT id FROM public."Countries" WHERE code = 'DE'), '', 'DUS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FRA', 'Frankfurt', (SELECT id FROM public."Countries" WHERE code = 'DE'), '', 'FRA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PAR', 'Paris', (SELECT id FROM public."Countries" WHERE code = 'FR'), '', 'PAR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BOD', 'Bordeaux', (SELECT id FROM public."Countries" WHERE code = 'FR'), '', 'BOD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LYS', 'Lyon', (SELECT id FROM public."Countries" WHERE code = 'FR'), '', 'LYS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LHV', 'Le Havre', (SELECT id FROM public."Countries" WHERE code = 'FR'), '', 'LHV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LIL', 'Lille', (SELECT id FROM public."Countries" WHERE code = 'FR'), '', 'LIL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MMA', 'Malmo', (SELECT id FROM public."Countries" WHERE code = 'SE'), '', 'MMA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DEL', 'Delhi', (SELECT id FROM public."Countries" WHERE code = 'IN'), '', 'DEL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MAA', 'Madras', (SELECT id FROM public."Countries" WHERE code = 'IN'), '', 'MAA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DPS', 'Denpasar', (SELECT id FROM public."Countries" WHERE code = 'ID'), '', 'DPS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('JKT', 'Jakarta', (SELECT id FROM public."Countries" WHERE code = 'ID'), '', 'JKT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BRI', 'Bari', (SELECT id FROM public."Countries" WHERE code = 'IT'), '', 'BRI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MIL', 'Milan', (SELECT id FROM public."Countries" WHERE code = 'IT'), '', 'MIL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PMO', 'Palermo', (SELECT id FROM public."Countries" WHERE code = 'IT'), '', 'PMO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('POA', 'Porto Alegre', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'POA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('REC', 'Recife', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'REC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SSA', 'Salvador', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'SSA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('JPA', 'Joao Pessoa', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'JPA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MCZ', 'Maceio', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'MCZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NAT', 'Natal', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'NAT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BSB', 'Brasilia', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'BSB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BZC', 'Buzios', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'BZC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BEL', 'Belem', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'BEL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AJU', 'Aracaju', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'AJU') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BHZ', 'Belo Horizonte', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'BHZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CWB', 'Curitiba', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'CWB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CGB', 'Cuiaba', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'CGB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('IOS', 'Ilheus', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'IOS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GYN', 'Goiania', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'GYN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FOR', 'Fortaleza', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'FOR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('RIO', 'Rio De Janeiro', (SELECT id FROM public."Countries" WHERE code = 'BR'), '', 'RIO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CHC', 'Christchurch', (SELECT id FROM public."Countries" WHERE code = 'NZ'), '', 'CHC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AKL', 'Auckland', (SELECT id FROM public."Countries" WHERE code = 'NZ'), '', 'AKL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('WLG', 'Wellington', (SELECT id FROM public."Countries" WHERE code = 'NZ'), '', 'WLG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PRY', 'Pretoria', (SELECT id FROM public."Countries" WHERE code = 'ZA'), '', 'PRY') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PEZ', 'Port Elizabeth', (SELECT id FROM public."Countries" WHERE code = 'ZA'), '', 'PEZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DUR', 'Durban', (SELECT id FROM public."Countries" WHERE code = 'ZA'), '', 'DUR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CTW', 'Cape Town', (SELECT id FROM public."Countries" WHERE code = 'ZA'), '', 'CTW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ALP', 'Aleppo', (SELECT id FROM public."Countries" WHERE code = 'SY'), '', 'ALP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CAI', 'Cairo', (SELECT id FROM public."Countries" WHERE code = 'EG'), '', 'CAI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AMM', 'Amman', (SELECT id FROM public."Countries" WHERE code = 'JO'), '', 'AMM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AMS', 'Amsterdam', (SELECT id FROM public."Countries" WHERE code = 'NL'), '', 'AMS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ANF', 'Antofagasta', (SELECT id FROM public."Countries" WHERE code = 'CL'), '', 'ANF') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ARI', 'Arica', (SELECT id FROM public."Countries" WHERE code = 'CL'), '', 'ARI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('IQQ', 'Iquique', (SELECT id FROM public."Countries" WHERE code = 'CL'), '', 'IQQ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PMC', 'Puerto Montt', (SELECT id FROM public."Countries" WHERE code = 'CL'), '', 'PMC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PUQ', 'Punta Arenas', (SELECT id FROM public."Countries" WHERE code = 'CL'), '', 'PUQ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ZCO', 'Temuco', (SELECT id FROM public."Countries" WHERE code = 'CL'), '', 'ZCO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LSC', 'La Serena', (SELECT id FROM public."Countries" WHERE code = 'CL'), '', 'LSC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ANR', 'Antwerp', (SELECT id FROM public."Countries" WHERE code = 'BE'), '', 'ANR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KUL', 'Kuala Lumpur', (SELECT id FROM public."Countries" WHERE code = 'MY'), '', 'KUL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PEN', 'Penang', (SELECT id FROM public."Countries" WHERE code = 'MY'), '', 'PEN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MPM', 'Maputo', (SELECT id FROM public."Countries" WHERE code = 'MZ'), '', 'MPM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('APW', 'Apia', (SELECT id FROM public."Countries" WHERE code = 'WS'), '', 'APW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AQP', 'Arequipa', (SELECT id FROM public."Countries" WHERE code = 'PE'), '', 'AQP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('OSA', 'Osaka', (SELECT id FROM public."Countries" WHERE code = 'JP'), '', 'OSA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FUK', 'Fukuoka', (SELECT id FROM public."Countries" WHERE code = 'JP'), '', 'FUK') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NGO', 'Nagoya', (SELECT id FROM public."Countries" WHERE code = 'JP'), '', 'NGO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('OKA', 'Okinawa', (SELECT id FROM public."Countries" WHERE code = 'JP'), '', 'OKA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ASM', 'Asmara', (SELECT id FROM public."Countries" WHERE code = 'ER'), '', 'ASM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ASU', 'Asuncion', (SELECT id FROM public."Countries" WHERE code = 'PY'), '', 'ASU') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FPO', 'Freeport', (SELECT id FROM public."Countries" WHERE code = 'BS'), '', 'FPO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NAS', 'Nassau', (SELECT id FROM public."Countries" WHERE code = 'BS'), '', 'NAS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AUA', 'Aruba', (SELECT id FROM public."Countries" WHERE code = 'AW'), '', 'AUA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AUH', 'Abu Dhabi', (SELECT id FROM public."Countries" WHERE code = 'AE'), '', 'AUH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DXB', 'Dubai', (SELECT id FROM public."Countries" WHERE code = 'AE'), '', 'DXB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SHJ', 'Sharjah', (SELECT id FROM public."Countries" WHERE code = 'AE'), '', 'SHJ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PPT', 'Papeete', (SELECT id FROM public."Countries" WHERE code = 'PF'), '', 'PPT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VRA', 'Varadero', (SELECT id FROM public."Countries" WHERE code = 'CU'), '', 'VRA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ZLO', 'Manzanillo', (SELECT id FROM public."Countries" WHERE code = 'CU'), '', 'ZLO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HOG', 'Holguin', (SELECT id FROM public."Countries" WHERE code = 'CU'), '', 'HOG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('AVI', 'Ciego De Avila', (SELECT id FROM public."Countries" WHERE code = 'CU'), '', 'AVI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MNL', 'Manila', (SELECT id FROM public."Countries" WHERE code = 'PH'), '', 'MNL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BAH', 'Bahrain', (SELECT id FROM public."Countries" WHERE code = 'BH'), '', 'BAH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GBE', 'Gaborone', (SELECT id FROM public."Countries" WHERE code = 'BW'), '', 'GBE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TSR', 'Timisoara', (SELECT id FROM public."Countries" WHERE code = 'RO'), '', 'TSR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BDA', 'Bermuda', (SELECT id FROM public."Countries" WHERE code = 'BM'), '', 'BDA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BEY', 'Beirut', (SELECT id FROM public."Countries" WHERE code = 'LB'), '', 'BEY') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NAN', 'Nadi', (SELECT id FROM public."Countries" WHERE code = 'FJ'), '', 'NAN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SUV', 'Suva', (SELECT id FROM public."Countries" WHERE code = 'FJ'), '', 'SUV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BGF', 'Bangui', (SELECT id FROM public."Countries" WHERE code = 'CF'), '', 'BGF') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BGI', 'Barbados', (SELECT id FROM public."Countries" WHERE code = 'BB'), '', 'BGI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BGW', 'Baghdad', (SELECT id FROM public."Countries" WHERE code = 'IQ'), '', 'BGW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BSR', 'Basra', (SELECT id FROM public."Countries" WHERE code = 'IQ'), '', 'BSR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CAN', 'Guangzhou', (SELECT id FROM public."Countries" WHERE code = 'CN'), '', 'CAN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BJS', 'Beijing', (SELECT id FROM public."Countries" WHERE code = 'CN'), '', 'BJS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DLC', 'Dalian', (SELECT id FROM public."Countries" WHERE code = 'CN'), '', 'DLC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SHA', 'Shanghai', (SELECT id FROM public."Countries" WHERE code = 'CN'), '', 'SHA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BJL', 'Banjul', (SELECT id FROM public."Countries" WHERE code = 'GM'), '', 'BJL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BJM', 'Bujumbura', (SELECT id FROM public."Countries" WHERE code = 'BI'), '', 'BJM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BKK', 'Bangkok', (SELECT id FROM public."Countries" WHERE code = 'TH'), '', 'BKK') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HKT', 'Phuket', (SELECT id FROM public."Countries" WHERE code = 'TH'), '', 'HKT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BKO', 'Bamako', (SELECT id FROM public."Countries" WHERE code = 'ML'), '', 'BKO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CCS', 'Caracas', (SELECT id FROM public."Countries" WHERE code = 'VE'), '', 'CCS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PMV', 'Porlamar', (SELECT id FROM public."Countries" WHERE code = 'VE'), '', 'PMV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MAR', 'Maracaibo', (SELECT id FROM public."Countries" WHERE code = 'VE'), '', 'MAR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LLW', 'Lilongwe', (SELECT id FROM public."Countries" WHERE code = 'MW'), '', 'LLW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BLZ', 'Blantyre', (SELECT id FROM public."Countries" WHERE code = 'MW'), '', 'BLZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BON', 'Bonaire', (SELECT id FROM public."Countries" WHERE code = 'AN'), '', 'BON') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MLH', 'Mulhouse', (SELECT id FROM public."Countries" WHERE code = 'CH'), '', 'MLH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ZRH', 'Zurich', (SELECT id FROM public."Countries" WHERE code = 'CH'), '', 'ZRH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SDQ', 'Santo Domingo', (SELECT id FROM public."Countries" WHERE code = 'DO'), '', 'SDQ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BTS', 'Bratislava', (SELECT id FROM public."Countries" WHERE code = 'SK'), '', 'BTS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BUD', 'Budapest', (SELECT id FROM public."Countries" WHERE code = 'HU'), '', 'BUD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BUQ', 'Bulawayo', (SELECT id FROM public."Countries" WHERE code = 'ZW'), '', 'BUQ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HRE', 'Harare', (SELECT id FROM public."Countries" WHERE code = 'ZW'), '', 'HRE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('BZV', 'Brazzaville', (SELECT id FROM public."Countries" WHERE code = 'CG'), '', 'BZV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CBB', 'Cochabamba', (SELECT id FROM public."Countries" WHERE code = 'BO'), '', 'CBB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PAP', 'Port Au Prince', (SELECT id FROM public."Countries" WHERE code = 'HT'), '', 'PAP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CAY', 'Cayenne', (SELECT id FROM public."Countries" WHERE code = 'GF'), '', 'CAY') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FAO', 'Faro', (SELECT id FROM public."Countries" WHERE code = 'PT'), '', 'FAO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SNN', 'Shannon', (SELECT id FROM public."Countries" WHERE code = 'IE'), '', 'SNN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DAC', 'Dhaka', (SELECT id FROM public."Countries" WHERE code = 'BD'), '', 'DAC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CKY', 'Conakry', (SELECT id FROM public."Countries" WHERE code = 'GN'), '', 'CKY') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CMB', 'Colombo', (SELECT id FROM public."Countries" WHERE code = 'LK'), '', 'CMB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('COO', 'Cotonou', (SELECT id FROM public."Countries" WHERE code = 'BJ'), '', 'COO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GYE', 'Guayaquil', (SELECT id FROM public."Countries" WHERE code = 'EC'), '', 'GYE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('UIO', 'Quito', (SELECT id FROM public."Countries" WHERE code = 'EC'), '', 'UIO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YTO', 'Toronto', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'YTO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YEG', 'Edmonton', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'YEG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YUL', 'Montreal', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'YUL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YOW', 'Ottawa', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'YOW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YYC', 'Calgary', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'YYC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YQG', 'Windsor', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'YQG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YWG', 'Winnipeg', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'YWG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('VAN', 'Vancouver', (SELECT id FROM public."Countries" WHERE code = 'CA'), '', 'VAN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CYR', 'Colonia', (SELECT id FROM public."Countries" WHERE code = 'UY'), '', 'CYR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PDP', 'Punta Del Este', (SELECT id FROM public."Countries" WHERE code = 'UY'), '', 'PDP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MVD', 'Montevideo', (SELECT id FROM public."Countries" WHERE code = 'UY'), '', 'MVD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DAR', 'Dar Es Salaam', (SELECT id FROM public."Countries" WHERE code = 'TZ'), '', 'DAR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ZAG', 'Zagreb', (SELECT id FROM public."Countries" WHERE code = 'HR'), '', 'ZAG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DKR', 'Dakar', (SELECT id FROM public."Countries" WHERE code = 'SN'), '', 'DKR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DLA', 'Douala', (SELECT id FROM public."Countries" WHERE code = 'CM'), '', 'DLA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('YAO', 'Yaounde', (SELECT id FROM public."Countries" WHERE code = 'CM'), '', 'YAO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('DOH', 'Doha', (SELECT id FROM public."Countries" WHERE code = 'QA'), '', 'DOH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LCA', 'Larnaca', (SELECT id FROM public."Countries" WHERE code = 'CY'), '', 'LCA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PFO', 'Paphos', (SELECT id FROM public."Countries" WHERE code = 'CY'), '', 'PFO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('WDH', 'Windhoek', (SELECT id FROM public."Countries" WHERE code = 'NA'), '', 'WDH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TLV', 'Tel Aviv', (SELECT id FROM public."Countries" WHERE code = 'IL'), '', 'TLV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('JRS', 'Jerusalem', (SELECT id FROM public."Countries" WHERE code = 'IL'), '', 'JRS') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FBM', 'Lubumbashi', (SELECT id FROM public."Countries" WHERE code = 'CD'), '', 'FBM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FIH', 'Kinshasa', (SELECT id FROM public."Countries" WHERE code = 'CD'), '', 'FIH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('FNA', 'Freetown', (SELECT id FROM public."Countries" WHERE code = 'SL'), '', 'FNA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GIB', 'Gibraltar', (SELECT id FROM public."Countries" WHERE code = 'GI'), '', 'GIB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('GRZ', 'Graz', (SELECT id FROM public."Countries" WHERE code = 'AT'), '', 'GRZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KLU', 'Klagenfurt', (SELECT id FROM public."Countries" WHERE code = 'AT'), '', 'KLU') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LNZ', 'Linz', (SELECT id FROM public."Countries" WHERE code = 'AT'), '', 'LNZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MLA', 'Malta', (SELECT id FROM public."Countries" WHERE code = 'MT'), '', 'MLA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KHH', 'Kaohsiung', (SELECT id FROM public."Countries" WHERE code = 'TW'), '', 'KHH') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TPE', 'Taipei', (SELECT id FROM public."Countries" WHERE code = 'TW'), '', 'TPE') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KHI', 'Karachi', (SELECT id FROM public."Countries" WHERE code = 'PK'), '', 'KHI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('ISB', 'Islamabad', (SELECT id FROM public."Countries" WHERE code = 'PK'), '', 'ISB') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HEL', 'Helsinki', (SELECT id FROM public."Countries" WHERE code = 'FI'), '', 'HEL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('HKG', 'Hong Kong', (SELECT id FROM public."Countries" WHERE code = 'HK'), '', 'HKG') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('IEV', 'Kiev', (SELECT id FROM public."Countries" WHERE code = 'UA'), '', 'IEV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KGL', 'Kigali', (SELECT id FROM public."Countries" WHERE code = 'RW'), '', 'KGL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KIN', 'Kingston', (SELECT id FROM public."Countries" WHERE code = 'JM'), '', 'KIN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MBJ', 'Montego Bay', (SELECT id FROM public."Countries" WHERE code = 'JM'), '', 'MBJ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KRT', 'Khartoum', (SELECT id FROM public."Countries" WHERE code = 'SD'), '', 'KRT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('KWI', 'Kuwait', (SELECT id FROM public."Countries" WHERE code = 'KW'), '', 'KWI') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LAD', 'Luanda', (SELECT id FROM public."Countries" WHERE code = 'AO'), '', 'LAD') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LBV', 'Libreville', (SELECT id FROM public."Countries" WHERE code = 'GA'), '', 'LBV') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LFW', 'Lome', (SELECT id FROM public."Countries" WHERE code = 'TG'), '', 'LFW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('CTF', 'CARTAGO', (SELECT id FROM public."Countries" WHERE code = 'CR'), '', 'CTF') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LJU', 'Ljubljana', (SELECT id FROM public."Countries" WHERE code = 'SI'), '', 'LJU') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('LUN', 'Lusaka', (SELECT id FROM public."Countries" WHERE code = 'ZM'), '', 'LUN') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NBO', 'Nairobi', (SELECT id FROM public."Countries" WHERE code = 'KE'), '', 'NBO') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MCT', 'Muscat', (SELECT id FROM public."Countries" WHERE code = 'OM'), '', 'MCT') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MGA', 'Managua', (SELECT id FROM public."Countries" WHERE code = 'NI'), '', 'MGA') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('MLW', 'Monrovia', (SELECT id FROM public."Countries" WHERE code = 'LR'), '', 'MLW') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NKC', 'Nouakchott', (SELECT id FROM public."Countries" WHERE code = 'MR'), '', 'NKC') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('NIM', 'Niamey', (SELECT id FROM public."Countries" WHERE code = 'NE'), '', 'NIM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('PBM', 'Paramaribo', (SELECT id FROM public."Countries" WHERE code = 'SR'), '', 'PBM') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SAP', 'San Pedro Sula', (SELECT id FROM public."Countries" WHERE code = 'HN'), '', 'SAP') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TGU', 'Tegucigalpa', (SELECT id FROM public."Countries" WHERE code = 'HN'), '', 'TGU') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SAL', 'San Salvador', (SELECT id FROM public."Countries" WHERE code = 'SV'), '', 'SAL') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SEZ', 'Mahe Island', (SELECT id FROM public."Countries" WHERE code = 'SC'), '', 'SEZ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SJJ', 'Sarajevo', (SELECT id FROM public."Countries" WHERE code = 'BA'), '', 'SJJ') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('SOF', 'Sofia', (SELECT id FROM public."Countries" WHERE code = 'BG'), '', 'SOF') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('THR', 'Teheran', (SELECT id FROM public."Countries" WHERE code = 'IR'), '', 'THR') ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Cities" (code, name, "countriesId", statecode, iata) VALUES ('TIA', 'Tirana', (SELECT id FROM public."Countries" WHERE code = 'AL'), '', 'TIA') ON CONFLICT (code) DO NOTHING;
+
+-- 18. Aeropuertos (Completos)
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AAP', 'Andrau Airpark', (SELECT id FROM public."Cities" WHERE code = 'HOU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ABJ', 'Felix Houphouet Boigny Arpt', (SELECT id FROM public."Cities" WHERE code = 'ABJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ACC', 'Kotoka Airport', (SELECT id FROM public."Cities" WHERE code = 'ACC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ADD', 'Bole Airport', (SELECT id FROM public."Cities" WHERE code = 'ADD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ADE', 'Yemen Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'ADE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AEP', 'Jorge Newbery', (SELECT id FROM public."Cities" WHERE code = 'BUE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AGB', 'Mehlhausen', (SELECT id FROM public."Cities" WHERE code = 'MUC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AGP', 'Malaga Arpt', (SELECT id FROM public."Cities" WHERE code = 'AGP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AJU', 'Santa Maria Arpt', (SELECT id FROM public."Cities" WHERE code = 'AJU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AKL', 'Auckland Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'AKL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ALC', 'Alicante Arpt', (SELECT id FROM public."Cities" WHERE code = 'ALC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ALP', 'Nejrab Arpt', (SELECT id FROM public."Cities" WHERE code = 'ALP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AMM', 'Queen Alia Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'AMM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AMS', 'Schiphol Arpt', (SELECT id FROM public."Cities" WHERE code = 'AMS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ANC', 'Anchorage Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'ANC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ANF', 'Cerro Moreno Arpt', (SELECT id FROM public."Cities" WHERE code = 'ANF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ANK', 'Etimesgut Arpt', (SELECT id FROM public."Cities" WHERE code = 'ANK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ANR', 'Deurne Airport', (SELECT id FROM public."Cities" WHERE code = 'ANR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AOH', 'Allen County Arpt', (SELECT id FROM public."Cities" WHERE code = 'LIM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('APA', 'Centennial Airport', (SELECT id FROM public."Cities" WHERE code = 'DEN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('APW', 'Apia Airport', (SELECT id FROM public."Cities" WHERE code = 'APW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AQP', 'Rodriguez Ballon Arpt', (SELECT id FROM public."Cities" WHERE code = 'AQP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ARI', 'Chacalluta Arpt', (SELECT id FROM public."Cities" WHERE code = 'ARI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ASM', 'Asmara Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'ASM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ASU', 'Salvio Pettirosse Arpt', (SELECT id FROM public."Cities" WHERE code = 'ASU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ATL', 'Hartsfield Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'ATL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AUA', 'Reina Beatrix Arpt', (SELECT id FROM public."Cities" WHERE code = 'AUA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AUH', 'Dhabi Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'AUH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AUO', 'Auburn Opelika', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AVI', 'Maximo Gomez Arpt', (SELECT id FROM public."Cities" WHERE code = 'AVI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('AYT', 'Antalya Airport', (SELECT id FROM public."Cities" WHERE code = 'AYT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BAH', 'Muharraq Arpt', (SELECT id FROM public."Cities" WHERE code = 'BAH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BCN', 'Barcelona Arpt', (SELECT id FROM public."Cities" WHERE code = 'BCN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BDA', 'Bermuda International', (SELECT id FROM public."Cities" WHERE code = 'BDA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BDL', 'Bradley Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BOL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BEL', 'Val De Cans Arpt', (SELECT id FROM public."Cities" WHERE code = 'BEL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BER', 'Berlin Airports', (SELECT id FROM public."Cities" WHERE code = 'VER')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BEY', 'Beirut Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BEY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BFI', 'Seattle Boeing Field', (SELECT id FROM public."Cities" WHERE code = 'SEA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BFS', 'Belfast Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BHD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BGF', 'Bangui Airport', (SELECT id FROM public."Cities" WHERE code = 'BGF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BGI', 'Grantley Adams Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BGI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BGO', 'Flesland Airport', (SELECT id FROM public."Cities" WHERE code = 'BGO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BGW', 'Al Muthana Arpt', (SELECT id FROM public."Cities" WHERE code = 'BGW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BHD', 'Belfast City Arpt', (SELECT id FROM public."Cities" WHERE code = 'BHD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BHI', 'Commandante Airport', (SELECT id FROM public."Cities" WHERE code = 'BHI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BIO', 'Sondica Arpt', (SELECT id FROM public."Cities" WHERE code = 'BIO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BJL', 'Yundum Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BJL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BJM', 'Bujumbura Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BJM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BJS', 'Beijing', (SELECT id FROM public."Cities" WHERE code = 'BJS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BKK', 'Bangkok Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BKK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BKL', 'Burke Lakefront Arpt', (SELECT id FROM public."Cities" WHERE code = 'CLE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BKO', 'Senou Airport', (SELECT id FROM public."Cities" WHERE code = 'BKO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BLA', 'Gen J A Anzoategui Arpt', (SELECT id FROM public."Cities" WHERE code = 'BCN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BLZ', 'Chileka Airport', (SELECT id FROM public."Cities" WHERE code = 'BLZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BNA', 'Nashville Metro Arpt', (SELECT id FROM public."Cities" WHERE code = 'BNA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BOD', 'Merignac Arpt', (SELECT id FROM public."Cities" WHERE code = 'BOD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BON', 'Flamingo Field', (SELECT id FROM public."Cities" WHERE code = 'BON')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BOS', 'Logan Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BOS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BRI', 'Bari Airport', (SELECT id FROM public."Cities" WHERE code = 'BRI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BSB', 'Brasilia Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BSB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BSR', 'Basra Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BSR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BTS', 'Ivanka Arpt', (SELECT id FROM public."Cities" WHERE code = 'BTS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BUD', 'Ferihegy Arpt', (SELECT id FROM public."Cities" WHERE code = 'BUD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BUE', 'Buenos Aires Airports', (SELECT id FROM public."Cities" WHERE code = 'BUE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BUF', 'Greater Buffalo Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BUF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BUQ', 'Bulawayo Arpt', (SELECT id FROM public."Cities" WHERE code = 'BUQ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BWI', 'Baltimore Washington Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'BWI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BZC', 'Buzios Arpt', (SELECT id FROM public."Cities" WHERE code = 'BZC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BZV', 'Maya Maya Arpt', (SELECT id FROM public."Cities" WHERE code = 'BZV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CAI', 'Cairo Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'CAI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CAN', 'Baiyun Airport', (SELECT id FROM public."Cities" WHERE code = 'CAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CAS', 'Anfa Airport', (SELECT id FROM public."Cities" WHERE code = 'CAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CAY', 'Rochambeau Airport', (SELECT id FROM public."Cities" WHERE code = 'CAY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CBB', 'J Wilsterman Arpt', (SELECT id FROM public."Cities" WHERE code = 'CBB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CCS', 'Simon Bolivar Arpt', (SELECT id FROM public."Cities" WHERE code = 'CCS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CDG', 'Charles De Gaulle Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'PAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CGB', 'Marechal Rondon Arpt', (SELECT id FROM public."Cities" WHERE code = 'CGB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CGF', 'Cuyahoga County Airport', (SELECT id FROM public."Cities" WHERE code = 'CLE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CGK', 'Soekarno Hatta Intl', (SELECT id FROM public."Cities" WHERE code = 'JKT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CGX', 'Meigs Field', (SELECT id FROM public."Cities" WHERE code = 'CHI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CHC', 'Christchurch Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'CHC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CHI', 'Chicago Airports', (SELECT id FROM public."Cities" WHERE code = 'CHI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CHS', 'Charleston Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'CHS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CKY', 'Conakry Airport', (SELECT id FROM public."Cities" WHERE code = 'CKY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CLE', 'Hopkins Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'CLE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CLU', 'Columbus Municipal Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CMB', 'Katunayake Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CMH', 'Port Columbus Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CMN', 'Mohamed V Arpt', (SELECT id FROM public."Cities" WHERE code = 'CAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CNF', 'Tancredo Neves Intl Arpt.', (SELECT id FROM public."Cities" WHERE code = 'BHZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CNS', 'Cairns Airport', (SELECT id FROM public."Cities" WHERE code = 'CNS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('COO', 'Cotonou Airport', (SELECT id FROM public."Cities" WHERE code = 'COO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CPT', 'Cape Town International', (SELECT id FROM public."Cities" WHERE code = 'CTW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CRW', 'Yeager Arpt', (SELECT id FROM public."Cities" WHERE code = 'CHS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CSG', 'Columbus Metro Ft Benning Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CUN', 'Cancun Aeropuerto Internacional', (SELECT id FROM public."Cities" WHERE code = 'CUN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CUS', 'Columbus Municipal', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CWB', 'Afonso Pena Arpt', (SELECT id FROM public."Cities" WHERE code = 'CWB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CXH', 'Coal Harbor Sea Plane Arpt', (SELECT id FROM public."Cities" WHERE code = 'VAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CYR', 'Colonia Arpt', (SELECT id FROM public."Cities" WHERE code = 'CYR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CZM', 'Aeropuerto Intl De Cozumel', (SELECT id FROM public."Cities" WHERE code = 'CZM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DAC', 'Zia Intl Airport', (SELECT id FROM public."Cities" WHERE code = 'DAC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DAL', 'Love Field', (SELECT id FROM public."Cities" WHERE code = 'DFW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DAR', 'Es Salaam Intl', (SELECT id FROM public."Cities" WHERE code = 'DAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DAY', 'Dayton International Airport', (SELECT id FROM public."Cities" WHERE code = 'DAY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DBN', 'Dublin Municipal Arpt', (SELECT id FROM public."Cities" WHERE code = 'DUB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DEL', 'Delhi Indira Gandhi Intl', (SELECT id FROM public."Cities" WHERE code = 'DEL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DEN', 'Denver Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'DEN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DET', 'Detroit City Apt', (SELECT id FROM public."Cities" WHERE code = 'DTT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DFW', 'Dallas Ft Worth Intl', (SELECT id FROM public."Cities" WHERE code = 'DFW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DHA', 'Dhahran Intl', (SELECT id FROM public."Cities" WHERE code = 'DHA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DKR', 'Yoff Airport', (SELECT id FROM public."Cities" WHERE code = 'DKR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DLA', 'Douala Arpt', (SELECT id FROM public."Cities" WHERE code = 'DLA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DLC', 'Dalian Airport', (SELECT id FROM public."Cities" WHERE code = 'DLC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DOH', 'Doha Airport', (SELECT id FROM public."Cities" WHERE code = 'DOH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DPS', 'Ngurah Rai Arpt', (SELECT id FROM public."Cities" WHERE code = 'DPS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DTW', 'Detroit Metro Arpt', (SELECT id FROM public."Cities" WHERE code = 'DTT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DUB', 'Dublin Arpt', (SELECT id FROM public."Cities" WHERE code = 'DUB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DUR', 'Durban International', (SELECT id FROM public."Cities" WHERE code = 'DUR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DUS', 'Dusseldorf Arpt', (SELECT id FROM public."Cities" WHERE code = 'DUS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DWH', 'David Wayne Hooks Arpt', (SELECT id FROM public."Cities" WHERE code = 'HOU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DXB', 'Dubai Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'DXB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('EAP', 'Mulhouse/Basel Airports', (SELECT id FROM public."Cities" WHERE code = 'MLH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('EFD', 'Ellington Field', (SELECT id FROM public."Cities" WHERE code = 'HOU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ERS', 'Eros Arpt', (SELECT id FROM public."Cities" WHERE code = 'WDH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ESB', 'Esenboga Arpt', (SELECT id FROM public."Cities" WHERE code = 'ANK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('EWR', 'Newark Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'EWR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('EZE', 'Ministro Pistarini', (SELECT id FROM public."Cities" WHERE code = 'BUE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FAO', 'Faro Airport', (SELECT id FROM public."Cities" WHERE code = 'FAO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FBM', 'Luano', (SELECT id FROM public."Cities" WHERE code = 'FBM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FBU', 'Fornebu Arpt', (SELECT id FROM public."Cities" WHERE code = 'OSL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FIH', 'Kinshasa Arpt', (SELECT id FROM public."Cities" WHERE code = 'FIH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FNA', 'Lungi Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'FNA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FOR', 'Pinto Martines Arpt', (SELECT id FROM public."Cities" WHERE code = 'FOR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FPO', 'Freeport Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'FPO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FRA', 'Frankfurt Intl', (SELECT id FROM public."Cities" WHERE code = 'FRA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FTY', 'Fulton Cty Arpt', (SELECT id FROM public."Cities" WHERE code = 'ATL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('FUK', 'Itazuke Arpt', (SELECT id FROM public."Cities" WHERE code = 'FUK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GBE', 'Gaborone Arpt', (SELECT id FROM public."Cities" WHERE code = 'GBE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GDL', 'Miguel Hidalgo Arpt', (SELECT id FROM public."Cities" WHERE code = 'GDL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GED', 'Sussex County Arpt', (SELECT id FROM public."Cities" WHERE code = 'GEO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GEN', 'Gardermoen Arpt', (SELECT id FROM public."Cities" WHERE code = 'OSL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GEO', 'Timehri Airport', (SELECT id FROM public."Cities" WHERE code = 'GEO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GGW', 'International Glasgow', (SELECT id FROM public."Cities" WHERE code = 'GLA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GIB', 'North Front Arpt', (SELECT id FROM public."Cities" WHERE code = 'GIB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GIG', 'Rio Internacional', (SELECT id FROM public."Cities" WHERE code = 'RIO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GLA', 'Glasgow Arpt', (SELECT id FROM public."Cities" WHERE code = 'GLA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GRX', 'Granada Arpt', (SELECT id FROM public."Cities" WHERE code = 'GND')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GRZ', 'Thalerhof Arpt', (SELECT id FROM public."Cities" WHERE code = 'GRZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GTR', 'Golden Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GYE', 'Simon Bolivar Airport', (SELECT id FROM public."Cities" WHERE code = 'GYE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GYM', 'Gen Jose M Yanez Arpt', (SELECT id FROM public."Cities" WHERE code = 'GYM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('GYN', 'Santa Genoveva', (SELECT id FROM public."Cities" WHERE code = 'GYN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HBA', 'Hobart Arpt', (SELECT id FROM public."Cities" WHERE code = 'HBA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HEL', 'Helsinki Arpt', (SELECT id FROM public."Cities" WHERE code = 'HEL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HFD', 'Brainard Arpt', (SELECT id FROM public."Cities" WHERE code = 'BOL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HKG', 'Hong Kong Intl', (SELECT id FROM public."Cities" WHERE code = 'HKG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HKT', 'Phuket Intl Airport', (SELECT id FROM public."Cities" WHERE code = 'HKT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HMA', 'Malmo City Hvc Arpt', (SELECT id FROM public."Cities" WHERE code = 'MMA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HNL', 'Honolulu Intl', (SELECT id FROM public."Cities" WHERE code = 'HNL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HOG', 'Frank Pias Arpt', (SELECT id FROM public."Cities" WHERE code = 'HOG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HOU', 'Houston Hobby Arpt', (SELECT id FROM public."Cities" WHERE code = 'HOU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('HRE', 'Harare Arpt', (SELECT id FROM public."Cities" WHERE code = 'HRE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('IAH', 'Houston Intl', (SELECT id FROM public."Cities" WHERE code = 'HOU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('IBZ', 'Ibiza Airport', (SELECT id FROM public."Cities" WHERE code = 'IBZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('IEV', 'Zhulhany Arpt', (SELECT id FROM public."Cities" WHERE code = 'IEV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('IOS', 'Eduardo Gomes Airport', (SELECT id FROM public."Cities" WHERE code = 'IOS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('IQQ', 'Cavancha Chucumata Arpt', (SELECT id FROM public."Cities" WHERE code = 'IQQ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ISB', 'Islamabad Intl', (SELECT id FROM public."Cities" WHERE code = 'ISB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ITM', 'Itami Arpt', (SELECT id FROM public."Cities" WHERE code = 'OSA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('IWS', 'West Houston', (SELECT id FROM public."Cities" WHERE code = 'HOU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JAJ', 'Perimeter Hlpt', (SELECT id FROM public."Cities" WHERE code = 'ATL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JAO', 'Beaver Ruin Helpt', (SELECT id FROM public."Cities" WHERE code = 'ATL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JBP', 'Commerce Business Plaza Heliport', (SELECT id FROM public."Cities" WHERE code = 'LAX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JCC', 'China Basin Hlpt', (SELECT id FROM public."Cities" WHERE code = 'SFO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JDP', 'Issy Les Moulineaux Arpt', (SELECT id FROM public."Cities" WHERE code = 'PAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JED', 'Jeddah Intl', (SELECT id FROM public."Cities" WHERE code = 'JED')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JFK', 'John F Kennedy Intl', (SELECT id FROM public."Cities" WHERE code = 'NYC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JKT', 'Kemayoran Arpt', (SELECT id FROM public."Cities" WHERE code = 'JKT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JPA', 'Castro Pinto Arpt', (SELECT id FROM public."Cities" WHERE code = 'JPA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JRE', 'East 60th St Hlpt', (SELECT id FROM public."Cities" WHERE code = 'NYC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JRS', 'Atarot Airport', (SELECT id FROM public."Cities" WHERE code = 'JRS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('JTO', 'Thousand Oaks Hlpt', (SELECT id FROM public."Cities" WHERE code = 'LAX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KAN', 'Aminu Kano Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'KAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KBP', 'Borispol Arpt', (SELECT id FROM public."Cities" WHERE code = 'IEV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KGL', 'Kayibanda Arpt', (SELECT id FROM public."Cities" WHERE code = 'KGL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KHH', 'Kaohsiung Intl', (SELECT id FROM public."Cities" WHERE code = 'KHH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KHI', 'Karachi Arpt', (SELECT id FROM public."Cities" WHERE code = 'KHI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KIN', 'Norman Manly Arpt', (SELECT id FROM public."Cities" WHERE code = 'KIN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KIX', 'Kansai International Arpt', (SELECT id FROM public."Cities" WHERE code = 'OSA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KLU', 'Klagenfurt Arpt', (SELECT id FROM public."Cities" WHERE code = 'KLU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KRS', 'Kjevik Airport', (SELECT id FROM public."Cities" WHERE code = 'KRS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KRT', 'Civil Arpt', (SELECT id FROM public."Cities" WHERE code = 'KRT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KTP', 'Tinson Arpt', (SELECT id FROM public."Cities" WHERE code = 'KIN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KUL', 'Subang Kuala Lumpur Intl', (SELECT id FROM public."Cities" WHERE code = 'KUL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('KWI', 'Kuwait Intl', (SELECT id FROM public."Cities" WHERE code = 'KWI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LAD', 'Four De Fevereiro Arpt', (SELECT id FROM public."Cities" WHERE code = 'LAD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LAP', 'Aeropuerto Gen Marquez De Leon', (SELECT id FROM public."Cities" WHERE code = 'LPB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LAS', 'McCarran Intl', (SELECT id FROM public."Cities" WHERE code = 'LAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LAX', 'Los Angeles Intl', (SELECT id FROM public."Cities" WHERE code = 'LAX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LBA', 'Leeds Bradford Arpt', (SELECT id FROM public."Cities" WHERE code = 'LBA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LBG', 'Le Bourget Arpt', (SELECT id FROM public."Cities" WHERE code = 'PAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LBH', 'Palm Beach Arpt', (SELECT id FROM public."Cities" WHERE code = 'SYD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LBV', 'Libreville Arpt', (SELECT id FROM public."Cities" WHERE code = 'LBV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LCA', 'Larnaca Intl', (SELECT id FROM public."Cities" WHERE code = 'LCA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LEH', 'Octeville Arpt', (SELECT id FROM public."Cities" WHERE code = 'LHV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LEJ', 'Schkeuditz Arpt', (SELECT id FROM public."Cities" WHERE code = 'LEJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LFW', 'Lome Airport', (SELECT id FROM public."Cities" WHERE code = 'LFW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LGA', 'La Guardia', (SELECT id FROM public."Cities" WHERE code = 'NYC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LGB', 'Long Beach Municipal', (SELECT id FROM public."Cities" WHERE code = 'LGB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LIL', 'Lesquin Arpt', (SELECT id FROM public."Cities" WHERE code = 'LIL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LIM', 'Nlima Intl Jorge Chavez', (SELECT id FROM public."Cities" WHERE code = 'LIM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LIN', 'Linate Arpt', (SELECT id FROM public."Cities" WHERE code = 'MIL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LJU', 'Brnik Airport', (SELECT id FROM public."Cities" WHERE code = 'LJU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LKE', 'Lake Union Seaplane Base', (SELECT id FROM public."Cities" WHERE code = 'SEA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LLW', 'Lilongwe Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'LLW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LNZ', 'Hoersching Arpt', (SELECT id FROM public."Cities" WHERE code = 'LNZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LOS', 'Murtala Muhammed Arpt', (SELECT id FROM public."Cities" WHERE code = 'LOS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LPB', 'El Alto Arpt', (SELECT id FROM public."Cities" WHERE code = 'LPB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LSC', 'La Florida', (SELECT id FROM public."Cities" WHERE code = 'LSC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LUN', 'Lusaka Airport', (SELECT id FROM public."Cities" WHERE code = 'LUN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LUQ', 'San Luis Cty Arpt', (SELECT id FROM public."Cities" WHERE code = 'SLZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LVS', 'Las Vegas Arpt', (SELECT id FROM public."Cities" WHERE code = 'LAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('LYS', 'Satolas Airport', (SELECT id FROM public."Cities" WHERE code = 'LYS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MAA', 'Meenambarkkam Arpt', (SELECT id FROM public."Cities" WHERE code = 'MAA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MAD', 'Barajas Arpt', (SELECT id FROM public."Cities" WHERE code = 'MAD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MAH', 'Aerop De Menorca', (SELECT id FROM public."Cities" WHERE code = 'MAH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MAR', 'La Chinita Arpt', (SELECT id FROM public."Cities" WHERE code = 'MAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MBJ', 'Sangster Arpt', (SELECT id FROM public."Cities" WHERE code = 'MBJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MCO', 'Orlando Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'ORL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MCT', 'Seeb Intl', (SELECT id FROM public."Cities" WHERE code = 'MCT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MCZ', 'Palmeres Airport', (SELECT id FROM public."Cities" WHERE code = 'MCZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MDW', 'Midway', (SELECT id FROM public."Cities" WHERE code = 'CHI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MEB', 'Essendon Arpt', (SELECT id FROM public."Cities" WHERE code = 'MEL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MDE', 'Aeropuerto Internacional Jose Maria Cordoba', (SELECT id FROM public."Cities" WHERE code = 'MDE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MEL', 'Tullamarine Arpt', (SELECT id FROM public."Cities" WHERE code = 'MEL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MEM', 'Memphis Intl', (SELECT id FROM public."Cities" WHERE code = 'MEM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MGA', 'Augusto C Sandino', (SELECT id FROM public."Cities" WHERE code = 'MGA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MIA', 'Miami Intl', (SELECT id FROM public."Cities" WHERE code = 'MIA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MID', 'Merida Intl', (SELECT id FROM public."Cities" WHERE code = 'MID')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MIL', 'Milan Airports', (SELECT id FROM public."Cities" WHERE code = 'MIL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MJV', 'San Javier Airport', (SELECT id FROM public."Cities" WHERE code = 'MJV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MKE', 'General Mitchell Fld', (SELECT id FROM public."Cities" WHERE code = 'MKE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MLA', 'Luqa Airport', (SELECT id FROM public."Cities" WHERE code = 'MLA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MLB', 'Melbourne Regional', (SELECT id FROM public."Cities" WHERE code = 'MEL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MLH', 'Euroairport French', (SELECT id FROM public."Cities" WHERE code = 'MLH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MLW', 'Sprigg Payne Arpt', (SELECT id FROM public."Cities" WHERE code = 'MLW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MMA', 'Malmo Airports', (SELECT id FROM public."Cities" WHERE code = 'MMA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MME', 'Teesside Arpt', (SELECT id FROM public."Cities" WHERE code = 'MME')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MMX', 'Sturup Arpt', (SELECT id FROM public."Cities" WHERE code = 'MMA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MNL', 'Ninoy Aquino Intl', (SELECT id FROM public."Cities" WHERE code = 'MNL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MPM', 'Maputo Intl', (SELECT id FROM public."Cities" WHERE code = 'MPM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MRD', 'Alberto Carnevalli Arpt', (SELECT id FROM public."Cities" WHERE code = 'MID')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MSP', 'Minneapolis St Paul Intl', (SELECT id FROM public."Cities" WHERE code = 'MSP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MSY', 'Moisant Intl', (SELECT id FROM public."Cities" WHERE code = 'MSY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MTC', 'Selfridge Air Natl Guard', (SELECT id FROM public."Cities" WHERE code = 'DTT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MTY', 'Escobedo Arpt', (SELECT id FROM public."Cities" WHERE code = 'MTY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MUC', 'Franz Josef Strauss Arpt', (SELECT id FROM public."Cities" WHERE code = 'MUC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MVD', 'Carrasco Arpt', (SELECT id FROM public."Cities" WHERE code = 'MVD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MXP', 'Malpensa Arpt', (SELECT id FROM public."Cities" WHERE code = 'MIL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MYF', 'Montogomery Fld', (SELECT id FROM public."Cities" WHERE code = 'SAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MZO', 'Sierra Maestra Arpt', (SELECT id FROM public."Cities" WHERE code = 'ZLO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('MZT', 'Buelina Arpt', (SELECT id FROM public."Cities" WHERE code = 'MZT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NAN', 'Nadi Intl', (SELECT id FROM public."Cities" WHERE code = 'NAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NAS', 'Nassau Intl', (SELECT id FROM public."Cities" WHERE code = 'NAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NAT', 'Augusto Severo Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'NAT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NBO', 'Jomo Kenyatta Intl', (SELECT id FROM public."Cities" WHERE code = 'NBO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NEW', 'New Lakefront Arpt', (SELECT id FROM public."Cities" WHERE code = 'MSY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NGO', 'Komaki Arpt', (SELECT id FROM public."Cities" WHERE code = 'NGO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NIM', 'Niamey Airport', (SELECT id FROM public."Cities" WHERE code = 'NIM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NKC', 'Nouakchott Arpt', (SELECT id FROM public."Cities" WHERE code = 'NKC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NQA', 'Memphis Naval Air Station', (SELECT id FROM public."Cities" WHERE code = 'MEM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NSI', 'Nsimalen Arpt', (SELECT id FROM public."Cities" WHERE code = 'YAO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('NYC', 'New York City Area Airports', (SELECT id FROM public."Cities" WHERE code = 'NYC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('OFK', 'Karl Stefan Fld', (SELECT id FROM public."Cities" WHERE code = 'NOR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('OKA', 'Naha Field', (SELECT id FROM public."Cities" WHERE code = 'OKA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('OLU', 'Columbus Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('OPF', 'Opa Locka Arpt', (SELECT id FROM public."Cities" WHERE code = 'MIA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ORD', 'OHare Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'CHI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ORL', 'Herndon Arpt', (SELECT id FROM public."Cities" WHERE code = 'ORL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ORY', 'Orly Arpt', (SELECT id FROM public."Cities" WHERE code = 'PAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('OSA', 'Osaka', (SELECT id FROM public."Cities" WHERE code = 'OSA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('OSL', 'Oslo Airports', (SELECT id FROM public."Cities" WHERE code = 'OSL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('OSU', 'Ohio State Univ Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PAP', 'Mais Gate Arpt', (SELECT id FROM public."Cities" WHERE code = 'PAP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PAR', 'Paris Airports', (SELECT id FROM public."Cities" WHERE code = 'PAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PBM', 'Zanderij Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'PBM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PDK', 'Dekalb Peachtree', (SELECT id FROM public."Cities" WHERE code = 'ATL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PDP', 'Cap Curbelo Arpt', (SELECT id FROM public."Cities" WHERE code = 'PDP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PDX', 'Portland Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'PDX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PEK', 'Beijing Capital Arpt', (SELECT id FROM public."Cities" WHERE code = 'BJS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PEN', 'Penang Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'PEN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PER', 'Perth Arpt', (SELECT id FROM public."Cities" WHERE code = 'PER')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PFO', 'Paphos Intl Airport', (SELECT id FROM public."Cities" WHERE code = 'PFO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PHT', 'Henry County Arpt', (SELECT id FROM public."Cities" WHERE code = 'PAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PHX', 'Sky Harbor Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'PHX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PID', 'Paradise Island Arpt', (SELECT id FROM public."Cities" WHERE code = 'NAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PIK', 'Prestwick Arpt', (SELECT id FROM public."Cities" WHERE code = 'GLA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PLZ', 'Port Elizabeth Airport', (SELECT id FROM public."Cities" WHERE code = 'PEZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PMC', 'Tepual Airport', (SELECT id FROM public."Cities" WHERE code = 'PMC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PMO', 'Punta Raisi Arpt', (SELECT id FROM public."Cities" WHERE code = 'PMO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PMV', 'Delcaribe Gen S Marino Arpt', (SELECT id FROM public."Cities" WHERE code = 'PMV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PNA', 'Pamplona Noain Arpt', (SELECT id FROM public."Cities" WHERE code = 'PNA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('POA', 'Porto Alegre Airport', (SELECT id FROM public."Cities" WHERE code = 'POA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PPT', 'Intl Tahiti Faaa', (SELECT id FROM public."Cities" WHERE code = 'PPT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PRX', 'Paris Cox Field Arpt', (SELECT id FROM public."Cities" WHERE code = 'PAR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PRY', 'Wonderboom Arpt', (SELECT id FROM public."Cities" WHERE code = 'PRY')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PSK', 'New River Valley Arpt', (SELECT id FROM public."Cities" WHERE code = 'DUB')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PTJ', 'Portland Arpt', (SELECT id FROM public."Cities" WHERE code = 'PDX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PUQ', 'Presidente Ibanez Arpt', (SELECT id FROM public."Cities" WHERE code = 'PUQ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PVR', 'Ordaz Arpt', (SELECT id FROM public."Cities" WHERE code = 'PVR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PWK', 'Pal Waukee Arpt', (SELECT id FROM public."Cities" WHERE code = 'CHI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('PWM', 'Portland Intl Jetport', (SELECT id FROM public."Cities" WHERE code = 'PDX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QBA', 'San Francisco Bay Area Airpts', (SELECT id FROM public."Cities" WHERE code = 'SFO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QDF', 'Dallas Area Airports', (SELECT id FROM public."Cities" WHERE code = 'DFW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QGV', 'Neu Isenburg Arpt', (SELECT id FROM public."Cities" WHERE code = 'FRA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QHO', 'Houston Airports', (SELECT id FROM public."Cities" WHERE code = 'HOU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QKN', 'Kingston Airports', (SELECT id FROM public."Cities" WHERE code = 'KIN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QLA', 'Los Angeles Area Airports', (SELECT id FROM public."Cities" WHERE code = 'LAX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QMI', 'Miami Area Airports', (SELECT id FROM public."Cities" WHERE code = 'MIA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QRV', 'Arras Arpt', (SELECT id FROM public."Cities" WHERE code = 'LIL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('QSE', 'Seattle Area Airports', (SELECT id FROM public."Cities" WHERE code = 'SEA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RAC', 'Horlick Arpt', (SELECT id FROM public."Cities" WHERE code = 'MKE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RAK', 'Menara Airport', (SELECT id FROM public."Cities" WHERE code = 'RAK')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RBA', 'Sale Airport', (SELECT id FROM public."Cities" WHERE code = 'RBA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RDU', 'Raleigh Durham Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'RDU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('REC', 'Recife Airport', (SELECT id FROM public."Cities" WHERE code = 'REC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RIC', 'Byrd Intl', (SELECT id FROM public."Cities" WHERE code = 'RIC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RIO', 'Rio De Janeiro Airports', (SELECT id FROM public."Cities" WHERE code = 'RIO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RMA', 'Roma Arpt', (SELECT id FROM public."Cities" WHERE code = 'ROM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ROB', 'Roberts Intl', (SELECT id FROM public."Cities" WHERE code = 'MLW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ROC', 'Monroe Cty Arpt New York', (SELECT id FROM public."Cities" WHERE code = 'ROC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RSE', 'Au Rose Bay Arpt', (SELECT id FROM public."Cities" WHERE code = 'SYD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RST', 'Rochester Municipal', (SELECT id FROM public."Cities" WHERE code = 'ROC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('RUH', 'King Khaled Intl', (SELECT id FROM public."Cities" WHERE code = 'RUH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SAL', 'El Salvador Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'SAL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SAN', 'Lindbergh Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'SAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SAP', 'La Mesa Airport', (SELECT id FROM public."Cities" WHERE code = 'SAP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SAT', 'San Antonio Intl', (SELECT id FROM public."Cities" WHERE code = 'SAI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SAV', 'Travis Field', (SELECT id FROM public."Cities" WHERE code = 'SAV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SDA', 'Saddam Intl', (SELECT id FROM public."Cities" WHERE code = 'BGW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SDM', 'Brown Fld Municipal', (SELECT id FROM public."Cities" WHERE code = 'SAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SDQ', 'Las Americas Arpt', (SELECT id FROM public."Cities" WHERE code = 'SDQ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SDR', 'Santander Airport', (SELECT id FROM public."Cities" WHERE code = 'SDR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SDU', 'Santos Dumont Arpt', (SELECT id FROM public."Cities" WHERE code = 'RIO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SDV', 'Dov Airport', (SELECT id FROM public."Cities" WHERE code = 'TLV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SEA', 'Seattle Tacoma Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'SEA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SEZ', 'Seychelles Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'SEZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SFO', 'San Francisco Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'SFO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SHA', 'Shanghai Intl Hongqiao', (SELECT id FROM public."Cities" WHERE code = 'SHA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SHJ', 'Sharjah Airport', (SELECT id FROM public."Cities" WHERE code = 'SHJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SJJ', 'Butmir Arpt', (SELECT id FROM public."Cities" WHERE code = 'SJJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SLC', 'Salt Lake City Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'SLC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SMO', 'Santa Monica Municipal Arpt', (SELECT id FROM public."Cities" WHERE code = 'LAX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SNN', 'Shannon Arpt', (SELECT id FROM public."Cities" WHERE code = 'SNN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SOF', 'Sofia Intl', (SELECT id FROM public."Cities" WHERE code = 'SOF')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SSA', 'Dois De Julho Arpt', (SELECT id FROM public."Cities" WHERE code = 'SSA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('STD', 'Mayor Humberto Vivas Guerrero Arpt', (SELECT id FROM public."Cities" WHERE code = 'SDQ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('STR', 'Eghterdingen Arpt', (SELECT id FROM public."Cities" WHERE code = 'STR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SUV', 'Nausori Airport', (SELECT id FROM public."Cities" WHERE code = 'SUV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SVG', 'Sola Airport', (SELECT id FROM public."Cities" WHERE code = 'SVG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SVQ', 'San Pablo Arpt', (SELECT id FROM public."Cities" WHERE code = 'SVQ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SVZ', 'San Antonio Arpt', (SELECT id FROM public."Cities" WHERE code = 'SAI')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SXF', 'Schoenefeld Arpt', (SELECT id FROM public."Cities" WHERE code = 'VER')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('SYD', 'Sydney Kingsford Smith Arpt', (SELECT id FROM public."Cities" WHERE code = 'SYD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TAM', 'General F Javier Mina', (SELECT id FROM public."Cities" WHERE code = 'TAM')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TGU', 'Toncontin Arpt', (SELECT id FROM public."Cities" WHERE code = 'TGU')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('THF', 'Tempelhof Arpt', (SELECT id FROM public."Cities" WHERE code = 'VER')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('THR', 'Mehrabad Arpt', (SELECT id FROM public."Cities" WHERE code = 'THR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TIA', 'Rinas Arpt', (SELECT id FROM public."Cities" WHERE code = 'TIA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TLV', 'Ben Gurion Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'TLV')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TMB', 'Tamiami Airport', (SELECT id FROM public."Cities" WHERE code = 'MIA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TPA', 'Tampa Intl', (SELECT id FROM public."Cities" WHERE code = 'TPA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TPE', 'Chiang Kai Shek Arpt', (SELECT id FROM public."Cities" WHERE code = 'TPE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TPF', 'Peter O Knight Arpt', (SELECT id FROM public."Cities" WHERE code = 'TPA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TSR', 'Timisoara Arpt', (SELECT id FROM public."Cities" WHERE code = 'TSR')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TSS', 'East 34th St Hlpt', (SELECT id FROM public."Cities" WHERE code = 'NYC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TUS', 'Tucson Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'TUS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('TXL', 'Tegel Airport', (SELECT id FROM public."Cities" WHERE code = 'VER')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('UBS', 'Lowndes Cty Arpt', (SELECT id FROM public."Cities" WHERE code = 'CMH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('UIO', 'Mariscal Arpt', (SELECT id FROM public."Cities" WHERE code = 'UIO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('UIZ', 'Berz Macomb Arpt', (SELECT id FROM public."Cities" WHERE code = 'DTT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VCT', 'Victoria Regional Arpt', (SELECT id FROM public."Cities" WHERE code = 'YYJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VER', 'Las Bajadas General Heriberto Jara', (SELECT id FROM public."Cities" WHERE code = 'VER')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VGO', 'Vigo Airport', (SELECT id FROM public."Cities" WHERE code = 'VGO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VGT', 'Las Vegas North Air Terminal', (SELECT id FROM public."Cities" WHERE code = 'LAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VIT', 'Vitoria Arpt', (SELECT id FROM public."Cities" WHERE code = 'VIX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VIX', 'Eurico Sales Arpt', (SELECT id FROM public."Cities" WHERE code = 'VIX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VLC', 'Valencia Arpt', (SELECT id FROM public."Cities" WHERE code = 'VLC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VNY', 'Los Angeles Van Nuys Arpt', (SELECT id FROM public."Cities" WHERE code = 'LAX')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VPZ', 'Porter County', (SELECT id FROM public."Cities" WHERE code = 'VAP')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('VRA', 'Juan Gualberto Gomez Arpt', (SELECT id FROM public."Cities" WHERE code = 'VRA')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('WDH', 'Windhoek Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'WDH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('WIL', 'Wilson Airport', (SELECT id FROM public."Cities" WHERE code = 'NBO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('WLG', 'Wellington Intl', (SELECT id FROM public."Cities" WHERE code = 'WLG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('WZY', 'Seaplane Base Arpt', (SELECT id FROM public."Cities" WHERE code = 'NAS')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YAO', 'Yaounde Airport', (SELECT id FROM public."Cities" WHERE code = 'YAO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YBZ', 'Downtown Hlpt Toronto', (SELECT id FROM public."Cities" WHERE code = 'YTO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YEA', 'Edmonton Airports', (SELECT id FROM public."Cities" WHERE code = 'YEG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YED', 'Namao Field', (SELECT id FROM public."Cities" WHERE code = 'YEG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YEG', 'Edmonton Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'YEG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YGK', 'Norman Rodgers Arpt', (SELECT id FROM public."Cities" WHERE code = 'KIN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YHU', 'St Hubert Arpt', (SELECT id FROM public."Cities" WHERE code = 'YUL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YIP', 'Willow Run Arpt', (SELECT id FROM public."Cities" WHERE code = 'DTT')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YKZ', 'Buttonville Arpt', (SELECT id FROM public."Cities" WHERE code = 'YTO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YMQ', 'Montreal Airports', (SELECT id FROM public."Cities" WHERE code = 'YUL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YMX', 'Mirabel Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'YUL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YMY', 'Victoria Stol', (SELECT id FROM public."Cities" WHERE code = 'YUL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YOW', 'Ottawa Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'YOW')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YQF', 'Red Deer Arpt', (SELECT id FROM public."Cities" WHERE code = 'YYC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YQG', 'Windsor Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'YQG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YQY', 'Sydney Airport', (SELECT id FROM public."Cities" WHERE code = 'SYD')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YTO', 'Toronto Area Airports', (SELECT id FROM public."Cities" WHERE code = 'YTO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YTZ', 'Toronto City Centre Airport', (SELECT id FROM public."Cities" WHERE code = 'YTO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YUL', 'Dorval Intl', (SELECT id FROM public."Cities" WHERE code = 'YUL')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YVR', 'Vancouver Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'VAN')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YWG', 'Winnipeg Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'YWG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YWH', 'Inner Harbor Sea Plane Arpt', (SELECT id FROM public."Cities" WHERE code = 'YYJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YXD', 'Edmonton Municipal Arpt', (SELECT id FROM public."Cities" WHERE code = 'YEG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YYC', 'Calgary Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'YYC')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YYJ', 'Victoria Intl Arpt', (SELECT id FROM public."Cities" WHERE code = 'YYJ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('YYZ', 'Lester B Pearson Intl', (SELECT id FROM public."Cities" WHERE code = 'YTO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ZAG', 'Zagreb Arpt', (SELECT id FROM public."Cities" WHERE code = 'ZAG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ZAZ', 'Zaragoza Airport', (SELECT id FROM public."Cities" WHERE code = 'ZAZ')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ZCO', 'Manquehue Arpt', (SELECT id FROM public."Cities" WHERE code = 'ZCO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ZLO', 'Aeropuerto Intl', (SELECT id FROM public."Cities" WHERE code = 'ZLO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('ZRH', 'Zurich Airport', (SELECT id FROM public."Cities" WHERE code = 'ZRH')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CTG', 'Aeropuerto Internacional Rafael Nunez', (SELECT id FROM public."Cities" WHERE code = 'CTG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BOG', 'Aeropuerto Internacional El Dorado', (SELECT id FROM public."Cities" WHERE code = 'BOG')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('CLO', 'Alfonso Bonilla Arag¢n', (SELECT id FROM public."Cities" WHERE code = 'CLO')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('DIM', 'Aeropuerto Olaya Herrera', (SELECT id FROM public."Cities" WHERE code = 'MDE')) ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."Airports" (code, name, "citiesId") VALUES ('BAQ', 'AEROPUERTO ERNESTO CORTIZO', (SELECT id FROM public."Cities" WHERE code = 'BAQ')) ON CONFLICT (code) DO NOTHING;
+
+-- 22. CellCustomizations (Initial inserts for default celdas mapping for BOG)
+DO $$
+DECLARE
+    v_branch_id integer;
+BEGIN
+    SELECT id INTO v_branch_id FROM public."Branch" WHERE code = 'BOG' LIMIT 1;
+    IF v_branch_id IS NOT NULL THEN
+        INSERT INTO public."CellCustomization" (code, name, value, "branchId", "implantId") VALUES
+        ('idCotizacion', 'ID Cotización', 'B2', v_branch_id, NULL),
+        ('asesor', 'Asesor', 'B4', v_branch_id, NULL),
+        ('fecha', 'Fecha', 'G4', v_branch_id, NULL),
+        ('clienteNombre', 'Cliente Nombre', 'B7', v_branch_id, NULL),
+        ('clienteIdentificacion', 'Cliente ID', 'G7', v_branch_id, NULL),
+        ('clienteDireccion', 'Dirección', 'B8', v_branch_id, NULL),
+        ('clienteTelefono', 'Teléfono', 'G8', v_branch_id, NULL),
+        ('centroCosto', 'C. Costo', 'B9', v_branch_id, NULL),
+        ('solicita', 'Solicita', 'G9', v_branch_id, NULL),
+        ('tCambio', 'T. Cambio', 'I11', v_branch_id, NULL),
+        ('descripcionPlan', 'Desc Plan', 'B12', v_branch_id, NULL),
+        ('fechasViaje', 'Fechas Viaje', 'G12', v_branch_id, NULL),
+        ('hotelesServicios', 'Servicios', 'A13', v_branch_id, NULL),
+        ('pasajeros', 'Pasajeros', 'B14', v_branch_id, NULL),
+        ('totalAdultos', 'Total Adultos', 'C15', v_branch_id, NULL),
+        ('totalNinos', 'Total Niños', 'G15', v_branch_id, NULL),
+        ('logo', 'Celda Logo', 'A1', v_branch_id, NULL),
+        ('proveedor1Nombre', 'Prov 1: Nombre', 'B18', v_branch_id, NULL),
+        ('proveedor1NIT', 'Prov 1: NIT', 'E18', v_branch_id, NULL),
+        ('proveedor1Contacto', 'Prov 1: Contacto', 'H18', v_branch_id, NULL),
+        ('prov1TarifaNeta', 'Prov 1: Neta', 'B23', v_branch_id, NULL),
+        ('prov1TarifaNetaPago', 'Prov 1: Neta Pago', 'D23', v_branch_id, NULL),
+        ('prov1Impuestos', 'Prov 1: Impuestos', 'B24', v_branch_id, NULL),
+        ('prov1ImpuestosPago', 'Prov 1: Impuestos Pago', 'D24', v_branch_id, NULL),
+        ('prov1Adicionales', 'Prov 1: Adicionales', 'B25', v_branch_id, NULL),
+        ('prov1AdicionalesPago', 'Prov 1: Adicionales Pago', 'D25', v_branch_id, NULL),
+        ('prov1Comision', 'Prov 1: Comisión', 'B26', v_branch_id, NULL),
+        ('prov1Descuento', 'Prov 1: Descuento', 'B27', v_branch_id, NULL),
+        ('prov1Sobrecomision', 'Prov 1: Sobrecomisión', 'B28', v_branch_id, NULL),
+        ('prov1Fee', 'Prov 1: Fee', 'B29', v_branch_id, NULL),
+        ('prov1Total', 'Prov 1: Total', 'B30', v_branch_id, NULL),
+        ('prov1TotalPago', 'Prov 1: Total Pago', 'D30', v_branch_id, NULL),
+        ('proveedor2Nombre', 'Prov 2: Nombre', 'B19', v_branch_id, NULL),
+        ('proveedor2NIT', 'Prov 2: NIT', 'E19', v_branch_id, NULL),
+        ('proveedor2Contacto', 'Prov 2: Contacto', 'H29', v_branch_id, NULL),
+        ('prov2TarifaNeta', 'Prov 2: Neta', 'G23', v_branch_id, NULL),
+        ('prov2TarifaNetaPago', 'Prov 2: Neta Pago', 'I23', v_branch_id, NULL),
+        ('prov2Impuestos', 'Prov 2: Impuestos', 'G24', v_branch_id, NULL),
+        ('prov2ImpuestosPago', 'Prov 2: Impuestos Pago', 'I24', v_branch_id, NULL),
+        ('prov2Adicionales', 'Prov 2: Adicionales', 'G25', v_branch_id, NULL),
+        ('prov2AdicionalesPago', 'Prov 2: Adicionales Pago', 'I25', v_branch_id, NULL),
+        ('prov2Comision', 'Prov 2: Comisión', 'G26', v_branch_id, NULL),
+        ('prov2Descuento', 'Prov 2: Descuento', 'G27', v_branch_id, NULL),
+        ('prov2Sobrecomision', 'Prov 2: Sobrecomisión', 'G28', v_branch_id, NULL),
+        ('prov2Fee', 'Prov 2: Fee', 'G29', v_branch_id, NULL),
+        ('prov2Total', 'Prov 2: Total', 'G30', v_branch_id, NULL),
+        ('prov2TotalPago', 'Prov 2: Total Pago', 'I30', v_branch_id, NULL),
+        ('tarifaNeta', 'Total: Tarifa Neta', '', v_branch_id, NULL),
+        ('tarifaNetaPago', 'Total: Neta Pago', '', v_branch_id, NULL),
+        ('impuestos', 'Total: Impuestos', '', v_branch_id, NULL),
+        ('impuestosPago', 'Total: Impuestos Pago', '', v_branch_id, NULL),
+        ('adicionalesServ', 'Total: Adicionales', '', v_branch_id, NULL),
+        ('adicionalesServPago', 'Total: Adicionales Pago', '', v_branch_id, NULL),
+        ('comision', 'Total: Comisión', '', v_branch_id, NULL),
+        ('descuento', 'Total: Descuento', '', v_branch_id, NULL),
+        ('sobrecomision', 'Total: Sobrecomisión', '', v_branch_id, NULL),
+        ('fee', 'Total: Fee', '', v_branch_id, NULL),
+        ('total', 'Total: Total', '', v_branch_id, NULL),
+        ('totalPago', 'Total: Total Pago', '', v_branch_id, NULL),
+        ('baseComisionable', 'Base Comisión', 'B35', v_branch_id, NULL),
+        ('comisionAsesor', 'Comisión Asesor', 'B36', v_branch_id, NULL),
+        ('baseComisionTop', 'Comisión Top', 'B37', v_branch_id, NULL),
+        ('observaciones', 'Observaciones', 'B42', v_branch_id, NULL)
+        ON CONFLICT ("branchId", "code") WHERE "branchId" IS NOT NULL DO NOTHING;
+    END IF;
+END $$;
+
+-- 11. Datos Iniciales para la tabla Menu
+INSERT INTO public."Menu" (code, name, parent, action, activo)
+VALUES 
+    ('DASHBOARD', 'Dashboard', NULL, '/dashboard', true),
+    ('COTIZACIONES', 'Cotizaciones', NULL, '/dashboard/quotations/history', true),
+    ('FACTURACION', 'Facturación', NULL, '/dashboard/invoices/history', true),
+    ('MAESTROS', 'Maestros', NULL, '/dashboard/settings', true),
+    ('REPORTES', 'Reportes', NULL, '/dashboard/reports', true)
+ON CONFLICT (code) DO UPDATE SET 
+    name = EXCLUDED.name,
+    parent = EXCLUDED.parent,
+    action = EXCLUDED.action,
+    activo = EXCLUDED.activo;
+
+-- 12. Estados de Cotización Iniciales
+INSERT INTO public."QuotationState" (code, name, color)
+VALUES
+    ('NUEVO', 'Nuevo', 'blue'),
+    ('ENVIADO', 'ENVIADO', 'emerald')
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('LICENSE_KEY', 'Clave de Licencia del Sistema', '') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('LICENSE_EXPIRATION_DATE', 'Fecha de Expiración de Licencia', '') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PRODUCTO_RESERVA_GDS', 'Producto por Defecto para Reservas GDS', 'TAN') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('AGENCY_NAME', 'Nombre o Razón Social de la Agencia', '') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('AGENCY_NIT', 'NIT de la Agencia', '') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('TASA_CAMBIO_IATA', 'Tasa de Cambio IATA', '4200.00') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('TARIFA_ADMIN_OW', 'Tarifa Administrativa Nacional One Way', '29100') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('TARIFA_ADMIN_RT', 'Tarifa Administrativa Nacional Roundtrip', '52800') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PRODUCTO_TARIFA_ADMINISTRATIVA', 'Producto por Defecto para Tarifa Administrativa', '77') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('TARIFA_ADMIN_INT_RANGES', 'Rangos Tarifa Administrativa Internacional (JSON)', '[{"min":0,"max":354,"feeUsd":15,"label":"Menores o iguales a USD 354"},{"min":354.01,"max":590,"feeUsd":28,"label":"Mayores de USD 354 hasta USD 590"},{"min":590.01,"max":944,"feeUsd":46,"label":"Mayores de USD 590 hasta USD 944"},{"min":944.01,"max":999999,"feeUsd":95,"label":"Mayores de USD 944"}]') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."Master" (code, name, "inactivo") VALUES ('Diagnostics', 'diagnostico', false) ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."Menu" (code, name, action, activo) VALUES ('DIAGNOSTICS', 'Trazabilidad y Diagnóstico', '/dashboard/diagnostics', true) ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, action = EXCLUDED.action;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('TRACEABILITY_MODE', 'Modo de Trazabilidad y Diagnóstico', 'OFF') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('ZeusItemDescriptionConfig', 'Parametrización Descripción Ítems Zeus ERP', '{"separator":" - ","fields":[{"id":"descripcion_manual","name":"Descripción Manual","enabled":true,"order":1,"label":"Servicio"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":true,"order":2,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":true,"order":3,"label":"Hasta"},{"id":"proveedor","name":"Proveedor","enabled":true,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"nacionalidad","name":"Nacionalidad","enabled":true,"order":6,"label":"Nacionalidad"},{"id":"numero_cotizacion","name":"Número de cotización","enabled":false,"order":7,"label":"Cotización"},{"id":"pasajero","name":"Nombre del pasajero","enabled":false,"order":8,"label":"Pasajero"},{"id":"destino","name":"Destino","enabled":false,"order":9,"label":"Destino"},{"id":"reservacion","name":"Código de Reserva","enabled":false,"order":10,"label":"Reserva"}]}') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('ZeusObservationsConfig', 'Parametrización Observaciones Zeus ERP', '{"separator":" - ","fields":[{"id":"numero_cotizacion","name":"Número de cotización","enabled":true,"order":1,"label":"Cotización"},{"id":"numero_factura","name":"Número de factura","enabled":false,"order":2,"label":"Factura"},{"id":"pasajero","name":"Nombre del pasajero","enabled":true,"order":3,"label":"Pasajero"},{"id":"proveedor","name":"Proveedor","enabled":false,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":false,"order":6,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":false,"order":7,"label":"Hasta"},{"id":"descripcion_adicional","name":"Descripción adicional","enabled":false,"order":8,"label":"Servicios"}]}') ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EnviarTiposFacturacionHotelesZeus', 'Enviar Tipos de Facturación de Hoteles a Zeus ERP (1: Sí, 0: No)', '1') ON CONFLICT (code) DO NOTHING;
+
+
+-- >>> 3. PROCEDIMIENTOS ALMACENADOS Y FUNCIONES <<<
+-- ============================================================================
+-- AGENCIASNEW - PROCEDIMIENTOS ALMACENADOS Y FUNCIONES EN POSTGRESQL
+-- Archivo: SQL/PostgreSQL/TODOS_LOS_SPS_Y_FUNCIONES_POSTGRESQL.sql
+-- Motor: PostgreSQL 12+ (PL/pgSQL)
+-- ============================================================================
+
+-- Configuración de Codificación y Parámetros
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+
+-- Safeguards de Columnas Críticas para compilación limpia de SPs y Funciones
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Quotation') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Quotation' AND column_name = 'observations') THEN
+            ALTER TABLE public."Quotation" ADD COLUMN "observations" text;
+        END IF;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Invoices') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Invoices' AND column_name = 'observations') THEN
+            ALTER TABLE public."Invoices" ADD COLUMN "observations" text;
+        END IF;
+    END IF;
+END $$;
+
+
+
+-- ############################################################################
+-- 1. FUNCIONES SQL (PL/pgSQL)
+-- ############################################################################
+
+-- ============================================================================
+-- Función: fnAirportListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -5700,7 +5268,9 @@ BEGIN
     RETURN QUERY SELECT a.id, a.code::text, a.name::text, a."citiesId", c.name::text FROM public."Airports" a LEFT JOIN public."Cities" c ON a."citiesId" = c.id ORDER BY a.name ASC;
 END; $function$;
 
--- Archivo: fnBranchListar.sql
+-- ============================================================================
+-- Función: fnBranchListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -5724,8 +5294,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnCellCustomizationListar.sql
+-- ============================================================================
+-- Función: fnCellCustomizationListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -5770,8 +5341,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnCityListar.sql
+-- ============================================================================
+-- Función: fnCityListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -5792,7 +5364,9 @@ BEGIN
     RETURN QUERY SELECT c.id, c.code::text, c.name::text, c."countriesId", c.statecode::text, c.iata::text, co.name::text FROM public."Cities" c LEFT JOIN public."Countries" co ON c."countriesId" = co.id ORDER BY c.name ASC;
 END; $function$;
 
--- Archivo: fnClienteListar.sql
+-- ============================================================================
+-- Función: fnClienteListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -5844,8 +5418,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnComboListar.sql
+-- ============================================================================
+-- Función: fnComboListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -5918,8 +5493,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnCotizacion.sql
+-- ============================================================================
+-- Función: fnCotizacion.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -5958,17 +5534,99 @@ BEGIN
             'state', q.state,
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'costoTotal', COALESCE(q."costoTotal", 0),
+            'valorBase', COALESCE(q."valorBase", 0),
+            'utilidad', COALESCE(q.utilidad, 0),
+            'comisionTotalPercentage', COALESCE(q."comisionTotalPercentage", q."commissionPercentage", 0),
+            'comisionFreelancePercentage', COALESCE(q."comisionFreelancePercentage", 0),
+            'comisionFreelanceValue', COALESCE(q."comisionFreelanceValue", 0),
+            'comisionPropiaPercentage', COALESCE(q."comisionPropiaPercentage", q."commissionPercentage", 0),
+            'comisionPropiaValue', COALESCE(q."comisionPropiaValue", 0),
+            'comisionUtilidadPercentage', COALESCE(q."comisionUtilidadPercentage", 0),
+            'destination', q.destination,
+            'startDate', q."startDate",
+            'endDate', q."endDate",
+            'passengerFirstName', COALESCE(NULLIF(TRIM(q."passengerFirstName"), ''), CASE WHEN q.passenger IS NOT NULL AND TRIM(q.passenger) <> '' THEN SPLIT_PART(TRIM(q.passenger), ' ', 1) ELSE '' END),
+            'passengerLastName', COALESCE(NULLIF(TRIM(q."passengerLastName"), ''), CASE WHEN q.passenger IS NOT NULL AND POSITION(' ' IN TRIM(q.passenger)) > 0 THEN SUBSTRING(TRIM(q.passenger) FROM POSITION(' ' IN TRIM(q.passenger)) + 1) ELSE '' END),
+            'passenger', q.passenger,
+            'paxAdults', q."paxAdults",
+            'paxChildren', q."paxChildren",
+            'reservationCode', q."reservationCode",
+            'copyFieldsToProducts', COALESCE(q."copyFieldsToProducts", true),
+            'manualDescription', q."manualDescription",
+            'observations', q."observations",
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate"
+        ) || jsonb_build_object(
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,
                 'name', c.name,
                 'document', c.document
             ) ELSE jsonb_build_object('id', null, 'name', 'Cliente desconocido', 'document', '') END,
+            'seller', CASE WHEN s.id IS NOT NULL THEN jsonb_build_object('id', s.id, 'name', s.name) ELSE NULL END,
+            'branch', CASE WHEN b.id IS NOT NULL THEN jsonb_build_object('id', b.id, 'name', b.name) ELSE NULL END,
+            'implant', CASE WHEN imp.id IS NOT NULL THEN jsonb_build_object('id', imp.id, 'name', imp.name) ELSE NULL END,
+            'ticketPrinter', CASE WHEN tp.id IS NOT NULL THEN jsonb_build_object('id', tp.id, 'name', tp.name) ELSE NULL END,
+            'user', CASE WHEN qu.id IS NOT NULL THEN jsonb_build_object('id', qu.id, 'name', qu.name) ELSE NULL END,
+            'userName', COALESCE(qu.name, 'Sistema'),
             'combos', COALESCE((
                 SELECT jsonb_agg(jsonb_build_object('id', qc."comboId", 'comboId', qc."comboId", 'name', cb.name))
                 FROM public."QuotationCombo" qc
                 JOIN public."Combo" cb ON qc."comboId" = cb.id
                 WHERE qc."quotationId" = q.id
             ), '[]'::jsonb),
+            'manualServices', COALESCE((
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'id', ms.id,
+                        'serviceName', ms."serviceName",
+                        'name', ms."serviceName",
+                        'salePrice', ms."salePrice",
+                        'amount', ms."salePrice",
+                        'cost', ms.cost,
+                        'utility', ms.utility,
+                        'providerName', ms."providerName"
+                    )
+                )
+                FROM public."QuotationManualService" ms
+                WHERE ms."quotationId" = q.id
+            ), '[]'::jsonb),
+            'stateHistory', COALESCE(
+                (
+                    SELECT jsonb_agg(
+                        jsonb_build_object(
+                            'id', qsh.id,
+                            'quotationId', qsh."quotationId",
+                            'state', qsh.state,
+                            'description', qsh.description,
+                            'userId', qsh."userId",
+                            'userName', COALESCE(u.name, 'Sistema'),
+                            'createdAt', qsh."createdAt",
+                            'metadata', qsh.metadata
+                        ) ORDER BY qsh."createdAt" DESC, qsh.id DESC
+                    )
+                    FROM public."QuotationStateHistory" qsh
+                    LEFT JOIN public."User" u ON qsh."userId" = u.id
+                    WHERE qsh."quotationId" = q.id
+                ),
+                jsonb_build_array(
+                    jsonb_build_object(
+                        'id', q.id,
+                        'quotationId', q.id,
+                        'state', COALESCE(q.state, 'NUEVO'),
+                        'description', COALESCE(q."stateDescription", 'Creación de cotización'),
+                        'userId', q."userId",
+                        'userName', COALESCE(qu.name, 'Sistema'),
+                        'createdAt', COALESCE(q."stateUpdatedAt", q.date, NOW()),
+                        'metadata', jsonb_build_object(
+                            'initialState', COALESCE(q.state, 'NUEVO'),
+                            'totalAmount', q."totalAmount",
+                            'destination', q.destination,
+                            'passenger', q.passenger
+                        )
+                    )
+                )
+            ),
             'products', COALESCE(
                 (
                     SELECT jsonb_agg(
@@ -6003,11 +5661,13 @@ BEGIN
                             'service', COALESCE(qp.service, qp.servicios),
                             'servicios', COALESCE(qp.servicios, qp.service),
                             'descripcion', qp.descripcion,
+                            'passengerFirstName', qp."passengerFirstName",
+                            'passengerLastName', qp."passengerLastName",
                             'passenger', qp.passenger,
                             'providerDueDate', qp."providerDueDate",
                             'providerInvoice', qp."providerInvoice",
                             'passengers', COALESCE((
-                                SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'name', qpax.name, 'document', qpax.document))
+                                SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'firstName', qpax."firstName", 'lastName', qpax."lastName", 'name', qpax.name, 'document', qpax.document))
                                 FROM public."QuotationProductPassenger" qpax
                                 WHERE qpax."quotationProductId" = qp.id
                             ), '[]'::jsonb),
@@ -6051,14 +5711,20 @@ BEGIN
     INTO v_result
     FROM public."Quotation" q
     LEFT JOIN public."Client" c ON q."clientId" = c.id
+    LEFT JOIN public."Seller" s ON q."sellerId" = s.id
+    LEFT JOIN public."Branch" b ON q."branchId" = b.id
+    LEFT JOIN public."Implant" imp ON q."implantId" = imp.id
+    LEFT JOIN public."TicketPrinter" tp ON q."ticketPrinterId" = tp.id
+    LEFT JOIN public."User" qu ON q."userId" = qu.id
     WHERE q.id = p_quotation_id;
 
     RETURN v_result;
 END;
 $$;
 
-
--- Archivo: fnCotizacionHistorial.sql
+-- ============================================================================
+-- Función: fnCotizacionHistorial.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6117,11 +5783,40 @@ BEGIN
         END IF;
     END IF;
 
+    -- Auto-reparación de cotizaciones cuyo userId quedó en NULL o en el fallback 1 cuando el Tiqueteador corresponde a otro Usuario creador registrado
+    UPDATE public."Quotation" q_fix
+    SET "userId" = sub.real_user_id
+    FROM (
+        SELECT q2.id AS quotation_id, u2.id AS real_user_id
+        FROM public."Quotation" q2
+        LEFT JOIN public."TicketPrinter" tp ON tp.id = q2."ticketPrinterId"
+        LEFT JOIN public."User" u2 ON (
+            u2."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u2.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u2.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE (q2."userId" IS NULL OR q2."userId" = 1)
+          AND tp.id IS NOT NULL
+          AND u2.id IS NOT NULL
+          AND u2.id <> 1
+    ) sub
+    WHERE q_fix.id = sub.quotation_id
+      AND COALESCE(q_fix."userId", 0) <> sub.real_user_id;
+
+    UPDATE public."QuotationStateHistory" qsh_fix
+    SET "userId" = q_src."userId"
+    FROM public."Quotation" q_src
+    WHERE qsh_fix."quotationId" = q_src.id
+      AND qsh_fix.state = 'NUEVO'
+      AND (qsh_fix."userId" IS NULL OR qsh_fix."userId" = 1)
+      AND q_src."userId" IS NOT NULL
+      AND q_src."userId" <> 1;
+
     RETURN QUERY
     SELECT 
         jsonb_build_object(
             'id', q.id,
-            'internalNumber', q."internalNumber",
+            'internalNumber', q.id::text,
             'clientName', COALESCE(c.name, 'Cliente desconocido'),
             'providerName', COALESCE((
                 SELECT prov.name 
@@ -6147,8 +5842,30 @@ BEGIN
                 0
             ),
             'currency', q.currency,
-            'userName', COALESCE(u.name, 'Sistema'),
+            'userName', COALESCE(
+                (
+                    SELECT u_init.name
+                    FROM public."QuotationStateHistory" qsh_init
+                    LEFT JOIN public."User" u_init ON u_init.id = qsh_init."userId"
+                    WHERE qsh_init."quotationId" = q.id
+                      AND qsh_init.state = 'NUEVO'
+                      AND qsh_init."userId" IS NOT NULL
+                      AND u_init.id IS NOT NULL
+                      AND (qsh_init."userId" <> 1 OR q."userId" = 1)
+                    ORDER BY qsh_init.id ASC
+                    LIMIT 1
+                ),
+                u.name,
+                'Sistema'
+            ),
             'state', COALESCE(q.state, 'NUEVO'),
+            'stateColor', (
+                SELECT qs.color
+                FROM public."QuotationState" qs
+                WHERE UPPER(TRIM(qs.code)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                   OR UPPER(TRIM(qs.name)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                LIMIT 1
+            ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
             'nights', COALESCE((
@@ -6185,7 +5902,9 @@ BEGIN
                     AND NULLIF(qp.passenger, '') IS NOT NULL 
                     LIMIT 1
                 ), 'Mismo titular')
-            )
+            ),
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate"
         )
     FROM public."Quotation" q
     LEFT JOIN public."Client" c ON q."clientId" = c.id
@@ -6227,8 +5946,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnCotizacionListar.sql
+-- ============================================================================
+-- Función: fnCotizacionListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6257,11 +5977,31 @@ RETURNS SETOF JSONB
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- Auto-reparación de cotizaciones cuyo userId quedó en NULL o en el fallback 1 cuando el Tiqueteador corresponde a otro Usuario creador registrado
+    UPDATE public."Quotation" q_fix
+    SET "userId" = sub.real_user_id
+    FROM (
+        SELECT q2.id AS quotation_id, u2.id AS real_user_id
+        FROM public."Quotation" q2
+        LEFT JOIN public."TicketPrinter" tp ON tp.id = q2."ticketPrinterId"
+        LEFT JOIN public."User" u2 ON (
+            u2."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u2.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u2.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE (q2."userId" IS NULL OR q2."userId" = 1)
+          AND tp.id IS NOT NULL
+          AND u2.id IS NOT NULL
+          AND u2.id <> 1
+    ) sub
+    WHERE q_fix.id = sub.quotation_id
+      AND COALESCE(q_fix."userId", 0) <> sub.real_user_id;
+
     RETURN QUERY
     SELECT 
         jsonb_build_object(
             'id', q.id,
-            'internalNumber', q."internalNumber",
+            'internalNumber', q.id::text,
             'date', q.date,
             'clientId', q."clientId",
             'currency', q.currency,
@@ -6282,8 +6022,20 @@ BEGIN
                 0
             ),
             'state', q.state,
+            'stateColor', (
+                SELECT qs.color
+                FROM public."QuotationState" qs
+                WHERE UPPER(TRIM(qs.code)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                   OR UPPER(TRIM(qs.name)) = UPPER(TRIM(COALESCE(q.state, 'NUEVO')))
+                LIMIT 1
+            ),
             'stateDescription', q."stateDescription",
             'stateUpdatedAt', q."stateUpdatedAt",
+            'zeusInvoiceNumber', q."zeusInvoiceNumber",
+            'zeusInvoiceDate', q."zeusInvoiceDate",
+            'passengerFirstName', q."passengerFirstName",
+            'passengerLastName', q."passengerLastName",
+            'passenger', q.passenger,
             'user', CASE WHEN u.id IS NOT NULL THEN jsonb_build_object('id', u.id, 'name', u.name) ELSE NULL END,
             'client', CASE WHEN c.id IS NOT NULL THEN jsonb_build_object(
                 'id', c.id,
@@ -6308,8 +6060,11 @@ BEGIN
                             'checkOutDate', qp."checkOutDate",
                             'inNationality', COALESCE(qp."inNationality", 1),
                             'mainTaxId', qp."mainTaxId",
+                            'passengerFirstName', qp."passengerFirstName",
+                            'passengerLastName', qp."passengerLastName",
+                            'passenger', qp.passenger,
                             'passengers', COALESCE((
-                                SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'name', qpax.name, 'document', qpax.document))
+                                SELECT jsonb_agg(jsonb_build_object('id', qpax.id, 'firstName', qpax."firstName", 'lastName', qpax."lastName", 'name', qpax.name, 'document', qpax.document))
                                 FROM public."QuotationProductPassenger" qpax
                                 WHERE qpax."quotationProductId" = qp.id
                             ), '[]'::jsonb),
@@ -6349,8 +6104,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnCountryListar.sql
+-- ============================================================================
+-- Función: fnCountryListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6371,7 +6127,9 @@ BEGIN
     RETURN QUERY SELECT c.id, c.code::text, c.name::text, c.dane::text, c.region::text, c.prefix::text, c."curencyId" FROM public."Countries" c ORDER BY c.id ASC;
 END; $function$;
 
--- Archivo: fnCreditCardListar.sql
+-- ============================================================================
+-- Función: fnCreditCardListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6408,8 +6166,9 @@ BEGIN
 END;
 $function$;
 
-
--- Archivo: fnCreditCardValidar.sql
+-- ============================================================================
+-- Función: fnCreditCardValidar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6471,8 +6230,9 @@ BEGIN
 END;
 $function$;
 
-
--- Archivo: fnDocumentResolutionListar.sql
+-- ============================================================================
+-- Función: fnDocumentResolutionListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6529,8 +6289,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnEquivalenceInterface.sql
+-- ============================================================================
+-- Función: fnEquivalenceInterface.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6589,8 +6350,9 @@ $BODY$;
 
 ALTER FUNCTION public."fnEquivalenceInterface"(integer, integer, text) OWNER TO postgres;
 
-
--- Archivo: fnGetSQLServerConfig.sql
+-- ============================================================================
+-- Función: fnGetSQLServerConfig.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6623,8 +6385,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
--- Archivo: fnImplantListar.sql
+-- ============================================================================
+-- Función: fnImplantListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6648,8 +6411,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnImpuestoListar.sql
+-- ============================================================================
+-- Función: fnImpuestoListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6700,8 +6464,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnInterfaceExtractParamValue.sql
+-- ============================================================================
+-- Función: fnInterfaceExtractParamValue.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6812,8 +6577,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnInterfacesList.sql
+-- ============================================================================
+-- Función: fnInterfacesList.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6864,8 +6630,9 @@ $BODY$;
 
 ALTER FUNCTION public."fnInterfacesList"() OWNER TO postgres;
 
-
--- Archivo: fnInvoicesListar.sql
+-- ============================================================================
+-- Función: fnInvoicesListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6891,6 +6658,7 @@ BEGIN
             'internalNumber', i."internalNumber",
             'date', i.date,
             'dueDate', i."dueDate",
+            'observations', COALESCE(i.observations, ''),
             'state', COALESCE(i.state, 'NUEVO'),
             'isExcelImport', COALESCE(i."isExcelImport", false),
             'zeusInvoiceNumber', i."zeusInvoiceNumber",
@@ -6917,7 +6685,7 @@ BEGIN
                             'provider', CASE WHEN prov.id IS NOT NULL THEN jsonb_build_object('id', prov.id, 'name', prov.name) ELSE NULL END,
                             'prestadora', CASE WHEN h.id IS NOT NULL THEN jsonb_build_object('id', h.id, 'name', h.name) ELSE NULL END,
                             'passengers', COALESCE((
-                                SELECT jsonb_agg(jsonb_build_object('id', pax.id, 'name', pax.name, 'document', pax.document))
+                                SELECT jsonb_agg(jsonb_build_object('id', pax.id, 'firstName', pax."firstName", 'lastName', pax."lastName", 'name', pax.name, 'document', pax.document))
                                 FROM public."InvoicesProductPasenger" pax
                                 WHERE pax."invoiceProductId" = ip.id
                             ), '[]'::jsonb)
@@ -6937,8 +6705,18 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public."fnInvoicesListar"()
+RETURNS SETOF JSONB
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY SELECT * FROM public.fnInvoicesListar();
+END;
+$$;
 
--- Archivo: fnMasterList.sql
+-- ============================================================================
+-- Función: fnMasterList.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -6975,8 +6753,9 @@ $BODY$;
 
 ALTER FUNCTION public."fnMasterList"() OWNER TO postgres;
 
-
--- Archivo: fnMenu.sql
+-- ============================================================================
+-- Función: fnMenu.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7002,8 +6781,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnMenuAll.sql
+-- ============================================================================
+-- Función: fnMenuAll.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7028,8 +6808,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnMonedaListar.sql
+-- ============================================================================
+-- Función: fnMonedaListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7075,8 +6856,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnObtenerSiguienteConsecutivo.sql
+-- ============================================================================
+-- Función: fnObtenerSiguienteConsecutivo.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7189,8 +6971,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnParameterListar.sql
+-- ============================================================================
+-- Función: fnParameterListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7214,8 +6997,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnPaymentListar.sql
+-- ============================================================================
+-- Función: fnPaymentListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7236,7 +7020,9 @@ BEGIN
     RETURN QUERY SELECT p.id, p.code, p.name, p.iscash, p.iscredit, p.inactive FROM public."Payment" p ORDER BY p.id ASC;
 END; $function$;
 
--- Archivo: fnPreCotizacionListar.sql
+-- ============================================================================
+-- Función: fnPreCotizacionListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7349,8 +7135,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnPrestadoraListar.sql
+-- ============================================================================
+-- Función: fnPrestadoraListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7390,8 +7177,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnProductoListar.sql
+-- ============================================================================
+-- Función: fnProductoListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7415,8 +7203,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnProveedorListar.sql
+-- ============================================================================
+-- Función: fnProveedorListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7461,8 +7250,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnProviderTypeListar.sql
+-- ============================================================================
+-- Función: fnProviderTypeListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7496,8 +7286,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnQuitarEspeciales.sql
+-- ============================================================================
+-- Función: fnQuitarEspeciales.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7524,8 +7315,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-
--- Archivo: fnQuotationStateListar.sql
+-- ============================================================================
+-- Función: fnQuotationStateListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7547,8 +7339,9 @@ BEGIN
     RETURN QUERY SELECT t.id, t.code::text, t.name::text, t.color::text, t."createdAt"::timestamp FROM public."QuotationState" t ORDER BY t.name ASC;
 END; $function$;
 
-
--- Archivo: fnReportDinamic.sql
+-- ============================================================================
+-- Función: fnReportDinamic.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7717,8 +7510,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnReservaBuscarParaFacturar.sql
+-- ============================================================================
+-- Función: fnReservaBuscarParaFacturar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7788,7 +7582,7 @@ BEGIN
                         'passengers', COALESCE((
                             SELECT jsonb_agg(
                                 jsonb_build_object(
-                                    'name', TRIM(COALESCE(bpp2.firstnm, '') || ' ' || COALESCE(bpp2.lastnm, '')),
+                                    'firstName', COALESCE(bpp2.firstnm, ''), 'lastName', COALESCE(bpp2.lastnm, ''), 'name', TRIM(COALESCE(bpp2.firstnm, '') || ' ' || COALESCE(bpp2.lastnm, '')),
                                     'document', COALESCE(bpp2.identification, '')
                                 )
                             )
@@ -7904,8 +7698,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnResolucionListar.sql
+-- ============================================================================
+-- Función: fnResolucionListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7929,8 +7724,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnRoleListar.sql
+-- ============================================================================
+-- Función: fnRoleListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -7974,8 +7770,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnRptCotizacion.sql
+-- ============================================================================
+-- Función: fnRptCotizacion.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8026,6 +7823,8 @@ CREATE OR REPLACE FUNCTION public."fnRptCotizacion"(
 
         -- Resúmenes de cabecera
         "pasajeros" text,
+        "pasajerosNombres" text,
+        "pasajerosApellidos" text,
         "totalAdultos" integer,
         "totalNinos" integer,
         "baseComisionable" double precision,
@@ -8038,6 +7837,8 @@ CREATE OR REPLACE FUNCTION public."fnRptCotizacion"(
         "fechaInicioCabecera" timestamp without time zone,
         "fechaFinCabecera" timestamp without time zone,
         "pasajeroCabecera" text,
+        "pasajeroCabeceraNombres" text,
+        "pasajeroCabeceraApellidos" text,
         "paxAdultosCabecera" integer,
         "paxNinosCabecera" integer,
         "reservacionCabecera" text,
@@ -8164,6 +7965,16 @@ BEGIN
             FROM "QuotationProductPassenger" p
             WHERE p."quotationProductId" = qp.id
         )::text AS "pasajeros",
+        (
+            SELECT string_agg(COALESCE(NULLIF(TRIM(p."firstName"), ''), p.name), ', ')
+            FROM "QuotationProductPassenger" p
+            WHERE p."quotationProductId" = qp.id
+        )::text AS "pasajerosNombres",
+        (
+            SELECT string_agg(COALESCE(NULLIF(TRIM(p."lastName"), ''), ''), ', ')
+            FROM "QuotationProductPassenger" p
+            WHERE p."quotationProductId" = qp.id
+        )::text AS "pasajerosApellidos",
         COALESCE(qp."paxAdults", 0)::integer AS "totalAdultos",
         COALESCE(qp."paxChildren", 0)::integer AS "totalNinos",
         COALESCE(q."baseCommissionable", 0)::double precision AS "baseComisionable",
@@ -8176,6 +7987,8 @@ BEGIN
         q."startDate" AS "fechaInicioCabecera",
         q."endDate" AS "fechaFinCabecera",
         COALESCE(q.passenger, '')::text AS "pasajeroCabecera",
+        COALESCE(q."passengerFirstName", '')::text AS "pasajeroCabeceraNombres",
+        COALESCE(q."passengerLastName", '')::text AS "pasajeroCabeceraApellidos",
         COALESCE(q."paxAdults", 0)::integer AS "paxAdultosCabecera",
         COALESCE(q."paxChildren", 0)::integer AS "paxNinosCabecera",
         COALESCE(q."reservationCode", '')::text AS "reservacionCabecera",
@@ -8286,8 +8099,9 @@ BEGIN
 END;
 $BODY$;
 
-
--- Archivo: fnSellerListar.sql
+-- ============================================================================
+-- Función: fnSellerListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8311,8 +8125,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnSysConsecutivoListar.sql
+-- ============================================================================
+-- Función: fnSysConsecutivoListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8365,8 +8180,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnTicketPrinterListar.sql
+-- ============================================================================
+-- Función: fnTicketPrinterListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8390,8 +8206,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnTicketTypeListar.sql
+-- ============================================================================
+-- Función: fnTicketTypeListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8413,8 +8230,9 @@ BEGIN
     RETURN QUERY SELECT t.id, t.code::text, t.name::text, t.description::text, t."isActive" FROM public."TicketType" t ORDER BY t.name ASC;
 END; $function$;
 
-
--- Archivo: fnTransactionConsecutiveListar.sql
+-- ============================================================================
+-- Función: fnTransactionConsecutiveListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8467,8 +8285,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnUserPermissions.sql
+-- ============================================================================
+-- Función: fnUserPermissions.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8509,8 +8328,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnUsuarioListar.sql
+-- ============================================================================
+-- Función: fnUsuarioListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8565,8 +8385,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fnVariableListar.sql
+-- ============================================================================
+-- Función: fnVariableListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8590,8 +8411,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fn_obtener_decimales_moneda.sql
+-- ============================================================================
+-- Función: fn_obtener_decimales_moneda.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8620,8 +8442,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: fn_obtener_historial_estados.sql
+-- ============================================================================
+-- Función: fn_obtener_historial_estados.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8635,7 +8458,7 @@ BEGIN
     END LOOP;
 END $$;
 
--- Crear función para obtener el historial de estados de una cotización
+-- Crear función para obtener el historial de estados de una cotización con metadata de cambios
 CREATE OR REPLACE FUNCTION public.fn_obtener_historial_estados(p_quotation_id INT)
 RETURNS TABLE (
     id INT,
@@ -8643,28 +8466,54 @@ RETURNS TABLE (
     description TEXT,
     "createdAt" TIMESTAMP,
     "userId" INT,
-    "userName" TEXT
+    "userName" TEXT,
+    metadata JSONB
 ) AS $$
 BEGIN
-    RETURN QUERY
-    SELECT 
-        qsh.id,
-        qsh.state,
-        qsh.description,
-        qsh."createdAt",
-        qsh."userId",
-        COALESCE(u.name, 'Sistema'::TEXT) AS "userName"
-    FROM public."QuotationStateHistory" qsh
-    LEFT JOIN public."User" u ON qsh."userId" = u.id
-    WHERE qsh."quotationId" = p_quotation_id
-    ORDER BY qsh."createdAt" DESC;
+    IF EXISTS (SELECT 1 FROM public."QuotationStateHistory" WHERE "quotationId" = p_quotation_id) THEN
+        RETURN QUERY
+        SELECT 
+            qsh.id,
+            qsh.state,
+            qsh.description,
+            qsh."createdAt",
+            qsh."userId",
+            COALESCE(u.name, 'Sistema'::TEXT) AS "userName",
+            qsh.metadata
+        FROM public."QuotationStateHistory" qsh
+        LEFT JOIN public."User" u ON qsh."userId" = u.id
+        WHERE qsh."quotationId" = p_quotation_id
+        ORDER BY qsh."createdAt" DESC, qsh.id DESC;
+    ELSE
+        RETURN QUERY
+        SELECT 
+            COALESCE(q.id, 1) AS id,
+            COALESCE(q.state, 'NUEVO')::VARCHAR(25) AS state,
+            COALESCE(q."stateDescription", 'Creación de cotización')::TEXT AS description,
+            COALESCE(q."stateUpdatedAt", q.date, NOW())::TIMESTAMP AS "createdAt",
+            q."userId",
+            COALESCE(u.name, 'Sistema'::TEXT) AS "userName",
+            jsonb_build_object(
+                'initialState', COALESCE(q.state, 'NUEVO'),
+                'totalAmount', q."totalAmount",
+                'destination', q.destination,
+                'passenger', q.passenger
+            ) AS metadata
+        FROM public."Quotation" q
+        LEFT JOIN public."User" u ON q."userId" = u.id
+        WHERE q.id = p_quotation_id;
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
 
 
--- >>> 3. PROCEDIMIENTOS ALMACENADOS (SP) <<<
+-- ############################################################################
+-- 2. PROCEDIMIENTOS ALMACENADOS (SPs) (PL/pgSQL)
+-- ############################################################################
 
--- Archivo: spAirportActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spAirportActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8690,7 +8539,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spAirportCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spAirportCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8714,7 +8565,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; p_id := 0; END; $procedure$;
 
--- Archivo: spAirportEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spAirportEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8734,7 +8587,9 @@ BEGIN
     DELETE FROM public."Airports" WHERE id = p_id; p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN foreign_key_violation THEN p_mensaje_resultado := 'ERROR: En uso.'; WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spBranchActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spBranchActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8793,8 +8648,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spBranchCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spBranchCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8844,8 +8700,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spBranchEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spBranchEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8880,8 +8737,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spCellCustomizationDelete.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCellCustomizationDelete.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8913,8 +8771,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spCellCustomizationUpsert.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCellCustomizationUpsert.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8952,8 +8811,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spCityActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCityActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -8979,7 +8839,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spCityCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCityCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9003,7 +8865,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; p_id := 0; END; $procedure$;
 
--- Archivo: spCityEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCityEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9023,7 +8887,9 @@ BEGIN
     DELETE FROM public."Cities" WHERE id = p_id; p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN foreign_key_violation THEN p_mensaje_resultado := 'ERROR: En uso.'; WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spClienteActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spClienteActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9076,8 +8942,9 @@ END;
 $BODY$
 LANGUAGE plpgsql;
 
-
--- Archivo: spClienteCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spClienteCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9123,8 +8990,9 @@ END;
 $BODY$
 LANGUAGE plpgsql;
 
-
--- Archivo: spClienteEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spClienteEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9176,8 +9044,9 @@ END;
 $BODY$
 LANGUAGE plpgsql;
 
-
--- Archivo: spComboActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spComboActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9258,8 +9127,9 @@ AS $$
     END;
 $$;
 
-
--- Archivo: spComboCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spComboCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9341,8 +9211,9 @@ AS $$
     END;
 $$;
 
-
--- Archivo: spComboEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spComboEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9372,8 +9243,583 @@ EXCEPTION
 END;
 $$;
 
+-- ============================================================================
+-- Procedimiento Almacenado: spCotizacionActualizar.sql
+-- ============================================================================
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionActualizar'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
 
--- Archivo: spCotizacionActualizarEstado.sql
+CREATE OR REPLACE PROCEDURE public."spCotizacionActualizar"(
+    IN p_id integer, 
+    IN p_data jsonb, 
+    IN p_acting_user_id integer, 
+    INOUT p_mensaje_resultado text DEFAULT ''
+)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_item RECORD;
+    v_tax RECORD;
+    v_pax RECORD;
+    v_var RECORD;
+    v_pmt RECORD;
+    v_combo RECORD;
+    v_manual RECORD;
+    v_quotation_product_id INT;
+    -- Variables para validación de campos obligatorios dinámicos
+    v_val_item JSONB;
+    v_val_prod_id INT;
+    v_mandatory_fields JSONB;
+    v_field_key TEXT;
+    v_model TEXT;
+    v_field_name TEXT;
+    v_prod_desc TEXT;
+    v_has_passengers BOOLEAN;
+    v_has_empty_pax_name BOOLEAN;
+    v_has_payments BOOLEAN;
+    v_json_field_name TEXT;
+    -- Variables para validación de variables obligatorias específicas del cliente
+    v_client_id INT;
+    v_client_mandatory_vars JSONB;
+    v_client_var_id_text TEXT;
+    v_req_var_id INT;
+    v_req_var_name TEXT;
+    v_item_json JSONB;
+    v_item_prod_id INT;
+    v_item_prod_desc TEXT;
+    v_has_var BOOLEAN;
+    v_old_state TEXT;
+    -- Variables para cálculos financieros
+    v_mostrar_totalizacion BOOLEAN;
+    v_comision_utilidad DOUBLE PRECISION;
+    v_comision_freelance DOUBLE PRECISION;
+    v_comision_propia DOUBLE PRECISION;
+    v_costo_total DOUBLE PRECISION;
+    v_valor_base DOUBLE PRECISION;
+    v_decimals INT;
+    v_acting_user_id INT := NULL;
+    v_permitir_sin_productos TEXT := '1';
+    -- Variables para nombres y apellidos separados de pasajeros
+    v_pax_first_name TEXT;
+    v_pax_last_name TEXT;
+    v_pax_full_name TEXT;
+    v_item_pax_first TEXT;
+    v_item_pax_last TEXT;
+    v_item_pax_full TEXT;
+    v_sub_pax_first TEXT;
+    v_sub_pax_last TEXT;
+    v_sub_pax_full TEXT;
+BEGIN
+    -- Resolución segura de p_acting_user_id para evitar violación de Quotation_userId_fkey
+    IF p_acting_user_id IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id;
+        IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
+            SELECT id INTO v_acting_user_id FROM public."User" WHERE UPPER(email) = UPPER(p_data->>'userEmail');
+        END IF;
+    END IF;
+
+    IF v_acting_user_id IS NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" ORDER BY id ASC LIMIT 1;
+    END IF;
+
+    -- Validaciones
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation" WHERE id = p_id) THEN
+        p_mensaje_resultado := 'ERROR: La cotización con ID ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
+    SELECT "state" INTO v_old_state FROM public."Quotation" WHERE id = p_id;
+
+    IF NULLIF(p_data->>'clientId', '') IS NULL THEN
+        p_mensaje_resultado := 'ERROR: El campo Cliente es obligatorio.';
+        RETURN;
+    END IF;
+
+    -- Parámetro del Sistema para permitir o no cotizaciones sin productos
+    SELECT COALESCE(value, '1') INTO v_permitir_sin_productos
+    FROM public."SystemParameter"
+    WHERE code IN ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'PermitirCotizacionSinProductos')
+    LIMIT 1;
+
+    IF v_permitir_sin_productos IS NULL THEN
+        v_permitir_sin_productos := '1';
+    END IF;
+
+    IF p_data->'items' IS NULL OR jsonb_array_length(COALESCE(p_data->'items', '[]'::jsonb)) = 0 THEN
+        IF v_permitir_sin_productos NOT IN ('1', 'true', 'TRUE', 't', 'SI', 'si') THEN
+            p_mensaje_resultado := 'ERROR: La cotización debe tener al menos un producto.';
+            RETURN;
+        END IF;
+    ELSE
+        IF EXISTS (
+            SELECT 1 FROM jsonb_to_recordset(p_data->'items') AS x("productId" INT, "mainTaxId" TEXT)
+            WHERE "productId" IS NULL OR NULLIF("mainTaxId", '') IS NULL
+        ) THEN
+            p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto y un Cargo Principal seleccionado.';
+            RETURN;
+        END IF;
+    END IF;
+
+    -- Validación de campos obligatorios dinámicos por producto
+    IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 THEN
+        FOR v_val_item IN SELECT jsonb_array_elements(p_data->'items')
+        LOOP
+            v_val_prod_id := (v_val_item->>'productId')::INT;
+            
+            SELECT "mandatoryFields", "description" 
+            INTO v_mandatory_fields, v_prod_desc 
+            FROM public."Product" 
+            WHERE id = v_val_prod_id;
+
+            v_prod_desc := COALESCE(v_prod_desc, 'Producto #' || v_val_prod_id);
+
+            IF v_mandatory_fields IS NOT NULL AND jsonb_typeof(v_mandatory_fields) = 'array' THEN
+                FOR v_field_key IN SELECT jsonb_array_elements_text(v_mandatory_fields)
+                LOOP
+                    v_model := split_part(v_field_key, '.', 1);
+                    v_field_name := split_part(v_field_key, '.', 2);
+
+                    IF v_model = 'Quotation' THEN
+                        IF NULLIF(p_data->>v_field_name, '') IS NULL THEN
+                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo general "' || v_field_name || '".';
+                            RETURN;
+                        END IF;
+                    ELSIF v_model = 'QuotationProduct' THEN
+                        v_json_field_name := v_field_name;
+                        IF v_field_name = 'checkInDate' THEN
+                            v_json_field_name := 'checkIn';
+                        ELSIF v_field_name = 'checkOutDate' THEN
+                            v_json_field_name := 'checkOut';
+                        ELSIF v_field_name = 'description' THEN
+                            v_json_field_name := 'descripcion';
+                        ELSIF v_field_name = 'service' THEN
+                            IF NULLIF(v_val_item->>'service', '') IS NULL AND v_val_item->>'servicios' IS NOT NULL THEN
+                                v_json_field_name := 'servicios';
+                            END IF;
+                        END IF;
+
+                        IF v_field_name = 'passengers' THEN
+                            v_has_passengers := FALSE;
+                            v_has_empty_pax_name := FALSE;
+                            
+                            IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
+                                SELECT EXISTS (
+                                    SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p("firstName" TEXT, "lastName" TEXT, name TEXT)
+                                    WHERE (p."firstName" IS NULL OR trim(p."firstName") = '') AND (p.name IS NULL OR trim(p.name) = '')
+                                ) INTO v_has_empty_pax_name;
+                            END IF;
+
+                            IF NOT v_has_passengers OR v_has_empty_pax_name THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pasajero con su nombre.';
+                                RETURN;
+                            END IF;
+                        ELSIF v_field_name = 'payments' THEN
+                            v_has_payments := FALSE;
+                            IF v_val_item->'payments' IS NOT NULL AND jsonb_typeof(v_val_item->'payments') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'payments') > 0, FALSE) INTO v_has_payments;
+                            END IF;
+
+                            IF NOT v_has_payments THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pago.';
+                                RETURN;
+                            END IF;
+                        ELSE
+                            IF NULLIF(v_val_item->>v_json_field_name, '') IS NULL THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo "' || v_field_name || '".';
+                                RETURN;
+                            END IF;
+                        END IF;
+                    END IF;
+                END LOOP;
+            END IF;
+        END LOOP;
+    END IF;
+
+    -- Validación de variables obligatorias específicas del cliente para cotizaciones
+    v_client_id := NULLIF(p_data->>'clientId', '')::INT;
+    IF v_client_id IS NOT NULL THEN
+        SELECT "mandatoryVariables" INTO v_client_mandatory_vars
+        FROM public."Client"
+        WHERE id = v_client_id;
+
+        -- Normalizar variables obligatorias para cotización (soporta formato objeto {"quotation": [...], "invoice": [...]} y legado array [...])
+        IF v_client_mandatory_vars IS NOT NULL THEN
+            IF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars->'quotation' IS NOT NULL AND jsonb_typeof(v_client_mandatory_vars->'quotation') = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars->'quotation';
+            ELSIF jsonb_typeof(v_client_mandatory_vars) = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars;
+            ELSE
+                v_client_mandatory_vars := '[]'::jsonb;
+            END IF;
+        ELSE
+            v_client_mandatory_vars := '[]'::jsonb;
+        END IF;
+
+        IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 AND jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
+            FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars)
+            LOOP
+                v_req_var_id := v_client_var_id_text::INT;
+                
+                SELECT "name" INTO v_req_var_name FROM public."MasterVariable" WHERE id = v_req_var_id;
+                v_req_var_name := COALESCE(v_req_var_name, 'Variable #' || v_req_var_id);
+
+                FOR v_item_json IN SELECT jsonb_array_elements(p_data->'items')
+                LOOP
+                    v_item_prod_id := (v_item_json->>'productId')::INT;
+                    SELECT "description" INTO v_item_prod_desc FROM public."Product" WHERE id = v_item_prod_id;
+                    v_item_prod_desc := COALESCE(v_item_prod_desc, 'Producto #' || v_item_prod_id);
+
+                    SELECT EXISTS (
+                        SELECT 1 FROM jsonb_to_recordset(v_item_json->'variables') AS v("masterVariableId" INT, value TEXT)
+                        WHERE v."masterVariableId" = v_req_var_id AND NULLIF(trim(v.value), '') IS NOT NULL
+                    ) INTO v_has_var;
+
+                    IF NOT v_has_var THEN
+                        p_mensaje_resultado := 'ERROR: El cliente requiere completar la variable adicional "' || v_req_var_name || '" en el producto "' || v_item_prod_desc || '".';
+                        RETURN;
+                    END IF;
+                END LOOP;
+            END LOOP;
+        END IF;
+    END IF;
+
+    -- Obtener decimales de la moneda
+    v_decimals := COALESCE(public.fn_obtener_decimales_moneda(p_data->>'currency'), 2);
+
+    -- Resolución inteligente de nombres y apellidos del pasajero principal
+    v_pax_first_name := NULLIF(TRIM(p_data->>'passengerFirstName'), '');
+    v_pax_last_name := NULLIF(TRIM(p_data->>'passengerLastName'), '');
+    IF v_pax_first_name IS NULL AND v_pax_last_name IS NULL AND NULLIF(TRIM(p_data->>'passenger'), '') IS NOT NULL THEN
+        IF POSITION(' ' IN TRIM(p_data->>'passenger')) = 0 THEN
+            v_pax_first_name := TRIM(p_data->>'passenger');
+            v_pax_last_name := '';
+        ELSE
+            v_pax_first_name := SPLIT_PART(TRIM(p_data->>'passenger'), ' ', 1);
+            v_pax_last_name := SUBSTRING(TRIM(p_data->>'passenger') FROM POSITION(' ' IN TRIM(p_data->>'passenger')) + 1);
+        END IF;
+    END IF;
+    v_pax_full_name := NULLIF(TRIM(COALESCE(v_pax_first_name, '') || ' ' || COALESCE(v_pax_last_name, '')), '');
+
+    UPDATE public."Quotation" SET
+        "clientId" = (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
+        "currency" = p_data->>'currency',
+        "exchangeRate" = NULLIF(p_data->>'exchangeRate', '')::FLOAT,
+        "branchId" = (SELECT id FROM public."Branch" WHERE id = NULLIF(p_data->>'branchId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'branchCode')) LIMIT 1),
+        "implantId" = (SELECT id FROM public."Implant" WHERE id = NULLIF(p_data->>'implantId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'implantCode')) LIMIT 1),
+        "sellerId" = (SELECT id FROM public."Seller" WHERE id = NULLIF(p_data->>'sellerId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'sellerCode')) LIMIT 1),
+        "ticketPrinterId" = (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
+        "commissionPercentage" = NULLIF(p_data->>'commissionPercentage', '')::FLOAT,
+        "chargesAndTaxes" = ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision,
+        "totalAmount" = ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision,
+        "state" = COALESCE(p_data->>'state', 'Nuevo'),
+        "stateDescription" = CASE WHEN COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', 'Nuevo') THEN p_data->>'stateDescription' ELSE "stateDescription" END,
+        "stateUpdatedAt" = CASE WHEN COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', 'Nuevo') THEN CURRENT_TIMESTAMP ELSE "stateUpdatedAt" END,
+        "date" = CURRENT_TIMESTAMP,
+        "destination" = p_data->>'destination',
+        "startDate" = CASE WHEN p_data->>'startDate' IS NOT NULL AND p_data->>'startDate' <> '' THEN (p_data->>'startDate')::TIMESTAMP ELSE NULL END,
+        "endDate" = CASE WHEN p_data->>'endDate' IS NOT NULL AND p_data->>'endDate' <> '' THEN (p_data->>'endDate')::TIMESTAMP ELSE NULL END,
+        "passengerFirstName" = v_pax_first_name,
+        "passengerLastName" = v_pax_last_name,
+        "passenger" = v_pax_full_name,
+        "paxAdults" = NULLIF(p_data->>'paxAdults', '')::INT,
+        "paxChildren" = NULLIF(p_data->>'paxChildren', '')::INT,
+        "reservationCode" = p_data->>'reservationCode',
+        "copyFieldsToProducts" = COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
+        "manualDescription" = p_data->>'manualDescription',
+        "observations" = p_data->>'observations',
+        "userId" = COALESCE(
+            CASE
+                WHEN "userId" IS NULL OR "userId" = 1 THEN (
+                    SELECT u.id
+                    FROM public."TicketPrinter" tp
+                    JOIN public."User" u ON (
+                        u."ticketPrinterId" = tp.id
+                        OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(tp.email)))
+                        OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u.name)) = UPPER(TRIM(tp.name)))
+                    )
+                    WHERE tp.id = COALESCE(
+                        (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
+                        "ticketPrinterId"
+                    )
+                    ORDER BY u.id ASC
+                    LIMIT 1
+                )
+                ELSE "userId"
+            END,
+            "userId",
+            v_acting_user_id
+        )
+    WHERE id = p_id;
+
+    -- Insertar historial de estado y modificación con usuario, fecha, hora y metadata de cambios
+    IF COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', v_old_state, 'Nuevo') THEN
+        INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId", "metadata")
+        VALUES (
+            p_id, 
+            COALESCE(p_data->>'state', 'Nuevo'), 
+            COALESCE(NULLIF(p_data->>'stateDescription', ''), 'Cambio de estado a ' || COALESCE(p_data->>'state', 'Nuevo')), 
+            CURRENT_TIMESTAMP, 
+            v_acting_user_id,
+            p_data
+        );
+    ELSE
+        INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId", "metadata")
+        VALUES (
+            p_id, 
+            'MODIFICADO', 
+            COALESCE(NULLIF(p_data->>'stateDescription', ''), 'Modificación de cotización y actualización de datos'), 
+            CURRENT_TIMESTAMP, 
+            v_acting_user_id,
+            p_data
+        );
+    END IF;
+
+    DELETE FROM public."QuotationCombo" WHERE "quotationId" = p_id;
+    FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
+    LOOP
+        INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
+        VALUES (p_id, COALESCE(v_combo."comboId", v_combo.id));
+    END LOOP;
+
+    DELETE FROM public."QuotationManualService" WHERE "quotationId" = p_id;
+    IF p_data->'manualServices' IS NOT NULL AND jsonb_typeof(p_data->'manualServices') = 'array' THEN
+        FOR v_manual IN SELECT * FROM jsonb_to_recordset(p_data->'manualServices') AS x(
+            "providerName" TEXT, "serviceName" TEXT, "cost" FLOAT, "salePrice" FLOAT, "utility" FLOAT
+        )
+        LOOP
+            INSERT INTO public."QuotationManualService" (
+                "quotationId", "providerName", "serviceName", "cost", "salePrice", "utility"
+            ) VALUES (
+                p_id, 
+                v_manual."providerName", 
+                v_manual."serviceName", 
+                COALESCE(v_manual."cost", 0), 
+                COALESCE(v_manual."salePrice", 0), 
+                COALESCE(v_manual."utility", COALESCE(v_manual."salePrice", 0) - COALESCE(v_manual."cost", 0))
+            );
+        END LOOP;
+    END IF;
+
+    DELETE FROM public."QuotationProduct" WHERE "quotationId" = p_id;
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(COALESCE(p_data->'items', '[]'::jsonb)) AS x(
+                      "productId" INT, "productCode" TEXT, quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
+                      "providerCode" TEXT, "prestadoraCode" TEXT,
+                      "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,
+                      "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
+                      "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
+                      "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "payments" JSONB, "inNationality" INT,
+                      "service" TEXT, "servicios" TEXT, "descripcion" TEXT, 
+                      "passengerFirstName" TEXT, "passengerLastName" TEXT, "passenger" TEXT,
+                      "providerDueDate" TEXT, "providerInvoice" TEXT
+                  )
+    LOOP
+        v_item_pax_first := NULLIF(TRIM(v_item."passengerFirstName"), '');
+        v_item_pax_last := NULLIF(TRIM(v_item."passengerLastName"), '');
+        IF v_item_pax_first IS NULL AND v_item_pax_last IS NULL AND NULLIF(TRIM(v_item."passenger"), '') IS NOT NULL THEN
+            IF POSITION(' ' IN TRIM(v_item."passenger")) = 0 THEN
+                v_item_pax_first := TRIM(v_item."passenger");
+                v_item_pax_last := '';
+            ELSE
+                v_item_pax_first := SPLIT_PART(TRIM(v_item."passenger"), ' ', 1);
+                v_item_pax_last := SUBSTRING(TRIM(v_item."passenger") FROM POSITION(' ' IN TRIM(v_item."passenger")) + 1);
+            END IF;
+        END IF;
+
+        IF COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE) AND v_item_pax_first IS NULL AND v_item_pax_last IS NULL THEN
+            v_item_pax_first := v_pax_first_name;
+            v_item_pax_last := v_pax_last_name;
+        END IF;
+
+        v_item_pax_full := NULLIF(TRIM(COALESCE(v_item_pax_first, '') || ' ' || COALESCE(v_item_pax_last, '')), '');
+
+        INSERT INTO public."QuotationProduct" (
+            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
+            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
+            "serviceType", "destination", "reservationCode", "sellerCommission", 
+            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
+            "service", "servicios", "descripcion", 
+            "passengerFirstName", "passengerLastName", "passenger",
+            "providerDueDate", "providerInvoice"
+        ) VALUES (
+            p_id,
+            (SELECT id FROM public."Product" WHERE id = v_item."productId" OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."productCode")) LIMIT 1),
+            v_item.quantity, 
+            ROUND(v_item.price::numeric, v_decimals)::double precision, 
+            ROUND(v_item.cost::numeric, v_decimals)::double precision, 
+            (SELECT id FROM public."Provider" WHERE id = NULLIF(v_item."providerId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."providerCode")) LIMIT 1),
+            (SELECT id FROM public."Prestadora" WHERE id = NULLIF(v_item."prestadoraId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."prestadoraCode")) LIMIT 1),
+            CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
+            CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
+            v_item.nights, v_item."paxAdults", v_item."paxChildren",
+            v_item."serviceType", v_item."destination", v_item."reservationCode", 
+            ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
+            ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
+            NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
+            COALESCE(v_item."service", v_item."servicios"), COALESCE(v_item."servicios", v_item."service"), v_item."descripcion",
+            v_item_pax_first,
+            v_item_pax_last,
+            v_item_pax_full,
+            CASE WHEN v_item."providerDueDate" IS NOT NULL AND v_item."providerDueDate" <> '' THEN v_item."providerDueDate"::TIMESTAMP ELSE NULL END,
+            v_item."providerInvoice"
+        ) RETURNING id INTO v_quotation_product_id;
+
+        IF v_item.passengers IS NOT NULL THEN
+            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x("firstName" TEXT, "lastName" TEXT, name TEXT, document TEXT)
+            LOOP
+                v_sub_pax_first := NULLIF(TRIM(v_pax."firstName"), '');
+                v_sub_pax_last := NULLIF(TRIM(v_pax."lastName"), '');
+                IF v_sub_pax_first IS NULL AND v_sub_pax_last IS NULL AND NULLIF(TRIM(v_pax.name), '') IS NOT NULL THEN
+                    IF POSITION(' ' IN TRIM(v_pax.name)) = 0 THEN
+                        v_sub_pax_first := TRIM(v_pax.name);
+                        v_sub_pax_last := '';
+                    ELSE
+                        v_sub_pax_first := SPLIT_PART(TRIM(v_pax.name), ' ', 1);
+                        v_sub_pax_last := SUBSTRING(TRIM(v_pax.name) FROM POSITION(' ' IN TRIM(v_pax.name)) + 1);
+                    END IF;
+                END IF;
+                v_sub_pax_full := COALESCE(NULLIF(TRIM(COALESCE(v_sub_pax_first, '') || ' ' || COALESCE(v_sub_pax_last, '')), ''), v_pax.name, '');
+
+                INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "firstName", "lastName", "name", "document")
+                VALUES (v_quotation_product_id, v_sub_pax_first, v_sub_pax_last, v_sub_pax_full, COALESCE(v_pax.document, ''));
+            END LOOP;
+        END IF;
+
+        IF v_item."appliedTaxes" IS NOT NULL THEN
+            FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS x("chargeAndTaxId" INT, "explicitAmount" FLOAT)
+            LOOP
+                INSERT INTO public."QuotationProductTax" (
+                    "quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
+                )
+                SELECT v_quotation_product_id, ct.id, ct.value, ct."valueType", 
+                       ROUND(v_tax."explicitAmount"::numeric, v_decimals)::double precision, 
+                       CASE WHEN NULLIF(v_item."mainTaxId", '')::INT = ct.id THEN TRUE ELSE FALSE END
+                FROM public."ChargeAndTax" ct
+                WHERE ct.id = v_tax."chargeAndTaxId";
+            END LOOP;
+        END IF;
+
+        IF v_item.variables IS NOT NULL THEN
+            FOR v_var IN SELECT * FROM jsonb_to_recordset(v_item.variables) AS x("masterVariableId" INT, value TEXT)
+            LOOP
+                INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
+                VALUES (v_quotation_product_id, v_var."masterVariableId", v_var.value);
+            END LOOP;
+        END IF;
+
+        IF v_item.payments IS NOT NULL THEN
+            FOR v_pmt IN SELECT * FROM jsonb_to_recordset(v_item.payments) AS x(
+                "amount" FLOAT, "paymentMethod" TEXT, "date" TEXT, "reference" TEXT,
+                "creditCardId" INT, "cardNumber" TEXT, "authorizationCode" TEXT, "voucher" TEXT, "expirationDate" TEXT
+            )
+            LOOP
+                INSERT INTO public."QuotationProductPayment" (
+                    "quotationProductId", "amount", "paymentMethod", "reference", "date",
+                    "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
+                ) VALUES (
+                    v_quotation_product_id, 
+                    ROUND(v_pmt."amount"::numeric, v_decimals)::double precision, 
+                    v_pmt."paymentMethod", v_pmt."reference",
+                    CASE WHEN v_pmt."date" IS NOT NULL AND v_pmt."date" <> '' THEN v_pmt."date"::TIMESTAMP ELSE CURRENT_TIMESTAMP END,
+                    v_pmt."creditCardId", v_pmt."cardNumber", v_pmt."authorizationCode", v_pmt."voucher", v_pmt."expirationDate"
+                );
+            END LOOP;
+        END IF;
+    END LOOP;
+
+    -- Recalcular valores financieros
+    SELECT 
+        COALESCE(SUM(qp.cost), 0.0), 
+        COALESCE(SUM(
+            qp.price * qp.quantity + COALESCE((
+                SELECT SUM(qpt2."explicitAmount")
+                FROM public."QuotationProductTax" qpt2
+                JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
+                LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
+                WHERE qpt2."quotationProductId" = qp.id
+                  AND COALESCE(qpt2."isMain", false) = false
+                  AND qpt2."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)
+                  AND ct2."targetTaxId" IS NOT NULL
+                  AND (
+                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
+                  )
+            ), 0.0)
+        ), 0.0)
+    INTO v_costo_total, v_valor_base
+    FROM public."QuotationProduct" qp
+    WHERE qp."quotationId" = p_id;
+
+    SELECT COALESCE(value = 'true', FALSE) INTO v_mostrar_totalizacion
+    FROM public."SystemParameter"
+    WHERE code = 'MOSTRAR_TOTALIZACION_COTIZACION';
+
+    v_comision_freelance := COALESCE(NULLIF(p_data->>'comisionFreelancePercentage', '')::DOUBLE PRECISION, 0.0);
+
+    IF v_mostrar_totalizacion THEN
+        v_comision_utilidad := ROUND(public.fn_calcular_porcentaje_comision(public.fn_calcular_utilidad(v_valor_base, v_costo_total), v_valor_base)::NUMERIC, 2)::DOUBLE PRECISION;
+        v_comision_propia := v_comision_utilidad - v_comision_freelance;
+    ELSE
+        v_comision_propia := public.fn_calcular_comision_resta(
+            COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
+            v_comision_freelance
+        );
+    END IF;
+
+    UPDATE public."Quotation"
+    SET 
+        "totalAmount" = COALESCE(
+            NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
+            ROUND((COALESCE("chargesAndTaxes", 0) + 
+                COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = p_id), 0.0) +
+                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = p_id AND COALESCE(qpt."isMain", false) = false AND qpt."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)), 0.0)
+            )::numeric, v_decimals)::double precision
+        ),
+        "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,
+        "valorBase" = ROUND(v_valor_base::numeric, v_decimals)::double precision,
+        "comisionTotalPercentage" = COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
+        "comisionFreelancePercentage" = v_comision_freelance,
+        "comisionPropiaPercentage" = v_comision_propia,
+        "commissionPercentage" = v_comision_propia,
+        "utilidad" = ROUND(public.fn_calcular_utilidad(v_valor_base, v_costo_total)::numeric, v_decimals)::double precision,
+        "comisionUtilidadPercentage" = public.fn_calcular_porcentaje_comision(
+            public.fn_calcular_utilidad(v_valor_base, v_costo_total),
+            v_valor_base
+        ),
+        "comisionFreelanceValue" = ROUND(public.fn_calcular_valor_comision(v_comision_freelance, v_valor_base)::numeric, v_decimals)::double precision,
+        "comisionPropiaValue" = ROUND(public.fn_calcular_valor_comision(v_comision_propia, v_valor_base)::numeric, v_decimals)::double precision
+    WHERE id = p_id;
+
+    p_mensaje_resultado := 'SUCCESS: Cotización ' || p_id || ' actualizada correctamente.';
+
+    -- Registrar en Auditoría
+    CALL public."spLogRegistrar"(
+        p_acting_user_id, 
+        'QUOTATION', 
+        'UPDATE', 
+        'Se actualizó la cotización con ID ' || p_id, 
+        p_data, 
+        v_quotation_product_id -- Reutilizamos variable para el logId temporal
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$procedure$;
+
+-- ============================================================================
+-- Procedimiento Almacenado: spCotizacionActualizarEstado.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9395,45 +9841,101 @@ AS $$
 DECLARE
     v_estados_str TEXT;
     v_item_text TEXT;
+    v_key TEXT;
     v_id INT;
     v_estado TEXT;
     v_row_json JSONB;
+    v_cot_val TEXT;
 BEGIN
     /**
      * Este procedimiento recibe la respuesta de SQL Server (spCotizacionesCrear)
-     * Parsea UNICAMENTE el nodo 'Estados' que contiene el formato 'ID:Estado|ID:Estado|'
+     * Soporta:
+     * 1. Nodo 'Estados': formato 'CONSECUTIVO:Estado|CONSECUTIVO:Estado|'
+     * 2. Objetos directos con { "Cotizacion": "...", "Estado": "...", "bl_existe": ..., "quotationId": ... }
+     * 3. Actualización flexible por internalNumber o id de forma segura
      */
     
-    -- El input puede ser un array de objetos o un objeto individual
-    -- Buscamos el campo 'Estados' en cada objeto
-	
     IF JSONB_TYPEOF(p_response) = 'array' THEN
         FOR v_row_json IN SELECT jsonb_array_elements(p_response)
         LOOP
+            -- 1. Parsear el nodo 'Estados' si está presente
             v_estados_str := v_row_json->>'Estados';
             
             IF v_estados_str IS NOT NULL AND v_estados_str <> '' THEN
-                -- Iterar sobre cada par ID:Estado separado por '|'
                 FOR v_item_text IN SELECT unnest(string_to_array(btrim(v_estados_str, '|'), '|'))
                 LOOP
                     v_item_text := trim(v_item_text);
                     IF v_item_text LIKE '%:%' THEN
-                        BEGIN
-                            -- Split por ':'
-                            v_id := split_part(v_item_text, ':', 1)::INT;
-                            v_estado := split_part(v_item_text, ':', 2);
-                            
-                            -- Actualizar con el estado LITERAL recibido
-                            UPDATE public."Quotation"
-                            SET "state" = v_estado
-                            WHERE id = v_id;
-                        EXCEPTION WHEN OTHERS THEN
-                            -- Ignorar errores de casteo en items individuales
-                        END;
+                        v_key := split_part(v_item_text, ':', 1);
+                        v_estado := split_part(v_item_text, ':', 2);
+                        
+                        IF UPPER(v_estado) = 'ENVIADO' THEN
+                            v_estado := 'ENVIADO';
+                        ELSIF UPPER(v_estado) = 'NUEVO' THEN
+                            v_estado := 'NUEVO';
+                        END IF;
+                        
+                        -- Intentar actualizar por internalNumber
+                        UPDATE public."Quotation"
+                        SET "state" = v_estado,
+                            "stateUpdatedAt" = CURRENT_TIMESTAMP
+                        WHERE "internalNumber" = v_key;
+                        
+                        IF NOT FOUND THEN
+                            BEGIN
+                                IF v_key ~ '^[0-9]+$' THEN
+                                    v_id := v_key::INT;
+                                    UPDATE public."Quotation"
+                                    SET "state" = v_estado,
+                                        "stateUpdatedAt" = CURRENT_TIMESTAMP
+                                    WHERE id = v_id;
+                                ELSIF v_key ~ '^Q[0-9]+$' THEN
+                                    v_id := substring(v_key from 2)::INT;
+                                    UPDATE public."Quotation"
+                                    SET "state" = v_estado,
+                                        "stateUpdatedAt" = CURRENT_TIMESTAMP
+                                    WHERE id = v_id;
+                                END IF;
+                            EXCEPTION WHEN OTHERS THEN END;
+                        END IF;
                     END IF;
                 END LOOP;
             END IF;
+
+            -- 2. Procesar por quotationId o Cotizacion directa
+            IF v_row_json->>'quotationId' IS NOT NULL AND (v_row_json->>'quotationId') ~ '^[0-9]+$' THEN
+                v_id := (v_row_json->>'quotationId')::INT;
+                UPDATE public."Quotation"
+                SET "state" = 'ENVIADO',
+                    "stateUpdatedAt" = CURRENT_TIMESTAMP
+                WHERE id = v_id;
+            END IF;
+
+            v_cot_val := COALESCE(v_row_json->>'Cotizacion', v_row_json->>'cd_consecutivo');
+            IF v_cot_val IS NOT NULL AND v_cot_val <> '' THEN
+                UPDATE public."Quotation"
+                SET "state" = 'ENVIADO',
+                    "stateUpdatedAt" = CURRENT_TIMESTAMP
+                WHERE "internalNumber" = v_cot_val;
+                
+                IF NOT FOUND THEN
+                    BEGIN
+                        IF v_cot_val ~ '^[0-9]+$' THEN
+                            UPDATE public."Quotation"
+                            SET "state" = 'ENVIADO',
+                                "stateUpdatedAt" = CURRENT_TIMESTAMP
+                            WHERE id = v_cot_val::INT;
+                        ELSIF v_cot_val ~ '^Q[0-9]+$' THEN
+                            UPDATE public."Quotation"
+                            SET "state" = 'ENVIADO',
+                                "stateUpdatedAt" = CURRENT_TIMESTAMP
+                            WHERE id = substring(v_cot_val from 2)::INT;
+                        END IF;
+                    EXCEPTION WHEN OTHERS THEN END;
+                END IF;
+            END IF;
         END LOOP;
+
     ELSIF JSONB_TYPEOF(p_response) = 'object' THEN
         v_estados_str := p_response->>'Estados';
         IF v_estados_str IS NOT NULL AND v_estados_str <> '' THEN
@@ -9441,27 +9943,89 @@ BEGIN
             LOOP
                 v_item_text := trim(v_item_text);
                 IF v_item_text LIKE '%:%' THEN
-                    BEGIN
-                        v_id := split_part(v_item_text, ':', 1)::INT;
-                        v_estado := split_part(v_item_text, ':', 2);
-                        
-                        UPDATE public."Quotation"
-                        SET "state" = v_estado
-                        WHERE id = v_id;
-                    EXCEPTION WHEN OTHERS THEN END;
+                    v_key := split_part(v_item_text, ':', 1);
+                    v_estado := split_part(v_item_text, ':', 2);
+                    
+                    IF UPPER(v_estado) = 'ENVIADO' THEN
+                        v_estado := 'ENVIADO';
+                    ELSIF UPPER(v_estado) = 'NUEVO' THEN
+                        v_estado := 'NUEVO';
+                    END IF;
+                    
+                    UPDATE public."Quotation"
+                    SET "state" = v_estado,
+                        "stateUpdatedAt" = CURRENT_TIMESTAMP
+                    WHERE "internalNumber" = v_key;
+                    
+                    IF NOT FOUND THEN
+                        BEGIN
+                            IF v_key ~ '^[0-9]+$' THEN
+                                v_id := v_key::INT;
+                                UPDATE public."Quotation"
+                                SET "state" = v_estado,
+                                    "stateUpdatedAt" = CURRENT_TIMESTAMP
+                                WHERE id = v_id;
+                            ELSIF v_key ~ '^Q[0-9]+$' THEN
+                                v_id := substring(v_key from 2)::INT;
+                                UPDATE public."Quotation"
+                                SET "state" = v_estado,
+                                    "stateUpdatedAt" = CURRENT_TIMESTAMP
+                                WHERE id = v_id;
+                            END IF;
+                        EXCEPTION WHEN OTHERS THEN END;
+                    END IF;
                 END IF;
             END LOOP;
         END IF;
+
+        IF p_response->>'quotationId' IS NOT NULL AND (p_response->>'quotationId') ~ '^[0-9]+$' THEN
+            v_id := (p_response->>'quotationId')::INT;
+            UPDATE public."Quotation"
+            SET "state" = 'ENVIADO',
+                "stateUpdatedAt" = CURRENT_TIMESTAMP
+            WHERE id = v_id;
+        END IF;
+
+        v_cot_val := COALESCE(p_response->>'Cotizacion', p_response->>'cd_consecutivo');
+        IF v_cot_val IS NOT NULL AND v_cot_val <> '' THEN
+            UPDATE public."Quotation"
+            SET "state" = 'ENVIADO',
+                "stateUpdatedAt" = CURRENT_TIMESTAMP
+            WHERE "internalNumber" = v_cot_val;
+            
+            IF NOT FOUND THEN
+                BEGIN
+                    IF v_cot_val ~ '^[0-9]+$' THEN
+                        UPDATE public."Quotation"
+                        SET "state" = 'ENVIADO',
+                            "stateUpdatedAt" = CURRENT_TIMESTAMP
+                        WHERE id = v_cot_val::INT;
+                    ELSIF v_cot_val ~ '^Q[0-9]+$' THEN
+                        UPDATE public."Quotation"
+                        SET "state" = 'ENVIADO',
+                            "stateUpdatedAt" = CURRENT_TIMESTAMP
+                        WHERE id = substring(v_cot_val from 2)::INT;
+                    END IF;
+                EXCEPTION WHEN OTHERS THEN END;
+            END IF;
+        END IF;
     END IF;
-	--SELECT * from public."Quotation" WHERE id = 31; 
-	--UPDATE public."Quotation"
-	--SET "state" = 'Nuevo'--v_row_json::text
-	--WHERE id = 31; 
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE public."spCotizacionActualizarEstado"(
+    p_response JSONB
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionActualizarEstado(p_response);
+END;
+$$;
 
--- Archivo: spCotizacionActualizarEstadoManual.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCotizacionActualizarEstadoManual.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9484,9 +10048,11 @@ CREATE OR REPLACE PROCEDURE public.spCotizacionActualizarEstadoManual(
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_resolved_state TEXT;
 BEGIN
     -- Validaciones
-    IF p_state IS NULL OR p_state = '' THEN
+    IF p_state IS NULL OR TRIM(p_state) = '' THEN
         p_mensaje_resultado := 'ERROR: El estado es obligatorio.';
         RETURN;
     END IF;
@@ -9496,21 +10062,26 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Validar si el estado existe en la tabla de estados
-    IF NOT EXISTS (SELECT 1 FROM public."QuotationState" WHERE code = p_state) THEN
-        p_mensaje_resultado := 'ERROR: El estado "' || p_state || '" no es válido.';
-        RETURN;
+    -- Resolver código del estado por code o por name (insensible a mayúsculas/minúsculas)
+    SELECT code INTO v_resolved_state
+    FROM public."QuotationState"
+    WHERE UPPER(TRIM(code)) = UPPER(TRIM(p_state))
+       OR UPPER(TRIM(name)) = UPPER(TRIM(p_state))
+    LIMIT 1;
+
+    IF v_resolved_state IS NULL THEN
+        v_resolved_state := TRIM(p_state);
     END IF;
 
     UPDATE public."Quotation" SET
-        "state" = p_state,
+        "state" = v_resolved_state,
         "stateDescription" = p_description,
         "stateUpdatedAt" = CURRENT_TIMESTAMP
     WHERE id = p_quotation_id;
 
     -- Insertar historial de estado
     INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
-    VALUES (p_quotation_id, p_state, p_description, CURRENT_TIMESTAMP, p_acting_user_id);
+    VALUES (p_quotation_id, v_resolved_state, p_description, CURRENT_TIMESTAMP, p_acting_user_id);
 
     p_mensaje_resultado := 'SUCCESS: Estado de cotización actualizado correctamente.';
 
@@ -9519,8 +10090,8 @@ BEGIN
         p_acting_user_id, 
         'QUOTATION', 
         'UPDATE_STATE', 
-        'Se cambió el estado de la cotización ID ' || p_quotation_id || ' a ' || p_state || '. Descripción: ' || COALESCE(p_description, ''), 
-        jsonb_build_object('quotationId', p_quotation_id, 'state', p_state, 'description', p_description), 
+        'Se cambió el estado de la cotización ID ' || p_quotation_id || ' a ' || v_resolved_state || '. Descripción: ' || COALESCE(p_description, ''), 
+        jsonb_build_object('quotationId', p_quotation_id, 'state', v_resolved_state, 'description', p_description), 
         p_quotation_id
     );
 
@@ -9530,8 +10101,614 @@ EXCEPTION
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE public."spCotizacionActualizarEstadoManual"(
+    p_quotation_id INT,
+    p_state TEXT,
+    p_description TEXT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionActualizarEstadoManual(p_quotation_id, p_state, p_description, p_acting_user_id, p_mensaje_resultado);
+END;
+$$;
 
--- Archivo: spCotizacionDuplicar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCotizacionCrear.sql
+-- ============================================================================
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT oid::regprocedure AS proc_name 
+        FROM pg_proc 
+        WHERE proname ILIKE 'spCotizacionCrear'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+    END LOOP;
+END $$;
+
+CREATE OR REPLACE PROCEDURE public."spCotizacionCrear"(
+    IN p_data jsonb, 
+    IN p_acting_user_id integer, 
+    INOUT p_quotation_id integer DEFAULT 0, 
+    INOUT p_mensaje_resultado text DEFAULT ''
+)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_internal_number TEXT;
+    v_quotation_id INT;
+    v_item RECORD;
+    v_tax RECORD;
+    v_pax RECORD;
+    v_var RECORD;
+    v_pmt RECORD;
+    v_combo RECORD;
+    v_manual RECORD;
+    v_quotation_product_id INT;
+    -- Variables para validación de campos obligatorios dinámicos
+    v_val_item JSONB;
+    v_val_prod_id INT;
+    v_mandatory_fields JSONB;
+    v_field_key TEXT;
+    v_model TEXT;
+    v_field_name TEXT;
+    v_prod_desc TEXT;
+    v_has_passengers BOOLEAN;
+    v_has_empty_pax_name BOOLEAN;
+    v_has_payments BOOLEAN;
+    v_json_field_name TEXT;
+    -- Variables para validación de variables obligatorias específicas del cliente
+    v_client_id INT;
+    v_client_mandatory_vars JSONB;
+    v_client_var_id_text TEXT;
+    v_req_var_id INT;
+    v_req_var_name TEXT;
+    v_item_json JSONB;
+    v_item_prod_id INT;
+    v_item_prod_desc TEXT;
+    v_has_var BOOLEAN;
+    -- Variables para cálculos financieros
+    v_mostrar_totalizacion BOOLEAN;
+    v_comision_utilidad DOUBLE PRECISION;
+    v_comision_freelance DOUBLE PRECISION;
+    v_comision_propia DOUBLE PRECISION;
+    v_costo_total DOUBLE PRECISION;
+    v_valor_base DOUBLE PRECISION;
+    v_decimals INT;
+    v_acting_user_id INT := NULL;
+    v_tp_user_id INT := NULL;
+    v_permitir_sin_productos TEXT := '1';
+    -- Variables para nombres y apellidos separados de pasajeros
+    v_pax_first_name TEXT;
+    v_pax_last_name TEXT;
+    v_pax_full_name TEXT;
+    v_item_pax_first TEXT;
+    v_item_pax_last TEXT;
+    v_item_pax_full TEXT;
+    v_sub_pax_first TEXT;
+    v_sub_pax_last TEXT;
+    v_sub_pax_full TEXT;
+BEGIN
+    -- Resolución segura y determinista del usuario creador (Elaborado por)
+    IF NULLIF(p_data->>'userId', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = NULLIF(p_data->>'userId', '')::INT LIMIT 1;
+    END IF;
+
+    IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE LOWER(TRIM(email)) = LOWER(TRIM(p_data->>'userEmail')) LIMIT 1;
+    END IF;
+
+    IF v_acting_user_id IS NULL AND p_acting_user_id IS NOT NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id LIMIT 1;
+    END IF;
+
+    -- Si no vino usuario explícito en p_data (o cayó en el fallback 1 por sesión no enviada) y el Tiqueteador seleccionado corresponde a un Usuario del sistema, asignar ese Usuario creador
+    IF (v_acting_user_id IS NULL OR (v_acting_user_id = 1 AND NULLIF(p_data->>'userId', '') IS NULL AND NULLIF(p_data->>'userEmail', '') IS NULL))
+       AND (NULLIF(p_data->>'ticketPrinterId', '') IS NOT NULL OR NULLIF(p_data->>'ticketPrinterCode', '') IS NOT NULL) THEN
+        SELECT u.id INTO v_tp_user_id
+        FROM public."TicketPrinter" tp
+        JOIN public."User" u ON (
+            u."ticketPrinterId" = tp.id
+            OR (NULLIF(TRIM(tp.email), '') IS NOT NULL AND LOWER(TRIM(u.email)) = LOWER(TRIM(tp.email)))
+            OR (NULLIF(TRIM(tp.name), '') IS NOT NULL AND UPPER(TRIM(u.name)) = UPPER(TRIM(tp.name)))
+        )
+        WHERE tp.id = NULLIF(p_data->>'ticketPrinterId', '')::INT
+           OR (tp.code IS NOT NULL AND UPPER(tp.code) = UPPER(p_data->>'ticketPrinterCode'))
+        ORDER BY u.id ASC
+        LIMIT 1;
+
+        IF v_tp_user_id IS NOT NULL THEN
+            v_acting_user_id := v_tp_user_id;
+        END IF;
+    END IF;
+
+    IF v_acting_user_id IS NULL THEN
+        SELECT id INTO v_acting_user_id FROM public."User" ORDER BY id ASC LIMIT 1;
+    END IF;
+
+    -- Validaciones
+    IF NULLIF(p_data->>'clientId', '') IS NULL THEN
+        p_mensaje_resultado := 'ERROR: El campo Cliente es obligatorio.';
+        RETURN;
+    END IF;
+
+    -- Parámetro del Sistema para permitir o no cotizaciones sin productos
+    SELECT COALESCE(value, '1') INTO v_permitir_sin_productos
+    FROM public."SystemParameter"
+    WHERE code IN ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'PermitirCotizacionSinProductos')
+    LIMIT 1;
+
+    IF v_permitir_sin_productos IS NULL THEN
+        v_permitir_sin_productos := '1';
+    END IF;
+
+    IF p_data->'items' IS NULL OR jsonb_array_length(COALESCE(p_data->'items', '[]'::jsonb)) = 0 THEN
+        IF v_permitir_sin_productos NOT IN ('1', 'true', 'TRUE', 't', 'SI', 'si') THEN
+            p_mensaje_resultado := 'ERROR: La cotización debe tener al menos un producto.';
+            RETURN;
+        END IF;
+    ELSE
+        IF EXISTS (
+            SELECT 1 FROM jsonb_to_recordset(p_data->'items') AS x("productId" INT, "mainTaxId" TEXT)
+            WHERE "productId" IS NULL OR NULLIF("mainTaxId", '') IS NULL
+        ) THEN
+            p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto y un Cargo Principal seleccionado.';
+            RETURN;
+        END IF;
+    END IF;
+
+    -- Validación de campos obligatorios dinámicos por producto
+    IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 THEN
+        FOR v_val_item IN SELECT jsonb_array_elements(p_data->'items')
+        LOOP
+            v_val_prod_id := (v_val_item->>'productId')::INT;
+            
+            SELECT "mandatoryFields", "description" 
+            INTO v_mandatory_fields, v_prod_desc 
+            FROM public."Product" 
+            WHERE id = v_val_prod_id;
+
+            v_prod_desc := COALESCE(v_prod_desc, 'Producto #' || v_val_prod_id);
+
+            IF v_mandatory_fields IS NOT NULL AND jsonb_typeof(v_mandatory_fields) = 'array' THEN
+                FOR v_field_key IN SELECT jsonb_array_elements_text(v_mandatory_fields)
+                LOOP
+                    v_model := split_part(v_field_key, '.', 1);
+                    v_field_name := split_part(v_field_key, '.', 2);
+
+                    IF v_model = 'Quotation' THEN
+                        IF NULLIF(p_data->>v_field_name, '') IS NULL THEN
+                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo general "' || v_field_name || '".';
+                            RETURN;
+                        END IF;
+                    ELSIF v_model = 'QuotationProduct' THEN
+                        v_json_field_name := v_field_name;
+                        IF v_field_name = 'checkInDate' THEN
+                            v_json_field_name := 'checkIn';
+                        ELSIF v_field_name = 'checkOutDate' THEN
+                            v_json_field_name := 'checkOut';
+                        ELSIF v_field_name = 'description' THEN
+                            v_json_field_name := 'descripcion';
+                        ELSIF v_field_name = 'service' THEN
+                            IF NULLIF(v_val_item->>'service', '') IS NULL AND v_val_item->>'servicios' IS NOT NULL THEN
+                                v_json_field_name := 'servicios';
+                            END IF;
+                        END IF;
+
+                        IF v_field_name = 'passengers' THEN
+                            v_has_passengers := FALSE;
+                            v_has_empty_pax_name := FALSE;
+                            
+                            IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
+                                SELECT EXISTS (
+                                    SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p("firstName" TEXT, "lastName" TEXT, name TEXT)
+                                    WHERE (p."firstName" IS NULL OR trim(p."firstName") = '') AND (p.name IS NULL OR trim(p.name) = '')
+                                ) INTO v_has_empty_pax_name;
+                            END IF;
+
+                            IF NOT v_has_passengers OR v_has_empty_pax_name THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pasajero con su nombre.';
+                                RETURN;
+                            END IF;
+                        ELSIF v_field_name = 'payments' THEN
+                            v_has_payments := FALSE;
+                            IF v_val_item->'payments' IS NOT NULL AND jsonb_typeof(v_val_item->'payments') = 'array' THEN
+                                SELECT COALESCE(jsonb_array_length(v_val_item->'payments') > 0, FALSE) INTO v_has_payments;
+                            END IF;
+
+                            IF NOT v_has_payments THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pago.';
+                                RETURN;
+                            END IF;
+                        ELSE
+                            IF NULLIF(v_val_item->>v_json_field_name, '') IS NULL THEN
+                                p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo "' || v_field_name || '".';
+                                RETURN;
+                            END IF;
+                        END IF;
+                    END IF;
+                END LOOP;
+            END IF;
+        END LOOP;
+    END IF;
+
+    -- Validación de variables obligatorias específicas del cliente para cotizaciones
+    v_client_id := NULLIF(p_data->>'clientId', '')::INT;
+    IF v_client_id IS NOT NULL THEN
+        SELECT "mandatoryVariables" INTO v_client_mandatory_vars
+        FROM public."Client"
+        WHERE id = v_client_id;
+
+        -- Normalizar variables obligatorias para cotización (soporta formato objeto {"quotation": [...], "invoice": [...]} y legado array [...])
+        IF v_client_mandatory_vars IS NOT NULL THEN
+            IF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars->'quotation' IS NOT NULL AND jsonb_typeof(v_client_mandatory_vars->'quotation') = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars->'quotation';
+            ELSIF jsonb_typeof(v_client_mandatory_vars) = 'array' THEN
+                v_client_mandatory_vars := v_client_mandatory_vars;
+            ELSE
+                v_client_mandatory_vars := '[]'::jsonb;
+            END IF;
+        ELSE
+            v_client_mandatory_vars := '[]'::jsonb;
+        END IF;
+
+        IF p_data->'items' IS NOT NULL AND jsonb_typeof(p_data->'items') = 'array' AND jsonb_array_length(p_data->'items') > 0 AND jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
+            FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars)
+            LOOP
+                v_req_var_id := v_client_var_id_text::INT;
+                
+                SELECT "name" INTO v_req_var_name FROM public."MasterVariable" WHERE id = v_req_var_id;
+                v_req_var_name := COALESCE(v_req_var_name, 'Variable #' || v_req_var_id);
+
+                FOR v_item_json IN SELECT jsonb_array_elements(p_data->'items')
+                LOOP
+                    v_item_prod_id := (v_item_json->>'productId')::INT;
+                    SELECT "description" INTO v_item_prod_desc FROM public."Product" WHERE id = v_item_prod_id;
+                    v_item_prod_desc := COALESCE(v_item_prod_desc, 'Producto #' || v_item_prod_id);
+
+                    SELECT EXISTS (
+                        SELECT 1 FROM jsonb_to_recordset(v_item_json->'variables') AS v("masterVariableId" INT, value TEXT)
+                        WHERE v."masterVariableId" = v_req_var_id AND NULLIF(trim(v.value), '') IS NOT NULL
+                    ) INTO v_has_var;
+
+                    IF NOT v_has_var THEN
+                        p_mensaje_resultado := 'ERROR: El cliente requiere completar la variable adicional "' || v_req_var_name || '" en el producto "' || v_item_prod_desc || '".';
+                        RETURN;
+                    END IF;
+                END LOOP;
+            END LOOP;
+        END IF;
+    END IF;
+
+    -- Obtener decimales de la moneda
+    v_decimals := COALESCE(public.fn_obtener_decimales_moneda(p_data->>'currency'), 2);
+
+    v_internal_number := NULLIF(p_data->>'consecutivo', '');
+
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    END IF;
+
+    -- Resolución inteligente de nombres y apellidos del pasajero principal
+    v_pax_first_name := NULLIF(TRIM(p_data->>'passengerFirstName'), '');
+    v_pax_last_name := NULLIF(TRIM(p_data->>'passengerLastName'), '');
+    IF v_pax_first_name IS NULL AND v_pax_last_name IS NULL AND NULLIF(TRIM(p_data->>'passenger'), '') IS NOT NULL THEN
+        IF POSITION(' ' IN TRIM(p_data->>'passenger')) = 0 THEN
+            v_pax_first_name := TRIM(p_data->>'passenger');
+            v_pax_last_name := '';
+        ELSE
+            v_pax_first_name := SPLIT_PART(TRIM(p_data->>'passenger'), ' ', 1);
+            v_pax_last_name := SUBSTRING(TRIM(p_data->>'passenger') FROM POSITION(' ' IN TRIM(p_data->>'passenger')) + 1);
+        END IF;
+    END IF;
+    v_pax_full_name := NULLIF(TRIM(COALESCE(v_pax_first_name, '') || ' ' || COALESCE(v_pax_last_name, '')), '');
+
+    INSERT INTO public."Quotation" (
+        "internalNumber", "date", "clientId", "currency", "exchangeRate", 
+        "branchId", "implantId", "sellerId", "ticketPrinterId", 
+        "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
+        "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
+        "destination", "startDate", "endDate", 
+        "passengerFirstName", "passengerLastName", "passenger", 
+        "paxAdults", "paxChildren",
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
+    ) VALUES (
+        COALESCE(v_internal_number, 'TEMP_' || gen_random_uuid()::text), CURRENT_TIMESTAMP,
+        (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
+        COALESCE(p_data->>'currency', 'COP'), COALESCE(NULLIF(p_data->>'exchangeRate', '')::FLOAT, 1.0),
+        COALESCE(
+            (SELECT id FROM public."Branch" WHERE id = NULLIF(p_data->>'branchId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'branchCode')) LIMIT 1),
+            (SELECT id FROM public."Branch" ORDER BY id ASC LIMIT 1)
+        ),
+        (SELECT id FROM public."Implant" WHERE id = NULLIF(p_data->>'implantId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'implantCode')) LIMIT 1),
+        (SELECT id FROM public."Seller" WHERE id = NULLIF(p_data->>'sellerId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'sellerCode')) LIMIT 1),
+        (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
+        0, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::FLOAT, 0), COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0),
+        COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0), v_acting_user_id, 'NUEVO', 'Creación de cotización', CURRENT_TIMESTAMP,
+        p_data->>'destination', 
+        CASE WHEN p_data->>'startDate' IS NOT NULL AND p_data->>'startDate' <> '' THEN (p_data->>'startDate')::TIMESTAMP ELSE NULL END,
+        CASE WHEN p_data->>'endDate' IS NOT NULL AND p_data->>'endDate' <> '' THEN (p_data->>'endDate')::TIMESTAMP ELSE NULL END,
+        v_pax_first_name,
+        v_pax_last_name,
+        v_pax_full_name,
+        NULLIF(p_data->>'paxAdults', '')::INT,
+        NULLIF(p_data->>'paxChildren', '')::INT,
+        p_data->>'reservationCode',
+        COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
+        p_data->>'manualDescription',
+        p_data->>'observations'
+    ) RETURNING id INTO v_quotation_id;
+
+    IF v_internal_number IS NULL OR v_internal_number = '' THEN
+        v_internal_number := v_quotation_id::text;
+        UPDATE public."Quotation"
+        SET "internalNumber" = v_internal_number
+        WHERE id = v_quotation_id;
+    END IF;
+
+    -- Insertar historial de estado inicial
+    INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId", "metadata")
+    VALUES (v_quotation_id, 'NUEVO', 'Creación de cotización', CURRENT_TIMESTAMP, v_acting_user_id, p_data);
+
+    FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
+    LOOP
+        DECLARE
+            v_combo_real_id INT := COALESCE(v_combo."comboId", v_combo.id);
+            v_cupos_disponibles INT;
+            v_combo_name TEXT;
+        BEGIN
+            SELECT "cupos", "name" INTO v_cupos_disponibles, v_combo_name
+            FROM public."Combo" WHERE id = v_combo_real_id;
+
+            IF v_cupos_disponibles IS NOT NULL AND v_cupos_disponibles <= 0 THEN
+                p_mensaje_resultado := 'ERROR: El combo "' || COALESCE(v_combo_name, v_combo_real_id::TEXT) || '" no tiene cupos disponibles.';
+                RETURN;
+            END IF;
+
+            INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
+            VALUES (v_quotation_id, v_combo_real_id);
+
+            -- Descontar 1 cupo
+            UPDATE public."Combo" SET "cupos" = "cupos" - 1 WHERE id = v_combo_real_id;
+        END;
+    END LOOP;
+
+    IF p_data->'manualServices' IS NOT NULL AND jsonb_typeof(p_data->'manualServices') = 'array' THEN
+        FOR v_manual IN SELECT * FROM jsonb_to_recordset(p_data->'manualServices') AS x(
+            "providerName" TEXT, "serviceName" TEXT, "cost" FLOAT, "salePrice" FLOAT, "utility" FLOAT
+        )
+        LOOP
+            INSERT INTO public."QuotationManualService" (
+                "quotationId", "providerName", "serviceName", "cost", "salePrice", "utility"
+            ) VALUES (
+                v_quotation_id, 
+                v_manual."providerName", 
+                v_manual."serviceName", 
+                COALESCE(v_manual."cost", 0), 
+                COALESCE(v_manual."salePrice", 0), 
+                COALESCE(v_manual."utility", COALESCE(v_manual."salePrice", 0) - COALESCE(v_manual."cost", 0))
+            );
+        END LOOP;
+    END IF;
+
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(COALESCE(p_data->'items', '[]'::jsonb)) AS x(
+                      "productId" INT, "productCode" TEXT, quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
+                      "providerCode" TEXT, "prestadoraCode" TEXT,
+                      "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,
+                      "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
+                      "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
+                      "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "payments" JSONB, "inNationality" INT,
+                      "service" TEXT, "servicios" TEXT, "descripcion" TEXT, 
+                      "passengerFirstName" TEXT, "passengerLastName" TEXT, "passenger" TEXT,
+                      "providerDueDate" TEXT, "providerInvoice" TEXT
+                  )
+    LOOP
+        v_item_pax_first := NULLIF(TRIM(v_item."passengerFirstName"), '');
+        v_item_pax_last := NULLIF(TRIM(v_item."passengerLastName"), '');
+        IF v_item_pax_first IS NULL AND v_item_pax_last IS NULL AND NULLIF(TRIM(v_item."passenger"), '') IS NOT NULL THEN
+            IF POSITION(' ' IN TRIM(v_item."passenger")) = 0 THEN
+                v_item_pax_first := TRIM(v_item."passenger");
+                v_item_pax_last := '';
+            ELSE
+                v_item_pax_first := SPLIT_PART(TRIM(v_item."passenger"), ' ', 1);
+                v_item_pax_last := SUBSTRING(TRIM(v_item."passenger") FROM POSITION(' ' IN TRIM(v_item."passenger")) + 1);
+            END IF;
+        END IF;
+
+        IF COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE) AND v_item_pax_first IS NULL AND v_item_pax_last IS NULL THEN
+            v_item_pax_first := v_pax_first_name;
+            v_item_pax_last := v_pax_last_name;
+        END IF;
+
+        v_item_pax_full := NULLIF(TRIM(COALESCE(v_item_pax_first, '') || ' ' || COALESCE(v_item_pax_last, '')), '');
+
+        INSERT INTO public."QuotationProduct" (
+            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
+            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
+            "serviceType", "destination", "reservationCode", "sellerCommission", 
+            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
+            "service", "servicios", "descripcion", 
+            "passengerFirstName", "passengerLastName", "passenger",
+            "providerDueDate", "providerInvoice"
+        ) VALUES (
+            v_quotation_id,
+            COALESCE(
+                (SELECT id FROM public."Product" WHERE id = v_item."productId" OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."productCode")) LIMIT 1),
+                (SELECT id FROM public."Product" ORDER BY id ASC LIMIT 1)
+            ),
+            v_item.quantity, 
+            ROUND(v_item.price::numeric, v_decimals)::double precision, 
+            ROUND(v_item.cost::numeric, v_decimals)::double precision, 
+            (SELECT id FROM public."Provider" WHERE id = NULLIF(v_item."providerId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."providerCode")) LIMIT 1),
+            (SELECT id FROM public."Prestadora" WHERE id = NULLIF(v_item."prestadoraId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."prestadoraCode")) LIMIT 1),
+            CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
+            CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
+            v_item.nights, v_item."paxAdults", v_item."paxChildren",
+            v_item."serviceType", v_item."destination", v_item."reservationCode", 
+            ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
+            ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
+            NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
+            COALESCE(v_item."service", v_item."servicios"), COALESCE(v_item."servicios", v_item."service"), v_item."descripcion",
+            v_item_pax_first,
+            v_item_pax_last,
+            v_item_pax_full,
+            CASE WHEN v_item."providerDueDate" IS NOT NULL AND v_item."providerDueDate" <> '' THEN v_item."providerDueDate"::TIMESTAMP ELSE NULL END,
+            v_item."providerInvoice"
+        ) RETURNING id INTO v_quotation_product_id;
+
+        IF v_item.passengers IS NOT NULL THEN
+            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x("firstName" TEXT, "lastName" TEXT, name TEXT, document TEXT)
+            LOOP
+                v_sub_pax_first := NULLIF(TRIM(v_pax."firstName"), '');
+                v_sub_pax_last := NULLIF(TRIM(v_pax."lastName"), '');
+                IF v_sub_pax_first IS NULL AND v_sub_pax_last IS NULL AND NULLIF(TRIM(v_pax.name), '') IS NOT NULL THEN
+                    IF POSITION(' ' IN TRIM(v_pax.name)) = 0 THEN
+                        v_sub_pax_first := TRIM(v_pax.name);
+                        v_sub_pax_last := '';
+                    ELSE
+                        v_sub_pax_first := SPLIT_PART(TRIM(v_pax.name), ' ', 1);
+                        v_sub_pax_last := SUBSTRING(TRIM(v_pax.name) FROM POSITION(' ' IN TRIM(v_pax.name)) + 1);
+                    END IF;
+                END IF;
+                v_sub_pax_full := COALESCE(NULLIF(TRIM(COALESCE(v_sub_pax_first, '') || ' ' || COALESCE(v_sub_pax_last, '')), ''), v_pax.name, '');
+
+                INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "firstName", "lastName", "name", "document")
+                VALUES (v_quotation_product_id, v_sub_pax_first, v_sub_pax_last, v_sub_pax_full, COALESCE(v_pax.document, ''));
+            END LOOP;
+        END IF;
+
+        IF v_item."appliedTaxes" IS NOT NULL THEN
+            FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS x("chargeAndTaxId" INT, "explicitAmount" FLOAT)
+            LOOP
+                INSERT INTO public."QuotationProductTax" (
+                    "quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
+                )
+                SELECT v_quotation_product_id, ct.id, ct.value, ct."valueType", 
+                       ROUND(v_tax."explicitAmount"::numeric, v_decimals)::double precision, 
+                       CASE WHEN NULLIF(v_item."mainTaxId", '')::INT = ct.id THEN TRUE ELSE FALSE END
+                FROM public."ChargeAndTax" ct
+                WHERE ct.id = v_tax."chargeAndTaxId";
+            END LOOP;
+        END IF;
+
+        IF v_item.variables IS NOT NULL THEN
+            FOR v_var IN SELECT * FROM jsonb_to_recordset(v_item.variables) AS x("masterVariableId" INT, value TEXT)
+            LOOP
+                INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
+                VALUES (v_quotation_product_id, v_var."masterVariableId", v_var.value);
+            END LOOP;
+        END IF;
+
+        IF v_item.payments IS NOT NULL THEN
+            FOR v_pmt IN SELECT * FROM jsonb_to_recordset(v_item.payments) AS x(
+                "amount" FLOAT, "paymentMethod" TEXT, "date" TEXT, "reference" TEXT,
+                "creditCardId" INT, "cardNumber" TEXT, "authorizationCode" TEXT, "voucher" TEXT, "expirationDate" TEXT
+            )
+            LOOP
+                INSERT INTO public."QuotationProductPayment" (
+                    "quotationProductId", "amount", "paymentMethod", "reference", "date",
+                    "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
+                ) VALUES (
+                    v_quotation_product_id, 
+                    ROUND(v_pmt."amount"::numeric, v_decimals)::double precision, 
+                    v_pmt."paymentMethod", v_pmt."reference",
+                    CASE WHEN v_pmt."date" IS NOT NULL AND v_pmt."date" <> '' THEN v_pmt."date"::TIMESTAMP ELSE CURRENT_TIMESTAMP END,
+                    v_pmt."creditCardId", v_pmt."cardNumber", v_pmt."authorizationCode", v_pmt."voucher", v_pmt."expirationDate"
+                );
+            END LOOP;
+        END IF;
+    END LOOP;
+
+    -- Calcular y actualizar el totalAmount y los nuevos campos financieros
+    SELECT 
+        COALESCE(SUM(qp.cost), 0.0), 
+        COALESCE(SUM(
+            qp.price * qp.quantity + COALESCE((
+                SELECT SUM(qpt2."explicitAmount")
+                FROM public."QuotationProductTax" qpt2
+                JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
+                LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
+                WHERE qpt2."quotationProductId" = qp.id
+                  AND COALESCE(qpt2."isMain", false) = false
+                  AND qpt2."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)
+                  AND ct2."targetTaxId" IS NOT NULL
+                  AND (
+                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
+                  )
+            ), 0.0)
+        ), 0.0)
+    INTO v_costo_total, v_valor_base
+    FROM public."QuotationProduct" qp
+    WHERE qp."quotationId" = v_quotation_id;
+
+    SELECT COALESCE(value = 'true', FALSE) INTO v_mostrar_totalizacion
+    FROM public."SystemParameter"
+    WHERE code = 'MOSTRAR_TOTALIZACION_COTIZACION';
+
+    v_comision_freelance := COALESCE(NULLIF(p_data->>'comisionFreelancePercentage', '')::DOUBLE PRECISION, 0.0);
+
+    IF v_mostrar_totalizacion THEN
+        v_comision_utilidad := ROUND(public.fn_calcular_porcentaje_comision(public.fn_calcular_utilidad(v_valor_base, v_costo_total), v_valor_base)::NUMERIC, 2)::DOUBLE PRECISION;
+        v_comision_propia := v_comision_utilidad - v_comision_freelance;
+    ELSE
+        v_comision_propia := public.fn_calcular_comision_resta(
+            COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
+            v_comision_freelance
+        );
+    END IF;
+
+    UPDATE public."Quotation"
+    SET 
+        "totalAmount" = COALESCE(
+            NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
+            ROUND((COALESCE("chargesAndTaxes", 0) + 
+                COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = v_quotation_id), 0.0) +
+                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = v_quotation_id AND COALESCE(qpt."isMain", false) = false AND qpt."chargeAndTaxId" <> COALESCE(qp."mainTaxId", -1)), 0.0)
+            )::numeric, v_decimals)::double precision
+        ),
+        "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,
+        "valorBase" = ROUND(v_valor_base::numeric, v_decimals)::double precision,
+        "comisionTotalPercentage" = COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
+        "comisionFreelancePercentage" = v_comision_freelance,
+        "comisionPropiaPercentage" = v_comision_propia,
+        "commissionPercentage" = v_comision_propia,
+        "utilidad" = ROUND(public.fn_calcular_utilidad(v_valor_base, v_costo_total)::numeric, v_decimals)::double precision,
+        "comisionUtilidadPercentage" = public.fn_calcular_porcentaje_comision(
+            public.fn_calcular_utilidad(v_valor_base, v_costo_total),
+            v_valor_base
+        ),
+        "comisionFreelanceValue" = ROUND(public.fn_calcular_valor_comision(v_comision_freelance, v_valor_base)::numeric, v_decimals)::double precision,
+        "comisionPropiaValue" = ROUND(public.fn_calcular_valor_comision(v_comision_propia, v_valor_base)::numeric, v_decimals)::double precision
+    WHERE id = v_quotation_id;
+
+    p_quotation_id := v_quotation_id;
+    p_mensaje_resultado := 'SUCCESS: Cotización creada correctamente con ID ' || v_quotation_id;
+
+    -- Registrar en Auditoría
+    CALL public."spLogRegistrar"(
+        v_acting_user_id, 
+        'QUOTATION', 
+        'CREATE', 
+        'Se creó la cotización ' || v_internal_number || ' (ID: ' || v_quotation_id || ')', 
+        p_data, 
+        v_quotation_id -- Reutilizamos variable para el logId temporal
+    );
+
+EXCEPTION
+    WHEN OTHERS THEN
+        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
+END;
+$procedure$;
+
+-- ============================================================================
+-- Procedimiento Almacenado: spCotizacionDuplicar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9545,7 +10722,7 @@ BEGIN
     END LOOP;
 END $$;
 
-CREATE OR REPLACE PROCEDURE public.spCotizacionDuplicar(
+CREATE OR REPLACE PROCEDURE public."spCotizacionDuplicar"(
     IN p_quotation_id INT,
     IN p_acting_user_id INT,
     INOUT p_new_quotation_id INT DEFAULT 0,
@@ -9580,13 +10757,15 @@ BEGIN
         v_user_id := v_orig_quotation."userId";
     END IF;
 
-    -- Generar consecutivo único interno desde TransactionConsecutive
-    SELECT x.v_consec_json->>'formattedConsecutive' INTO v_internal_number
-    FROM (SELECT public."fnObtenerSiguienteConsecutivo"('QUOTATION', v_orig_quotation."branchId", v_orig_quotation."implantId") AS v_consec_json) x;
-
-    IF v_internal_number IS NULL OR v_internal_number = '' THEN
-        v_internal_number := 'COT-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
+    -- Sincronizar secuencia si la tabla quedó vacía o desalineada
+    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
+        PERFORM setval('public."Quotation_id_seq"', 1, false);
+    ELSE
+        PERFORM setval('public."Quotation_id_seq"', GREATEST((SELECT COALESCE(MAX(id), 0) FROM public."Quotation"), 1), true);
     END IF;
+
+    -- Generar consecutivo temporal seguro para la inserción
+    v_internal_number := 'TEMP_' || gen_random_uuid()::text;
 
     -- Insertar la cabecera duplicada de la cotización
     INSERT INTO public."Quotation" (
@@ -9597,8 +10776,10 @@ BEGIN
         "costoTotal", "valorBase", "utilidad", "comisionTotalPercentage",
         "comisionFreelancePercentage", "comisionFreelanceValue",
         "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
-        "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
+        "destination", "startDate", "endDate", 
+        "passengerFirstName", "passengerLastName", "passenger", 
+        "paxAdults", "paxChildren",
+        "reservationCode", "copyFieldsToProducts", "manualDescription", "observations"
     ) VALUES (
         v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
         v_orig_quotation."branchId", v_orig_quotation."implantId", v_orig_quotation."sellerId", v_orig_quotation."ticketPrinterId",
@@ -9607,9 +10788,17 @@ BEGIN
         v_orig_quotation."costoTotal", v_orig_quotation."valorBase", v_orig_quotation."utilidad", v_orig_quotation."comisionTotalPercentage",
         v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
         v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
-        v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
-        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription"
+        v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", 
+        v_orig_quotation."passengerFirstName", v_orig_quotation."passengerLastName", v_orig_quotation."passenger", 
+        v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
+        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription", v_orig_quotation."observations"
     ) RETURNING id INTO v_new_id;
+
+    -- Asignar el número interno definitivo exactamente igual al ID generado
+    v_internal_number := v_new_id::text;
+    UPDATE public."Quotation"
+    SET "internalNumber" = v_internal_number
+    WHERE id = v_new_id;
 
     -- Insertar registro inicial en el historial de estados
     INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
@@ -9638,18 +10827,22 @@ BEGIN
             "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
             "serviceType", "destination", "reservationCode", "sellerCommission",
             "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger"
+            "service", "servicios", "descripcion", 
+            "passengerFirstName", "passengerLastName", "passenger",
+            "providerDueDate", "providerInvoice"
         ) VALUES (
             v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
             v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
             v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
             v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger"
+            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", 
+            v_orig_qp."passengerFirstName", v_orig_qp."passengerLastName", v_orig_qp."passenger",
+            v_orig_qp."providerDueDate", v_orig_qp."providerInvoice"
         ) RETURNING id INTO v_new_qp_id;
 
         -- Duplicar Pasajeros del producto
-        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-        SELECT v_new_qp_id, "name", "document"
+        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "firstName", "lastName", "name", "document")
+        SELECT v_new_qp_id, "firstName", "lastName", "name", "document"
         FROM public."QuotationProductPassenger"
         WHERE "quotationProductId" = v_orig_qp.id;
 
@@ -9692,8 +10885,9 @@ EXCEPTION
 END;
 $procedure$;
 
-
--- Archivo: spCotizacionEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCotizacionEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9738,8 +10932,21 @@ EXCEPTION
 END;
 $$;
 
+CREATE OR REPLACE PROCEDURE public."spCotizacionEliminar"(
+    p_quotation_id INT,
+    p_acting_user_id INT,
+    INOUT p_mensaje_resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    CALL public.spCotizacionEliminar(p_quotation_id, p_acting_user_id, p_mensaje_resultado);
+END;
+$$;
 
--- Archivo: spCountriesActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCountriesActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9772,8 +10979,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spCountriesCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCountriesCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9806,8 +11014,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spCountriesEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCountriesEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9834,8 +11043,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spCountryActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCountryActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9861,7 +11071,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spCountryCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCountryCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9885,7 +11097,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; p_id := 0; END; $procedure$;
 
--- Archivo: spCountryEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCountryEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9905,7 +11119,9 @@ BEGIN
     DELETE FROM public."Countries" WHERE id = p_id; p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN foreign_key_violation THEN p_mensaje_resultado := 'ERROR: En uso.'; WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spCreditCardActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCreditCardActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -9971,8 +11187,9 @@ EXCEPTION
 END;
 $procedure$;
 
-
--- Archivo: spCreditCardCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCreditCardCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10036,8 +11253,9 @@ EXCEPTION
 END;
 $procedure$;
 
-
--- Archivo: spCreditCardEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spCreditCardEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10083,8 +11301,9 @@ EXCEPTION
 END;
 $procedure$;
 
-
--- Archivo: spDocumentResolutionActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spDocumentResolutionActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10170,8 +11389,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spDocumentResolutionCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spDocumentResolutionCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10277,8 +11497,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spDocumentResolutionEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spDocumentResolutionEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10315,8 +11536,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spEquivalencesInterfacesConsultar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spEquivalencesInterfacesConsultar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10388,8 +11610,9 @@ BEGIN
 END;
 $BODY$;
 
-
--- Archivo: spEquivalencesInterfacesCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spEquivalencesInterfacesCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10449,8 +11672,9 @@ BEGIN
 END;
 $BODY$;
 
-
--- Archivo: spEquivalencesInterfacesEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spEquivalencesInterfacesEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10495,8 +11719,9 @@ BEGIN
 END;
 $BODY$;
 
-
--- Archivo: spExportInvoices (2).sql
+-- ============================================================================
+-- Procedimiento Almacenado: spExportInvoices (2).sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -10881,7 +12106,7 @@ BEGIN
         '' AS ds_numeracion_autorizada,
         NULL AS dt_fecha_resolucion,
         '' AS CodigoArchivoFisico,
-        '' AS ds_Observacion,
+        public."fnQuitarEspeciales"(COALESCE(e.observations, '')) AS ds_Observacion,
         '' AS ds_Campo_libre1,
         '' AS ds_Campo_libre2,
         '' AS cd_fuente_Reemplaza,
@@ -11365,7 +12590,9 @@ EXCEPTION
 END;
 $$;
 
--- Archivo: spExportInvoices.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spExportInvoices.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -11398,6 +12625,7 @@ DECLARE
     v_context TEXT;
     v_line    TEXT;
     v_err_concept TEXT := '';
+    v_enviar_tipos_fac_hoteles VARCHAR(50) := '1';
 BEGIN
     -- 1. Inicializar
     mensaje_resultado := '';
@@ -11440,28 +12668,13 @@ BEGIN
     -- 2.1 Pre-validación en Korex: Conceptos de Facturación y Clasificación de Servicio
     SELECT 'ERROR: La factura ' || COALESCE(e."internalNumber", 'FAC-' || e.id::text) || 
            ' contiene el producto ''' || COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') || 
-           ''' que no tiene asignado un Concepto de Facturación en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
+           ''' que no tiene asignado un Concepto de Facturación ni Clasificación de Servicio en Korex. Por favor asígnelo en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
     INTO v_err_concept
     FROM public."InvoicesProduct" ep
     JOIN public."Invoices" e ON ep."invoiceId" = e.id
     LEFT JOIN public."Product" pr ON ep."productId" = pr.id
     WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[])
       AND COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), '') = ''
-    LIMIT 1;
-
-    IF v_err_concept IS NOT NULL AND v_err_concept <> '' THEN
-        mensaje_resultado := v_err_concept;
-        RETURN;
-    END IF;
-
-    SELECT 'ERROR: La factura ' || COALESCE(e."internalNumber", 'FAC-' || e.id::text) || 
-           ' contiene el producto ''' || COALESCE(ep.descripcion, pr.description, 'SIN NOMBRE') || 
-           ''' que no tiene asignada una Clasificación de Servicio en Korex. Por favor asígnela en el maestro de productos o en la factura antes de exportar a Zeus ERP.'
-    INTO v_err_concept
-    FROM public."InvoicesProduct" ep
-    JOIN public."Invoices" e ON ep."invoiceId" = e.id
-    LEFT JOIN public."Product" pr ON ep."productId" = pr.id
-    WHERE e.id = ANY(string_to_array(Envoices_id, ',')::int[])
       AND COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') = ''
     LIMIT 1;
 
@@ -11653,6 +12866,8 @@ BEGIN
 		am_basedescuento DECIMAL,
 		Fecha_Salida TIMESTAMP,
 		Fecha_Llegada TIMESTAMP,
+		cd_facturaproveedor VARCHAR(25),
+		dt_fechavencimientoproveedor TIMESTAMP,
 		ColId VARCHAR(25),
 		cd_Consecutivo_depende VARCHAR(50),
 		CodigoReserva VARCHAR(50),
@@ -11757,6 +12972,22 @@ BEGIN
 		cd_codigo CHAR(25)
 	) ON COMMIT DROP;
 
+	CREATE TEMP TABLE IF NOT EXISTS Fac_Servicios_TiposFacturacionHoteles(
+		id INT GENERATED ALWAYS AS IDENTITY,
+		id_factura INT,
+		id_item INT,
+		in_tipoitem INT,
+		cd_TiposFacturacionHoteles varchar(25),
+		ds_TiposFacturacionHoteles varchar(100),
+		in_cantidad INT,
+		am_valor NUMERIC(18, 2),
+		am_contado NUMERIC(18, 2),
+		am_credito NUMERIC(18, 2),
+		cd_cargosdesc varchar(25),
+		ds_cargonm varchar(100),
+		id_cargosdesc INT
+	) ON COMMIT DROP;
+
     -- 4. Poblar Tabla Facturacion
     INSERT INTO Facturacion (
 		id_factura, cd_fuente, cd_serie, cd_consecutivo, cd_usuario, cd_sucursal, cd_implante, 
@@ -11783,10 +13014,17 @@ BEGIN
 		e.id AS id_factura,
         SUBSTRING(COALESCE(e.fuente, '55'), 1, 2) AS cd_fuente,
         SUBSTRING(COALESCE(e.serie, '00'), 1, 2) AS cd_serie,
-        SUBSTRING(COALESCE(e.consecutivo, 'I' || LPAD(e.id::text, 7, '0')), 1, 8) AS cd_consecutivo,
+        COALESCE(
+            CASE 
+                WHEN TRIM(COALESCE(e.consecutivo, '')) ~ '^[0-9]+$' THEN LPAD(TRIM(e.consecutivo), 8, '0')
+                WHEN NULLIF(TRIM(COALESCE(e.consecutivo, '')), '') IS NOT NULL THEN SUBSTRING(TRIM(e.consecutivo), 1, 8)
+                ELSE LPAD(e.id::text, 8, '0')
+            END,
+            LPAD(e.id::text, 8, '0')
+        ) AS cd_consecutivo,
         User_id AS cd_usuario,
-        SUBSTRING(COALESCE(b.code, 'OFP'), 1, 3) AS cd_sucursal,
-        SUBSTRING(COALESCE(i.code, ''), 1, 3) AS cd_implante,
+        SUBSTRING(COALESCE(b.code, 'OFP'), 1, 25) AS cd_sucursal,
+        SUBSTRING(COALESCE(i.code, ''), 1, 25) AS cd_implante,
         e.date AS dt_fechacont,
         e.date AS dt_vence,
         SUBSTRING(COALESCE(c.document, ''), 1, 25) AS cd_tercero_codigo,
@@ -11813,7 +13051,7 @@ BEGIN
         '' AS ds_numeracion_autorizada,
         NULL AS dt_fecha_resolucion,
         '' AS CodigoArchivoFisico,
-        '' AS ds_Observacion,
+        public."fnQuitarEspeciales"(COALESCE(e.observations, '')) AS ds_Observacion,
         '' AS ds_Campo_libre1,
         '' AS ds_Campo_libre2,
         '' AS cd_fuente_Reemplaza,
@@ -11894,6 +13132,7 @@ BEGIN
 		cd_conceptofacturacion, cd_tiposservicio, cd_proveedores, 
 		ds_servicio, am_valorprov, cd_monedaprov, dt_llegada, dt_salida, 
 		am_pordescuento, am_basedescuento, Fecha_Salida, Fecha_Llegada, 
+		cd_facturaproveedor, dt_fechavencimientoproveedor,
 		ColId, cd_Consecutivo_depende, CodigoReserva, 
 		cd_Consecutivo_variablesadicionales, am_valor_total, ds_proveedores, 
 		id_FormasPagoAirPlus, cd_FormasPagoAirPlus, ds_FormasPagoAirPlus, 
@@ -11940,8 +13179,14 @@ BEGIN
         COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ct.code = 'CMB'), 0) AS am_comb,
         COALESCE((SELECT SUM(ipt."explicitAmount") FROM public."InvoicesProductTax" ipt JOIN public."ChargeAndTax" ct ON ct.id = ipt."chargeAndTaxId" WHERE ipt."invoiceProductId" = ep.id AND ipt."isMain" = false AND ct.code NOT IN('CMB','TUA','IVA')), 0) AS am_vat,
         COALESCE(ep."sellerCommission", 0) AS am_Comision,
-		CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN TRIM(epp.name) ELSE COALESCE(arr[1], '') END AS ds_paxname,
-		CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END AS ds_paxape,
+		SUBSTRING(COALESCE(
+            NULLIF(TRIM(epp."firstName"), ''),
+            CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN TRIM(epp.name) ELSE COALESCE(arr[1], '') END
+        ), 1, 20) AS ds_paxname,
+		SUBSTRING(COALESCE(
+            NULLIF(TRIM(epp."lastName"), ''),
+            CASE WHEN epp.name IS NULL OR TRIM(epp.name) = '' THEN '' WHEN TRIM(epp.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END
+        ), 1, 20) AS ds_paxape,
 		CASE WHEN TRIM(epp.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)::char(3) ELSE ''::char(3) END AS ds_paxprefix,
         '' AS cd_tourcode,
         0 AS NumTktConj,
@@ -12007,9 +13252,14 @@ BEGIN
         0 AS am_porcomision,
         '' AS cd_tiposconceptfac,
         COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') AS cd_conceptofacturacion,
-        COALESCE(NULLIF(TRIM(ep."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
-        SUBSTRING(COALESCE(prov.code, prov.name, ''), 1, 25) AS cd_proveedores,
-        SUBSTRING(COALESCE(ep."servicios", ''), 1, 250) AS ds_servicio,
+        COALESCE(NULLIF(TRIM(pr."serviceType"), ''), '') AS cd_tiposservicio,
+        SUBSTRING(COALESCE(
+            NULLIF(TRIM(prov.code), ''),
+            NULLIF(TRIM(prov."airlineCode"), ''),
+            (SELECT p_fb.code FROM public."Provider" p_fb WHERE p_fb.code IS NOT NULL AND TRIM(p_fb.code) <> '' ORDER BY p_fb.id ASC LIMIT 1),
+            '890100577'
+        ), 1, 25) AS cd_proveedores,
+        SUBSTRING(COALESCE(NULLIF(TRIM(ep."servicios"), ''), NULLIF(TRIM(ep."descripcion"), ''), NULLIF(TRIM(pr.description), ''), ''), 1, 250) AS ds_servicio,
         (
             COALESCE(ep.price, 0) +
             COALESCE((
@@ -12030,12 +13280,14 @@ BEGIN
         COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS dt_salida,
         0 AS am_pordescuento,
         0 AS am_basedescuento,
-        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS Fecha_Salida,
-        COALESCE(ep."checkInDate", e.date) AS Fecha_Llegada,
+        COALESCE(ep."checkInDate", e.date) AS Fecha_Salida,
+        COALESCE(ep."checkOutDate", ep."checkInDate", e.date) AS Fecha_Llegada,
+        SUBSTRING(COALESCE(ep."providerInvoice", ''), 1, 25) AS cd_facturaproveedor,
+        COALESCE(ep."providerDueDate", ep."checkInDate", e.date) AS dt_fechavencimientoproveedor,
         '' AS ColId,
         '' AS cd_Consecutivo_depende,
         SUBSTRING(COALESCE(ep."reservationCode", ''), 1, 50) AS CodigoReserva,
-        'I' || LPAD(ep.id::text, 7, '0') AS cd_Consecutivo_variablesadicionales,
+        SUBSTRING(MD5(RANDOM()::TEXT || ep.id::TEXT || CLOCK_TIMESTAMP()::TEXT), 1, 8) AS cd_Consecutivo_variablesadicionales,
         COALESCE(e."totalAmount", 0) AS am_valor_total,
         SUBSTRING(COALESCE(prov.code, ''), 1, 250) AS ds_proveedores,
         NULL AS id_FormasPagoAirPlus,
@@ -12061,7 +13313,13 @@ BEGIN
 		    			FROM public."InvoicesProductPasenger" pp 
 						WHERE pp."invoiceProductId" = ep.id
     					ORDER BY pp.id
-    					LIMIT 1) epp ON true;
+    					LIMIT 1) epp ON true
+    WHERE (
+        COALESCE(ep.price, 0) > 0 
+        OR COALESCE(ep.cost, 0) > 0 
+        OR COALESCE(NULLIF(TRIM(ep.descripcion), ''), '') <> '' 
+        OR COALESCE(NULLIF(TRIM(ep.servicios), ''), '') <> ''
+    );
 
     -- 6. Poblar Tabla itinerarios
     INSERT INTO itinerarios (
@@ -12077,8 +13335,8 @@ BEGIN
 		COALESCE(epi."origin",'') AS ds_origen, 
 		COALESCE(epi."destination",'') AS ds_destino, 
 		COALESCE(epi."class",'') AS ds_clase,
-		COALESCE(epi."checkInDate", CURRENT_DATE) AS dt_llegada,
-		COALESCE(epi."checkOutDate",CURRENT_DATE) AS dt_salida,
+		COALESCE(epi."checkOutDate", CURRENT_DATE) AS dt_llegada,
+		COALESCE(epi."checkInDate", CURRENT_DATE) AS dt_salida,
 		COALESCE(epi."terminal",'') AS ds_terminal,
 		COALESCE(epi."prestadoraCode",'') AS cd_aerolinea,
 		COALESCE(epi."farebasis",'') AS cd_farebasis,
@@ -12101,8 +13359,14 @@ BEGIN
         f.id_factura AS id_factura,
         itm.id_item AS id_item,
         itm.in_tipoitem AS in_tipoitem,
-	    CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END AS ds_paxape,
-	    CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name) ELSE COALESCE(arr[1], '') END AS ds_paxname,
+	    SUBSTRING(COALESCE(
+            NULLIF(TRIM(p."lastName"), ''),
+            CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN '' ELSE COALESCE(arr[2], '') END
+        ), 1, 30) AS ds_paxape,
+	    SUBSTRING(COALESCE(
+            NULLIF(TRIM(p."firstName"), ''),
+            CASE WHEN p.name IS NULL OR TRIM(p.name) = '' THEN '' WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name) ELSE COALESCE(arr[1], '') END
+        ), 1, 30) AS ds_paxname,
 	    CASE WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)::char(3) ELSE ''::char(3) END AS ds_paxprefix,
         '' AS ds_paxClasificacion,
         '' AS cd_voucherpax,
@@ -12314,6 +13578,91 @@ BEGIN
     JOIN Item itm ON v."invoiceProductId" = itm.id_referencia_origen
     JOIN Facturacion f ON itm.id_factura = f.id_factura;
 
+    -- 10.1. Poblar Tabla Fac_Servicios_TiposFacturacionHoteles (controlado por parámetro general EnviarTiposFacturacionHotelesZeus)
+    SELECT COALESCE(TRIM(value), '1')
+    INTO v_enviar_tipos_fac_hoteles
+    FROM public."SystemParameter"
+    WHERE UPPER(code) = 'ENVIARTIPOSFACTURACIONHOTELESZEUS'
+    LIMIT 1;
+
+    IF UPPER(COALESCE(v_enviar_tipos_fac_hoteles, '1')) IN ('1', 'TRUE', 'SI', 'S') THEN
+        INSERT INTO Fac_Servicios_TiposFacturacionHoteles (
+            id_factura,
+            id_item,
+            in_tipoitem,
+            cd_TiposFacturacionHoteles,
+            ds_TiposFacturacionHoteles,
+            in_cantidad,
+            am_valor,
+            am_contado,
+            am_credito,
+            cd_cargosdesc,
+            ds_cargonm,
+            id_cargosdesc
+        )
+        SELECT
+            f.id_factura,
+            itm.id_item,
+            3 AS in_tipoitem,
+            'NCH' AS cd_TiposFacturacionHoteles,
+            'Noches' AS ds_TiposFacturacionHoteles,
+            nh.calc_nights AS in_cantidad,
+            ROUND((nh.total_val / NULLIF(nh.calc_nights, 0))::numeric, 2) AS am_valor,
+            CASE 
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+                ) THEN nh.total_val
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+                ) THEN 0
+                ELSE ROUND(
+                    (nh.total_val * 
+                    COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                    NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id), 0))::numeric, 2
+                )
+            END AS am_contado,
+            CASE 
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") LIKE '%tarjeta%' OR LOWER(ipp."paymentMethod") LIKE '%credito%')
+                ) THEN 0
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM public."InvoicesProductPayment" ipp 
+                    WHERE ipp."invoiceProductId" = ep.id AND (LOWER(ipp."paymentMethod") NOT LIKE '%tarjeta%' AND LOWER(ipp."paymentMethod") NOT LIKE '%credito%')
+                ) THEN nh.total_val
+                ELSE (
+                    nh.total_val - 
+                    ROUND(
+                        (nh.total_val * 
+                        COALESCE((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id AND LOWER("paymentMethod") NOT LIKE '%tarjeta%' AND LOWER("paymentMethod") NOT LIKE '%credito%'), 0) / 
+                        NULLIF((SELECT SUM(amount) FROM public."InvoicesProductPayment" WHERE "invoiceProductId" = ep.id), 0))::numeric, 2
+                    )
+                )
+            END AS am_credito,
+            COALESCE(ct_main.code, 'TAR') AS cd_cargosdesc,
+            COALESCE(ct_main.name, 'TARIFA') AS ds_cargonm,
+            COALESCE(ct_main.id, 1) AS id_cargosdesc
+        FROM public."InvoicesProduct" ep
+        JOIN Item itm ON ep.id = itm.id_item
+        JOIN Facturacion f ON itm.id_factura = f.id_factura
+        LEFT JOIN public."ChargeAndTax" ct_main ON ct_main.id = ep."mainTaxId"
+        CROSS JOIN LATERAL (
+            SELECT
+                CASE
+                    WHEN ep.nights IS NOT NULL AND ep.nights > 0 THEN ep.nights
+                    WHEN ep."checkInDate" IS NOT NULL AND ep."checkOutDate" IS NOT NULL
+                         AND (DATE(ep."checkOutDate") - DATE(ep."checkInDate")) > 0
+                    THEN (DATE(ep."checkOutDate") - DATE(ep."checkInDate"))::int
+                    ELSE 0
+                END AS calc_nights,
+                ROUND((COALESCE(ep.price, 0) * COALESCE(NULLIF(ep.quantity, 0), 1))::numeric, 2) AS total_val
+        ) nh
+        WHERE nh.calc_nights > 0
+          AND nh.total_val > 0;
+    END IF;
+
     -- 11. Generar XML
     SELECT xmlroot(
         xmlelement(name "Facturaciones",
@@ -12366,6 +13715,7 @@ BEGIN
 									s.cd_conceptofacturacion, s.cd_tiposservicio, s.cd_proveedores, 
 									s.ds_servicio, s.am_valorprov, s.cd_monedaprov, s.dt_llegada, s.dt_salida, 
 									s.am_pordescuento, s.am_basedescuento, s.Fecha_Salida, s.Fecha_Llegada, 
+									s.cd_facturaproveedor, s.dt_fechavencimientoproveedor,
 									s.ColId, s.cd_Consecutivo_depende, s.CodigoReserva, 
 									s.cd_Consecutivo_variablesadicionales, s.am_valor_total, s.ds_proveedores, 
 									s.id_FormasPagoAirPlus, s.cd_FormasPagoAirPlus, s.ds_FormasPagoAirPlus, 
@@ -12434,6 +13784,19 @@ BEGIN
                                     )
                                     FROM Variables v
                                     WHERE v.id_item = s.id_item AND v.in_tipoitem = s.in_tipoitem
+                                ),
+                                (
+                                    SELECT xmlagg(
+                                        xmlelement(name "TiposFacturacionHoteles",
+                                            xmlforest(
+                                                tf.id_factura, tf.id_item, tf.in_tipoitem, tf.cd_TiposFacturacionHoteles,
+                                                tf.ds_TiposFacturacionHoteles, tf.in_cantidad, tf.am_valor, tf.am_contado,
+                                                tf.am_credito, tf.cd_cargosdesc, tf.ds_cargonm, tf.id_cargosdesc
+                                            )
+                                        )
+                                    )
+                                    FROM Fac_Servicios_TiposFacturacionHoteles tf
+                                    WHERE tf.id_item = s.id_item
                                 )
                             )
                         )
@@ -12460,8 +13823,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spExportQuotation.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spExportQuotation.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -12493,6 +13857,7 @@ DECLARE
     v_msg     TEXT;
     v_context TEXT;
     v_line    TEXT;
+    v_enviar_tipos_fac_hoteles VARCHAR(50) := '1';
 BEGIN
     -- 1. Inicializar
     mensaje_resultado := '';
@@ -12519,181 +13884,183 @@ BEGIN
     -- 3. Crear Tablas Temporales (ESQUEMA COMPLETO)
     CREATE TEMP TABLE IF NOT EXISTS Cotizacion (
 		id INT GENERATED ALWAYS AS IDENTITY,
-		cd_sucursal VARCHAR(25),
-		cd_implante VARCHAR(25),
-		cd_consecutivo VARCHAR(25),
-		cd_usuario VARCHAR(25),
+		cd_sucursal VARCHAR(250),
+		ds_sucursal VARCHAR(250),
+		cd_implante VARCHAR(250),
+		ds_implante VARCHAR(250),
+		cd_consecutivo VARCHAR(250),
+		cd_usuario VARCHAR(250),
 		dt_fechacont TIMESTAMP ,
 		dt_fecha TIMESTAMP ,
-		cd_usuarioAct VARCHAR(25),
+		cd_usuarioAct VARCHAR(250),
 		dt_fechaAct TIMESTAMP ,
-		cd_tercero_codigo VARCHAR(25) ,
+		cd_tercero_codigo VARCHAR(250) ,
 		ds_tercero_nombre VARCHAR(250) ,
-		cd_cliente_codigo VARCHAR(25) ,
+		cd_cliente_codigo VARCHAR(250) ,
 		ds_cliente_nombre VARCHAR(250) ,
 		ds_cliente_dir VARCHAR(250) ,
-		ds_cliente_ciudad VARCHAR(100) ,
-		ds_cliente_tel VARCHAR(25) ,
+		ds_cliente_ciudad VARCHAR(250) ,
+		ds_cliente_tel VARCHAR(250) ,
 		ds_cliente_dirdesp VARCHAR(250) ,
-		ds_cliente_email VARCHAR(60) ,
-		ds_cliente_contacto VARCHAR(100) ,
-		ds_cliente_contacto_email VARCHAR(60) ,
-		cd_monedas_IATA VARCHAR(25),
-		cd_vendedor VARCHAR(25) ,
-		cd_tiqueteador VARCHAR(25) ,
+		ds_cliente_email VARCHAR(250) ,
+		ds_cliente_contacto VARCHAR(250) ,
+		ds_cliente_contacto_email VARCHAR(250) ,
+		cd_monedas_IATA VARCHAR(250),
+		cd_vendedor VARCHAR(250) ,
+		cd_tiqueteador VARCHAR(250) ,
 		bn_anexo BYTEA ,
 		am_tcambio DECIMAL ,
 		am_tcambiousd DECIMAL ,
-		cd_cencosto VARCHAR(16) ,
+		cd_cencosto VARCHAR(250) ,
 		ds_observacion VARCHAR(8000) ,
 		ds_Campo_libre1 VARCHAR(500) ,
 		ds_Campo_libre2 VARCHAR(500) ,
-		cd_tipoventa VARCHAR(25),
+		cd_tipoventa VARCHAR(250),
 		in_estado INT ,
 		dt_vence TIMESTAMP ,
-		cd_Etapa VARCHAR(25),
+		cd_Etapa VARCHAR(250),
 		ds_seguimiento_etapa VARCHAR(500) ,
 		bl_ManejaOpciones BIT(1) DEFAULT B'0',
 		in_NumeroOpciones INT ,
 		bl_CerrarCotizacion BIT(1) DEFAULT B'0',
 		in_OpcionSeleccionada INT ,
 		bl_grupos BIT(1) DEFAULT B'0',
-		gk_sabre VARCHAR(25) ,
-		cd_Especialista VARCHAR(25),
-		cd_TipoFormaPagoProveedor VARCHAR(25),
-		cd_MedioReservacion VARCHAR(25),
+		gk_sabre VARCHAR(250) ,
+		cd_Especialista VARCHAR(250),
+		cd_TipoFormaPagoProveedor VARCHAR(250),
+		cd_MedioReservacion VARCHAR(250),
 		bl_bloqueada BIT(1) DEFAULT B'0',
-		cd_usuario_Bloqueo VARCHAR(25),
+		cd_usuario_Bloqueo VARCHAR(250),
 		ds_AlertaSolicitud VARCHAR(8000) ,
 		bl_comisiona BIT(1) DEFAULT B'0',
-		ds_FormaDePago VARCHAR(250) ,
-		ds_records VARCHAR(25) ,
+		ds_FormaDePago VARCHAR(500) ,
+		ds_records VARCHAR(250) ,
 		bl_entregadoCliente BIT(1) DEFAULT B'0',
 		dt_entregadoCliente TIMESTAMP ,
 		id_sys_entidades INT ,
-		cd_MonedaPagoDestino VARCHAR(25) ,
-		cd_FormaPagoDestino VARCHAR(25) ,
-		ds_DocumentoPagoDestino VARCHAR(50) ,
+		cd_MonedaPagoDestino VARCHAR(250) ,
+		cd_FormaPagoDestino VARCHAR(250) ,
+		ds_DocumentoPagoDestino VARCHAR(250) ,
 		dt_CheckInPagoDestino TIMESTAMP ,
 		dt_CheckOutPagoDestino TIMESTAMP ,
 		bl_fechaPagoDestino BIT(1) DEFAULT B'0',
-		ds_hotelTieneTiquete VARCHAR(2),
-		ds_GDS VARCHAR(2),
-		cd_Evento VARCHAR(25),
+		ds_hotelTieneTiquete VARCHAR(20),
+		ds_GDS VARCHAR(20),
+		cd_Evento VARCHAR(250),
         orig_id_ref INT
     ) ON COMMIT DROP;
 
 	CREATE TEMP TABLE IF NOT EXISTS CotizacionServicios(
 		id INT GENERATED ALWAYS AS IDENTITY,
-		cd_TiposConceptFac VARCHAR(25),
-		cd_ConceptoFacturacion VARCHAR(25),
-		cd_TiposServicio VARCHAR(25) ,
-		cd_Cotizacion VARCHAR(25) ,
-		cd_fac_factura VARCHAR(25) ,
-		cd_fac_remision VARCHAR(25) ,
-		cd_proveedores VARCHAR(25) ,
-		ds_tiposervnm VARCHAR(50) ,
-		cd_prov_hotel VARCHAR(10) ,
-		cd_prov_car VARCHAR(10) ,
-		cd_prov_air VARCHAR(10) ,
-		ds_destino VARCHAR(30) ,
-		ds_servicio VARCHAR(250) ,
+		cd_TiposConceptFac VARCHAR(250),
+		cd_ConceptoFacturacion VARCHAR(250),
+		cd_TiposServicio VARCHAR(250) ,
+		cd_Cotizacion VARCHAR(250) ,
+		cd_fac_factura VARCHAR(250) ,
+		cd_fac_remision VARCHAR(250) ,
+		cd_proveedores VARCHAR(250) ,
+		ds_tiposervnm VARCHAR(250) ,
+		cd_prov_hotel VARCHAR(250) ,
+		cd_prov_car VARCHAR(250) ,
+		cd_prov_air VARCHAR(250) ,
+		ds_destino VARCHAR(250) ,
+		ds_servicio VARCHAR(500) ,
 		ds_descrip VARCHAR(4000) ,
-		ds_paxname VARCHAR(20) ,
-		ds_paxape VARCHAR(20) ,
-		cd_paxtype VARCHAR(25) ,
+		ds_paxname VARCHAR(250) ,
+		ds_paxape VARCHAR(250) ,
+		cd_paxtype VARCHAR(250) ,
 		in_nacionalidad INT ,
-		cd_voucher VARCHAR(20) ,
+		cd_voucher VARCHAR(250) ,
 		in_cantpax INT ,
 		dt_llegada TIMESTAMP ,
 		dt_salida TIMESTAMP ,
-		cd_cencosto VARCHAR(16) ,
-		cd_auxiliar VARCHAR(16) ,
-		cd_item VARCHAR(16) ,
+		cd_cencosto VARCHAR(250) ,
+		cd_auxiliar VARCHAR(250) ,
+		cd_item VARCHAR(250) ,
 		am_valorprov DECIMAL ,
-		cd_monedaprov VARCHAR(25) ,
+		cd_monedaprov VARCHAR(250) ,
 		ds_InfoAdicional VARCHAR(8000) ,
-		cd_carrental VARCHAR(25) ,
-		cd_hoteles VARCHAR(25) ,
+		cd_carrental VARCHAR(250) ,
+		cd_hoteles VARCHAR(250) ,
 		bl_anulado BIT(1) DEFAULT B'0' ,
-		cd_tiquete VARCHAR(11) ,
-		cd_fuente_anul VARCHAR(2) ,
-		cd_serie_anul VARCHAR(2) ,
-		cd_consecutivo_anul VARCHAR(8) ,
-		cd_usuario_anul VARCHAR(25),
-		cd_sucursal_anul VARCHAR(25) ,
-		cd_implante_anul VARCHAR(25) ,
+		cd_tiquete VARCHAR(250) ,
+		cd_fuente_anul VARCHAR(20) ,
+		cd_serie_anul VARCHAR(20) ,
+		cd_consecutivo_anul VARCHAR(50) ,
+		cd_usuario_anul VARCHAR(250),
+		cd_sucursal_anul VARCHAR(250) ,
+		cd_implante_anul VARCHAR(250) ,
 		am_basecomisionable DECIMAL ,
 		am_porcomision NUMERIC(8, 4) ,
-		cd_voucherPrefijo VARCHAR(25) ,
+		cd_voucherPrefijo VARCHAR(250) ,
 		bl_notdomicilionacional BIT(1) DEFAULT B'0' ,
 		Valor_Comision DECIMAL ,
 		Valor_Recaudo DECIMAL ,
 		dias_recaudo INT ,
-		ds_paxClasificacion VARCHAR(7) ,
-		cd_tipoplan VARCHAR(25) ,
-		cd_acomodacion VARCHAR(25) ,
+		ds_paxClasificacion VARCHAR(50) ,
+		cd_tipoplan VARCHAR(250) ,
+		cd_acomodacion VARCHAR(250) ,
 		in_dias INT ,
 		in_noches INT ,
-		ds_records VARCHAR(25) ,
-		cd_GrConcepto VARCHAR(25) ,
+		ds_records VARCHAR(250) ,
+		cd_GrConcepto VARCHAR(250) ,
 		in_diasSrv INT ,
 		in_nochesSrv INT ,
-		cd_Especialista VARCHAR(25),
+		cd_Especialista VARCHAR(250),
 		am_porcentaje_descuento NUMERIC(8, 4) ,
 		am_valor_descuento DECIMAL ,
 		ds_motivo_descuento VARCHAR(1000) ,
-		cd_cargosdesc_descuento VARCHAR(25) ,
+		cd_cargosdesc_descuento VARCHAR(250) ,
 		in_NumeroOpcion INT ,
 		dt_FechaSalidaSrv TIMESTAMP ,
 		dt_FechaLlegadaSrv TIMESTAMP ,
-		cd_localizador VARCHAR(25) ,
-		cd_voucherpax VARCHAR(25) ,
+		cd_localizador VARCHAR(250) ,
+		cd_voucherpax VARCHAR(250) ,
 		am_basecomisionableprov DECIMAL ,
 		am_porcomisionprov NUMERIC(8, 4) ,
-		cd_NumeFac VARCHAR(15) ,
+		cd_NumeFac VARCHAR(250) ,
 		dt_VenceFac TIMESTAMP ,
-		cd_AcomodacionSrv VARCHAR(25) ,
-		cd_TipoPlanSrv VARCHAR(25) ,
+		cd_AcomodacionSrv VARCHAR(250) ,
+		cd_TipoPlanSrv VARCHAR(250) ,
 		in_habitaciones INT ,
 		in_habitacionesSrv INT ,
-		cd_Consecutivo_VARiablesAdicionales VARCHAR(8) ,
-		cd_confirmacion VARCHAR(25) ,
+		cd_Consecutivo_VARiablesAdicionales VARCHAR(50) ,
+		cd_confirmacion VARCHAR(250) ,
 		ds_confirmadopor VARCHAR(250) ,
-		cd_paxidentificacion VARCHAR(25) ,
+		cd_paxidentificacion VARCHAR(250) ,
 		bl_politicaCancelacion BIT(1) DEFAULT B'0' ,
 		dt_politicaCancelacion TIMESTAMP ,
-		cd_tipoHabitacionacion VARCHAR(25) ,
-		cd_fac_facturaComision VARCHAR(25) ,
-		cd_fac_remisionComision VARCHAR(25) ,
-		cd_TarjetaAsistencia VARCHAR(25) ,
-		cd_Regiones VARCHAR(25) ,
+		cd_tipoHabitacionacion VARCHAR(250) ,
+		cd_fac_facturaComision VARCHAR(250) ,
+		cd_fac_remisionComision VARCHAR(250) ,
+		cd_TarjetaAsistencia VARCHAR(250) ,
+		cd_Regiones VARCHAR(250) ,
 		Iden_GDS INT ,
 		id_sys_entidades INT ,
-		ds_TipoAuto VARCHAR(50) ,
-		ds_Origen VARCHAR(30) ,
+		ds_TipoAuto VARCHAR(250) ,
+		ds_Origen VARCHAR(250) ,
 		ds_DirOrigen VARCHAR(250) ,
 		ds_DirDestino VARCHAR(250) ,
-		ds_TipoTarifa VARCHAR(50) ,
+		ds_TipoTarifa VARCHAR(250) ,
 		am_ValorUSD DECIMAL ,
-		ds_NoVuelo VARCHAR(25) ,
+		ds_NoVuelo VARCHAR(250) ,
 		ds_Vehiculo VARCHAR(250) ,
-		ds_Placa VARCHAR(25) ,
+		ds_Placa VARCHAR(250) ,
 		ds_CategoriaVehiculo VARCHAR(250) ,
-		ds_NombreConductor VARCHAR(50) ,
-		ds_telefono VARCHAR(25) ,
-		ds_IdiomaConductor VARCHAR(25) ,
-		cd_MonedaSrv VARCHAR(25) ,
-		cd_TipoServicio VARCHAR(25) ,
-		cd_Aerolinea VARCHAR(25) ,
+		ds_NombreConductor VARCHAR(250) ,
+		ds_telefono VARCHAR(250) ,
+		ds_IdiomaConductor VARCHAR(250) ,
+		cd_MonedaSrv VARCHAR(250) ,
+		cd_TipoServicio VARCHAR(250) ,
+		cd_Aerolinea VARCHAR(250) ,
 		in_EdadPax INT ,
 		am_PorFacParcial NUMERIC(8, 4) ,
-		ds_GDS VARCHAR(25) ,
+		ds_GDS VARCHAR(250) ,
 		dt_fechaficheroBBVA TIMESTAMP ,
 		bl_tiquete BIT(1) DEFAULT B'0' ,
 		am_basedescuento DECIMAL ,
 		am_pordescuento NUMERIC(18, 4) ,
-		cd_CotizacionServicios_Depende VARCHAR(25),
+		cd_CotizacionServicios_Depende VARCHAR(250),
         orig_id_ref INT,
 		orig_id_quotationref INT,
 		mainTaxId INT
@@ -12768,7 +14135,7 @@ BEGIN
 		in_cantidad INT,
 		am_contado DECIMAL,
 		am_credito DECIMAL,
-		am_valor DECIMAL GENERATED ALWAYS AS (am_contado + am_credito) STORED,
+		am_valor DECIMAL,
 		ds_cargonm varchar(50) NULL
 	) ON COMMIT DROP;
 
@@ -12786,19 +14153,19 @@ BEGIN
 		id INT GENERATED ALWAYS AS IDENTITY,
 		cd_Cotizacion VARCHAR(25),
 		cd_CotizacionServicios VARCHAR(25),
-		cd_codigo VARCHAR(3),
+		cd_codigo VARCHAR(25),
 		ds_FPnm VARCHAR(100),
 		bl_FPrepresenta BIT(1) DEFAULT B'0',
 		id_TarjetasCredito INT,
 		cd_tccode VARCHAR(10),
 		ds_tcnumber VARCHAR(16),
 		ds_tcvoucher VARCHAR(25),
-		cd_idbanco VARCHAR(3),
+		cd_idbanco VARCHAR(25),
 		ds_cheque VARCHAR(30),
 		ds_referencia VARCHAR(50),
 		am_valor DECIMAL,
 		ds_tcexp VARCHAR(7),
-		ds_plaza VARCHAR(3),
+		ds_plaza VARCHAR(25),
 		ds_Poliza VARCHAR(20),
 		ds_PolAnexo VARCHAR(20),
 		am_valor_ME DECIMAL DEFAULT 0,
@@ -12809,7 +14176,7 @@ BEGIN
     -- 4. Poblar Tablas Temporales (POBLANDO TODAS LAS COLUMNAS CON NOMBRES EXPLÍCITOS)
     
     INSERT INTO Cotizacion (
-        cd_sucursal, cd_implante, cd_consecutivo, cd_usuario, dt_fechacont, dt_fecha, 
+        cd_sucursal, ds_sucursal, cd_implante, ds_implante, cd_consecutivo, cd_usuario, dt_fechacont, dt_fecha, 
         cd_usuarioAct, dt_fechaAct, cd_tercero_codigo, ds_tercero_nombre, cd_cliente_codigo, 
         ds_cliente_nombre, ds_cliente_dir, ds_cliente_ciudad, ds_cliente_tel, ds_cliente_dirdesp, 
         ds_cliente_email, ds_cliente_contacto, ds_cliente_contacto_email, cd_monedas_IATA, 
@@ -12825,9 +14192,18 @@ BEGIN
     )
     SELECT 
         COALESCE(b.code, '') as cd_sucursal, 
+        NULLIF(COALESCE(b.name, ''), '') as ds_sucursal, 
         COALESCE(i.code, '') as cd_implante, 
-        COALESCE(NULLIF(TRIM(q."internalNumber"), ''), 'Q' || LPAD(q."id"::text, 7, '0')) as cd_consecutivo, 
-        public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuario, 
+        NULLIF(COALESCE(i.name, ''), '') as ds_implante, 
+        COALESCE(
+            CASE 
+                WHEN TRIM(COALESCE(q."internalNumber", '')) ~ '^[0-9]+$' THEN LPAD(TRIM(q."internalNumber"), 8, '0')
+                WHEN NULLIF(TRIM(COALESCE(q."internalNumber", '')), '') IS NOT NULL THEN SUBSTRING(TRIM(q."internalNumber"), 1, 8)
+                ELSE LPAD(q."id"::text, 8, '0')
+            END,
+            LPAD(q."id"::text, 8, '0')
+        ) as cd_consecutivo, 
+        public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuario,
         q.date as dt_fechacont, 
         q.date as dt_fecha,
         public."fnQuitarEspeciales"(v_nombre_usuario) as cd_usuarioAct, 
@@ -12838,7 +14214,7 @@ BEGIN
         public."fnQuitarEspeciales"(c.name) as ds_cliente_nombre, 
         public."fnQuitarEspeciales"(COALESCE(c.address, '')) as ds_cliente_dir, 
         '' as ds_cliente_ciudad, 
-        '' as ds_cliente_tel, 
+        public."fnQuitarEspeciales"(COALESCE(c."contactInfo", '')) as ds_cliente_tel, 
         '' as ds_cliente_dirdesp, 
         COALESCE(u.email, '') as ds_cliente_email, 
         public."fnQuitarEspeciales"(c.name) as ds_cliente_contacto, 
@@ -12850,7 +14226,7 @@ BEGIN
         q."exchangeRate" as am_tcambio, 
         q."exchangeRate" as am_tcambiousd, 
         '' as cd_cencosto,
-        '' as ds_observacion, 
+        public."fnQuitarEspeciales"(COALESCE(q."observations", '')) as ds_observacion, 
         '' as ds_Campo_libre1, 
         '' as ds_Campo_libre2, 
         '' as cd_tipoventa, 
@@ -12879,10 +14255,10 @@ BEGIN
               AND qpmt."paymentMethod" IS NOT NULL
               AND qpmt."paymentMethod" <> ''
         ), '') as ds_FormaDePago, 
-        '' as ds_records, 
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(q."reservationCode", '')), 1, 25) as ds_records, 
         B'0' as bl_entregadoCliente, 
         q.date as dt_entregadoCliente, 
-        0 as id_sys_entidades, 
+        65 as id_sys_entidades, 
         '' as cd_MonedaPagoDestino, 
         '' as cd_FormaPagoDestino, 
         '' as ds_DocumentoPagoDestino, 
@@ -12932,7 +14308,7 @@ BEGIN
     SELECT 
         COALESCE(pr."type", '') as cd_TiposConceptFac, 
         COALESCE(NULLIF(TRIM(pr."billingConcept"), ''), NULLIF(TRIM(pr.code), ''), '') as cd_ConceptoFacturacion, 
-        COALESCE(NULLIF(TRIM(qp."serviceType"), ''), NULLIF(TRIM(pr."serviceType"), ''), '') as cd_TiposServicio, 
+        COALESCE(NULLIF(TRIM(qp."serviceType"), ''), '') as cd_TiposServicio, 
         q.cd_consecutivo as cd_Cotizacion,
         '' as cd_fac_factura, 
         '' as cd_fac_remision, 
@@ -12942,27 +14318,33 @@ BEGIN
         '' as cd_prov_car, 
         '' as cd_prov_air, 
         COALESCE(qp.destination, '') as ds_destino, 
-        COALESCE(pr.description, '') as ds_servicio, 
-        COALESCE(pr.description, '') as ds_descrip, 
-		CASE 
-	        WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
-	        WHEN TRIM(qpp.name) NOT LIKE '% %' THEN TRIM(qpp.name)
-	        ELSE COALESCE(arr[1], '')
-	    END AS ds_paxname,
-	    CASE 
-	        WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
-	        WHEN TRIM(qpp.name) NOT LIKE '% %' THEN ''
-	        ELSE COALESCE(arr[2], '')
-	    END AS ds_paxape,
+        COALESCE(NULLIF(TRIM(qp.servicios), ''), NULLIF(TRIM(qp.descripcion), ''), NULLIF(TRIM(pr.description), ''), '') as ds_servicio, 
+        COALESCE(NULLIF(TRIM(qp.descripcion), ''), NULLIF(TRIM(pr.description), ''), '') as ds_descrip, 
+		SUBSTRING(COALESCE(
+	        NULLIF(TRIM(qpp.firstName), ''),
+	        CASE 
+	            WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
+	            WHEN TRIM(qpp.name) NOT LIKE '% %' THEN TRIM(qpp.name)
+	            ELSE COALESCE(arr[1], '')
+	        END
+	    ), 1, 20) AS ds_paxname,
+	    SUBSTRING(COALESCE(
+	        NULLIF(TRIM(qpp.lastName), ''),
+	        CASE 
+	            WHEN qpp.name IS NULL OR TRIM(qpp.name) = '' THEN ''
+	            WHEN TRIM(qpp.name) NOT LIKE '% %' THEN ''
+	            ELSE COALESCE(arr[2], '')
+	        END
+	    ), 1, 20) AS ds_paxape,
         CASE 
-	        WHEN TRIM(qpp.name) LIKE '% %' THEN COALESCE(arr[3], '')
+	        WHEN TRIM(qpp.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)
 	        ELSE ''
 	    END as cd_paxtype, 
         COALESCE(qp."inNationality", 1) as in_nacionalidad, 
         '' as cd_voucher, 
         qp.quantity as in_cantpax, 
         COALESCE(qp."checkInDate", q.dt_fecha) as dt_llegada,
-        COALESCE(qp."checkOutDate", q.dt_fecha) as dt_salida, 
+        COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha) as dt_salida, 
         '' as cd_cencosto, 
         '' as cd_auxiliar, 
         '' as cd_item, 
@@ -13006,32 +14388,32 @@ BEGIN
 	    END  as ds_paxClasificacion, 
         '' as cd_tipoplan, 
         '' as cd_acomodacion, 
-        0 as in_dias,
-        COALESCE(qp.nights, 0) as in_noches, 
-        '' as ds_records, 
+        COALESCE(NULLIF(qp.nights, 0), GREATEST(ABS(DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_dias,
+        COALESCE(NULLIF(qp.nights, 0), GREATEST(ABS(DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_noches, 
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(NULLIF(TRIM(qp."reservationCode"), ''), NULLIF(TRIM(qt."reservationCode"), ''), '')), 1, 25) as ds_records, 
         '' as cd_GrConcepto, 
-        0 as in_diasSrv, 
-        0 as in_nochesSrv, 
+        COALESCE(NULLIF(qp.nights, 0), GREATEST(ABS(DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_diasSrv, 
+        COALESCE(NULLIF(qp.nights, 0), GREATEST(ABS(DATE(COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha)) - DATE(COALESCE(qp."checkInDate", q.dt_fecha))), 1)) as in_nochesSrv, 
         '' as cd_Especialista,
         0 as am_porcentaje_descuento, 
         0 as am_valor_descuento, 
         '' as ds_motivo_descuento,
         '' as cd_cargosdesc_descuento, 
         0 as in_NumeroOpcion, 
-        q.dt_fecha as dt_FechaSalidaSrv, 
-        q.dt_fecha as dt_FechaLlegadaSrv,
-        '' as cd_localizador, 
+        COALESCE(qp."checkInDate", q.dt_fecha) as dt_FechaSalidaSrv, 
+        COALESCE(qp."checkOutDate", qp."checkInDate", q.dt_fecha) as dt_FechaLlegadaSrv,
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(NULLIF(TRIM(qp."reservationCode"), ''), NULLIF(TRIM(qt."reservationCode"), ''), '')), 1, 25) as cd_localizador, 
         '' as cd_voucherpax, 
         0 as am_basecomisionableprov, 
         0 as am_porcomisionprov,
-        '' as cd_NumeFac, 
-        q.dt_fecha as dt_VenceFac, 
+        COALESCE(qp."providerInvoice", '') as cd_NumeFac, 
+        COALESCE(qp."providerDueDate", qp."checkInDate", q.dt_fecha) as dt_VenceFac, 
         '' as cd_AcomodacionSrv, 
         '' as cd_TipoPlanSrv, 
-        0 as in_habitaciones,
-        0 as in_habitacionesSrv, 
+        1 as in_habitaciones,
+        1 as in_habitacionesSrv, 
         'Q' || LPAD(qp."id"::text, 7, '0') as cd_Consecutivo_VARiablesAdicionales, 
-        '' as cd_confirmacion,
+        SUBSTRING(public."fnQuitarEspeciales"(COALESCE(NULLIF(TRIM(qp."reservationCode"), ''), NULLIF(TRIM(qt."reservationCode"), ''), '')), 1, 25) as cd_confirmacion,
         '' as ds_confirmadopor, 
         COALESCE(qpp.document,'') as cd_paxidentificacion, 
         B'0' as bl_politicaCancelacion,
@@ -13042,7 +14424,7 @@ BEGIN
         '' as cd_TarjetaAsistencia, 
         '' as cd_Regiones, 
         0 as Iden_GDS, 
-        0 as id_sys_entidades,
+        109 as id_sys_entidades,
         '' as ds_TipoAuto, 
         '' as ds_Origen, 
         '' as ds_DirOrigen, 
@@ -13079,6 +14461,8 @@ BEGIN
 	LEFT JOIN LATERAL ( 
         SELECT 
             COALESCE(pp.id, 999999) as id,
+            COALESCE(NULLIF(TRIM(pp."firstName"), ''), NULLIF(TRIM(qp."passengerFirstName"), ''), NULLIF(TRIM(qt."passengerFirstName"), '')) as firstName,
+            COALESCE(NULLIF(TRIM(pp."lastName"), ''), NULLIF(TRIM(qp."passengerLastName"), ''), NULLIF(TRIM(qt."passengerLastName"), '')) as lastName,
             COALESCE(pp.name, qp.passenger, '') as name,
             COALESCE(pp.document, '') as document,
             regexp_split_to_array(TRIM(COALESCE(pp.name, qp.passenger, '')), '\s+') AS arr
@@ -13113,29 +14497,35 @@ BEGIN
 	SELECT 
 	    cs.cd_Cotizacion, 
 	    cs.cd_Consecutivo_VARiablesAdicionales AS cd_CotizacionServicios, 
+	    SUBSTRING(COALESCE(
+	        NULLIF(TRIM(p."lastName"), ''),
+	        CASE 
+	            WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
+	            WHEN TRIM(p.name) NOT LIKE '% %' THEN ''
+	            ELSE COALESCE(arr[2], '')
+	        END
+	    ), 1, 30) AS ds_paxape,
+	    SUBSTRING(COALESCE(
+	        NULLIF(TRIM(p."firstName"), ''),
+	        CASE 
+	            WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
+	            WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name)
+	            ELSE COALESCE(arr[1], '')
+	        END
+	    ), 1, 30) AS ds_paxname,
 	    CASE 
-	        WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
-	        WHEN TRIM(p.name) NOT LIKE '% %' THEN ''
-	        ELSE COALESCE(arr[2], '')
-	    END AS ds_paxape,
-	    CASE 
-	        WHEN p.name IS NULL OR TRIM(p.name) = '' THEN ''
-	        WHEN TRIM(p.name) NOT LIKE '% %' THEN TRIM(p.name)
-	        ELSE COALESCE(arr[1], '')
-	    END AS ds_paxname,
-	    CASE 
-	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[3], '')
+	        WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[3], ''), 1, 3)
 	        ELSE ''
 	    END AS ds_paxprefix,
 	    CASE 
-	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[4], '')
+	        WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[4], ''), 1, 7)
 	        ELSE ''
 	    END AS ds_paxClasificacion,
 	    CASE 
-	        WHEN TRIM(p.name) LIKE '% %' THEN COALESCE(arr[5], '')
+	        WHEN TRIM(p.name) LIKE '% %' THEN SUBSTRING(COALESCE(arr[5], ''), 1, 25)
 	        ELSE ''
 	    END AS cd_voucherpax,
-	    p.document AS cd_paxidentificacion, 
+	    SUBSTRING(COALESCE(p.document, ''), 1, 25) AS cd_paxidentificacion, 
 	    0 AS in_edad, 
 	    '' AS cd_tiquete
 		FROM (
@@ -13233,29 +14623,57 @@ BEGIN
 	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = cs.orig_id_ref and tp."chargeAndTaxId" = qp."mainTaxId"
     WHERE COALESCE(target_ct.type, ct.type) = 'TAX';
 
-	INSERT INTO Fac_Servicios_TiposFacturacionHoteles(
-		cd_Cotizacion,
-		cd_CotizacionServicios,
-		cd_TiposFacturacionHoteles,
-		cd_cargosdesc,
-		in_cantidad,
-		am_contado,
-		am_credito,
-		ds_cargonm
-	)	
-	SELECT 
-		'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
-		'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
-		'NCH' AS cd_TiposFacturacionHoteles, --ADT Adulto,CHD Niño,HAB Habitacion,CAN Cantidad,NCH Noches
-		COALESCE(ct."code",'TAR') AS cd_cargosdesc,
-		COALESCE(qp."quantity",0) AS in_cantidad,
-		COALESCE(tp."explicitAmount",0)/COALESCE(qp."quantity",1) AS am_contado,
-		0 AS am_credito,
-		COALESCE(ct."name",'Tarifa') AS ds_cargonm
-	FROM public."QuotationProduct" qp
-	JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
-	LEFT JOIN public."ChargeAndTax" ct ON ct.id = qp."mainTaxId"
-	LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = qp."id" and tp."chargeAndTaxId" = qp."mainTaxId";
+	-- Poblar Fac_Servicios_TiposFacturacionHoteles (controlado por parámetro general EnviarTiposFacturacionHotelesZeus)
+	SELECT COALESCE(TRIM(value), '1')
+	INTO v_enviar_tipos_fac_hoteles
+	FROM public."SystemParameter"
+	WHERE UPPER(code) = 'ENVIARTIPOSFACTURACIONHOTELESZEUS'
+	LIMIT 1;
+
+	IF UPPER(COALESCE(v_enviar_tipos_fac_hoteles, '1')) IN ('1', 'TRUE', 'SI', 'S') THEN
+		INSERT INTO Fac_Servicios_TiposFacturacionHoteles(
+			cd_Cotizacion,
+			cd_CotizacionServicios,
+			cd_TiposFacturacionHoteles,
+			cd_cargosdesc,
+			in_cantidad,
+			am_valor,
+			am_contado,
+			am_credito,
+			ds_cargonm
+		)	
+		SELECT 
+			'Q' || LPAD(qp."quotationId"::text, 7, '0') as cd_Cotizacion, 
+			'Q' || LPAD(qp."id"::text, 7, '0') as cd_CotizacionServicios,
+			'NCH' AS cd_TiposFacturacionHoteles, --ADT Adulto,CHD Niño,HAB Habitacion,CAN Cantidad,NCH Noches
+			COALESCE(ct."code",'TAR') AS cd_cargosdesc,
+			nh.calc_nights AS in_cantidad,
+			ROUND((nh.total_val / NULLIF(nh.calc_nights, 0))::numeric, 2) AS am_valor,
+			nh.total_val AS am_contado,
+			0 AS am_credito,
+			COALESCE(ct."name",'Tarifa') AS ds_cargonm
+		FROM public."QuotationProduct" qp
+		JOIN Cotizacion q ON qp."quotationId" = q.orig_id_ref
+		LEFT JOIN public."ChargeAndTax" ct ON ct.id = qp."mainTaxId"
+		LEFT JOIN public."QuotationProductTax" tp ON tp."quotationProductId" = qp."id" and tp."chargeAndTaxId" = qp."mainTaxId"
+		CROSS JOIN LATERAL (
+			SELECT
+				CASE
+					WHEN qp.nights IS NOT NULL AND qp.nights > 0 THEN qp.nights
+					WHEN qp."checkInDate" IS NOT NULL AND qp."checkOutDate" IS NOT NULL
+					     AND (DATE(qp."checkOutDate") - DATE(qp."checkInDate")) > 0
+					THEN (DATE(qp."checkOutDate") - DATE(qp."checkInDate"))::int
+					ELSE 0
+				END AS calc_nights,
+				ROUND(COALESCE(
+					NULLIF(tp."explicitAmount", 0),
+					COALESCE(qp.price, 0) * COALESCE(NULLIF(qp.quantity, 0), 1),
+					0
+				)::numeric, 2) AS total_val
+		) nh
+		WHERE nh.calc_nights > 0
+		  AND nh.total_val > 0;
+	END IF;
 
 	INSERT INTO CotizacionServicios_TipoProv(
 		cd_Cotizacion,
@@ -13294,7 +14712,7 @@ BEGIN
 	SELECT
 		cs.cd_Cotizacion,
 		cs.cd_Consecutivo_VARiablesAdicionales AS cd_CotizacionServicios,
-		COALESCE(p.code,'') AS cd_codigo,
+		SUBSTRING(COALESCE(p.code, qpmt."paymentMethod", ''), 1, 25) AS cd_codigo,
 		COALESCE(qpmt."paymentMethod", '') AS ds_FPnm,
 		B'0' AS bl_FPrepresenta,
 		COALESCE(qpmt."cardNumber", '') AS ds_tcnumber,
@@ -13315,7 +14733,7 @@ BEGIN
             xmlagg(
                 xmlelement(name "Cotizacion",
                     xmlforest(
-                        q.cd_sucursal, q.cd_implante, q.cd_consecutivo, q.cd_usuario,
+                        q.cd_sucursal, q.ds_sucursal, q.cd_implante, q.ds_implante, q.cd_consecutivo, q.cd_usuario,
                         q.dt_fechacont, q.dt_fecha, q.cd_usuarioAct, q.dt_fechaAct,
                         q.cd_tercero_codigo, q.ds_tercero_nombre, q.cd_cliente_codigo,
                         q.ds_cliente_nombre, q.ds_cliente_dir, q.ds_cliente_ciudad,
@@ -13522,7 +14940,9 @@ EXCEPTION
 END;
 $$;
 
--- Archivo: spFacturaActualizarEstado.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spFacturaActualizarEstado.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -13560,8 +14980,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spImplantActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImplantActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -13622,8 +15043,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spImplantCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImplantCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -13674,8 +15096,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spImplantEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImplantEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -13710,8 +15133,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spImportInvoices.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImportInvoices.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -13785,6 +15209,9 @@ DECLARE
     v_imported_count INT := 0;
     v_created_ids TEXT := '';
     v_decimals INT;
+    v_existing_id INT;
+    v_existing_state TEXT;
+    v_existing_zeus_num TEXT;
 BEGIN
     -- 1. Crear tabla temporal
     CREATE TEMP TABLE IF NOT EXISTS tmp_import_invoice_rows (
@@ -14052,18 +15479,47 @@ BEGIN
             END IF;
         END IF;
 
-        INSERT INTO public."Invoices" (
-            "internalNumber", "date", "clientId", "currency", "exchangeRate", 
-            "branchId", "implantId", "sellerId", "ticketPrinterId", 
-            "baseCommissionable", "commissionPercentage", "chargesAndTaxes", "totalAmount", "userId", "state",
-            "fuente", "serie", "consecutivo"
-        ) VALUES (
-            v_internal_number, now(), v_client_id, COALESCE(v_invoice_record.moneda, 'COP'), 
-            COALESCE(v_invoice_record.tasa_cambio, 1), v_branch_id, v_implant_id, v_seller_id, 
-            v_ticket_printer_id, 0, ROUND(COALESCE(v_invoice_record.comision_global, 0)::numeric, v_decimals)::double precision, 
-            ROUND(COALESCE(v_invoice_record.cargos_global, 0)::numeric, v_decimals)::double precision, 0, p_user_id, 'NUEVO',
-            v_invoice_record.fuente, v_invoice_record.serie, v_invoice_record.consecutivo
-        ) RETURNING id INTO v_invoice_id;
+        -- Verificar si ya existe la factura en el sistema
+        SELECT id, "state", "zeusInvoiceNumber" INTO v_existing_id, v_existing_state, v_existing_zeus_num 
+        FROM public."Invoices" 
+        WHERE "internalNumber" = v_internal_number;
+
+        IF v_existing_id IS NOT NULL THEN
+            IF UPPER(COALESCE(v_existing_state, '')) IN ('EXPORTED', 'EXPORTADA', 'ENVIADO') OR (v_existing_zeus_num IS NOT NULL AND TRIM(v_existing_zeus_num) <> '') THEN
+                -- Factura ya fue exportada a Zeus ERP, no duplicar ni sobrescribir
+                CONTINUE;
+            ELSE
+                v_invoice_id := v_existing_id;
+                UPDATE public."Invoices" SET
+                    "clientId" = v_client_id, "currency" = COALESCE(v_invoice_record.moneda, 'COP'),
+                    "exchangeRate" = COALESCE(v_invoice_record.tasa_cambio, 1), "branchId" = v_branch_id,
+                    "implantId" = v_implant_id, "sellerId" = v_seller_id, "ticketPrinterId" = v_ticket_printer_id,
+                    "baseCommissionable" = 0, "commissionPercentage" = ROUND(COALESCE(v_invoice_record.comision_global, 0)::numeric, v_decimals)::double precision,
+                    "chargesAndTaxes" = ROUND(COALESCE(v_invoice_record.cargos_global, 0)::numeric, v_decimals)::double precision,
+                    "totalAmount" = 0, "userId" = p_user_id, "state" = 'NUEVO',
+                    "fuente" = v_invoice_record.fuente, "serie" = v_invoice_record.serie, "consecutivo" = v_invoice_record.consecutivo
+                WHERE id = v_invoice_id;
+
+                DELETE FROM public."InvoicesProductPayment" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProductTax" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProductPasenger" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProductVariable" WHERE "invoiceProductId" IN (SELECT id FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id);
+                DELETE FROM public."InvoicesProduct" WHERE "invoiceId" = v_invoice_id;
+            END IF;
+        ELSE
+            INSERT INTO public."Invoices" (
+                "internalNumber", "date", "clientId", "currency", "exchangeRate", 
+                "branchId", "implantId", "sellerId", "ticketPrinterId", 
+                "baseCommissionable", "commissionPercentage", "chargesAndTaxes", "totalAmount", "userId", "state",
+                "fuente", "serie", "consecutivo"
+            ) VALUES (
+                v_internal_number, now(), v_client_id, COALESCE(v_invoice_record.moneda, 'COP'), 
+                COALESCE(v_invoice_record.tasa_cambio, 1), v_branch_id, v_implant_id, v_seller_id, 
+                v_ticket_printer_id, 0, ROUND(COALESCE(v_invoice_record.comision_global, 0)::numeric, v_decimals)::double precision, 
+                ROUND(COALESCE(v_invoice_record.cargos_global, 0)::numeric, v_decimals)::double precision, 0, p_user_id, 'NUEVO',
+                v_invoice_record.fuente, v_invoice_record.serie, v_invoice_record.consecutivo
+            ) RETURNING id INTO v_invoice_id;
+        END IF;
 
         v_created_ids := v_created_ids || v_internal_number || ', ';
 
@@ -14387,8 +15843,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spImportQuotation.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImportQuotation.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -14622,7 +16079,7 @@ BEGIN
         -- Obtener decimales de la moneda
         v_decimals := public.fn_obtener_decimales_moneda(COALESCE(v_quotation_record.moneda, 'COP'));
 
-        v_internal_number := 'QUO-SP-' || to_char(now(), 'YYYYMMDD') || '-' || floor(random() * 10000)::TEXT;
+        v_internal_number := 'TEMP_' || gen_random_uuid()::TEXT;
 
         INSERT INTO public."Quotation" (
             "internalNumber", "date", "clientId", "currency", "exchangeRate", 
@@ -14634,6 +16091,11 @@ BEGIN
             v_ticket_printer_id, 0, ROUND(COALESCE(v_quotation_record.comision_global, 0)::numeric, v_decimals)::double precision, 
             ROUND(COALESCE(v_quotation_record.cargos_global, 0)::numeric, v_decimals)::double precision, 0, p_user_id
         ) RETURNING id INTO v_quotation_id;
+
+        v_internal_number := v_quotation_id::TEXT;
+        UPDATE public."Quotation"
+        SET "internalNumber" = v_internal_number
+        WHERE id = v_quotation_id;
 
         v_created_ids := v_created_ids || v_quotation_id || ',';
 
@@ -14828,8 +16290,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spImpuestoActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImpuestoActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -14888,8 +16351,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spImpuestoCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImpuestoCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -14939,8 +16403,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spImpuestoEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spImpuestoEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -14992,8 +16457,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spInterfaceAmadeusPG.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spInterfaceAmadeusPG.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -15811,8 +17277,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-
--- Archivo: spInterfaceFile.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spInterfaceFile.sql
+-- ============================================================================
 -- Drop de sobrecargas previas para prevenir error 42883
 DO $$ 
 BEGIN
@@ -15857,8 +17324,9 @@ BEGIN
 END;
 $BODY$;
 
-
--- Archivo: spInterfaceSabre.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spInterfaceSabre.sql
+-- ============================================================================
 -- Drop de sobrecargas previas para prevenir error 42883
 DO $$ 
 BEGIN
@@ -16517,8 +17985,9 @@ BEGIN
 END;
 $BODY$;
 
-
--- Archivo: spInterfaceSabrePG.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spInterfaceSabrePG.sql
+-- ============================================================================
 -- Drop de sobrecargas previas para prevenir error 42883
 DO $$ 
 BEGIN
@@ -17177,8 +18646,9 @@ BEGIN
 END;
 $BODY$;
 
-
--- Archivo: spInvoicesActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spInvoicesActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -17223,6 +18693,9 @@ DECLARE
     v_item_prod_id INT;
     v_item_prod_desc TEXT;
     v_has_var BOOLEAN;
+    v_pax_first TEXT;
+    v_pax_last TEXT;
+    v_pax_full TEXT;
 BEGIN
     -- Validaciones
     IF NOT EXISTS (SELECT 1 FROM public."Invoices" WHERE id = p_id) THEN
@@ -17307,7 +18780,8 @@ BEGIN
         "date" = CURRENT_TIMESTAMP,
         "fuente" = NULLIF(p_data->>'fuente', ''),
         "serie" = NULLIF(p_data->>'serie', ''),
-        "consecutivo" = NULLIF(p_data->>'consecutivo', '')
+        "consecutivo" = NULLIF(p_data->>'consecutivo', ''),
+        "observations" = p_data->>'observations'
     WHERE id = p_id;
 
     DELETE FROM public."InvoicesProductCombo" WHERE "invoiceId" = p_id;
@@ -17402,10 +18876,23 @@ BEGIN
         ) RETURNING id INTO v_invoice_product_id;
 
         IF v_item.passengers IS NOT NULL THEN
-            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
+            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x("firstName" TEXT, "lastName" TEXT, name TEXT, document TEXT)
             LOOP
-                INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "name", "document")
-                VALUES (v_invoice_product_id, v_pax.name, v_pax.document);
+                v_pax_first := NULLIF(TRIM(v_pax."firstName"), '');
+                v_pax_last := NULLIF(TRIM(v_pax."lastName"), '');
+                IF v_pax_first IS NULL AND v_pax_last IS NULL AND NULLIF(TRIM(v_pax.name), '') IS NOT NULL THEN
+                    IF POSITION(' ' IN TRIM(v_pax.name)) = 0 THEN
+                        v_pax_first := TRIM(v_pax.name);
+                        v_pax_last := '';
+                    ELSE
+                        v_pax_first := SPLIT_PART(TRIM(v_pax.name), ' ', 1);
+                        v_pax_last := SUBSTRING(TRIM(v_pax.name) FROM POSITION(' ' IN TRIM(v_pax.name)) + 1);
+                    END IF;
+                END IF;
+                v_pax_full := COALESCE(NULLIF(TRIM(COALESCE(v_pax_first, '') || ' ' || COALESCE(v_pax_last, '')), ''), v_pax.name, '');
+
+                INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "firstName", "lastName", "name", "document")
+                VALUES (v_invoice_product_id, v_pax_first, v_pax_last, v_pax_full, COALESCE(v_pax.document, ''));
             END LOOP;
         END IF;
 
@@ -17488,8 +18975,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spInvoicesCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spInvoicesCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -17550,6 +19038,9 @@ DECLARE
     -- Variables para validación de variables obligatorias específicas del cliente
     v_client_mandatory_vars JSONB;
     v_client_var_id_text TEXT;
+    v_pax_first TEXT;
+    v_pax_last TEXT;
+    v_pax_full TEXT;
     v_req_var_id INT;
     v_req_var_name TEXT;
     v_item_json JSONB;
@@ -17620,6 +19111,9 @@ BEGIN
     END IF;
 
     v_branch_id := NULLIF(p_data->>'branchId', '')::INT;
+    IF v_branch_id IS NULL THEN
+        SELECT id INTO v_branch_id FROM public."Branch" ORDER BY id ASC LIMIT 1;
+    END IF;
     v_implant_id := NULLIF(p_data->>'implantId', '')::INT;
 
     -- Obtener decimales de la moneda
@@ -17889,13 +19383,13 @@ BEGIN
             "internalNumber", "date", "dueDate", "clientId", "currency", "exchangeRate", 
             "branchId", "implantId", "sellerId", "ticketPrinterId", 
             "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
-            "totalAmount", "userId", "state", "fuente", "serie", "consecutivo"
+            "totalAmount", "userId", "state", "fuente", "serie", "consecutivo", "observations"
         ) VALUES (
             v_internal_number, v_date, v_due_date, v_client_id, p_data->>'currency', COALESCE(NULLIF(p_data->>'exchangeRate', '')::FLOAT, 1.0),
             v_branch_id, v_implant_id, NULLIF(p_data->>'sellerId', '')::INT, NULLIF(p_data->>'ticketPrinterId', '')::INT,
             0, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::FLOAT, 0.0), COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0.0),
             COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0.0), p_acting_user_id, 'NUEVO',
-            v_fuente_val, v_serie_val, v_consec_val
+            v_fuente_val, v_serie_val, v_consec_val, NULLIF(p_data->>'observations', '')
         ) RETURNING id INTO v_invoice_id;
 
         FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
@@ -17983,10 +19477,23 @@ BEGIN
             ) RETURNING id INTO v_invoice_product_id;
 
             IF v_item.passengers IS NOT NULL THEN
-                FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
+                FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x("firstName" TEXT, "lastName" TEXT, name TEXT, document TEXT)
                 LOOP
-                    INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "name", "document")
-                    VALUES (v_invoice_product_id, v_pax.name, v_pax.document);
+                    v_pax_first := NULLIF(TRIM(v_pax."firstName"), '');
+                    v_pax_last := NULLIF(TRIM(v_pax."lastName"), '');
+                    IF v_pax_first IS NULL AND v_pax_last IS NULL AND NULLIF(TRIM(v_pax.name), '') IS NOT NULL THEN
+                        IF POSITION(' ' IN TRIM(v_pax.name)) = 0 THEN
+                            v_pax_first := TRIM(v_pax.name);
+                            v_pax_last := '';
+                        ELSE
+                            v_pax_first := SPLIT_PART(TRIM(v_pax.name), ' ', 1);
+                            v_pax_last := SUBSTRING(TRIM(v_pax.name) FROM POSITION(' ' IN TRIM(v_pax.name)) + 1);
+                        END IF;
+                    END IF;
+                    v_pax_full := COALESCE(NULLIF(TRIM(COALESCE(v_pax_first, '') || ' ' || COALESCE(v_pax_last, '')), ''), v_pax.name, '');
+
+                    INSERT INTO public."InvoicesProductPasenger" ("invoiceProductId", "firstName", "lastName", "name", "document")
+                    VALUES (v_invoice_product_id, v_pax_first, v_pax_last, v_pax_full, COALESCE(v_pax.document, ''));
                 END LOOP;
             END IF;
 
@@ -18074,8 +19581,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spInvoicesEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spInvoicesEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18102,8 +19610,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spLimpiarMovimientosProduccion.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spLimpiarMovimientosProduccion.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18169,8 +19678,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-
--- Archivo: spLogListar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spLogListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18226,8 +19736,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spLogRegistrar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spLogRegistrar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18260,7 +19771,9 @@ BEGIN
 END;
 $$;
 
--- Archivo: spMaestroImportar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spMaestroImportar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18488,8 +20001,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spMonedaActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spMonedaActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18541,8 +20055,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spMonedaCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spMonedaCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18584,8 +20099,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spMonedaEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spMonedaEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18621,8 +20137,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spMonedaListar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spMonedaListar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18665,8 +20182,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spParameterActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spParameterActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18709,8 +20227,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spParameterCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spParameterCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18746,8 +20265,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spParameterEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spParameterEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18782,8 +20302,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spPaymentActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPaymentActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18809,7 +20330,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spPaymentCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPaymentCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18833,7 +20356,9 @@ BEGIN
     p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; p_id := 0; END; $procedure$;
 
--- Archivo: spPaymentEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPaymentEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18853,7 +20378,9 @@ BEGIN
     DELETE FROM public."Payment" WHERE id = p_id; p_mensaje_resultado := 'SUCCESS';
 EXCEPTION WHEN foreign_key_violation THEN p_mensaje_resultado := 'ERROR: En uso.'; WHEN OTHERS THEN p_mensaje_resultado := 'ERROR: ' || SQLERRM; END; $procedure$;
 
--- Archivo: spPreCotizacionConvertir.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPreCotizacionConvertir.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -18932,8 +20459,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spPreCotizacionCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPreCotizacionCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19026,8 +20554,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spPreCotizacionEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPreCotizacionEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19071,8 +20600,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spPrestadoraActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPrestadoraActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19118,8 +20648,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spPrestadoraCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPrestadoraCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19159,8 +20690,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spPrestadoraEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spPrestadoraEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19190,8 +20722,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProductoActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProductoActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19242,8 +20775,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProductoCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProductoCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19283,8 +20817,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProductoEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProductoEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19336,8 +20871,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProveedorActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProveedorActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19385,8 +20921,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProveedorCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProveedorCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19427,8 +20964,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProveedorEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProveedorEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19458,8 +20996,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProviderTypeActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProviderTypeActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19499,8 +21038,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProviderTypeCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProviderTypeCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19537,8 +21077,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spProviderTypeEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spProviderTypeEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19569,8 +21110,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spQuotationStateActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spQuotationStateActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19580,7 +21122,7 @@ BEGIN
         FROM pg_proc 
         WHERE proname ILIKE 'spQuotationStateActualizar'
     LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -19591,25 +21133,34 @@ CREATE OR REPLACE PROCEDURE public."spQuotationStateActualizar"(
     p_name TEXT,
     p_color TEXT,
     p_acting_user_id INT,
-    INOUT p_mensaje_resultado TEXT
+    INOUT p_mensaje_resultado TEXT,
+    p_is_active BOOLEAN DEFAULT NULL
 )
 LANGUAGE plpgsql AS $$
 BEGIN
     UPDATE public."QuotationState"
-    SET code = COALESCE(p_code, code),
-        name = COALESCE(p_name, name),
-        color = p_color
+    SET code = COALESCE(TRIM(UPPER(p_code)), code),
+        name = COALESCE(TRIM(p_name), name),
+        color = COALESCE(p_color, color),
+        "isActive" = COALESCE(p_is_active, "isActive")
     WHERE id = p_id;
+
+    IF NOT FOUND THEN
+        p_mensaje_resultado := 'ERROR: El estado con ID ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
     p_mensaje_resultado := 'SUCCESS: Estado de cotización actualizado correctamente.';
 EXCEPTION
     WHEN unique_violation THEN
-        p_mensaje_resultado := 'ERROR: El código ya existe.';
+        p_mensaje_resultado := 'ERROR: El código "' || TRIM(p_code) || '" ya existe.';
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
 
-
--- Archivo: spQuotationStateCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spQuotationStateCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19619,7 +21170,7 @@ BEGIN
         FROM pg_proc 
         WHERE proname ILIKE 'spQuotationStateCrear'
     LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -19633,20 +21184,38 @@ CREATE OR REPLACE PROCEDURE public."spQuotationStateCrear"(
     INOUT p_mensaje_resultado TEXT
 )
 LANGUAGE plpgsql AS $$
+DECLARE
+    v_max INT;
 BEGIN
-    INSERT INTO public."QuotationState" (code, name, color)
-    VALUES (p_code, p_name, p_color)
+    -- Sincronizar automáticamente la secuencia al MAX(id) existente para evitar colisiones PK (error 23505)
+    BEGIN
+        SELECT MAX(id) INTO v_max FROM public."QuotationState";
+        IF v_max IS NULL THEN
+            PERFORM setval('public."QuotationState_id_seq"', 1, false);
+        ELSE
+            PERFORM setval('public."QuotationState_id_seq"', v_max, true);
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+    END;
+
+    INSERT INTO public."QuotationState" (code, name, color, "isActive")
+    VALUES (TRIM(UPPER(p_code)), TRIM(p_name), COALESCE(p_color, 'blue'), true)
     RETURNING id INTO p_id;
     p_mensaje_resultado := 'SUCCESS: Estado de cotización creado correctamente.';
 EXCEPTION
     WHEN unique_violation THEN
-        p_mensaje_resultado := 'ERROR: El código ya existe.';
+        IF EXISTS (SELECT 1 FROM public."QuotationState" WHERE UPPER(TRIM(code)) = UPPER(TRIM(p_code))) THEN
+            p_mensaje_resultado := 'ERROR: El código "' || TRIM(p_code) || '" ya existe.';
+        ELSE
+            p_mensaje_resultado := 'ERROR: Restricción única violada: ' || SQLERRM;
+        END IF;
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
 
-
--- Archivo: spQuotationStateEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spQuotationStateEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19656,7 +21225,7 @@ BEGIN
         FROM pg_proc 
         WHERE proname ILIKE 'spQuotationStateEliminar'
     LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
+        EXECUTE 'DROP PROCEDURE ' || r.proc_name || ' CASCADE';
     END LOOP;
 END $$;
 
@@ -19669,14 +21238,21 @@ CREATE OR REPLACE PROCEDURE public."spQuotationStateEliminar"(
 LANGUAGE plpgsql AS $$
 BEGIN
     DELETE FROM public."QuotationState" WHERE id = p_id;
+
+    IF NOT FOUND THEN
+        p_mensaje_resultado := 'ERROR: El estado con ID ' || p_id || ' no existe.';
+        RETURN;
+    END IF;
+
     p_mensaje_resultado := 'SUCCESS: Estado de cotización eliminado correctamente.';
 EXCEPTION
     WHEN OTHERS THEN
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
 
-
--- Archivo: spResolucionActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spResolucionActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19737,8 +21313,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spResolucionCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spResolucionCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19787,8 +21364,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spResolucionEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spResolucionEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19823,8 +21401,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spRoleGuardarYPermisos.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spRoleGuardarYPermisos.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19899,8 +21478,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spSellerActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spSellerActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19945,8 +21525,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spSellerCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spSellerCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -19983,8 +21564,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spSellerEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spSellerEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20019,8 +21601,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spSysConsecutivoActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spSysConsecutivoActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20087,8 +21670,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-
--- Archivo: spSysConsecutivoCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spSysConsecutivoCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20139,8 +21723,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-
--- Archivo: spSysConsecutivoEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spSysConsecutivoEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20181,8 +21766,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-
--- Archivo: spTicketPrinterActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTicketPrinterActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20225,8 +21811,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spTicketPrinterCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTicketPrinterCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20262,8 +21849,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spTicketPrinterEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTicketPrinterEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20298,8 +21886,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spTicketTypeActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTicketTypeActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20339,8 +21928,9 @@ EXCEPTION
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
 
-
--- Archivo: spTicketTypeCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTicketTypeCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20377,8 +21967,9 @@ EXCEPTION
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
 
-
--- Archivo: spTicketTypeEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTicketTypeEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20407,8 +21998,9 @@ EXCEPTION
         p_mensaje_resultado := 'ERROR: ' || SQLERRM;
 END; $$;
 
-
--- Archivo: spTraceabilityClean.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTraceabilityClean.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20446,8 +22038,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-
--- Archivo: spTraceabilityGetDetails.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTraceabilityGetDetails.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20514,8 +22107,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spTraceabilityList.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTraceabilityList.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20587,8 +22181,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spTraceabilityLog.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTraceabilityLog.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20692,8 +22287,9 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-
--- Archivo: spTransactionConsecutiveActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTransactionConsecutiveActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20757,8 +22353,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spTransactionConsecutiveCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTransactionConsecutiveCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20833,8 +22430,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spTransactionConsecutiveEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spTransactionConsecutiveEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20871,8 +22469,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spUsuarioActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spUsuarioActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20932,8 +22531,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spUsuarioConsultar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spUsuarioConsultar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -20979,8 +22579,9 @@ BEGIN
 END;
 $$;
 
-
--- Archivo: spUsuarioCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spUsuarioCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -21042,8 +22643,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spUsuarioEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spUsuarioEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -21080,8 +22682,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spVariableActualizar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spVariableActualizar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -21124,8 +22727,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spVariableCrear.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spVariableCrear.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -21161,8 +22765,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spVariableEliminar.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spVariableEliminar.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -21197,1105 +22802,9 @@ EXCEPTION
 END;
 $$;
 
-
--- Archivo: spCotizacionActualizar.sql
-DO $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN 
-        SELECT oid::regprocedure AS proc_name 
-        FROM pg_proc 
-        WHERE proname ILIKE 'spCotizacionActualizar'
-    LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
-    END LOOP;
-END $$;
-
-CREATE OR REPLACE PROCEDURE public."spCotizacionActualizar"(
-    IN p_id integer, 
-    IN p_data jsonb, 
-    IN p_acting_user_id integer, 
-    INOUT p_mensaje_resultado text DEFAULT ''
-)
-LANGUAGE plpgsql
-AS $procedure$
-DECLARE
-    v_item RECORD;
-    v_tax RECORD;
-    v_pax RECORD;
-    v_var RECORD;
-    v_pmt RECORD;
-    v_combo RECORD;
-    v_manual RECORD;
-    v_quotation_product_id INT;
-    -- Variables para validación de campos obligatorios dinámicos
-    v_val_item JSONB;
-    v_val_prod_id INT;
-    v_mandatory_fields JSONB;
-    v_field_key TEXT;
-    v_model TEXT;
-    v_field_name TEXT;
-    v_prod_desc TEXT;
-    v_has_passengers BOOLEAN;
-    v_has_empty_pax_name BOOLEAN;
-    v_has_payments BOOLEAN;
-    v_json_field_name TEXT;
-    -- Variables para validación de variables obligatorias específicas del cliente
-    v_client_id INT;
-    v_client_mandatory_vars JSONB;
-    v_client_var_id_text TEXT;
-    v_req_var_id INT;
-    v_req_var_name TEXT;
-    v_item_json JSONB;
-    v_item_prod_id INT;
-    v_item_prod_desc TEXT;
-    v_has_var BOOLEAN;
-    v_old_state TEXT;
-    -- Variables para cálculos financieros
-    v_mostrar_totalizacion BOOLEAN;
-    v_comision_utilidad DOUBLE PRECISION;
-    v_comision_freelance DOUBLE PRECISION;
-    v_comision_propia DOUBLE PRECISION;
-    v_costo_total DOUBLE PRECISION;
-    v_valor_base DOUBLE PRECISION;
-    v_decimals INT;
-    v_acting_user_id INT := NULL;
-BEGIN
-    -- Resolución segura de p_acting_user_id para evitar violación de Quotation_userId_fkey
-    IF p_acting_user_id IS NOT NULL THEN
-        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id;
-        IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
-            SELECT id INTO v_acting_user_id FROM public."User" WHERE UPPER(email) = UPPER(p_data->>'userEmail');
-        END IF;
-    END IF;
-
-    IF v_acting_user_id IS NULL THEN
-        SELECT id INTO v_acting_user_id FROM public."User" ORDER BY id ASC LIMIT 1;
-    END IF;
-
-    -- Validaciones
-    IF NOT EXISTS (SELECT 1 FROM public."Quotation" WHERE id = p_id) THEN
-        p_mensaje_resultado := 'ERROR: La cotización con ID ' || p_id || ' no existe.';
-        RETURN;
-    END IF;
-
-    SELECT "state" INTO v_old_state FROM public."Quotation" WHERE id = p_id;
-
-    IF NULLIF(p_data->>'clientId', '') IS NULL THEN
-        p_mensaje_resultado := 'ERROR: El campo Cliente es obligatorio.';
-        RETURN;
-    END IF;
-
-    IF p_data->'items' IS NULL OR jsonb_array_length(p_data->'items') = 0 THEN
-        p_mensaje_resultado := 'ERROR: La cotización debe tener al menos un producto.';
-        RETURN;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM jsonb_to_recordset(p_data->'items') AS x("productId" INT, "mainTaxId" TEXT)
-        WHERE "productId" IS NULL OR NULLIF("mainTaxId", '') IS NULL
-    ) THEN
-        p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto y un Cargo Principal seleccionado.';
-        RETURN;
-    END IF;
-
-    -- Validación de campos obligatorios dinámicos por producto
-    FOR v_val_item IN SELECT jsonb_array_elements(p_data->'items')
-    LOOP
-        v_val_prod_id := (v_val_item->>'productId')::INT;
-        
-        SELECT "mandatoryFields", "description" 
-        INTO v_mandatory_fields, v_prod_desc 
-        FROM public."Product" 
-        WHERE id = v_val_prod_id;
-
-        v_prod_desc := COALESCE(v_prod_desc, 'Producto #' || v_val_prod_id);
-
-        IF v_mandatory_fields IS NOT NULL AND jsonb_typeof(v_mandatory_fields) = 'array' THEN
-            FOR v_field_key IN SELECT jsonb_array_elements_text(v_mandatory_fields)
-            LOOP
-                v_model := split_part(v_field_key, '.', 1);
-                v_field_name := split_part(v_field_key, '.', 2);
-
-                IF v_model = 'Quotation' THEN
-                    IF NULLIF(p_data->>v_field_name, '') IS NULL THEN
-                        p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo general "' || v_field_name || '".';
-                        RETURN;
-                    END IF;
-                ELSIF v_model = 'QuotationProduct' THEN
-                    v_json_field_name := v_field_name;
-                    IF v_field_name = 'checkInDate' THEN
-                        v_json_field_name := 'checkIn';
-                    ELSIF v_field_name = 'checkOutDate' THEN
-                        v_json_field_name := 'checkOut';
-                    ELSIF v_field_name = 'description' THEN
-                        v_json_field_name := 'descripcion';
-                    ELSIF v_field_name = 'service' THEN
-                        IF NULLIF(v_val_item->>'service', '') IS NULL AND v_val_item->>'servicios' IS NOT NULL THEN
-                            v_json_field_name := 'servicios';
-                        END IF;
-                    END IF;
-
-                    IF v_field_name = 'passengers' THEN
-                        v_has_passengers := FALSE;
-                        v_has_empty_pax_name := FALSE;
-                        
-                        IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
-                            SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
-                            SELECT EXISTS (
-                                SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p(name TEXT)
-                                WHERE p.name IS NULL OR trim(p.name) = ''
-                            ) INTO v_has_empty_pax_name;
-                        END IF;
-
-                        IF NOT v_has_passengers OR v_has_empty_pax_name THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pasajero con su nombre.';
-                            RETURN;
-                        END IF;
-                    ELSIF v_field_name = 'payments' THEN
-                        v_has_payments := FALSE;
-                        IF v_val_item->'payments' IS NOT NULL AND jsonb_typeof(v_val_item->'payments') = 'array' THEN
-                            SELECT COALESCE(jsonb_array_length(v_val_item->'payments') > 0, FALSE) INTO v_has_payments;
-                        END IF;
-
-                        IF NOT v_has_payments THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pago.';
-                            RETURN;
-                        END IF;
-                    ELSE
-                        IF NULLIF(v_val_item->>v_json_field_name, '') IS NULL THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo "' || v_field_name || '".';
-                            RETURN;
-                        END IF;
-                    END IF;
-                END IF;
-            END LOOP;
-        END IF;
-    END LOOP;
-
-    -- Validación de variables obligatorias específicas del cliente para cotizaciones
-    v_client_id := NULLIF(p_data->>'clientId', '')::INT;
-    IF v_client_id IS NOT NULL THEN
-        SELECT "mandatoryVariables" INTO v_client_mandatory_vars
-        FROM public."Client"
-        WHERE id = v_client_id;
-
-        -- Normalizar variables obligatorias para cotización (soporta formato objeto {"quotation": [...], "invoice": [...]} y legado array [...])
-        IF v_client_mandatory_vars IS NOT NULL THEN
-            IF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars->'quotation' IS NOT NULL AND jsonb_typeof(v_client_mandatory_vars->'quotation') = 'array' THEN
-                v_client_mandatory_vars := v_client_mandatory_vars->'quotation';
-            ELSIF jsonb_typeof(v_client_mandatory_vars) = 'array' THEN
-                v_client_mandatory_vars := v_client_mandatory_vars;
-            ELSE
-                v_client_mandatory_vars := '[]'::jsonb;
-            END IF;
-        ELSE
-            v_client_mandatory_vars := '[]'::jsonb;
-        END IF;
-
-        IF jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
-            FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars)
-            LOOP
-                v_req_var_id := v_client_var_id_text::INT;
-                
-                SELECT "name" INTO v_req_var_name FROM public."MasterVariable" WHERE id = v_req_var_id;
-                v_req_var_name := COALESCE(v_req_var_name, 'Variable #' || v_req_var_id);
-
-                FOR v_item_json IN SELECT jsonb_array_elements(p_data->'items')
-                LOOP
-                    v_item_prod_id := (v_item_json->>'productId')::INT;
-                    SELECT "description" INTO v_item_prod_desc FROM public."Product" WHERE id = v_item_prod_id;
-                    v_item_prod_desc := COALESCE(v_item_prod_desc, 'Producto #' || v_item_prod_id);
-
-                    SELECT EXISTS (
-                        SELECT 1 FROM jsonb_to_recordset(v_item_json->'variables') AS v("masterVariableId" INT, value TEXT)
-                        WHERE v."masterVariableId" = v_req_var_id AND NULLIF(trim(v.value), '') IS NOT NULL
-                    ) INTO v_has_var;
-
-                    IF NOT v_has_var THEN
-                        p_mensaje_resultado := 'ERROR: El cliente requiere completar la variable adicional "' || v_req_var_name || '" en el producto "' || v_item_prod_desc || '".';
-                        RETURN;
-                    END IF;
-                END LOOP;
-            END LOOP;
-        END IF;
-    END IF;
-
-    -- Obtener decimales de la moneda
-    v_decimals := COALESCE(public.fn_obtener_decimales_moneda(p_data->>'currency'), 2);
-
-    UPDATE public."Quotation" SET
-        "clientId" = (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
-        "currency" = p_data->>'currency',
-        "exchangeRate" = NULLIF(p_data->>'exchangeRate', '')::FLOAT,
-        "branchId" = (SELECT id FROM public."Branch" WHERE id = NULLIF(p_data->>'branchId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'branchCode')) LIMIT 1),
-        "implantId" = (SELECT id FROM public."Implant" WHERE id = NULLIF(p_data->>'implantId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'implantCode')) LIMIT 1),
-        "sellerId" = (SELECT id FROM public."Seller" WHERE id = NULLIF(p_data->>'sellerId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'sellerCode')) LIMIT 1),
-        "ticketPrinterId" = (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
-        "commissionPercentage" = NULLIF(p_data->>'commissionPercentage', '')::FLOAT,
-        "chargesAndTaxes" = ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision,
-        "totalAmount" = ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision,
-        "state" = COALESCE(p_data->>'state', 'Nuevo'),
-        "stateDescription" = CASE WHEN COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', 'Nuevo') THEN p_data->>'stateDescription' ELSE "stateDescription" END,
-        "stateUpdatedAt" = CASE WHEN COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', 'Nuevo') THEN CURRENT_TIMESTAMP ELSE "stateUpdatedAt" END,
-        "date" = CURRENT_TIMESTAMP,
-        "destination" = p_data->>'destination',
-        "startDate" = CASE WHEN p_data->>'startDate' IS NOT NULL AND p_data->>'startDate' <> '' THEN (p_data->>'startDate')::TIMESTAMP ELSE NULL END,
-        "endDate" = CASE WHEN p_data->>'endDate' IS NOT NULL AND p_data->>'endDate' <> '' THEN (p_data->>'endDate')::TIMESTAMP ELSE NULL END,
-        "passenger" = p_data->>'passenger',
-        "paxAdults" = NULLIF(p_data->>'paxAdults', '')::INT,
-        "paxChildren" = NULLIF(p_data->>'paxChildren', '')::INT,
-        "reservationCode" = p_data->>'reservationCode',
-        "copyFieldsToProducts" = COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
-        "manualDescription" = p_data->>'manualDescription'
-    WHERE id = p_id;
-
-    -- Insertar historial de estado si cambia
-    IF COALESCE(v_old_state, '') <> COALESCE(p_data->>'state', 'Nuevo') THEN
-        INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
-        VALUES (p_id, COALESCE(p_data->>'state', 'Nuevo'), p_data->>'stateDescription', CURRENT_TIMESTAMP, v_acting_user_id);
-    END IF;
-
-    DELETE FROM public."QuotationCombo" WHERE "quotationId" = p_id;
-    FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
-    LOOP
-        INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
-        VALUES (p_id, COALESCE(v_combo."comboId", v_combo.id));
-    END LOOP;
-
-    DELETE FROM public."QuotationManualService" WHERE "quotationId" = p_id;
-    IF p_data->'manualServices' IS NOT NULL AND jsonb_typeof(p_data->'manualServices') = 'array' THEN
-        FOR v_manual IN SELECT * FROM jsonb_to_recordset(p_data->'manualServices') AS x(
-            "providerName" TEXT, "serviceName" TEXT, "cost" FLOAT, "salePrice" FLOAT, "utility" FLOAT
-        )
-        LOOP
-            INSERT INTO public."QuotationManualService" (
-                "quotationId", "providerName", "serviceName", "cost", "salePrice", "utility"
-            ) VALUES (
-                p_id, 
-                v_manual."providerName", 
-                v_manual."serviceName", 
-                COALESCE(v_manual."cost", 0), 
-                COALESCE(v_manual."salePrice", 0), 
-                COALESCE(v_manual."utility", COALESCE(v_manual."salePrice", 0) - COALESCE(v_manual."cost", 0))
-            );
-        END LOOP;
-    END IF;
-
-    DELETE FROM public."QuotationProduct" WHERE "quotationId" = p_id;
-    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_data->'items') AS x(
-                      "productId" INT, "productCode" TEXT, quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
-                      "providerCode" TEXT, "prestadoraCode" TEXT,
-                      "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,
-                      "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
-                      "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
-                      "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "payments" JSONB, "inNationality" INT,
-                      "service" TEXT, "servicios" TEXT, "descripcion" TEXT, "passenger" TEXT,
-                      "providerDueDate" TEXT, "providerInvoice" TEXT
-                  )
-    LOOP
-        INSERT INTO public."QuotationProduct" (
-            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
-            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
-            "serviceType", "destination", "reservationCode", "sellerCommission", 
-            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger",
-            "providerDueDate", "providerInvoice"
-        ) VALUES (
-            p_id,
-            (SELECT id FROM public."Product" WHERE id = v_item."productId" OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."productCode")) LIMIT 1),
-            v_item.quantity, 
-            ROUND(v_item.price::numeric, v_decimals)::double precision, 
-            ROUND(v_item.cost::numeric, v_decimals)::double precision, 
-            (SELECT id FROM public."Provider" WHERE id = NULLIF(v_item."providerId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."providerCode")) LIMIT 1),
-            (SELECT id FROM public."Prestadora" WHERE id = NULLIF(v_item."prestadoraId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."prestadoraCode")) LIMIT 1),
-            CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
-            CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
-            v_item.nights, v_item."paxAdults", v_item."paxChildren",
-            v_item."serviceType", v_item."destination", v_item."reservationCode", 
-            ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
-            ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
-            NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
-            COALESCE(v_item."service", v_item."servicios"), COALESCE(v_item."servicios", v_item."service"), v_item."descripcion",
-            v_item."passenger",
-            CASE WHEN v_item."providerDueDate" IS NOT NULL AND v_item."providerDueDate" <> '' THEN v_item."providerDueDate"::TIMESTAMP ELSE NULL END,
-            v_item."providerInvoice"
-        ) RETURNING id INTO v_quotation_product_id;
-
-        IF v_item.passengers IS NOT NULL THEN
-            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
-            LOOP
-                INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-                VALUES (v_quotation_product_id, v_pax.name, v_pax.document);
-            END LOOP;
-        END IF;
-
-        IF v_item."appliedTaxes" IS NOT NULL THEN
-            FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS x("chargeAndTaxId" INT, "explicitAmount" FLOAT)
-            LOOP
-                INSERT INTO public."QuotationProductTax" (
-                    "quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
-                )
-                SELECT v_quotation_product_id, ct.id, ct.value, ct."valueType", 
-                       ROUND(v_tax."explicitAmount"::numeric, v_decimals)::double precision, 
-                       CASE WHEN NULLIF(v_item."mainTaxId", '')::INT = ct.id THEN TRUE ELSE FALSE END
-                FROM public."ChargeAndTax" ct
-                WHERE ct.id = v_tax."chargeAndTaxId";
-            END LOOP;
-        END IF;
-
-        IF v_item.variables IS NOT NULL THEN
-            FOR v_var IN SELECT * FROM jsonb_to_recordset(v_item.variables) AS x("masterVariableId" INT, value TEXT)
-            LOOP
-                INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
-                VALUES (v_quotation_product_id, v_var."masterVariableId", v_var.value);
-            END LOOP;
-        END IF;
-
-        IF v_item.payments IS NOT NULL THEN
-            FOR v_pmt IN SELECT * FROM jsonb_to_recordset(v_item.payments) AS x(
-                "amount" FLOAT, "paymentMethod" TEXT, "date" TEXT, "reference" TEXT,
-                "creditCardId" INT, "cardNumber" TEXT, "authorizationCode" TEXT, "voucher" TEXT, "expirationDate" TEXT
-            )
-            LOOP
-                INSERT INTO public."QuotationProductPayment" (
-                    "quotationProductId", "amount", "paymentMethod", "reference", "date",
-                    "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
-                ) VALUES (
-                    v_quotation_product_id, 
-                    ROUND(v_pmt."amount"::numeric, v_decimals)::double precision, 
-                    v_pmt."paymentMethod", v_pmt."reference",
-                    CASE WHEN v_pmt."date" IS NOT NULL AND v_pmt."date" <> '' THEN v_pmt."date"::TIMESTAMP ELSE CURRENT_TIMESTAMP END,
-                    v_pmt."creditCardId", v_pmt."cardNumber", v_pmt."authorizationCode", v_pmt."voucher", v_pmt."expirationDate"
-                );
-            END LOOP;
-        END IF;
-    END LOOP;
-
-    -- Recalcular valores financieros
-    SELECT 
-        COALESCE(SUM(qp.cost), 0.0), 
-        COALESCE(SUM(
-            qp.price * qp.quantity + COALESCE((
-                SELECT SUM(qpt2."explicitAmount")
-                FROM public."QuotationProductTax" qpt2
-                JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
-                LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
-                WHERE qpt2."quotationProductId" = qp.id
-                  AND qpt2."isMain" = false
-                  AND ct2."targetTaxId" IS NOT NULL
-                  AND (
-                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
-                  )
-            ), 0.0)
-        ), 0.0)
-    INTO v_costo_total, v_valor_base
-    FROM public."QuotationProduct" qp
-    WHERE qp."quotationId" = p_id;
-
-    SELECT COALESCE(value = 'true', FALSE) INTO v_mostrar_totalizacion
-    FROM public."SystemParameter"
-    WHERE code = 'MOSTRAR_TOTALIZACION_COTIZACION';
-
-    v_comision_freelance := COALESCE(NULLIF(p_data->>'comisionFreelancePercentage', '')::DOUBLE PRECISION, 0.0);
-
-    IF v_mostrar_totalizacion THEN
-        v_comision_utilidad := ROUND(public.fn_calcular_porcentaje_comision(public.fn_calcular_utilidad(v_valor_base, v_costo_total), v_valor_base)::NUMERIC, 2)::DOUBLE PRECISION;
-        v_comision_propia := v_comision_utilidad - v_comision_freelance;
-    ELSE
-        v_comision_propia := public.fn_calcular_comision_resta(
-            COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
-            v_comision_freelance
-        );
-    END IF;
-
-    UPDATE public."Quotation"
-    SET 
-        "totalAmount" = COALESCE(
-            NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
-            ROUND((COALESCE("chargesAndTaxes", 0) + 
-                COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = p_id), 0.0) +
-                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = p_id), 0.0)
-            )::numeric, v_decimals)::double precision
-        ),
-        "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,
-        "valorBase" = ROUND(v_valor_base::numeric, v_decimals)::double precision,
-        "comisionTotalPercentage" = COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
-        "comisionFreelancePercentage" = v_comision_freelance,
-        "comisionPropiaPercentage" = v_comision_propia,
-        "commissionPercentage" = v_comision_propia,
-        "utilidad" = ROUND(public.fn_calcular_utilidad(v_valor_base, v_costo_total)::numeric, v_decimals)::double precision,
-        "comisionUtilidadPercentage" = public.fn_calcular_porcentaje_comision(
-            public.fn_calcular_utilidad(v_valor_base, v_costo_total),
-            v_valor_base
-        ),
-        "comisionFreelanceValue" = ROUND(public.fn_calcular_valor_comision(v_comision_freelance, v_valor_base)::numeric, v_decimals)::double precision,
-        "comisionPropiaValue" = ROUND(public.fn_calcular_valor_comision(v_comision_propia, v_valor_base)::numeric, v_decimals)::double precision
-    WHERE id = p_id;
-
-    p_mensaje_resultado := 'SUCCESS: Cotización ' || p_id || ' actualizada correctamente.';
-
-    -- Registrar en Auditoría
-    CALL public."spLogRegistrar"(
-        p_acting_user_id, 
-        'QUOTATION', 
-        'UPDATE', 
-        'Se actualizó la cotización con ID ' || p_id, 
-        p_data, 
-        v_quotation_product_id -- Reutilizamos variable para el logId temporal
-    );
-
-EXCEPTION
-    WHEN OTHERS THEN
-        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
-END;
-$procedure$;
-
-
--- Archivo: spCotizacionCrear.sql
-DO $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN 
-        SELECT oid::regprocedure AS proc_name 
-        FROM pg_proc 
-        WHERE proname ILIKE 'spCotizacionCrear'
-    LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
-    END LOOP;
-END $$;
-
-CREATE OR REPLACE PROCEDURE public."spCotizacionCrear"(
-    IN p_data jsonb, 
-    IN p_acting_user_id integer, 
-    INOUT p_quotation_id integer DEFAULT 0, 
-    INOUT p_mensaje_resultado text DEFAULT ''
-)
-LANGUAGE plpgsql
-AS $procedure$
-DECLARE
-    v_internal_number TEXT;
-    v_quotation_id INT;
-    v_item RECORD;
-    v_tax RECORD;
-    v_pax RECORD;
-    v_var RECORD;
-    v_pmt RECORD;
-    v_combo RECORD;
-    v_manual RECORD;
-    v_quotation_product_id INT;
-    -- Variables para validación de campos obligatorios dinámicos
-    v_val_item JSONB;
-    v_val_prod_id INT;
-    v_mandatory_fields JSONB;
-    v_field_key TEXT;
-    v_model TEXT;
-    v_field_name TEXT;
-    v_prod_desc TEXT;
-    v_has_passengers BOOLEAN;
-    v_has_empty_pax_name BOOLEAN;
-    v_has_payments BOOLEAN;
-    v_json_field_name TEXT;
-    -- Variables para validación de variables obligatorias específicas del cliente
-    v_client_id INT;
-    v_client_mandatory_vars JSONB;
-    v_client_var_id_text TEXT;
-    v_req_var_id INT;
-    v_req_var_name TEXT;
-    v_item_json JSONB;
-    v_item_prod_id INT;
-    v_item_prod_desc TEXT;
-    v_has_var BOOLEAN;
-    -- Variables para cálculos financieros
-    v_mostrar_totalizacion BOOLEAN;
-    v_comision_utilidad DOUBLE PRECISION;
-    v_comision_freelance DOUBLE PRECISION;
-    v_comision_propia DOUBLE PRECISION;
-    v_costo_total DOUBLE PRECISION;
-    v_valor_base DOUBLE PRECISION;
-    v_decimals INT;
-    v_acting_user_id INT := NULL;
-BEGIN
-    -- Resolución segura de p_acting_user_id para evitar violación de Quotation_userId_fkey
-    IF p_acting_user_id IS NOT NULL THEN
-        SELECT id INTO v_acting_user_id FROM public."User" WHERE id = p_acting_user_id;
-        IF v_acting_user_id IS NULL AND NULLIF(p_data->>'userEmail', '') IS NOT NULL THEN
-            SELECT id INTO v_acting_user_id FROM public."User" WHERE UPPER(email) = UPPER(p_data->>'userEmail');
-        END IF;
-    END IF;
-
-    IF v_acting_user_id IS NULL THEN
-        SELECT id INTO v_acting_user_id FROM public."User" ORDER BY id ASC LIMIT 1;
-    END IF;
-
-    -- Validaciones
-    IF NULLIF(p_data->>'clientId', '') IS NULL THEN
-        p_mensaje_resultado := 'ERROR: El campo Cliente es obligatorio.';
-        RETURN;
-    END IF;
-
-    IF p_data->'items' IS NULL OR jsonb_array_length(p_data->'items') = 0 THEN
-        p_mensaje_resultado := 'ERROR: La cotización debe tener al menos un producto.';
-        RETURN;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM jsonb_to_recordset(p_data->'items') AS x("productId" INT, "mainTaxId" TEXT)
-        WHERE "productId" IS NULL OR NULLIF("mainTaxId", '') IS NULL
-    ) THEN
-        p_mensaje_resultado := 'ERROR: Todos los productos deben tener un producto y un Cargo Principal seleccionado.';
-        RETURN;
-    END IF;
-
-    -- Validación de campos obligatorios dinámicos por producto
-    FOR v_val_item IN SELECT jsonb_array_elements(p_data->'items')
-    LOOP
-        v_val_prod_id := (v_val_item->>'productId')::INT;
-        
-        SELECT "mandatoryFields", "description" 
-        INTO v_mandatory_fields, v_prod_desc 
-        FROM public."Product" 
-        WHERE id = v_val_prod_id;
-
-        v_prod_desc := COALESCE(v_prod_desc, 'Producto #' || v_val_prod_id);
-
-        IF v_mandatory_fields IS NOT NULL AND jsonb_typeof(v_mandatory_fields) = 'array' THEN
-            FOR v_field_key IN SELECT jsonb_array_elements_text(v_mandatory_fields)
-            LOOP
-                v_model := split_part(v_field_key, '.', 1);
-                v_field_name := split_part(v_field_key, '.', 2);
-
-                IF v_model = 'Quotation' THEN
-                    IF NULLIF(p_data->>v_field_name, '') IS NULL THEN
-                        p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo general "' || v_field_name || '".';
-                        RETURN;
-                    END IF;
-                ELSIF v_model = 'QuotationProduct' THEN
-                    v_json_field_name := v_field_name;
-                    IF v_field_name = 'checkInDate' THEN
-                        v_json_field_name := 'checkIn';
-                    ELSIF v_field_name = 'checkOutDate' THEN
-                        v_json_field_name := 'checkOut';
-                    ELSIF v_field_name = 'description' THEN
-                        v_json_field_name := 'descripcion';
-                    ELSIF v_field_name = 'service' THEN
-                        IF NULLIF(v_val_item->>'service', '') IS NULL AND v_val_item->>'servicios' IS NOT NULL THEN
-                            v_json_field_name := 'servicios';
-                        END IF;
-                    END IF;
-
-                    IF v_field_name = 'passengers' THEN
-                        v_has_passengers := FALSE;
-                        v_has_empty_pax_name := FALSE;
-                        
-                        IF v_val_item->'passengers' IS NOT NULL AND jsonb_typeof(v_val_item->'passengers') = 'array' THEN
-                            SELECT COALESCE(jsonb_array_length(v_val_item->'passengers') > 0, FALSE) INTO v_has_passengers;
-                            SELECT EXISTS (
-                                SELECT 1 FROM jsonb_to_recordset(v_val_item->'passengers') AS p(name TEXT)
-                                WHERE p.name IS NULL OR trim(p.name) = ''
-                            ) INTO v_has_empty_pax_name;
-                        END IF;
-
-                        IF NOT v_has_passengers OR v_has_empty_pax_name THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pasajero con su nombre.';
-                            RETURN;
-                        END IF;
-                    ELSIF v_field_name = 'payments' THEN
-                        v_has_payments := FALSE;
-                        IF v_val_item->'payments' IS NOT NULL AND jsonb_typeof(v_val_item->'payments') = 'array' THEN
-                            SELECT COALESCE(jsonb_array_length(v_val_item->'payments') > 0, FALSE) INTO v_has_payments;
-                        END IF;
-
-                        IF NOT v_has_payments THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere registrar al menos un pago.';
-                            RETURN;
-                        END IF;
-                    ELSE
-                        IF NULLIF(v_val_item->>v_json_field_name, '') IS NULL THEN
-                            p_mensaje_resultado := 'ERROR: El producto "' || v_prod_desc || '" requiere completar el campo "' || v_field_name || '".';
-                            RETURN;
-                        END IF;
-                    END IF;
-                END IF;
-            END LOOP;
-        END IF;
-    END LOOP;
-
-    -- Validación de variables obligatorias específicas del cliente para cotizaciones
-    v_client_id := NULLIF(p_data->>'clientId', '')::INT;
-    IF v_client_id IS NOT NULL THEN
-        SELECT "mandatoryVariables" INTO v_client_mandatory_vars
-        FROM public."Client"
-        WHERE id = v_client_id;
-
-        -- Normalizar variables obligatorias para cotización (soporta formato objeto {"quotation": [...], "invoice": [...]} y legado array [...])
-        IF v_client_mandatory_vars IS NOT NULL THEN
-            IF jsonb_typeof(v_client_mandatory_vars) = 'object' AND v_client_mandatory_vars->'quotation' IS NOT NULL AND jsonb_typeof(v_client_mandatory_vars->'quotation') = 'array' THEN
-                v_client_mandatory_vars := v_client_mandatory_vars->'quotation';
-            ELSIF jsonb_typeof(v_client_mandatory_vars) = 'array' THEN
-                v_client_mandatory_vars := v_client_mandatory_vars;
-            ELSE
-                v_client_mandatory_vars := '[]'::jsonb;
-            END IF;
-        ELSE
-            v_client_mandatory_vars := '[]'::jsonb;
-        END IF;
-
-        IF jsonb_typeof(v_client_mandatory_vars) = 'array' AND jsonb_array_length(v_client_mandatory_vars) > 0 THEN
-            FOR v_client_var_id_text IN SELECT jsonb_array_elements_text(v_client_mandatory_vars)
-            LOOP
-                v_req_var_id := v_client_var_id_text::INT;
-                
-                SELECT "name" INTO v_req_var_name FROM public."MasterVariable" WHERE id = v_req_var_id;
-                v_req_var_name := COALESCE(v_req_var_name, 'Variable #' || v_req_var_id);
-
-                FOR v_item_json IN SELECT jsonb_array_elements(p_data->'items')
-                LOOP
-                    v_item_prod_id := (v_item_json->>'productId')::INT;
-                    SELECT "description" INTO v_item_prod_desc FROM public."Product" WHERE id = v_item_prod_id;
-                    v_item_prod_desc := COALESCE(v_item_prod_desc, 'Producto #' || v_item_prod_id);
-
-                    SELECT EXISTS (
-                        SELECT 1 FROM jsonb_to_recordset(v_item_json->'variables') AS v("masterVariableId" INT, value TEXT)
-                        WHERE v."masterVariableId" = v_req_var_id AND NULLIF(trim(v.value), '') IS NOT NULL
-                    ) INTO v_has_var;
-
-                    IF NOT v_has_var THEN
-                        p_mensaje_resultado := 'ERROR: El cliente requiere completar la variable adicional "' || v_req_var_name || '" en el producto "' || v_item_prod_desc || '".';
-                        RETURN;
-                    END IF;
-                END LOOP;
-            END LOOP;
-        END IF;
-    END IF;
-
-    -- Obtener decimales de la moneda
-    v_decimals := COALESCE(public.fn_obtener_decimales_moneda(p_data->>'currency'), 2);
-
-    v_internal_number := NULLIF(p_data->>'consecutivo', '');
-
-    IF NOT EXISTS (SELECT 1 FROM public."Quotation") THEN
-        PERFORM setval('public."Quotation_id_seq"', 1, false);
-    END IF;
-
-    INSERT INTO public."Quotation" (
-        "internalNumber", "date", "clientId", "currency", "exchangeRate", 
-        "branchId", "implantId", "sellerId", "ticketPrinterId", 
-        "baseCommissionable", "commissionPercentage", "chargesAndTaxes", 
-        "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
-        "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
-    ) VALUES (
-        COALESCE(v_internal_number, 'TEMP_' || gen_random_uuid()::text), CURRENT_TIMESTAMP,
-        (SELECT id FROM public."Client" WHERE id = NULLIF(p_data->>'clientId', '')::INT OR (document IS NOT NULL AND document = p_data->>'clientDocument') LIMIT 1),
-        p_data->>'currency', NULLIF(p_data->>'exchangeRate', '')::FLOAT,
-        COALESCE(
-            (SELECT id FROM public."Branch" WHERE id = NULLIF(p_data->>'branchId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'branchCode')) LIMIT 1),
-            (SELECT id FROM public."Branch" ORDER BY id ASC LIMIT 1)
-        ),
-        (SELECT id FROM public."Implant" WHERE id = NULLIF(p_data->>'implantId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'implantCode')) LIMIT 1),
-        (SELECT id FROM public."Seller" WHERE id = NULLIF(p_data->>'sellerId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'sellerCode')) LIMIT 1),
-        (SELECT id FROM public."TicketPrinter" WHERE id = NULLIF(p_data->>'ticketPrinterId', '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(p_data->>'ticketPrinterCode')) LIMIT 1),
-        0, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::FLOAT, 0), COALESCE(ROUND(NULLIF(p_data->>'chargesAndTaxes', '')::numeric, v_decimals)::double precision, 0),
-        COALESCE(ROUND(NULLIF(p_data->>'totalAmount', '')::numeric, v_decimals)::double precision, 0), v_acting_user_id, 'NUEVO', 'Creación de cotización', CURRENT_TIMESTAMP,
-        p_data->>'destination', 
-        CASE WHEN p_data->>'startDate' IS NOT NULL AND p_data->>'startDate' <> '' THEN (p_data->>'startDate')::TIMESTAMP ELSE NULL END,
-        CASE WHEN p_data->>'endDate' IS NOT NULL AND p_data->>'endDate' <> '' THEN (p_data->>'endDate')::TIMESTAMP ELSE NULL END,
-        p_data->>'passenger',
-        NULLIF(p_data->>'paxAdults', '')::INT,
-        NULLIF(p_data->>'paxChildren', '')::INT,
-        p_data->>'reservationCode',
-        COALESCE(NULLIF(p_data->>'copyFieldsToProducts', '')::BOOLEAN, TRUE),
-        p_data->>'manualDescription'
-    ) RETURNING id INTO v_quotation_id;
-
-    IF v_internal_number IS NULL OR v_internal_number = '' THEN
-        v_internal_number := v_quotation_id::text;
-        UPDATE public."Quotation"
-        SET "internalNumber" = v_internal_number
-        WHERE id = v_quotation_id;
-    END IF;
-
-    -- Insertar historial de estado inicial
-    INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
-    VALUES (v_quotation_id, 'NUEVO', 'Creación de cotización', CURRENT_TIMESTAMP, v_acting_user_id);
-
-    FOR v_combo IN SELECT * FROM jsonb_to_recordset(p_data->'combos') AS x("comboId" INT, "id" INT)
-    LOOP
-        DECLARE
-            v_combo_real_id INT := COALESCE(v_combo."comboId", v_combo.id);
-            v_cupos_disponibles INT;
-            v_combo_name TEXT;
-        BEGIN
-            SELECT "cupos", "name" INTO v_cupos_disponibles, v_combo_name
-            FROM public."Combo" WHERE id = v_combo_real_id;
-
-            IF v_cupos_disponibles IS NOT NULL AND v_cupos_disponibles <= 0 THEN
-                p_mensaje_resultado := 'ERROR: El combo "' || COALESCE(v_combo_name, v_combo_real_id::TEXT) || '" no tiene cupos disponibles.';
-                RETURN;
-            END IF;
-
-            INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
-            VALUES (v_quotation_id, v_combo_real_id);
-
-            -- Descontar 1 cupo
-            UPDATE public."Combo" SET "cupos" = "cupos" - 1 WHERE id = v_combo_real_id;
-        END;
-    END LOOP;
-
-    IF p_data->'manualServices' IS NOT NULL AND jsonb_typeof(p_data->'manualServices') = 'array' THEN
-        FOR v_manual IN SELECT * FROM jsonb_to_recordset(p_data->'manualServices') AS x(
-            "providerName" TEXT, "serviceName" TEXT, "cost" FLOAT, "salePrice" FLOAT, "utility" FLOAT
-        )
-        LOOP
-            INSERT INTO public."QuotationManualService" (
-                "quotationId", "providerName", "serviceName", "cost", "salePrice", "utility"
-            ) VALUES (
-                v_quotation_id, 
-                v_manual."providerName", 
-                v_manual."serviceName", 
-                COALESCE(v_manual."cost", 0), 
-                COALESCE(v_manual."salePrice", 0), 
-                COALESCE(v_manual."utility", COALESCE(v_manual."salePrice", 0) - COALESCE(v_manual."cost", 0))
-            );
-        END LOOP;
-    END IF;
-
-    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_data->'items') AS x(
-                      "productId" INT, "productCode" TEXT, quantity INT, price FLOAT, cost FLOAT, "providerId" TEXT, "prestadoraId" TEXT,
-                      "providerCode" TEXT, "prestadoraCode" TEXT,
-                      "checkIn" TEXT, "checkOut" TEXT, "nights" INT, "mainTaxId" TEXT,
-                      "paxAdults" INT, "paxChildren" INT, "serviceType" TEXT, "destination" TEXT,
-                      "reservationCode" TEXT, "sellerCommission" FLOAT, "ticketPrinterCommission" FLOAT,
-                      "comboId" TEXT, "appliedTaxes" JSONB, "passengers" JSONB, "variables" JSONB, "payments" JSONB, "inNationality" INT,
-                      "service" TEXT, "servicios" TEXT, "descripcion" TEXT, "passenger" TEXT,
-                      "providerDueDate" TEXT, "providerInvoice" TEXT
-                  )
-    LOOP
-        INSERT INTO public."QuotationProduct" (
-            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
-            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
-            "serviceType", "destination", "reservationCode", "sellerCommission", 
-            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger",
-            "providerDueDate", "providerInvoice"
-        ) VALUES (
-            v_quotation_id,
-            COALESCE(
-                (SELECT id FROM public."Product" WHERE id = v_item."productId" OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."productCode")) LIMIT 1),
-                (SELECT id FROM public."Product" ORDER BY id ASC LIMIT 1)
-            ),
-            v_item.quantity, 
-            ROUND(v_item.price::numeric, v_decimals)::double precision, 
-            ROUND(v_item.cost::numeric, v_decimals)::double precision, 
-            (SELECT id FROM public."Provider" WHERE id = NULLIF(v_item."providerId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."providerCode")) LIMIT 1),
-            (SELECT id FROM public."Prestadora" WHERE id = NULLIF(v_item."prestadoraId", '')::INT OR (code IS NOT NULL AND UPPER(code) = UPPER(v_item."prestadoraCode")) LIMIT 1),
-            CASE WHEN v_item."checkIn" IS NOT NULL AND v_item."checkIn" <> '' THEN v_item."checkIn"::TIMESTAMP ELSE NULL END,
-            CASE WHEN v_item."checkOut" IS NOT NULL AND v_item."checkOut" <> '' THEN v_item."checkOut"::TIMESTAMP ELSE NULL END,
-            v_item.nights, v_item."paxAdults", v_item."paxChildren",
-            v_item."serviceType", v_item."destination", v_item."reservationCode", 
-            ROUND(v_item."sellerCommission"::numeric, v_decimals)::double precision,
-            ROUND(v_item."ticketPrinterCommission"::numeric, v_decimals)::double precision, 
-            NULLIF(v_item."comboId", '')::INT, NULLIF(v_item."mainTaxId", '')::INT, COALESCE(v_item."inNationality", 1),
-            COALESCE(v_item."service", v_item."servicios"), COALESCE(v_item."servicios", v_item."service"), v_item."descripcion",
-            v_item."passenger",
-            CASE WHEN v_item."providerDueDate" IS NOT NULL AND v_item."providerDueDate" <> '' THEN v_item."providerDueDate"::TIMESTAMP ELSE NULL END,
-            v_item."providerInvoice"
-        ) RETURNING id INTO v_quotation_product_id;
-
-        IF v_item.passengers IS NOT NULL THEN
-            FOR v_pax IN SELECT * FROM jsonb_to_recordset(v_item.passengers) AS x(name TEXT, document TEXT)
-            LOOP
-                INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-                VALUES (v_quotation_product_id, v_pax.name, COALESCE(v_pax.document, ''));
-            END LOOP;
-        END IF;
-
-        IF v_item."appliedTaxes" IS NOT NULL THEN
-            FOR v_tax IN SELECT * FROM jsonb_to_recordset(v_item."appliedTaxes") AS x("chargeAndTaxId" INT, "explicitAmount" FLOAT)
-            LOOP
-                INSERT INTO public."QuotationProductTax" (
-                    "quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
-                )
-                SELECT v_quotation_product_id, ct.id, ct.value, ct."valueType", 
-                       ROUND(v_tax."explicitAmount"::numeric, v_decimals)::double precision, 
-                       CASE WHEN NULLIF(v_item."mainTaxId", '')::INT = ct.id THEN TRUE ELSE FALSE END
-                FROM public."ChargeAndTax" ct
-                WHERE ct.id = v_tax."chargeAndTaxId";
-            END LOOP;
-        END IF;
-
-        IF v_item.variables IS NOT NULL THEN
-            FOR v_var IN SELECT * FROM jsonb_to_recordset(v_item.variables) AS x("masterVariableId" INT, value TEXT)
-            LOOP
-                INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
-                VALUES (v_quotation_product_id, v_var."masterVariableId", v_var.value);
-            END LOOP;
-        END IF;
-
-        IF v_item.payments IS NOT NULL THEN
-            FOR v_pmt IN SELECT * FROM jsonb_to_recordset(v_item.payments) AS x(
-                "amount" FLOAT, "paymentMethod" TEXT, "date" TEXT, "reference" TEXT,
-                "creditCardId" INT, "cardNumber" TEXT, "authorizationCode" TEXT, "voucher" TEXT, "expirationDate" TEXT
-            )
-            LOOP
-                INSERT INTO public."QuotationProductPayment" (
-                    "quotationProductId", "amount", "paymentMethod", "reference", "date",
-                    "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
-                ) VALUES (
-                    v_quotation_product_id, 
-                    ROUND(v_pmt."amount"::numeric, v_decimals)::double precision, 
-                    v_pmt."paymentMethod", v_pmt."reference",
-                    CASE WHEN v_pmt."date" IS NOT NULL AND v_pmt."date" <> '' THEN v_pmt."date"::TIMESTAMP ELSE CURRENT_TIMESTAMP END,
-                    v_pmt."creditCardId", v_pmt."cardNumber", v_pmt."authorizationCode", v_pmt."voucher", v_pmt."expirationDate"
-                );
-            END LOOP;
-        END IF;
-    END LOOP;
-
-    -- Calcular y actualizar el totalAmount y los nuevos campos financieros
-    SELECT 
-        COALESCE(SUM(qp.cost), 0.0), 
-        COALESCE(SUM(
-            qp.price * qp.quantity + COALESCE((
-                SELECT SUM(qpt2."explicitAmount")
-                FROM public."QuotationProductTax" qpt2
-                JOIN public."ChargeAndTax" ct2 ON ct2.id = qpt2."chargeAndTaxId"
-                LEFT JOIN public."ChargeAndTax" target_ct ON target_ct.id = ct2."targetTaxId"
-                WHERE qpt2."quotationProductId" = qp.id
-                  AND qpt2."isMain" = false
-                  AND ct2."targetTaxId" IS NOT NULL
-                  AND (
-                      target_ct.type = 'PRINCIPAL' OR target_ct."isEditable" = false OR target_ct.code = 'TAR' OR target_ct.name ILIKE '%TARIFA%' OR target_ct.id = qp."mainTaxId"
-                  )
-            ), 0.0)
-        ), 0.0)
-    INTO v_costo_total, v_valor_base
-    FROM public."QuotationProduct" qp
-    WHERE qp."quotationId" = v_quotation_id;
-
-    SELECT COALESCE(value = 'true', FALSE) INTO v_mostrar_totalizacion
-    FROM public."SystemParameter"
-    WHERE code = 'MOSTRAR_TOTALIZACION_COTIZACION';
-
-    v_comision_freelance := COALESCE(NULLIF(p_data->>'comisionFreelancePercentage', '')::DOUBLE PRECISION, 0.0);
-
-    IF v_mostrar_totalizacion THEN
-        v_comision_utilidad := ROUND(public.fn_calcular_porcentaje_comision(public.fn_calcular_utilidad(v_valor_base, v_costo_total), v_valor_base)::NUMERIC, 2)::DOUBLE PRECISION;
-        v_comision_propia := v_comision_utilidad - v_comision_freelance;
-    ELSE
-        v_comision_propia := public.fn_calcular_comision_resta(
-            COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
-            v_comision_freelance
-        );
-    END IF;
-
-    UPDATE public."Quotation"
-    SET 
-        "totalAmount" = COALESCE(
-            NULLIF(p_data->>'totalAmount', '')::DOUBLE PRECISION,
-            ROUND((COALESCE("chargesAndTaxes", 0) + 
-                COALESCE((SELECT SUM(qp.price * qp.quantity) FROM public."QuotationProduct" qp WHERE qp."quotationId" = v_quotation_id), 0.0) +
-                COALESCE((SELECT SUM(qpt."explicitAmount") FROM public."QuotationProductTax" qpt JOIN public."QuotationProduct" qp ON qpt."quotationProductId" = qp.id WHERE qp."quotationId" = v_quotation_id), 0.0)
-            )::numeric, v_decimals)::double precision
-        ),
-        "costoTotal" = ROUND(v_costo_total::numeric, v_decimals)::double precision,
-        "valorBase" = ROUND(v_valor_base::numeric, v_decimals)::double precision,
-        "comisionTotalPercentage" = COALESCE(NULLIF(p_data->>'comisionTotalPercentage', '')::DOUBLE PRECISION, COALESCE(NULLIF(p_data->>'commissionPercentage', '')::DOUBLE PRECISION, 0.0)),
-        "comisionFreelancePercentage" = v_comision_freelance,
-        "comisionPropiaPercentage" = v_comision_propia,
-        "commissionPercentage" = v_comision_propia,
-        "utilidad" = ROUND(public.fn_calcular_utilidad(v_valor_base, v_costo_total)::numeric, v_decimals)::double precision,
-        "comisionUtilidadPercentage" = public.fn_calcular_porcentaje_comision(
-            public.fn_calcular_utilidad(v_valor_base, v_costo_total),
-            v_valor_base
-        ),
-        "comisionFreelanceValue" = ROUND(public.fn_calcular_valor_comision(v_comision_freelance, v_valor_base)::numeric, v_decimals)::double precision,
-        "comisionPropiaValue" = ROUND(public.fn_calcular_valor_comision(v_comision_propia, v_valor_base)::numeric, v_decimals)::double precision
-    WHERE id = v_quotation_id;
-
-    p_quotation_id := v_quotation_id;
-    p_mensaje_resultado := 'SUCCESS: Cotización creada correctamente con ID ' || v_quotation_id;
-
-    -- Registrar en Auditoría
-    CALL public."spLogRegistrar"(
-        v_acting_user_id, 
-        'QUOTATION', 
-        'CREATE', 
-        'Se creó la cotización ' || v_internal_number || ' (ID: ' || v_quotation_id || ')', 
-        p_data, 
-        v_quotation_id -- Reutilizamos variable para el logId temporal
-    );
-
-EXCEPTION
-    WHEN OTHERS THEN
-        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
-END;
-$procedure$;
-
-
--- Archivo: spCotizacionDuplicar.sql
-DO $$
-DECLARE
-    r RECORD;
-BEGIN
-    FOR r IN 
-        SELECT oid::regprocedure AS proc_name 
-        FROM pg_proc 
-        WHERE proname ILIKE 'spCotizacionDuplicar'
-    LOOP
-        EXECUTE 'DROP PROCEDURE ' || r.proc_name || '';
-    END LOOP;
-END $$;
-
-CREATE OR REPLACE PROCEDURE public."spCotizacionDuplicar"(
-    IN p_quotation_id INT,
-    IN p_acting_user_id INT,
-    INOUT p_new_quotation_id INT DEFAULT 0,
-    INOUT p_mensaje_resultado TEXT DEFAULT ''
-)
-LANGUAGE plpgsql
-AS $procedure$
-DECLARE
-    v_internal_number TEXT;
-    v_new_id INT;
-    v_orig_quotation RECORD;
-    v_orig_qp RECORD;
-    v_new_qp_id INT;
-    v_user_id INT := NULL;
-BEGIN
-    -- Validar existencia de la cotización origen
-    SELECT * INTO v_orig_quotation 
-    FROM public."Quotation" 
-    WHERE id = p_quotation_id;
-
-    IF v_orig_quotation.id IS NULL THEN
-        p_mensaje_resultado := 'ERROR: Cotización origen no encontrada (ID ' || p_quotation_id || ').';
-        RETURN;
-    END IF;
-
-    -- Validar si p_acting_user_id existe en la tabla User, de lo contrario usar el de la cotización origen
-    IF p_acting_user_id IS NOT NULL THEN
-        SELECT id INTO v_user_id FROM public."User" WHERE id = p_acting_user_id;
-    END IF;
-
-    IF v_user_id IS NULL THEN
-        v_user_id := v_orig_quotation."userId";
-    END IF;
-
-    -- Generar consecutivo único interno
-    v_internal_number := 'QUO-' || to_char(CURRENT_DATE, 'YYYYMMDD') || '-' || floor(random() * 10000)::text;
-
-    -- Insertar la cabecera duplicada de la cotización
-    INSERT INTO public."Quotation" (
-        "internalNumber", "date", "clientId", "currency", "exchangeRate",
-        "branchId", "implantId", "sellerId", "ticketPrinterId",
-        "baseCommissionable", "commissionPercentage", "chargesAndTaxes",
-        "totalAmount", "userId", "state", "stateDescription", "stateUpdatedAt",
-        "costoTotal", "valorBase", "utilidad", "comisionTotalPercentage",
-        "comisionFreelancePercentage", "comisionFreelanceValue",
-        "comisionPropiaPercentage", "comisionPropiaValue", "comisionUtilidadPercentage",
-        "destination", "startDate", "endDate", "passenger", "paxAdults", "paxChildren",
-        "reservationCode", "copyFieldsToProducts", "manualDescription"
-    ) VALUES (
-        v_internal_number, CURRENT_TIMESTAMP, v_orig_quotation."clientId", v_orig_quotation."currency", v_orig_quotation."exchangeRate",
-        v_orig_quotation."branchId", v_orig_quotation."implantId", v_orig_quotation."sellerId", v_orig_quotation."ticketPrinterId",
-        v_orig_quotation."baseCommissionable", v_orig_quotation."commissionPercentage", v_orig_quotation."chargesAndTaxes",
-        v_orig_quotation."totalAmount", v_user_id, 'NUEVO', 'Copia de cotización #' || p_quotation_id::text, CURRENT_TIMESTAMP,
-        v_orig_quotation."costoTotal", v_orig_quotation."valorBase", v_orig_quotation."utilidad", v_orig_quotation."comisionTotalPercentage",
-        v_orig_quotation."comisionFreelancePercentage", v_orig_quotation."comisionFreelanceValue",
-        v_orig_quotation."comisionPropiaPercentage", v_orig_quotation."comisionPropiaValue", v_orig_quotation."comisionUtilidadPercentage",
-        v_orig_quotation."destination", v_orig_quotation."startDate", v_orig_quotation."endDate", v_orig_quotation."passenger", v_orig_quotation."paxAdults", v_orig_quotation."paxChildren",
-        v_orig_quotation."reservationCode", v_orig_quotation."copyFieldsToProducts", v_orig_quotation."manualDescription"
-    ) RETURNING id INTO v_new_id;
-
-    -- Insertar registro inicial en el historial de estados
-    INSERT INTO public."QuotationStateHistory" ("quotationId", "state", "description", "createdAt", "userId")
-    VALUES (v_new_id, 'NUEVO', 'Copia de cotización #' || p_quotation_id::text, CURRENT_TIMESTAMP, v_user_id);
-
-    -- Duplicar combos asociados
-    INSERT INTO public."QuotationCombo" ("quotationId", "comboId")
-    SELECT v_new_id, "comboId"
-    FROM public."QuotationCombo"
-    WHERE "quotationId" = p_quotation_id;
-
-    -- Duplicar servicios manuales si la tabla existe
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'QuotationManualService') THEN
-        INSERT INTO public."QuotationManualService" ("quotationId", "providerName", "serviceName", "cost", "salePrice", "utility")
-        SELECT v_new_id, "providerName", "serviceName", "cost", "salePrice", "utility"
-        FROM public."QuotationManualService"
-        WHERE "quotationId" = p_quotation_id;
-    END IF;
-
-    -- Duplicar productos y sus detalles
-    FOR v_orig_qp IN 
-        SELECT * FROM public."QuotationProduct" WHERE "quotationId" = p_quotation_id
-    LOOP
-        INSERT INTO public."QuotationProduct" (
-            "quotationId", "productId", "quantity", "price", "cost", "providerId", "prestadoraId",
-            "checkInDate", "checkOutDate", "nights", "paxAdults", "paxChildren",
-            "serviceType", "destination", "reservationCode", "sellerCommission",
-            "ticketPrinterCommission", "comboId", "mainTaxId", "inNationality",
-            "service", "servicios", "descripcion", "passenger",
-            "providerDueDate", "providerInvoice"
-        ) VALUES (
-            v_new_id, v_orig_qp."productId", v_orig_qp."quantity", v_orig_qp."price", v_orig_qp."cost", v_orig_qp."providerId", v_orig_qp."prestadoraId",
-            v_orig_qp."checkInDate", v_orig_qp."checkOutDate", v_orig_qp."nights", v_orig_qp."paxAdults", v_orig_qp."paxChildren",
-            v_orig_qp."serviceType", v_orig_qp."destination", v_orig_qp."reservationCode", v_orig_qp."sellerCommission",
-            v_orig_qp."ticketPrinterCommission", v_orig_qp."comboId", v_orig_qp."mainTaxId", v_orig_qp."inNationality",
-            v_orig_qp."service", v_orig_qp."servicios", v_orig_qp."descripcion", v_orig_qp."passenger",
-            v_orig_qp."providerDueDate", v_orig_qp."providerInvoice"
-        ) RETURNING id INTO v_new_qp_id;
-
-        -- Duplicar Pasajeros del producto
-        INSERT INTO public."QuotationProductPassenger" ("quotationProductId", "name", "document")
-        SELECT v_new_qp_id, "name", "document"
-        FROM public."QuotationProductPassenger"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Impuestos del producto
-        INSERT INTO public."QuotationProductTax" ("quotationProductId", "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain")
-        SELECT v_new_qp_id, "chargeAndTaxId", "valueSnapshot", "valueTypeSnapshot", "explicitAmount", "isMain"
-        FROM public."QuotationProductTax"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Variables del producto
-        INSERT INTO public."QuotationProductVariable" ("quotationProductId", "masterVariableId", "value")
-        SELECT v_new_qp_id, "masterVariableId", "value"
-        FROM public."QuotationProductVariable"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-        -- Duplicar Pagos del producto
-        INSERT INTO public."QuotationProductPayment" ("quotationProductId", "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate")
-        SELECT v_new_qp_id, "amount", "paymentMethod", "reference", "date", "creditCardId", "cardNumber", "authorizationCode", "voucher", "expirationDate"
-        FROM public."QuotationProductPayment"
-        WHERE "quotationProductId" = v_orig_qp.id;
-
-    END LOOP;
-
-    p_new_quotation_id := v_new_id;
-    p_mensaje_resultado := 'SUCCESS: Cotización duplicada correctamente con ID ' || v_new_id;
-
-    -- Registrar en auditoría
-    CALL public."spLogRegistrar"(
-        v_user_id, 
-        'QUOTATION', 
-        'DUPLICATE', 
-        'Se duplicó la cotización #' || p_quotation_id || ' generando la cotización #' || v_new_id || ' (' || v_internal_number || ')', 
-        jsonb_build_object('sourceQuotationId', p_quotation_id, 'newQuotationId', v_new_id), 
-        v_new_id
-    );
-
-EXCEPTION
-    WHEN OTHERS THEN
-        p_mensaje_resultado := 'ERROR: ' || SQLERRM;
-END;
-$procedure$;
-
-
--- Archivo: spSiteModuleMasterToggle.sql
+-- ============================================================================
+-- Procedimiento Almacenado: spSiteModuleMasterToggle.sql
+-- ============================================================================
 DO $$
 DECLARE
     r RECORD;
@@ -22330,5 +22839,4 @@ BEGIN
     END IF;
 END;
 $$;
-
 

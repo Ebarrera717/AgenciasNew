@@ -3643,6 +3643,9 @@ DELETE FROM public."SystemParameter" WHERE code IN ('EnviarFacturasAutoSQLserver
 
 INSERT INTO public."SystemParameter" (code, name, value) VALUES ('PERMITIR_COTIZACION_SIN_PRODUCTOS', 'Permitir Cotizaciones sin Productos (Solo Cliente/Origen)', '1') ON CONFLICT (code) DO NOTHING;
 
+-- Control de envío de Tipos de Facturación de Hoteles hacia Zeus ERP (1 = Sí, 0 = No)
+INSERT INTO public."SystemParameter" (code, name, value) VALUES ('EnviarTiposFacturacionHotelesZeus', 'Enviar Tipos de Facturación de Hoteles a Zeus ERP (1: Sí, 0: No)', '1') ON CONFLICT (code) DO NOTHING;
+
 -- Parametrización dinámica de información enviada a Zeus (Descripción de Ítems y Observaciones)
 INSERT INTO public."SystemParameter" ("code", "name", "value") 
 VALUES ('ZeusItemDescriptionConfig', 'Parametrización Descripción Ítems Zeus ERP', '{"separator":" - ","fields":[{"id":"descripcion_manual","name":"Descripción Manual","enabled":true,"order":1,"label":"Servicio"},{"id":"fecha_inicial","name":"Fecha inicial","enabled":true,"order":2,"label":"Desde"},{"id":"fecha_final","name":"Fecha final","enabled":true,"order":3,"label":"Hasta"},{"id":"proveedor","name":"Proveedor","enabled":true,"order":4,"label":"Proveedor"},{"id":"prestador","name":"Prestador","enabled":false,"order":5,"label":"Prestador"},{"id":"nacionalidad","name":"Nacionalidad","enabled":true,"order":6,"label":"Nacionalidad"},{"id":"numero_cotizacion","name":"Número de cotización","enabled":false,"order":7,"label":"Cotización"},{"id":"pasajero","name":"Nombre del pasajero","enabled":false,"order":8,"label":"Pasajero"},{"id":"destino","name":"Destino","enabled":false,"order":9,"label":"Destino"},{"id":"reservacion","name":"Código de Reserva","enabled":false,"order":10,"label":"Reserva"}]}') 
